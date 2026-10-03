@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<phpunit bootstrap="bootstrap.php" colors="true">
+  <testsuites>
+    <testsuite name="Masha Feedly">
+      <directory>Unit</directory>
+      <directory>Functional</directory>
+    </testsuite>
+  </testsuites>
+</phpunit>

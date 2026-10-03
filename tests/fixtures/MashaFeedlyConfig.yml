@@ -1,0 +1,13 @@
+SilverStripe\Security\Member:
+  allowed:
+    FirstName: Erika
+    Surname: Muster
+    Email: allowed@example.test
+  notAllowed:
+    FirstName: Max
+    Surname: Beispiel
+    Email: not-allowed@example.test
+  normalize:
+    FirstName: Test
+    Surname: Normalisierung
+    Email: normalize@example.test

@@ -1,0 +1,21 @@
+{
+  "name": "kooperativeweb/masha-feedly",
+  "description": "Masha-Feedly-Einträge und Kommentare für Silverstripe CMS",
+  "type": "silverstripe-vendormodule",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.3",
+    "silverstripe/framework": "^6.2"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11.3"
+  },
+  "autoload": {
+    "psr-4": {
+      "KW\\MashaFeedly\\": "src/"
+    }
+  },
+  "extra": {
+    "expose": ["client/dist"]
+  }
+}

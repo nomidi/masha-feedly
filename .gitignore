@@ -1,0 +1,10 @@
+# Lokale Zugangsdaten und Umgebungsdateien
+/.env
+/.env.*
+!/.env.example
+/tests/e2e/.env.e2e
+
+# Lokale Test- und Composer-Artefakte
+/tests/.phpunit.result.cache
+/vendor/
+/composer.lock

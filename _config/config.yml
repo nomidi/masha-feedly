@@ -1,0 +1,33 @@
+---
+Name: kw-masha-feedly
+---
+SilverStripe\Control\Controller:
+  extensions:
+    - KW\MashaFeedly\Extension\MashaFeedlyWidgetExtension
+
+SilverStripe\Control\Director:
+  rules:
+    '__masha-feedly': 'KW\MashaFeedly\Control\MashaFeedlyEntryController'
+    '__masha-feedly-comment': 'KW\MashaFeedly\Control\MashaFeedlyCommentController'
+
+KW\MashaFeedly\Control\MashaFeedlyEntryController:
+  allowed_actions:
+    savedViews: true
+    saveView: true
+    deleteView: true
+
+SilverStripe\SiteConfig\SiteConfig:
+  extensions:
+    - KW\MashaFeedly\Extension\MashaFeedlyConfigExtension
+
+SilverStripe\Security\Member:
+  extensions:
+    - KW\MashaFeedly\Extension\MashaFeedlyMemberExtension
+
+SilverStripe\Assets\File:
+  extensions:
+    - KW\MashaFeedly\Extension\MashaFeedlyProfileImageExtension
+
+SilverStripe\Admin\LeftAndMain:
+  extensions:
+    - KW\MashaFeedly\Extension\MashaFeedlyAdminAssetsExtension

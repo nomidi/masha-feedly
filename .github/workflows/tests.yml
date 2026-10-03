@@ -1,0 +1,67 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  javascript:
+    name: JavaScript-Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: JavaScript-Tests ausführen
+        run: node --test tests/javascript/*.test.cjs
+
+  php:
+    name: PHP-Tests
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: masha_feedly_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      SS_ENVIRONMENT_TYPE: dev
+      SS_DATABASE_CLASS: MySQLDatabase
+      SS_DATABASE_SERVER: 127.0.0.1
+      SS_DATABASE_NAME: masha_feedly_test
+      SS_DATABASE_USERNAME: root
+      SS_DATABASE_PASSWORD: ''
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: PHP und Erweiterungen einrichten
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: curl, gd, intl, mbstring, mysqli, pdo_mysql, xml, zip
+          coverage: none
+
+      - name: Composer-Abhängigkeiten installieren
+        run: composer install --no-interaction --prefer-dist
+
+      - name: PHP-Unit- und Funktionstests ausführen
+        run: vendor/bin/phpunit -c tests/phpunit.xml.dist
+        env:
+          SS_PHPUNIT_FLUSH: '1'
