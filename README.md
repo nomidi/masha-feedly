@@ -7,17 +7,23 @@ Masha:Feedly ergänzt SilverStripe CMS um einen gemeinsamen Fehler- und Feedback
 - [Benutzung auf Deutsch](docs/de/README.md)
 - [Usage in English](docs/en/README.md)
 
-## Composer-Installation
+## Installation
 
-Das Paket ist als Silverstripe-Vendormodul angelegt. In einem Silverstripe-Projekt kann es direkt aus diesem GitHub-Repository installiert werden:
+Im Silverstripe-Projektverzeichnis ausführen:
+
+```sh
+composer require kooperativeweb/masha-feedly
+sake dev/build flush=1
+```
+
+## Installation aus GitHub
+
+Bis die Version auf Packagist verfügbar ist, kann das Paket direkt aus GitHub installiert werden. Dafür in der `composer.json` des Silverstripe-Projekts ein VCS-Repository ergänzen und die Entwicklungsversion anfordern:
 
 ```json
 {
   "repositories": [
-    {
-      "type": "vcs",
-      "url": "https://github.com/nomidi/masha-feedly"
-    }
+    { "type": "vcs", "url": "https://github.com/nomidi/masha-feedly" }
   ],
   "require": {
     "kooperativeweb/masha-feedly": "dev-main"
@@ -25,11 +31,11 @@ Das Paket ist als Silverstripe-Vendormodul angelegt. In einem Silverstripe-Proje
 }
 ```
 
-Danach im Projektverzeichnis ausführen:
+Anschließend ausführen:
 
 ```sh
 composer update kooperativeweb/masha-feedly
-vendor/bin/sake dev/build flush=1
+sake dev/build flush=1
 ```
 
 ## Anforderungen
