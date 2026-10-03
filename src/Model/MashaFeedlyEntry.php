@@ -179,15 +179,16 @@ class MashaFeedlyEntry extends DataObject
         $member = Security::getCurrentUser();
         if ($this->isInDB() && $member instanceof Member && MashaFeedlyConfigExtension::canUse($member)) {
             MashaFeedlyEntryRead::markAsSeen($this, $member);
-            $unreadCounts = MashaFeedlyEntryRead::unreadCounts($member);
+            $unreadCount = MashaFeedlyEntryRead::unreadCount($member);
+            $feedbackCount = \KW\MashaFeedly\Admin\MashaFeedlyAdmin::menuFeedbackCount();
             $fields->addFieldToTab(
                 'Root.Main',
                 LiteralField::create(
                     'MashaFeedlyUnreadMarker',
-                    '<span hidden data-masha-feedly-unread-general-count="'
-                        . $unreadCounts['general']
-                        . '" data-masha-feedly-unread-personal-count="'
-                        . $unreadCounts['personal'] . '"></span>'
+                    '<span hidden data-masha-feedly-unread-count="'
+                        . $unreadCount
+                        . '" data-masha-feedly-feedback-count="'
+                        . $feedbackCount . '"></span>'
                 )
             );
         }

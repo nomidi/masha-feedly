@@ -63,7 +63,14 @@ class MashaFeedlyAdmin extends ModelAdmin
         'deleteCategory',
     ];
 
-    /** Ergänzt die Menübezeichnung um die ungelesene Anzahl des aktuellen Mitglieds. */
+    /** Liefert die Anzahl offener Einträge in der Feedback-Kategorie. */
+    public static function menuFeedbackCount(): int
+    {
+        $category = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first();
+        return $category && !$category->IsClosed ? $category->Entries()->count() : 0;
+    }
+
+    /** Ergänzt die Menübezeichnung um neue Einträge und ausstehendes Feedback. */
     public static function menu_title($class = null, $localise = true)
     {
         $title = parent::menu_title($class, $localise);
@@ -76,10 +83,10 @@ class MashaFeedlyAdmin extends ModelAdmin
             return $title;
         }
 
-        $unreadCounts = MashaFeedlyEntryRead::unreadCounts($member);
-        $totalUnread = $unreadCounts['general'] + $unreadCounts['personal'];
-        return $totalUnread > 0
-            ? $title . ' (' . $unreadCounts['general'] . '/' . $unreadCounts['personal'] . ')'
+        $totalUnread = MashaFeedlyEntryRead::unreadCount($member);
+        $feedbackCount = self::menuFeedbackCount();
+        return $totalUnread > 0 || $feedbackCount > 0
+            ? $title . ' (' . $totalUnread . '/' . $feedbackCount . ')'
             : $title;
     }
 
@@ -137,6 +144,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                     );
                 }
                 Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly-admin.css');
+                Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly.css');
                 Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-admin.js');
             }
             return $form;
@@ -248,13 +256,11 @@ class MashaFeedlyAdmin extends ModelAdmin
         }
 
         $member = Security::getCurrentUser();
-        $unreadCounts = $member instanceof Member
-            ? MashaFeedlyEntryRead::unreadCounts($member)
-            : ['general' => 0, 'personal' => 0];
+        $unreadCount = $member instanceof Member ? MashaFeedlyEntryRead::unreadCount($member) : 0;
         return $this->jsonResponse([
             'success' => true,
-            'unreadGeneralCount' => $unreadCounts['general'],
-            'unreadPersonalCount' => $unreadCounts['personal'],
+            'unreadCount' => $unreadCount,
+            'feedbackCount' => self::menuFeedbackCount(),
         ]);
     }
 
@@ -378,9 +384,8 @@ class MashaFeedlyAdmin extends ModelAdmin
         $canManageCategories = $member instanceof Member && Permission::checkMember($member, 'ADMIN');
         $adminTranslations = [];
         foreach ([
-            'MENU_GENERAL_UNREAD' => '{count} neue Einträge für alle',
-            'MENU_PERSONAL_UNREAD_DU' => '{count} neue Einträge für dich',
-            'MENU_PERSONAL_UNREAD_SIE' => '{count} neue Einträge für Sie',
+            'MENU_NEW_COUNT' => '{count} neue Einträge',
+            'MENU_FEEDBACK_COUNT' => '{count} warten auf Feedback',
             'BOARD_SAVING' => 'Änderung wird gespeichert …',
             'BOARD_SAVE_ERROR' => 'Speichern fehlgeschlagen.',
             'BOARD_SAVE_SUCCESS' => 'Eintrag wurde gespeichert.',
@@ -404,6 +409,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             'BOARD_ENTRY_SAVING' => 'Eintrag wird gespeichert …',
             'BOARD_ENTRY_SAVE_ERROR' => 'Eintrag konnte nicht gespeichert werden.',
             'BOARD_ENTRY_SAVE_SUCCESS' => 'Eintrag wurde gespeichert.',
+            'BOARD_ENTRY_UPLOAD_HINT' => 'Bilder, PDFs oder ZIP-Dateien auswählen',
         ] as $key => $default) {
             $adminTranslations[$key] = self::translate($key, $default);
         }
@@ -431,8 +437,8 @@ class MashaFeedlyAdmin extends ModelAdmin
         $html .= '<header class="masha-feedly-board__header"><div><h2>' . self::translate('BOARD_HEADER', 'Einträge nach Kategorie') . '</h2>'
             . '<p>' . self::translate('BOARD_HELP', 'Ziehe Einträge in andere Kategorien. Admins können Kategorien am Griff sortieren und eigene leere Kategorien löschen.') . '</p></div>'
             . '<div class="masha-feedly-board__header-actions">';
-        $html .= '<button type="button" class="btn btn-primary masha-feedly-board__action-button masha-feedly-board__action-button--entry" data-open-entry-form aria-haspopup="dialog">'
-            . self::translate('BOARD_CREATE_ENTRY', 'Eintrag hinzufügen') . '</button>';
+        //$html .= '<button type="button" class="btn btn-primary masha-feedly-board__action-button masha-feedly-board__action-button--entry" data-open-entry-form aria-haspopup="dialog">'
+        //    . self::translate('BOARD_CREATE_ENTRY', 'Eintrag hinzufügen') . '</button>';
         if ($canManageCategories) {
             $html .= '<button type="button" class="btn btn-default masha-feedly-board__action-button masha-feedly-board__action-button--category" data-open-category-form aria-haspopup="dialog">'
                 . self::translate('BOARD_CATEGORY_ADD', 'Kategorie hinzufügen') . '</button>';
@@ -459,23 +465,26 @@ class MashaFeedlyAdmin extends ModelAdmin
         $priorities = MashaFeedlyPriority::get()->sort('Sort ASC, Title ASC');
         $defaultCategoryID = (int)MashaFeedlyCategory::defaultCategory()->ID;
         $defaultPriorityID = (int)MashaFeedlyPriority::defaultPriority()->ID;
-        $html .= '<div class="masha-feedly-board__modal" data-entry-modal hidden="hidden">'
-            . '<section class="masha-feedly-board__dialog masha-feedly-board__entry-dialog" role="dialog" aria-modal="true" aria-labelledby="masha-feedly-create-title">'
-            . '<header class="masha-feedly-board__dialog-header"><div><span class="masha-feedly-board__eyebrow">'
+        $html .= '<div class="masha-feedly-board__modal kw-masha-feedly__modal kw-masha-feedly__create-modal" data-entry-modal hidden="hidden">'
+            . '<section class="masha-feedly-board__dialog masha-feedly-board__entry-dialog kw-masha-feedly__dialog" role="dialog" aria-modal="true" aria-labelledby="masha-feedly-create-title">'
+            . '<header class="masha-feedly-board__dialog-header kw-masha-feedly__dialog-header"><div><span class="masha-feedly-board__eyebrow kw-masha-feedly__eyebrow">'
             . self::translate('BOARD_CREATE_ENTRY_EYEBROW', 'NEUER EINTRAG') . '</span><h2 id="masha-feedly-create-title">'
             . self::translate('BOARD_CREATE_ENTRY_TITLE', 'Eintrag hinzufügen') . '</h2></div>'
-            . '<button type="button" class="masha-feedly-board__dialog-close" data-close-entry-modal aria-label="'
+            . '<button type="button" class="masha-feedly-board__dialog-close kw-masha-feedly__close" data-close-entry-modal aria-label="'
             . $this->escapeBoardValue(self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen')) . '">×</button></header>'
-            . '<form class="masha-feedly-board__entry-form" data-admin-create-entry-form data-create-url="'
+            . '<form class="masha-feedly-board__entry-form kw-masha-feedly__create-form" data-admin-create-entry-form data-create-url="'
             . $this->escapeBoardValue(Controller::join_links(Director::baseURL(), '__masha-feedly', 'createEntry'))
             . '" data-security-id="' . $this->escapeBoardValue((string)SecurityToken::getSecurityID()) . '">'
             . '<label for="MashaFeedlyAdminEntryContent">' . self::translate('BOARD_ENTRY_DESCRIPTION', 'Beschreibung')
             . '<textarea id="MashaFeedlyAdminEntryContent" name="Content" rows="5" maxlength="10000" required placeholder="'
             . $this->escapeBoardValue(self::translate('BOARD_ENTRY_PLACEHOLDER', 'Beschreibe den Fehler oder Hinweis …')) . '"></textarea></label>'
-            . '<label class="masha-feedly-board__upload"><span>' . self::translate('BOARD_ENTRY_ATTACHMENTS', 'Dateien anhängen')
-            . '</span><input type="file" name="Attachments[]" multiple accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,application/zip,.jpg,.jpeg,.png,.gif,.webp,.pdf,.zip">'
-            . '<small>' . self::translate('BOARD_ENTRY_UPLOAD_LIMIT', 'Bilder, PDFs oder ZIP-Dateien · max. 10 MB je Datei') . '</small></label>'
-            . '<div class="masha-feedly-board__entry-fields"><label>' . self::translate('BOARD_ENTRY_STATUS', 'Status')
+            . '<label class="masha-feedly-board__upload kw-masha-feedly__attachment-field">'
+            . '<svg class="kw-masha-feedly__upload-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M22 13a1 1 0 0 0-1 1v4.213A2.79 2.79 0 0 1 18.213 21H5.787A2.79 2.79 0 0 1 3 18.213V14a1 1 0 0 0-2 0v4.213A4.792 4.792 0 0 0 5.787 23H18.213A4.792 4.792 0 0 0 23 18.213V14a1 1 0 0 0-1-1zM6.707 8.707 11 4.414V17a1 1 0 0 0 2 0V4.414l4.293 4.293a1 1 0 0 0 1.414-1.414l-6-6a1 1 0 0 0-1.414 0l-6 6a1 1 0 0 0 1.414 1.414z"/></svg>'
+            . '<span class="kw-masha-feedly__attachment-title">' . self::translate('BOARD_ENTRY_ATTACHMENTS', 'Dateien anhängen') . '</span>'
+            . '<span class="kw-masha-feedly__attachment-hint">' . self::translate('BOARD_ENTRY_UPLOAD_HINT', 'Bilder, PDFs oder ZIP-Dateien auswählen') . '</span>'
+            . '<input type="file" name="Attachments[]" multiple accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,application/zip,.jpg,.jpeg,.png,.gif,.webp,.pdf,.zip">'
+            . '<small>' . self::translate('BOARD_ENTRY_UPLOAD_LIMIT', 'Maximal 10 MB pro Datei, 20 MB insgesamt') . '</small></label>'
+            . '<div class="masha-feedly-board__entry-fields kw-masha-feedly__form-grid"><label>' . self::translate('BOARD_ENTRY_STATUS', 'Status')
             . '<select name="CategoryID">';
         foreach ($categories as $category) {
             $html .= '<option value="' . (int)$category->ID . '"'
@@ -492,17 +501,23 @@ class MashaFeedlyAdmin extends ModelAdmin
             . '<input type="datetime-local" name="EntryDate"></label></div>';
         $allowedMemberIDs = MashaFeedlyConfigExtension::memberIDs();
         if ($allowedMemberIDs) {
-            $html .= '<fieldset class="masha-feedly-board__entry-assignees"><legend>'
+            $html .= '<fieldset class="masha-feedly-board__entry-assignees kw-masha-feedly__assignees"><legend>'
                 . self::translate('BOARD_ENTRY_ASSIGNEES', 'Verantwortlich') . '</legend><div>';
             foreach (Member::get()->filter('ID', $allowedMemberIDs)->sort('Surname ASC, FirstName ASC') as $assignee) {
-                $html .= '<label><input type="checkbox" name="AssignedMemberIDs[]" value="' . (int)$assignee->ID . '">'
-                    . '<span>' . $this->escapeBoardValue((string)$assignee->getName()) . '</span></label>';
+                $name = (string)$assignee->getName();
+                $imageURL = $this->memberProfileImageURL($assignee);
+                $html .= '<label class="kw-masha-feedly__assignee-choice" title="' . $this->escapeBoardValue($name) . '">'
+                    . '<input type="checkbox" name="AssignedMemberIDs[]" value="' . (int)$assignee->ID . '">'
+                    . '<span class="kw-masha-feedly__assignee-avatar" style="background-color: '
+                    . $this->escapeBoardValue((string)$assignee->getMashaFeedlyDisplayColor()) . '" aria-label="' . $this->escapeBoardValue($name) . '">'
+                    . ($imageURL !== '' ? '<img src="' . $this->escapeBoardValue($imageURL) . '" alt="" loading="lazy">' : $this->escapeBoardValue((string)$assignee->getMashaFeedlyInitials()))
+                    . '</span><span class="kw-masha-feedly__assignee-name">' . $this->escapeBoardValue($name) . '</span></label>';
             }
             $html .= '</div></fieldset>';
         }
-        $html .= '<p class="masha-feedly-board__dialog-status" data-entry-form-status role="status" aria-live="polite"></p>'
-            . '<footer class="masha-feedly-board__dialog-actions"><button type="button" class="btn btn-default" data-close-entry-modal>'
-            . self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen') . '</button><button type="submit" class="btn btn-primary">'
+        $html .= '<p class="masha-feedly-board__dialog-status kw-masha-feedly__form-status" data-entry-form-status role="status" aria-live="polite"></p>'
+            . '<footer class="masha-feedly-board__dialog-actions kw-masha-feedly__dialog-actions"><button type="button" class="btn btn-default kw-masha-feedly__secondary" data-close-entry-modal>'
+            . self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen') . '</button><button type="submit" class="btn btn-primary kw-masha-feedly__submit">'
             . self::translate('BOARD_CREATE_ENTRY', 'Eintrag hinzufügen') . '</button></footer></form></section></div>';
         $unreadEntryIDs = $member instanceof Member
             ? MashaFeedlyEntryRead::unreadEntryIDs($member)
@@ -550,11 +565,6 @@ class MashaFeedlyAdmin extends ModelAdmin
             $html .= '</header>';
             $html .= '<div class="masha-feedly-board__list" data-category-id="' . (int)$category->ID . '">';
             foreach ($entries as $entry) {
-                $description = trim(preg_replace('/\s+/u', ' ', html_entity_decode(
-                    strip_tags((string)$entry->Content),
-                    ENT_QUOTES | ENT_HTML5,
-                    'UTF-8'
-                )) ?? '');
                 $assignedEntryMemberIDs = array_map('intval', $entry->AssignedMembers()->column('ID'));
                 $isUnread = in_array((int)$entry->ID, $unreadEntryIDs, true);
                 $isPersonallyAssigned = $member instanceof Member
@@ -564,32 +574,8 @@ class MashaFeedlyAdmin extends ModelAdmin
                     . (int)$entry->ID . '" data-entry-unread="'
                     . ($isUnread ? 'true' : 'false')
                     . '" data-assigned-member-ids="' . $this->escapeBoardValue(implode(',', $assignedEntryMemberIDs))
-                    . '"><span class="masha-feedly-board__drag-handle" draggable="true"'
-                    . ' title="' . $this->escapeBoardValue(self::translate('BOARD_DRAG_TITLE', 'Zum Sortieren ziehen')) . '" aria-label="' . $this->escapeBoardValue(self::translate('BOARD_DRAG_ARIA', 'Eintrag sortieren')) . '">⠿</span>'
-                    . '<div class="masha-feedly-board__card-heading">';
-                if ($isUnread) {
-                    $unreadLabel = $isPersonallyAssigned
-                        ? self::translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'BOARD_NEW_FOR_SIE' : 'BOARD_NEW_FOR_DU', 'Neue Aktivität für dich')
-                        : self::translate('BOARD_NEW_FOR_ALL', 'Neue Aktivität für alle');
-                    $unreadStyle = $isPersonallyAssigned ? 'personal' : 'general';
-                    $html .= '<span class="masha-feedly-board__new-indicator masha-feedly-board__new-indicator--'
-                        . $unreadStyle . '" aria-label="' . $unreadLabel . '" title="' . $unreadLabel . '">'
-                        . '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
-                        . '<path d="M12 2.5 14.4 9.6 21.5 12l-7.1 2.4L12 21.5l-2.4-7.1L2.5 12l7.1-2.4z"/>'
-                        . '</svg><span>' . self::translate('BOARD_NEW', 'Aktivität') . '</span></span>';
-                }
-                $frontendEntryURL = $this->frontendEntryURL($entry);
-                if ($frontendEntryURL !== '') {
-                    $html .= '<a href="' . $this->escapeBoardValue($frontendEntryURL)
-                        . '" target="_blank" rel="noopener noreferrer">';
-                } else {
-                    $html .= '<span class="masha-feedly-board__entry-title">';
-                }
-                $html .= $this->escapeBoardValue($entry->getTitle() ?: self::translate('BOARD_ENTRY_NO_DESCRIPTION', 'Eintrag ohne Beschreibung'));
-                $html .= $frontendEntryURL !== '' ? '</a></div>' : '</span></div>';
-                if ($description !== '') {
-                    $html .= '<p>' . $this->escapeBoardValue(mb_strimwidth($description, 0, 180, '…')) . '</p>';
-                }
+                    . '"><div class="masha-feedly-board__card-topline"><span class="masha-feedly-board__entry-number">#'
+                    . (int)$entry->ID . '</span>';
                 $priority = $entry->Priority();
                 if ($priority->exists()) {
                     $html .= '<span class="masha-feedly-board__priority" style="--masha-feedly-priority-color:'
@@ -598,7 +584,16 @@ class MashaFeedlyAdmin extends ModelAdmin
                         . $this->escapeBoardValue((string)$priority->Title) . '">'
                         . $priority->getIconSVG() . '</span>';
                 }
-                $html .= '<time>' . $this->escapeBoardValue((string)$entry->dbObject('EntryDate')->Nice()) . '</time>';
+                if ($isUnread) {
+                    $unreadLabel = $isPersonallyAssigned
+                        ? self::translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'BOARD_NEW_FOR_SIE' : 'BOARD_NEW_FOR_DU', 'Neue Aktivität für dich')
+                        : self::translate('BOARD_NEW_FOR_ALL', 'Neue Aktivität für alle');
+                    $html .= '<span class="masha-feedly-board__new-indicator" aria-label="' . $unreadLabel . '" title="' . $unreadLabel . '">'
+                        . '<svg class="masha-feedly-board__new-icon" viewBox="0 0 177800 177800" aria-hidden="true" focusable="false">'
+                        . '<path fill="#48b02c" d="m91116 1296 7525 13368c395 700 1026 1138 1819 1263 793 124 1529-96 2119-640l11286-10389c695-639 1611-839 2508-546 896 291 1520 992 1706 1916l3026 15039c159 787 623 1400 1339 1763 715 365 1482 381 2212 47l13945-6391c859-394 1791-302 2554 255 763 554 1140 1413 1030 2348l-1769 15238c-93 799 159 1524 728 2092 568 567 1293 820 2091 726l15237-1769c937-108 1796 269 2350 1032s647 1695 255 2553l-6392 13944c-335 730-318 1499 46 2214 365 715 977 1180 1763 1338l15040 3026c925 186 1624 809 1916 1707 291 897 91 1813-547 2506l-10388 11287c-544 592-766 1326-642 2120 126 793 565 1424 1265 1817l13368 7525c821 463 1294 1273 1294 2217 0 943-473 1752-1294 2214l-13368 7525c-700 395-1140 1024-1265 1819-124 793 98 1529 642 2119l10388 11286c638 694 838 1611 545 2508-291 896-991 1520-1914 1706l-15040 3026c-788 159-1399 621-1764 1338-365 716-380 1483-45 2213l6391 13945c393 857 300 1791-255 2554-554 761-1413 1138-2349 1030l-15237-1769c-798-93-1524 159-2092 727s-820 1294-727 2092l1769 15237c108 936-269 1795-1032 2349-761 554-1695 647-2552 255l-13945-6391c-730-335-1499-318-2213 45-717 365-1181 978-1338 1766l-3026 15038c-186 923-811 1623-1706 1914-897 293-1814 93-2508-545l-11286-10388c-590-544-1326-766-2119-642-795 126-1424 565-1819 1266l-7525 13367c-462 821-1271 1292-2214 1294-944 0-1754-473-2217-1294l-7525-13367c-393-700-1024-1140-1817-1264-794-126-1528 96-2120 641l-11285 10387c-694 638-1610 838-2506 547-898-292-1523-991-1709-1916l-3026-15040c-158-786-623-1398-1338-1763-715-364-1484-381-2214-46l-13944 6391c-858 393-1790 300-2553-254s-1140-1413-1032-2350l1769-15237c94-798-160-1523-726-2091-568-569-1293-821-2092-728l-15238 1769c-937 110-1794-269-2350-1030-554-764-647-1698-253-2556l6391-13943c334-730 316-1497-47-2213-365-717-976-1179-1764-1338l-15038-3026c-925-186-1625-810-1916-1706-293-898-92-1816 548-2509l10387-11285c544-590 764-1326 640-2119-125-795-565-1424-1265-1819l-13366-7525c-821-462-1294-1271-1296-2214 0-944 473-1754 1296-2217l13366-7525c700-393 1139-1024 1265-1818 124-793-96-1527-640-2119l-10389-11285c-639-694-839-1610-548-2508 292-898 993-1521 1918-1707l15039-3026c787-159 1398-623 1763-1338 363-716 381-1484 47-2214l-6391-13944c-394-858-302-1792 253-2554 554-763 1413-1140 2350-1031l15238 1769c797 94 1522-160 2090-728s822-1293 728-2090l-1769-15238c-109-937 268-1796 1031-2350 762-555 1696-647 2554-253l13944 6391c730 334 1498 316 2212-47 717-365 1181-976 1340-1763l3026-15039c186-925 809-1626 1706-1918 898-291 1814-90 2507 548l11287 10389c592 544 1326 764 2119 640 793-126 1425-563 1818-1263l7525-13368c463-823 1272-1296 2217-1296 943 2 1752 475 2214 1296z"/>'
+                        . '<path fill="#fff" d="m43403 112710-5400-30623 6018-1062 16142 18239-3606-20449 5747-1014 5399 30625-6211 1095-15864-17796 3521 19972zm32326-5700-5400-30623 22702-4004 915 5184-16522 2913 1197 6788 15373-2711 910 5155-15373 2711 1469 8334 17105-3015 910 5163zm34364-6059-12709-29335 6325-1116 8330 20220 1888-22020 7352-1298 9139 20444 927-22219 6224-1098-2035 31936-6561 1157-10133-21820-2045 23967z"/>'
+                        . '</svg></span>';
+                }
                 $assignedMembers = $entry->AssignedMembers()->sort('Surname ASC, FirstName ASC');
                 if ($assignedMembers->exists()) {
                     $html .= '<div class="masha-feedly-board__assignees" aria-label="' . $this->escapeBoardValue(self::translate('BOARD_ASSIGNED_MEMBERS', 'Zugeordnete Mitglieder')) . '">';
@@ -620,7 +615,21 @@ class MashaFeedlyAdmin extends ModelAdmin
                     }
                     $html .= '</div>';
                 }
-                $html .= '</article>';
+                $html .= '<span class="masha-feedly-board__drag-handle" draggable="true"'
+                    . ' title="' . $this->escapeBoardValue(self::translate('BOARD_DRAG_TITLE', 'Zum Sortieren ziehen')) . '" aria-label="' . $this->escapeBoardValue(self::translate('BOARD_DRAG_ARIA', 'Eintrag sortieren')) . '">⠿</span>'
+                    . '</div><div class="masha-feedly-board__card-heading">';
+                $frontendEntryURL = $this->frontendEntryURL($entry);
+                if ($frontendEntryURL !== '') {
+                    $html .= '<a href="' . $this->escapeBoardValue($frontendEntryURL)
+                        . '" target="_blank" rel="noopener noreferrer">';
+                } else {
+                    $html .= '<span class="masha-feedly-board__entry-title">';
+                }
+                $html .= $this->escapeBoardValue($entry->getTitle() ?: self::translate('BOARD_ENTRY_NO_DESCRIPTION', 'Eintrag ohne Beschreibung'));
+                $html .= $frontendEntryURL !== '' ? '</a></div>' : '</span></div>';
+                $html .= '<time class="masha-feedly-board__card-date" datetime="'
+                    . $this->escapeBoardValue((string)$entry->EntryDate) . '">'
+                    . $this->escapeBoardValue((string)$entry->dbObject('EntryDate')->Nice()) . '</time></article>';
             }
             $html .= '</div></section>';
         }

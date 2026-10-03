@@ -150,7 +150,30 @@ class MashaFeedlyEntryReadTest extends SapphireTest
         $this->assertSame(['general' => 0, 'personal' => 0], MashaFeedlyEntryRead::unreadCounts($firstMember));
         $this->assertSame(['general' => 0, 'personal' => 1], MashaFeedlyEntryRead::unreadCounts($secondMember));
         Security::setCurrentUser($secondMember);
-        $this->assertSame('Masha:Feedly (0/1)', MashaFeedlyAdmin::menu_title());
+        $this->assertSame('Masha:Feedly (1/0)', MashaFeedlyAdmin::menu_title());
+        Security::setCurrentUser(null);
+    }
+
+    /** Prüft, dass der CMS-Menüpunkt neue Einträge und offene Feedback-Fälle separat zählt. */
+    public function testMenuTitleShowsUnreadAndFeedbackCounts(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMembers([$member]);
+        MashaFeedlyCategory::ensureDefaultCategories();
+        $feedback = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first();
+        $this->assertNotNull($feedback);
+
+        $entry = MashaFeedlyEntry::create([
+            'Content' => 'Wartet auf Feedback',
+            'CategoryID' => (int)$feedback->ID,
+        ]);
+        $entry->write();
+        Security::setCurrentUser($member);
+
+        $this->assertSame(
+            sprintf('Masha:Feedly (%d/1)', MashaFeedlyEntryRead::unreadCount($member)),
+            MashaFeedlyAdmin::menu_title()
+        );
         Security::setCurrentUser(null);
     }
 

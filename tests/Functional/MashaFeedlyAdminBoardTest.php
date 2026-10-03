@@ -6,10 +6,12 @@ use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
+use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
 use SilverStripe\Dev\FunctionalTest;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\SecurityToken;
+use SilverStripe\Security\Security;
 
 /**
  * Prüft die Kategorienübersicht und die geschützte Sortieraktion im Masha-Feedly-Admin.
@@ -47,24 +49,23 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         }
         $this->assertStringContainsString('Ein Inhalt', $body);
         $this->assertStringContainsString('masha-feedly-board__priority', $body);
+        $this->assertStringContainsString('masha-feedly-board__entry-number">#', $body);
+        $this->assertStringContainsString('masha-feedly-board__card-topline', $body);
+        $this->assertStringContainsString('masha-feedly-board__card-date', $body);
+        $this->assertStringNotContainsString('masha-feedly-board__entry-status', $body);
+        $this->assertDoesNotMatchRegularExpression('/masha-feedly-board__priority-label/', $body);
+        $this->assertMatchesRegularExpression(
+            '/masha-feedly-board__card-topline[\\s\\S]*?masha-feedly-board__entry-number[\\s\\S]*?masha-feedly-board__priority[\\s\\S]*?masha-feedly-board__new-indicator[\\s\\S]*?masha-feedly-board__drag-handle[\\s\\S]*?masha-feedly-board__card-heading[\\s\\S]*?masha-feedly-board__card-date/',
+            $body,
+            'Jede Karte zeigt ID, Priorität, Neu-Icon und Ziehgriff oben, Titel danach und das Datum darunter.'
+        );
         $this->assertStringContainsString('aria-label="Normal"', $body);
         $this->assertStringContainsString('viewBox="0 0 24 24"', $body);
         $this->assertStringContainsString('data-masha-feedly-board', $body);
         $this->assertStringContainsString('data-admin-translations=', $body);
         $this->assertStringContainsString('draggable="true"', $body);
         $this->assertStringContainsString('masha-feedly-admin.js', $body);
-        $this->assertStringContainsString('data-open-entry-form', $body);
-        $this->assertStringContainsString('data-entry-modal hidden="hidden"', $body);
-        $this->assertStringContainsString('data-admin-create-entry-form', $body);
-        $this->assertStringContainsString('data-create-url="/__masha-feedly/createEntry"', $body);
-        $this->assertStringContainsString('name="Content"', $body);
-        $this->assertStringContainsString('name="CategoryID"', $body);
-        $this->assertStringContainsString('name="PriorityID"', $body);
-        $this->assertMatchesRegularExpression(
-            '/<button type="button" class="btn btn-primary masha-feedly-board__action-button masha-feedly-board__action-button--entry" data-open-entry-form[^>]*>Eintrag hinzufügen<\\/button>/',
-            $body,
-            'Das Eingabeformular für neue Einträge muss als Dialog im CMS geöffnet werden.'
-        );
+        $this->assertStringNotContainsString('data-open-entry-form', $body);
         $this->assertStringNotContainsString('masha-feedly-create=1', $body);
         $this->assertStringNotContainsString('/item/new', $body);
         $this->assertStringContainsString('masha-feedly-board__drag-handle', $body);
@@ -74,7 +75,13 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             strpos($body, 'masha-feedly-board__filters')
         );
         $this->assertStringContainsString('Alle Einträge', $body);
-        $this->assertStringContainsString('masha-feedly-board__new-indicator--general', $body);
+        $this->assertStringNotContainsString('masha-feedly-board__new-indicator--general', $body);
+        $this->assertStringNotContainsString('masha-feedly-board__new-indicator--personal', $body);
+        $this->assertStringNotContainsString('>Neu<', $body);
+        $this->assertStringContainsString('masha-feedly-board__new-icon', $body);
+        $this->assertStringContainsString('viewBox="0 0 177800 177800"', $body);
+        $this->assertStringContainsString('fill="#fff" d="m43403 112710', $body);
+        $this->assertStringNotContainsString('>Aktivität</span>', $body);
         $this->assertStringContainsString('Neue Aktivität für alle', $body);
         $this->assertStringContainsString('<svg viewBox="0 0 24 24" aria-hidden="true"', $body);
         $this->assertStringContainsString('Nicht zugeordnet', $body);
@@ -90,6 +97,50 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             . '#formular" target="_blank" rel="noopener noreferrer">Ein Inhalt</a>',
             $body,
             'Der Titel muss die Originalseite mit Eintragskennung in einem neuen, abgesicherten Tab öffnen.'
+        );
+    }
+
+    /** Stellt sicher, dass CMS-Neu-Markierungen mit dem Website-Zähler desselben Admins übereinstimmen. */
+    public function testAdminBoardNewBadgesMatchWebsiteUnreadCount(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $member = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $member);
+
+        $unreadIDs = MashaFeedlyEntryRead::unreadEntryIDs($member);
+        $unreadCounts = MashaFeedlyEntryRead::unreadCounts($member);
+        $this->assertSame(
+            count($unreadIDs),
+            $unreadCounts['general'] + $unreadCounts['personal'],
+            'Die getrennten CMS-Zähler müssen alle ungelesenen Einträge enthalten.'
+        );
+        $websiteResponse = $this->get('/__masha-feedly/listEntries?mode=all');
+        $websiteData = json_decode($websiteResponse->getBody(), true);
+        $this->assertIsArray($websiteData);
+        $this->assertSame(count($unreadIDs), (int)$websiteData['unreadCount']);
+
+        $boardResponse = $this->get('/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry');
+        $body = str_replace(['\\u003C', '\\u003E', '\\u0022'], ['<', '>', '"'], $boardResponse->getBody());
+        if ($unreadIDs) {
+            $this->assertMatchesRegularExpression(
+                '/class="masha-feedly-board__new-icon" viewBox="0 0 177800 177800"[\s\S]*?fill="#48b02c"[\s\S]*?fill="#fff"/',
+                $body,
+                'Ungelesene Karten müssen das Icon zeigen; die verständliche Beschriftung bleibt im Screenreader-Titel.'
+            );
+            $this->assertStringNotContainsString('>Neu</span>', $body);
+            $this->assertStringNotContainsString('>New</span>', $body);
+        }
+        foreach ($unreadIDs as $entryID) {
+            $this->assertMatchesRegularExpression(
+                '/data-entry-id="' . (int)$entryID . '" data-entry-unread="true"/',
+                $body,
+                'Jeder ungelesene Eintrag muss im CMS als neu markiert sein.'
+            );
+        }
+        $this->assertSame(
+            count($unreadIDs),
+            preg_match_all('/<span class="masha-feedly-board__new-indicator"/', $body),
+            'Die Zahl der Neu-Markierungen muss dem Website-Zähler entsprechen.'
         );
     }
 
@@ -400,7 +451,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertSame(2, preg_match_all('/class="masha-feedly-board__assignee"/', $body));
         $this->assertStringNotContainsString('Zugewiesen an', $body);
         $this->assertStringNotContainsString('<span>' . $firstMember->getName() . '</span></span>', $body);
-        $this->assertStringContainsString('masha-feedly-board__new-indicator--personal', $body);
+        $this->assertStringContainsString('class="masha-feedly-board__new-indicator"', $body);
+        $this->assertStringNotContainsString('masha-feedly-board__new-indicator--personal', $body);
+        $this->assertStringNotContainsString('>Neu</span>', $body);
         $this->assertStringContainsString('Neue Aktivität für dich', $body);
     }
 

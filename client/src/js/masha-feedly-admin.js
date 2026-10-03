@@ -35,7 +35,7 @@
     return message;
   };
   /** Aktualisiert den Zähler des Masha-Feedly-Menüpunkts für das aktuelle Mitglied. */
-  const updateUnreadMenuCount = (generalCount, personalCount) => {
+  const updateUnreadMenuCount = (newCount, feedbackCount) => {
     const menuLink = [...document.querySelectorAll('#cms-menu a[href*="masha-feedly"]')][0];
     const title = menuLink?.querySelector('.text');
     if (!title) return;
@@ -56,20 +56,17 @@
       if (badge.textContent !== String(count)) badge.textContent = String(count);
       if (badge.getAttribute('aria-label') !== label) badge.setAttribute('aria-label', label);
     };
-    updateBadge('general', generalCount, t('MENU_GENERAL_UNREAD', { count: generalCount }));
-    const personalKey = window.KWMashaFeedlyTranslations?.FORMAL_ADDRESS === 'sie'
-      ? 'MENU_PERSONAL_UNREAD_SIE'
-      : 'MENU_PERSONAL_UNREAD_DU';
-    updateBadge('personal', personalCount, t(personalKey, { count: personalCount }));
+    updateBadge('new', newCount, t('MENU_NEW_COUNT', { count: newCount }));
+    updateBadge('feedback', feedbackCount, t('MENU_FEEDBACK_COUNT', { count: feedbackCount }));
   };
 
   /** Übernimmt den vom Server gelieferten individuellen Zähler aus dem Eintragsformular. */
   const refreshUnreadMenuCount = () => {
-    const marker = document.querySelector('[data-masha-feedly-unread-general-count]');
+    const marker = document.querySelector('[data-masha-feedly-unread-count]');
     if (marker) {
       updateUnreadMenuCount(
-        Number(marker.dataset.mashaFeedlyUnreadGeneralCount || 0),
-        Number(marker.dataset.mashaFeedlyUnreadPersonalCount || 0)
+        Number(marker.dataset.mashaFeedlyUnreadCount || 0),
+        Number(marker.dataset.mashaFeedlyFeedbackCount || 0)
       );
       return;
     }
@@ -417,8 +414,8 @@
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || t('BOARD_SAVE_ERROR'));
-      if (Number.isFinite(Number(result.unreadGeneralCount))) {
-        updateUnreadMenuCount(Number(result.unreadGeneralCount), Number(result.unreadPersonalCount || 0));
+      if (Number.isFinite(Number(result.unreadCount))) {
+        updateUnreadMenuCount(Number(result.unreadCount), Number(result.feedbackCount || 0));
       }
       board.querySelectorAll('.masha-feedly-board__column').forEach((column) => {
         const columnList = column.querySelector('.masha-feedly-board__list');

@@ -31,24 +31,24 @@
     justify-content: center;
     margin-left: 0.3rem;
     padding: 0 0.35rem;
-    border: 1px solid #e6c34f;
+    border: 1px solid #b8dfb3;
     border-radius: 999px;
-    background: #fff2b8;
-    color: #624b00;
+    background: #eaf8e8;
+    color: #286b25;
     font-size: 0.72rem;
     font-weight: 700;
     line-height: 1;
     box-shadow: 0 1px 2px #27233112;
   }
 
-  .masha-feedly-menu__badge--general {
+  .masha-feedly-menu__badge--new {
     margin-left: auto;
   }
 
-  .masha-feedly-menu__badge--personal {
-    border-color: #e8a2c5;
-    background: #fde7f2;
-    color: #8a2456;
+  .masha-feedly-menu__badge--feedback {
+    border-color: #cbb9ee;
+    background: #f1edfb;
+    color: #57408d;
   }
 }
 
@@ -327,7 +327,7 @@
   &__card {
     position: relative;
     margin-bottom: 0.65rem;
-    padding: 0.85rem 2.5rem 0.85rem 0.85rem;
+    padding: 0.75rem 0.85rem;
     border: 1px solid #e8e5eb;
     border-radius: 0.6rem;
     background: #fff;
@@ -352,24 +352,64 @@
       }
     }
 
-    &-heading {
-      display: flex;
-      align-items: flex-start;
-      gap: 0.5rem;
-      min-width: 0;
+  }
+
+  &__card-topline {
+    display: flex;
+    min-height: 1.7rem;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+
+  &__card-heading {
+    min-width: 0;
+    margin-top: 0.4rem;
+    line-height: 1.35;
+
+    a,
+    .masha-feedly-board__entry-title {
+      display: -webkit-box;
+      overflow: hidden;
+      color: #272331;
+      font-weight: 700;
+      text-decoration: none;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow-wrap: anywhere;
     }
 
-    p {
-      margin: 0.5rem 0;
-      color: #686270;
-      font-size: 0.9rem;
-      line-height: 1.4;
-    }
+    a:hover { color: #c9006d; text-decoration: underline; }
+  }
 
-    time {
-      color: #77717f;
-      font-size: 0.78rem;
-    }
+  &__entry-number {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    min-height: 1.45rem;
+    padding: 0 0.45rem;
+    border: 1px solid #e8e2eb;
+    border-radius: 999px;
+    background: #f7f5f8;
+    color: #706978;
+    font-size: 0.72rem;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__card-date {
+    display: block;
+    margin-top: 0.3rem;
+    color: #77717f;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__priority-label {
+    margin-left: -0.35rem;
+    color: #5e5865;
+    font-size: 0.75rem;
+    font-weight: 650;
   }
 
   &__priority {
@@ -378,7 +418,7 @@
     justify-content: center;
     width: 1.35rem;
     height: 1.35rem;
-    margin: .35rem 0;
+    margin: 0;
     color: var(--masha-feedly-priority-color, #64748b);
   }
 
@@ -389,39 +429,47 @@
     display: inline-flex;
     flex: 0 0 auto;
     align-items: center;
-    gap: 0.25rem;
-    margin-top: 0.05rem;
-    padding: 0.18rem 0.45rem 0.18rem 0.35rem;
-    border: 1px solid #e6c34f;
-    border-radius: 999px;
-    background: #fff2b8;
-    color: #624b00;
-    font-size: 0.68rem;
-    font-weight: 750;
-    line-height: 1.2;
-    white-space: nowrap;
+    justify-content: center;
+    width: 1.55rem;
+    height: 1.55rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    line-height: 1;
 
     svg {
-      width: 0.85rem;
-      height: 0.85rem;
-      fill: currentColor;
+      width: 100%;
+      height: 100%;
     }
 
-    &--personal {
-      border-color: #e8a2c5;
-      background: #fde7f2;
-      color: #8a2456;
+    .masha-feedly-board__new-icon {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+
+      path:first-child { fill: #48b02c; }
+      path:last-child { fill: #fff; }
     }
+
   }
 
   &__drag-handle {
-    position: absolute;
-    top: 0.65rem;
-    right: 0.7rem;
+    display: inline-grid;
+    width: 1.7rem;
+    height: 1.7rem;
+    flex: 0 0 auto;
+    place-items: center;
+    margin-left: 0.15rem;
+    border-radius: 0.4rem;
     color: #8a8491;
     cursor: grab;
     font-size: 1.2rem;
     line-height: 1;
+
+    &:hover { background: #f7f3f8; }
+    &:focus-visible { outline: 2px solid #e6007e; outline-offset: 2px; }
 
     &:hover {
       color: #c9006d;
@@ -430,17 +478,15 @@
 
   &__assignees {
     display: flex;
-    position: absolute;
-    right: -0.35rem;
-    bottom: -0.45rem;
-    z-index: 1;
+    position: static;
     align-items: center;
+    margin-left: auto;
   }
 
   &__assignee {
     display: inline-grid;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 1.8rem;
+    height: 1.8rem;
     overflow: hidden;
     place-items: center;
     margin-left: -0.45rem;
@@ -479,6 +525,8 @@
     font-size: 0.875rem;
   }
 }
+
+.masha-feedly-board .kw-masha-feedly__modal { z-index: 100000; }
 
 @media (max-width: 700px) {
   .masha-feedly-board {

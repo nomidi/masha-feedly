@@ -8,6 +8,31 @@ const vm = require('node:vm');
 const sourcePath = path.resolve(__dirname, '../../client/src/js/masha-feedly-admin.js');
 const source = fs.readFileSync(sourcePath, 'utf8');
 
+test('zeigt im CMS-Board das grüne Neu-Icon statt eines Aktivität-Sterns', () => {
+  const renderer = fs.readFileSync(path.resolve(__dirname, '../../src/Admin/MashaFeedlyAdmin.php'), 'utf8');
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
+  assert.match(renderer, /class="masha-feedly-board__new-icon" viewBox="0 0 177800 177800"[\s\S]*?fill="#48b02c"[\s\S]*?fill="#fff"/);
+  assert.doesNotMatch(renderer, /masha-feedly-board__new-indicator--(?:general|personal)/);
+  assert.doesNotMatch(renderer, /<\/svg><span>.*BOARD_NEW/);
+  assert.doesNotMatch(styles, /&__new-indicator\s*\{[^}]*background:\s*#(?:fff2b8|fde7f2)/);
+  assert.doesNotMatch(styles, /&--personal\s*\{[^}]*background:\s*#fde7f2/);
+  assert.doesNotMatch(renderer, /M12 2\.5 14\.4 9\.6 21\.5 12/);
+  assert.match(styles, /\.masha-feedly-board__new-icon[\s\S]*?path:first-child \{ fill: #48b02c; \}[\s\S]*?path:last-child \{ fill: #fff; \}/);
+});
+
+test('ordnet Admin-Karten als Kopfzeile, Titel-Auszug und Datum darunter an', () => {
+  const renderer = fs.readFileSync(path.resolve(__dirname, '../../src/Admin/MashaFeedlyAdmin.php'), 'utf8');
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
+  assert.match(
+    renderer,
+    /card-topline[\s\S]*?entry-number[\s\S]*?board__priority[\s\S]*?new-indicator[\s\S]*?drag-handle[\s\S]*?card-heading[\s\S]*?card-date/
+  );
+  assert.match(styles, /&__card-topline\s*\{[\s\S]*?display: flex/);
+  assert.match(styles, /&__card-heading\s*\{[\s\S]*?-webkit-line-clamp: 2/);
+  assert.match(styles, /&__card-date\s*\{[\s\S]*?display: block/);
+  assert.doesNotMatch(renderer, /masha-feedly-board__card-metadata/);
+});
+
 /** Simuliert die Klassen eines DOM-Elements für die isolierten Board-Tests. */
 class TestClassList {
   constructor() {
@@ -160,13 +185,13 @@ class TestElement {
     }
     this.children.push(element);
     element.parentElement = this;
-    if (element.classList.contains('masha-feedly-menu__badge--general')) {
+    if (element.classList.contains('masha-feedly-menu__badge--new')) {
       this.badges ??= {};
-      this.badges.general = element;
+      this.badges.new = element;
     }
-    if (element.classList.contains('masha-feedly-menu__badge--personal')) {
+    if (element.classList.contains('masha-feedly-menu__badge--feedback')) {
       this.badges ??= {};
-      this.badges.personal = element;
+      this.badges.feedback = element;
     }
     this.updateSiblings();
   }
@@ -194,7 +219,7 @@ class TestElement {
 function createBoardEnvironment(fetchImplementation = async () => ({
   ok: true,
   json: async () => ({ success: true }),
-  }), unreadGeneralCount = null, hasBoard = true, serverMenuTitle = null, unreadPersonalCount = 0, formalAddress = 'du', confirmImplementation = () => true, documentReadyState = 'complete', includeGlobalTranslator = true) {
+  }), unreadCount = null, hasBoard = true, serverMenuTitle = null, feedbackCount = 0, formalAddress = 'du', confirmImplementation = () => true, documentReadyState = 'complete', includeGlobalTranslator = true) {
   const board = new TestElement('board', {
     moveUrl: '/move-entry',
     moveCategoryUrl: '/move-category',
@@ -203,9 +228,8 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     createEntryUrl: '/__masha-feedly/createEntry',
     securityId: 'csrf-test-token',
     adminTranslations: JSON.stringify({
-      MENU_GENERAL_UNREAD: '{count} neue Einträge für alle',
-      MENU_PERSONAL_UNREAD_DU: '{count} neue Einträge für dich',
-      MENU_PERSONAL_UNREAD_SIE: '{count} neue Einträge für Sie',
+      MENU_NEW_COUNT: '{count} neue Einträge',
+      MENU_FEEDBACK_COUNT: '{count} warten auf Feedback',
       BOARD_CATEGORY_DRAG_ARIA: 'Kategorie sortieren',
       BOARD_CATEGORY_DRAG_TITLE: 'Kategorie zum Sortieren ziehen',
       BOARD_CATEGORY_DELETE: 'Leere Kategorie löschen',
@@ -272,9 +296,9 @@ function createBoardEnvironment(fetchImplementation = async () => ({
   }
 
   const menuTitle = {
-    value: serverMenuTitle ?? (unreadGeneralCount === null
+    value: serverMenuTitle ?? (unreadCount === null
       ? 'Masha:Feedly'
-      : `Masha:Feedly (${unreadGeneralCount}/${unreadPersonalCount})`),
+      : `Masha:Feedly (${unreadCount}/${feedbackCount})`),
   };
   let titleWrites = 0;
   Object.defineProperty(menuTitle, 'textContent', {
@@ -287,10 +311,10 @@ function createBoardEnvironment(fetchImplementation = async () => ({
   });
   const menuLink = new TestElement('menu-link');
   menuLink.textElement = menuTitle;
-  const marker = unreadGeneralCount === null ? null : {
+  const marker = unreadCount === null ? null : {
     dataset: {
-      mashaFeedlyUnreadGeneralCount: String(unreadGeneralCount),
-      mashaFeedlyUnreadPersonalCount: String(unreadPersonalCount),
+      mashaFeedlyUnreadCount: String(unreadCount),
+      mashaFeedlyFeedbackCount: String(feedbackCount),
     },
   };
   let boardAvailable = hasBoard;
@@ -300,7 +324,7 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     readyState: documentReadyState,
     addEventListener: (name, callback) => { documentListeners[name] = callback; },
     querySelector: (selector) => {
-      if (selector === '[data-masha-feedly-unread-general-count]') return marker;
+      if (selector === '[data-masha-feedly-unread-count]') return marker;
       if (selector === '[data-masha-feedly-board]') return boardAvailable ? board : null;
       return null;
     },
@@ -317,9 +341,8 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     disconnect() {}
   }
   const dictionary = {
-    MENU_GENERAL_UNREAD: '{count} neue Einträge für alle',
-    MENU_PERSONAL_UNREAD_DU: '{count} neue Einträge für dich',
-    MENU_PERSONAL_UNREAD_SIE: '{count} neue Einträge für Sie',
+    MENU_NEW_COUNT: '{count} neue Einträge',
+    MENU_FEEDBACK_COUNT: '{count} warten auf Feedback',
     BOARD_SAVING: 'Änderung wird gespeichert …',
     BOARD_SAVE_ERROR: 'Speichern fehlgeschlagen.',
     BOARD_SAVE_SUCCESS: 'Eintrag wurde gespeichert.',
@@ -374,51 +397,46 @@ function createBoardEnvironment(fetchImplementation = async () => ({
   };
 }
 
-test('zeigt die Menü-Badge an, ohne den MutationObserver in eine Aktualisierungsschleife zu schicken', () => {
-  const { menuTitle, menuLink, triggerMutation, titleWrites } = createBoardEnvironment(async () => ({}), 3);
+test('zeigt Zähler für neue Einträge und Feedback ohne MutationObserver-Schleife', () => {
+  const { menuTitle, menuLink, triggerMutation, titleWrites } = createBoardEnvironment(async () => ({}), 3, true, null, 2);
 
   assert.equal(menuTitle.textContent, 'Masha:Feedly');
-  assert.equal(menuLink.badges.general.textContent, '3');
-  assert.equal(menuLink.badges.general.attributes['aria-label'], '3 neue Einträge für alle');
+  assert.equal(menuLink.badges.new.textContent, '3');
+  assert.equal(menuLink.badges.new.attributes['aria-label'], '3 neue Einträge');
+  assert.equal(menuLink.badges.feedback.textContent, '2');
+  assert.equal(menuLink.badges.feedback.attributes['aria-label'], '2 warten auf Feedback');
   const writesAfterInitialBadge = titleWrites();
-  const badgeWritesAfterInitialRender = menuLink.badges.general.textContentMutationCount;
+  const badgeWritesAfterInitialRender = menuLink.badges.new.textContentMutationCount;
   triggerMutation();
   triggerMutation();
   assert.equal(titleWrites(), writesAfterInitialBadge);
-  assert.equal(menuLink.badges.general.textContentMutationCount, badgeWritesAfterInitialRender);
+  assert.equal(menuLink.badges.new.textContentMutationCount, badgeWritesAfterInitialRender);
 });
 
-test('zeigt die Menü-Badge auch auf anderen CMS-Seiten ohne Masha-Feedly-Board', () => {
+test('zeigt beide Menü-Zähler auch auf anderen CMS-Seiten ohne Masha-Feedly-Board', () => {
   const { menuTitle, menuLink } = createBoardEnvironment(async () => ({}), null, false, 'Masha:Feedly (4/2)');
 
-  assert.equal(menuLink.badges?.general?.textContent, '4');
-  assert.equal(menuLink.badges?.personal?.textContent, '2');
+  assert.equal(menuLink.badges?.new?.textContent, '4');
+  assert.equal(menuLink.badges?.feedback?.textContent, '2');
   assert.equal(menuTitle.textContent, 'Masha:Feedly');
 });
 
-test('kennzeichnet persönlich zugeordnete neue Einträge mit einer eigenen Badge', () => {
+test('entfernt den Neu-Zähler bei null und lässt ausstehendes Feedback stehen', () => {
   const { menuLink } = createBoardEnvironment(async () => ({}), 0, true, null, 2);
-
-  assert.equal(menuLink.badges?.general ?? null, null);
-  assert.equal(menuLink.badges.personal.textContent, '2');
-  assert.equal(menuLink.badges.personal.classList.contains('masha-feedly-menu__badge--personal'), true);
-  assert.equal(menuLink.badges.personal.attributes['aria-label'], '2 neue Einträge für dich');
+  assert.equal(menuLink.badges?.new ?? null, null);
+  assert.equal(menuLink.badges.feedback.textContent, '2');
 });
 
-test('verwendet die konfigurierte Sie-Anrede in der persönlichen Menü-Badge', () => {
-  const { menuLink } = createBoardEnvironment(async () => ({}), 0, true, null, 2, 'sie');
-  assert.equal(menuLink.badges.personal.attributes['aria-label'], '2 neue Einträge für Sie');
-});
-
-test('entfernt die gelbe Menü-Badge, sobald keine Einträge mehr ungelesen sind', () => {
+test('zeigt keine Menü-Zähler, wenn weder Neuigkeiten noch Feedback offen sind', () => {
   const { menuLink } = createBoardEnvironment(async () => ({}), 0);
-  assert.equal(menuLink.badges?.general ?? null, null);
+  assert.equal(menuLink.badges?.new ?? null, null);
+  assert.equal(menuLink.badges?.feedback ?? null, null);
 });
 
 test('blendet die Menü-Badge nach dem Lesen des letzten Eintrags aus', async () => {
   const { board, menuLink } = createBoardEnvironment(async () => ({
     ok: true,
-    json: async () => ({ success: true, unreadGeneralCount: 0, unreadPersonalCount: 0 }),
+    json: async () => ({ success: true, unreadCount: 0, feedbackCount: 0 }),
   }), 1);
   const list = new TestElement('list', { categoryId: '1' });
   const card = new TestElement('card', { entryId: '42' });
@@ -427,7 +445,7 @@ test('blendet die Menü-Badge nach dem Lesen des letzten Eintrags aus', async ()
   startDragging(board, card);
   await board.listeners.drop({ target: list, preventDefault() {} });
 
-  assert.equal(menuLink.badges?.general ?? null, null);
+  assert.equal(menuLink.badges?.new ?? null, null);
 });
 
 test('filtert das Board nach nicht zugeordneten und ausgewählten persönlichen Einträgen', () => {
@@ -530,7 +548,7 @@ test('sendet beim Verschieben Kategorie und Reihenfolge und macht die Karte wied
   const { board, formDataInstances, menuTitle, menuLink } = createBoardEnvironment(async (url, options) => {
     requestURL = url;
     requestOptions = options;
-    return { ok: true, json: async () => ({ success: true, unreadGeneralCount: 2, unreadPersonalCount: 1 }) };
+    return { ok: true, json: async () => ({ success: true, unreadCount: 2, feedbackCount: 1 }) };
   });
   const sourceList = new TestElement('list', { categoryId: '1' });
   const targetList = new TestElement('list', { categoryId: '2' });
@@ -556,8 +574,8 @@ test('sendet beim Verschieben Kategorie und Reihenfolge und macht die Karte wied
   assert.equal(card.classList.contains('is-dragging'), false);
   assert.equal(board.status.textContent, 'Eintrag wurde gespeichert.');
   assert.equal(menuTitle.textContent, 'Masha:Feedly');
-  assert.equal(menuLink.badges.general.textContent, '2');
-  assert.equal(menuLink.badges.personal.textContent, '1');
+  assert.equal(menuLink.badges.new.textContent, '2');
+  assert.equal(menuLink.badges.feedback.textContent, '1');
 });
 
 test('stellt die Karte nach einem fehlgeschlagenen Verschieben in der Ursprungskategorie wieder her', async () => {
