@@ -1261,6 +1261,45 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__actions > .kw-masha-feedly__feedback-button strong,
 .kw-masha-feedly__actions > .kw-masha-feedly__closed-button strong { position: absolute; top: -5px; right: -5px; min-width: 20px; width: auto; height: 20px; padding: 0 4px; font-size: 11px; }
 .kw-masha-feedly__help-button { width: 48px; min-width: 48px; height: 48px; min-height: 48px; flex-basis: 48px; margin-top: 12px; }
+
+.kw-masha-feedly__hover-tooltip {
+  position: fixed;
+  z-index: 2147483647;
+  display: block;
+  width: max-content;
+  max-width: min(18rem, calc(100vw - 1rem));
+  max-height: min(40vh, 9rem);
+  box-sizing: border-box;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0.72rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.9rem;
+  background: linear-gradient(145deg, #382638, #241d2b);
+  color: #fff;
+  box-shadow: 0 0.8rem 2rem rgba(28, 16, 32, 0.35), 0 0 0 1px rgba(37, 23, 40, 0.12);
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(0.25rem) scale(0.97);
+  transform-origin: center;
+  transition: opacity 150ms ease, transform 180ms cubic-bezier(.2, .8, .2, 1), visibility 180ms;
+}
+.kw-masha-feedly__hover-tooltip[hidden] { display: none !important; }
+.kw-masha-feedly__hover-tooltip.is-visible { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
+.kw-masha-feedly__hover-tooltip::after { position: absolute; width: 0; height: 0; border: 7px solid transparent; content: ''; }
+.kw-masha-feedly__hover-tooltip.is-left::after { top: 50%; right: -14px; border-left-color: #2a202f; transform: translateY(-50%); }
+.kw-masha-feedly__hover-tooltip.is-right::after { top: 50%; left: -14px; border-right-color: #322436; transform: translateY(-50%); }
+.kw-masha-feedly__hover-tooltip.is-above::after { bottom: -14px; left: 50%; border-top-color: #2a202f; transform: translateX(-50%); }
+.kw-masha-feedly__hover-tooltip.is-below::after { top: -14px; left: 50%; border-bottom-color: #382638; transform: translateX(-50%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-masha-feedly__hover-tooltip { transition-duration: 0.01ms !important; }
+}
 @media (max-width: 40rem) {
   .kw-masha-feedly { --kw-feedly-panel-width: clamp(64px, 18vw, 76px); }
   .kw-masha-feedly[data-success-visible="true"] { --kw-feedly-panel-width: clamp(64px, 18vw, 76px); }
