@@ -32,7 +32,7 @@ function setup(enabled = '1', fetchResult = { ok: true, json: async () => ({ suc
     '[data-masha-feedly-onboarding-tip]', '[data-masha-feedly-onboarding-text]', '[data-masha-feedly-selection-message]',
     '[data-masha-feedly-tour-cancel]', '[data-masha-feedly-cancel-selection]',
     '[data-masha-feedly-restart-onboarding]', '[data-masha-feedly-restart-status]', '[data-masha-feedly-help-modal]',
-    '[data-masha-feedly-modal]', '[data-masha-feedly-onboarding-thanks]', '[data-masha-feedly-thanks-close]',
+    '[data-masha-feedly-modal]', '[data-masha-feedly-entry-form]', '[data-masha-feedly-onboarding-thanks]', '[data-masha-feedly-thanks-close]',
     '[data-masha-feedly-comment-form]', '[data-masha-feedly-edit-form]', '[data-masha-feedly-close-edit]',
   ]) nodes.set(selector, new Element({}, selector));
   const widget = new Element({ onboardingEnabled: enabled, onboardingUrl: '/complete', onboardingRestartUrl: '/restart', securityId: 'csrf' });
@@ -46,9 +46,14 @@ function setup(enabled = '1', fetchResult = { ok: true, json: async () => ({ suc
     ['panel help', null],
   ].map(([name, parent]) => {
     const control = new Element({}, name);
+    if (name === 'entry submit') control.insideWidget = true;
     control.closest = (selector) => parent && selector === parent ? control : null;
     return control;
   });
+  const entrySubmit = new Element({}, 'entry submit');
+  entrySubmit.insideWidget = true;
+  entrySubmit.form = nodes.get('[data-masha-feedly-entry-form]');
+  scopedControls.push(entrySubmit);
   widget.querySelectorAll = () => scopedControls;
   widget.querySelector = (selector) => nodes.get(selector) || (selector === '.kw-masha-feedly__toggle' ? (nodes.set(selector, new Element({}, selector)), nodes.get(selector)) : null);
   widget.contains = (element) => element?.insideWidget === true;
@@ -97,6 +102,14 @@ test('führt beim ersten Besuch durch Plus, Bereichsauswahl und Formular bis zum
   document.dispatchEvent({ type: 'kw-masha-feedly:onboarding-target-selected' });
   assert.equal(tip.hidden, false);
   assert.equal(nodes.get('[data-masha-feedly-onboarding-text]').textContent, 'TOUR_STEP_FORM');
+  assert.equal(scopedControls[6].disabled, false, 'der Submit-Button im Dialog-Footer bleibt trotz form="…" bedienbar');
+  let submitBlocked = false;
+  documentListeners.click({ target: scopedControls[6], preventDefault() { submitBlocked = true; }, stopImmediatePropagation() {} });
+  assert.equal(submitBlocked, false, 'der zugeordnete Submit-Button wird von der Tour nicht blockiert');
+  const submitButtonChild = new Element({}, 'entry submit label');
+  submitButtonChild.closest = (selector) => selector === 'button, input, select, textarea' ? scopedControls[6] : null;
+  documentListeners.click({ target: submitButtonChild, preventDefault() { submitBlocked = true; }, stopImmediatePropagation() {} });
+  assert.equal(submitBlocked, false, 'Klicks auf Text oder Icon im zugeordneten Submit-Button werden ebenfalls zugelassen');
   let backdropClickPrevented = false;
   documentListeners.click({
     target: nodes.get('[data-masha-feedly-modal]'),

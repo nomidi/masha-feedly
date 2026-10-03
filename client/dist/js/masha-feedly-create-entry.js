@@ -195,7 +195,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const submit = form.querySelector('[type="submit"]');
+    // Der Speichern-Button liegt im Dialog-Footer außerhalb des <form> und ist
+    // über das HTML-Attribut form="…" zugeordnet.
+    const submit = form.querySelector('[type="submit"]')
+      || (form.id ? document.querySelector(`button[type="submit"][form="${CSS.escape(form.id)}"]`) : null);
+    if (!submit) {
+      status.textContent = t('CREATE_SAVE_ERROR');
+      return;
+    }
     submit.disabled = true;
     status.textContent = t('CREATE_SAVING');
     const data = new FormData(form);

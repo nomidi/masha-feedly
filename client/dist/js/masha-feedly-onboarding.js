@@ -86,7 +86,9 @@ document.addEventListener('DOMContentLoaded', () => {
     widget.querySelectorAll('button, input, select, textarea').forEach((control) => {
       if (matches(control, '[data-masha-feedly-tour-cancel]')) return;
       controlStates.set(control, Boolean(control.disabled));
-      if (!allowed || !matches(control, allowed)) control.disabled = true;
+      // Formular-Buttons dürfen außerhalb des <form> stehen und über form="…"
+      // zugeordnet sein (z. B. im Dialog-Footer). Sie gehören trotzdem zum Schritt.
+      if (!allowed || (!matches(control, allowed) && !matches(control.form, allowed))) control.disabled = true;
     });
   };
 
@@ -144,7 +146,11 @@ document.addEventListener('DOMContentLoaded', () => {
         : !widget.contains(target);
     }
     if (step === 'form') {
+      // Bei Klick auf den Text oder das Icon im Submit-Button ist event.target
+      // ein Kind-Element. Die Formularzuordnung sitzt aber auf dem Button.
+      const clickedControl = target?.closest?.('button, input, select, textarea');
       return Boolean(matches(target, '[data-masha-feedly-entry-form]')
+        || matches(target.form || clickedControl?.form, '[data-masha-feedly-entry-form]')
         || matches(target, '[data-masha-feedly-close-modal]'));
     }
     if (step === 'entries') return Boolean(matches(target, '[data-masha-feedly-open-page-list]'));

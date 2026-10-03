@@ -84,7 +84,7 @@ function createEnvironment(fetchImplementation = async () => ({
   const pageURL = new TestElement('input');
   const selector = new TestElement('input');
   const selectedText = new TestElement('input');
-  const form = new TestElement('form', { dataset: { createUrl: '/__masha-feedly/createEntry', similarUrl: '/__masha-feedly/findSimilarEntries', securityId: 'csrf-token' } });
+  const form = new TestElement('form', { id: 'kw-masha-feedly-create-form', dataset: { createUrl: '/__masha-feedly/createEntry', similarUrl: '/__masha-feedly/findSimilarEntries', securityId: 'csrf-token' } });
   const similarSection = new TestElement('section'); similarSection.hidden = true;
   const similarResults = new TestElement('div');
   form.fields = {
@@ -95,7 +95,6 @@ function createEnvironment(fetchImplementation = async () => ({
     '[name="Content"]': content,
     '[data-masha-feedly-similar]': similarSection,
     '[data-masha-feedly-similar-results]': similarResults,
-    '[type="submit"]': submit,
   };
   form.append = (element) => {
     element.parentElement = form;
@@ -133,7 +132,11 @@ function createEnvironment(fetchImplementation = async () => ({
     body,
     addEventListener(name, callback) { documentListeners[name] = callback; },
     dispatchEvent(event) { dispatchedEvents.push(event.type); },
-    querySelector(selectorText) { return selectorText === '[data-kw-masha-feedly]' ? widget : null; },
+    querySelector(selectorText) {
+      if (selectorText === '[data-kw-masha-feedly]') return widget;
+      if (selectorText === 'button[type="submit"][form="kw-masha-feedly-create-form"]') return submit;
+      return null;
+    },
     createElement(tagName) { return new TestElement(tagName); },
   };
   const formData = {
@@ -251,6 +254,7 @@ test('bricht die Bereichsauswahl mit Escape ab und stellt das Widget wieder her'
 
 test('sendet das Formular mit CSRF-Token und zeigt die erfolgreiche Anlage', async () => {
   const env = createEnvironment();
+  assert.equal(env.form.querySelector('[type="submit"]'), null, 'der Submit-Button befindet sich außerhalb des Formulars');
   env.startButton.listeners.click();
   const target = new TestElement('p', { id: 'intro', text: 'Hinweistext' });
   env.documentListeners.click({ target, preventDefault() {}, stopPropagation() {} });
