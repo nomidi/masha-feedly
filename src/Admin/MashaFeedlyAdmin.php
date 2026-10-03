@@ -58,6 +58,9 @@ class MashaFeedlyAdmin extends ModelAdmin
     private static $allowed_actions = [
         'saveConfiguration',
         'moveEntry',
+        'moveCategory',
+        'createCategory',
+        'deleteCategory',
     ];
 
     /** Ergänzt die Menübezeichnung um die ungelesene Anzahl des aktuellen Mitglieds. */
@@ -255,20 +258,252 @@ class MashaFeedlyAdmin extends ModelAdmin
         ]);
     }
 
+    /** Speichert die Reihenfolge der Kategorien im Admin-Board. */
+    public function moveCategory(HTTPRequest $request): HTTPResponse
+    {
+        $member = Security::getCurrentUser();
+        if (!$this->canView() || !$member || !Permission::checkMember($member, 'ADMIN')) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung.'], 403);
+        }
+        if (!$request->isPOST()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'POST erforderlich.'], 405);
+        }
+        if (!SecurityToken::inst()->checkRequest($request)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Ungültiges Sicherheitstoken.'], 400);
+        }
+
+        $categoryIDs = array_values(array_unique(array_filter(array_map(
+            'intval',
+            (array)$request->postVar('CategoryIDs')
+        ), static fn(int $id): bool => $id > 0)));
+        if (!$categoryIDs) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Ungültige Kategorienreihenfolge.'], 400);
+        }
+        $categories = MashaFeedlyCategory::get()->byIDs($categoryIDs);
+        if ($categories->count() !== count($categoryIDs)
+            || $categories->count() !== MashaFeedlyCategory::get()->count()
+        ) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Ungültige Kategorienreihenfolge.'], 400);
+        }
+
+        foreach ($categoryIDs as $position => $categoryID) {
+            $category = MashaFeedlyCategory::get()->byID($categoryID);
+            $category->Sort = ($position + 1) * 10;
+            $category->write();
+        }
+
+        return $this->jsonResponse(['success' => true]);
+    }
+
+    /** Löscht ausschließlich leere, frei angelegte Kategorien aus dem Admin-Board. */
+    public function deleteCategory(HTTPRequest $request): HTTPResponse
+    {
+        $member = Security::getCurrentUser();
+        if (!$this->canView() || !$member || !Permission::checkMember($member, 'ADMIN')) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung.'], 403);
+        }
+        if (!$request->isPOST()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'POST erforderlich.'], 405);
+        }
+        if (!SecurityToken::inst()->checkRequest($request)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Ungültiges Sicherheitstoken.'], 400);
+        }
+
+        $category = MashaFeedlyCategory::get()->byID((int)$request->postVar('CategoryID'));
+        if (!$category) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Kategorie nicht gefunden.'], 404);
+        }
+        if ($category->Entries()->exists()) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Nur leere Kategorien können gelöscht werden.',
+            ], 409);
+        }
+        if (!$category->canDelete()) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => 'Diese erforderliche Kategorie kann nicht gelöscht werden.',
+            ], 409);
+        }
+
+        $category->delete();
+        return $this->jsonResponse(['success' => true]);
+    }
+
+    /** Legt eine neue benutzerdefinierte Kategorie direkt aus dem Board an. */
+    public function createCategory(HTTPRequest $request): HTTPResponse
+    {
+        $member = Security::getCurrentUser();
+        if (!$this->canView() || !$member || !Permission::checkMember($member, 'ADMIN')) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung.'], 403);
+        }
+        if (!$request->isPOST()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'POST erforderlich.'], 405);
+        }
+        if (!SecurityToken::inst()->checkRequest($request)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Ungültiges Sicherheitstoken.'], 400);
+        }
+
+        $title = trim((string)$request->postVar('Title'));
+        if ($title === '' || mb_strlen($title) > 120) {
+            // Keep validation failures as JSON: SilverStripe replaces error-status
+            // responses from this ModelAdmin action with its CMS error page.
+            return $this->jsonResponse(['success' => false, 'message' => 'Bitte einen Kategorienamen mit höchstens 120 Zeichen eingeben.']);
+        }
+
+        $sortValues = array_map('intval', MashaFeedlyCategory::get()->column('Sort'));
+        $category = MashaFeedlyCategory::create([
+            'Title' => $title,
+            'SystemKey' => '',
+            'Sort' => ($sortValues ? max($sortValues) : 0) + 10,
+            'IsClosed' => false,
+        ]);
+        $category->write();
+
+        return $this->jsonResponse([
+            'success' => true,
+            'category' => [
+                'id' => (int)$category->ID,
+                'title' => (string)$category->Title,
+                'sort' => (int)$category->Sort,
+            ],
+        ]);
+    }
+
     /** Rendert alle Kategorien samt sortierbaren Eintragskarten für die Übersicht. */
     private function renderEntryBoard(): string
     {
-        $newEntryURL = rtrim(Director::absoluteBaseURL(), '/') . '/?masha-feedly-create=1';
-        $html = '<section class="masha-feedly-board" data-masha-feedly-board data-move-url="'
+        MashaFeedlyPriority::ensureDefaultPriorities();
+        $member = Security::getCurrentUser();
+        $canManageCategories = $member instanceof Member && Permission::checkMember($member, 'ADMIN');
+        $adminTranslations = [];
+        foreach ([
+            'MENU_GENERAL_UNREAD' => '{count} neue Einträge für alle',
+            'MENU_PERSONAL_UNREAD_DU' => '{count} neue Einträge für dich',
+            'MENU_PERSONAL_UNREAD_SIE' => '{count} neue Einträge für Sie',
+            'BOARD_SAVING' => 'Änderung wird gespeichert …',
+            'BOARD_SAVE_ERROR' => 'Speichern fehlgeschlagen.',
+            'BOARD_SAVE_SUCCESS' => 'Eintrag wurde gespeichert.',
+            'BOARD_SAVE_FAILURE' => 'Eintrag konnte nicht gespeichert werden.',
+            'BOARD_CATEGORY_SAVING' => 'Kategorien werden sortiert …',
+            'BOARD_CATEGORY_SAVE_ERROR' => 'Sortieren fehlgeschlagen.',
+            'BOARD_CATEGORY_SAVE_SUCCESS' => 'Kategorienreihenfolge gespeichert.',
+            'BOARD_CATEGORY_SAVE_FAILURE' => 'Kategorienreihenfolge konnte nicht gespeichert werden.',
+            'BOARD_CATEGORY_NAME_REQUIRED' => 'Bitte gib einen Kategorienamen ein.',
+            'BOARD_CATEGORY_ADDING' => 'Kategorie wird angelegt …',
+            'BOARD_CATEGORY_ADD_ERROR' => 'Kategorie konnte nicht angelegt werden.',
+            'BOARD_CATEGORY_ADD_SUCCESS' => 'Kategorie wurde angelegt.',
+            'BOARD_CATEGORY_DELETE' => 'Leere Kategorie löschen',
+            'BOARD_CATEGORY_DELETE_CONFIRM' => 'Möchtest du diese leere Kategorie wirklich löschen?',
+            'BOARD_CATEGORY_DELETING' => 'Kategorie wird gelöscht …',
+            'BOARD_CATEGORY_DELETE_ERROR' => 'Kategorie konnte nicht gelöscht werden.',
+            'BOARD_CATEGORY_DELETE_SUCCESS' => 'Leere Kategorie gelöscht.',
+            'BOARD_CATEGORY_DELETE_FAILURE' => 'Kategorie konnte nicht gelöscht werden.',
+            'BOARD_CATEGORY_DRAG_ARIA' => 'Kategorie sortieren',
+            'BOARD_CATEGORY_DRAG_TITLE' => 'Kategorie zum Sortieren ziehen',
+            'BOARD_ENTRY_SAVING' => 'Eintrag wird gespeichert …',
+            'BOARD_ENTRY_SAVE_ERROR' => 'Eintrag konnte nicht gespeichert werden.',
+            'BOARD_ENTRY_SAVE_SUCCESS' => 'Eintrag wurde gespeichert.',
+        ] as $key => $default) {
+            $adminTranslations[$key] = self::translate($key, $default);
+        }
+        $html = '<section class="masha-feedly-board" data-masha-feedly-board data-admin-translations="'
+            . $this->escapeBoardValue((string)json_encode($adminTranslations, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP))
+            . '" data-move-url="'
             . $this->escapeBoardValue(Controller::join_links(
                 $this->getLinkForModelClass(MashaFeedlyEntry::class),
                 'moveEntry'
             )) . '" data-security-id="'
-            . $this->escapeBoardValue((string)SecurityToken::getSecurityID()) . '">';
+            . $this->escapeBoardValue((string)SecurityToken::getSecurityID()) . '" data-move-category-url="'
+            . $this->escapeBoardValue(Controller::join_links(
+                $this->getLinkForModelClass(MashaFeedlyEntry::class),
+                'moveCategory'
+            )) . '" data-delete-category-url="'
+            . $this->escapeBoardValue(Controller::join_links(
+                $this->getLinkForModelClass(MashaFeedlyEntry::class),
+                'deleteCategory'
+            )) . '" data-create-category-url="'
+            . $this->escapeBoardValue(Controller::join_links(
+                $this->getLinkForModelClass(MashaFeedlyEntry::class),
+                'createCategory'
+            )) . '" data-create-entry-url="'
+            . $this->escapeBoardValue(Controller::join_links(Director::baseURL(), '__masha-feedly', 'createEntry')) . '">';
         $html .= '<header class="masha-feedly-board__header"><div><h2>' . self::translate('BOARD_HEADER', 'Einträge nach Kategorie') . '</h2>'
-            . '<p>' . self::translate('BOARD_HELP', 'Ziehe Einträge in eine andere Kategorie oder sortiere sie innerhalb der Spalte.') . '</p></div>'
-            . '<a class="btn btn-primary" href="' . $this->escapeBoardValue($newEntryURL) . '" target="_blank" rel="noopener noreferrer">' . self::translate('BOARD_CREATE_ENTRY', 'Neuen Eintrag anlegen') . '</a></header>';
-        $member = Security::getCurrentUser();
+            . '<p>' . self::translate('BOARD_HELP', 'Ziehe Einträge in andere Kategorien. Admins können Kategorien am Griff sortieren und eigene leere Kategorien löschen.') . '</p></div>'
+            . '<div class="masha-feedly-board__header-actions">';
+        $html .= '<button type="button" class="btn btn-primary masha-feedly-board__action-button masha-feedly-board__action-button--entry" data-open-entry-form aria-haspopup="dialog">'
+            . self::translate('BOARD_CREATE_ENTRY', 'Eintrag hinzufügen') . '</button>';
+        if ($canManageCategories) {
+            $html .= '<button type="button" class="btn btn-default masha-feedly-board__action-button masha-feedly-board__action-button--category" data-open-category-form aria-haspopup="dialog">'
+                . self::translate('BOARD_CATEGORY_ADD', 'Kategorie hinzufügen') . '</button>';
+        }
+        $html .= '</div></header>';
+        if ($canManageCategories) {
+            $html .= '<div class="masha-feedly-board__modal" data-category-modal hidden="hidden">'
+                . '<section class="masha-feedly-board__dialog" role="dialog" aria-modal="true" aria-labelledby="masha-feedly-category-title">'
+                . '<header class="masha-feedly-board__dialog-header"><div><span class="masha-feedly-board__eyebrow">'
+                . self::translate('BOARD_CATEGORY_FORM_TITLE', 'Neue Kategorie') . '</span><h2 id="masha-feedly-category-title">'
+                . self::translate('BOARD_CATEGORY_NAME', 'Name der Kategorie') . '</h2></div>'
+                . '<button type="button" class="masha-feedly-board__dialog-close" data-close-category-modal aria-label="'
+                . $this->escapeBoardValue(self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen')) . '">×</button></header>'
+                . '<div class="masha-feedly-board__category-form" data-create-category-form role="form">'
+                . '<label for="MashaFeedlyCategoryTitle">' . self::translate('BOARD_CATEGORY_NAME', 'Name der Kategorie') . '</label>'
+                . '<input id="MashaFeedlyCategoryTitle" name="Title" maxlength="120" required data-category-title-input placeholder="'
+                . $this->escapeBoardValue(self::translate('BOARD_CATEGORY_PLACEHOLDER', 'z. B. Barrierefreiheit')) . '">'
+                . '<footer class="masha-feedly-board__dialog-actions"><button type="button" class="btn btn-default" data-cancel-category-form>'
+                . self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen') . '</button><button type="button" class="btn btn-primary" data-submit-category-form>'
+                . self::translate('BOARD_CATEGORY_ADD_SHORT', 'Kategorie hinzufügen') . '</button></footer></div></section></div>';
+        }
+
+        $categories = MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC');
+        $priorities = MashaFeedlyPriority::get()->sort('Sort ASC, Title ASC');
+        $defaultCategoryID = (int)MashaFeedlyCategory::defaultCategory()->ID;
+        $defaultPriorityID = (int)MashaFeedlyPriority::defaultPriority()->ID;
+        $html .= '<div class="masha-feedly-board__modal" data-entry-modal hidden="hidden">'
+            . '<section class="masha-feedly-board__dialog masha-feedly-board__entry-dialog" role="dialog" aria-modal="true" aria-labelledby="masha-feedly-create-title">'
+            . '<header class="masha-feedly-board__dialog-header"><div><span class="masha-feedly-board__eyebrow">'
+            . self::translate('BOARD_CREATE_ENTRY_EYEBROW', 'NEUER EINTRAG') . '</span><h2 id="masha-feedly-create-title">'
+            . self::translate('BOARD_CREATE_ENTRY_TITLE', 'Eintrag hinzufügen') . '</h2></div>'
+            . '<button type="button" class="masha-feedly-board__dialog-close" data-close-entry-modal aria-label="'
+            . $this->escapeBoardValue(self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen')) . '">×</button></header>'
+            . '<form class="masha-feedly-board__entry-form" data-admin-create-entry-form data-create-url="'
+            . $this->escapeBoardValue(Controller::join_links(Director::baseURL(), '__masha-feedly', 'createEntry'))
+            . '" data-security-id="' . $this->escapeBoardValue((string)SecurityToken::getSecurityID()) . '">'
+            . '<label for="MashaFeedlyAdminEntryContent">' . self::translate('BOARD_ENTRY_DESCRIPTION', 'Beschreibung')
+            . '<textarea id="MashaFeedlyAdminEntryContent" name="Content" rows="5" maxlength="10000" required placeholder="'
+            . $this->escapeBoardValue(self::translate('BOARD_ENTRY_PLACEHOLDER', 'Beschreibe den Fehler oder Hinweis …')) . '"></textarea></label>'
+            . '<label class="masha-feedly-board__upload"><span>' . self::translate('BOARD_ENTRY_ATTACHMENTS', 'Dateien anhängen')
+            . '</span><input type="file" name="Attachments[]" multiple accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,application/zip,.jpg,.jpeg,.png,.gif,.webp,.pdf,.zip">'
+            . '<small>' . self::translate('BOARD_ENTRY_UPLOAD_LIMIT', 'Bilder, PDFs oder ZIP-Dateien · max. 10 MB je Datei') . '</small></label>'
+            . '<div class="masha-feedly-board__entry-fields"><label>' . self::translate('BOARD_ENTRY_STATUS', 'Status')
+            . '<select name="CategoryID">';
+        foreach ($categories as $category) {
+            $html .= '<option value="' . (int)$category->ID . '"'
+                . ((int)$category->ID === $defaultCategoryID ? ' selected' : '') . '>'
+                . $this->escapeBoardValue((string)$category->Title) . '</option>';
+        }
+        $html .= '</select></label><label>' . self::translate('BOARD_ENTRY_PRIORITY', 'Priorität') . '<select name="PriorityID">';
+        foreach ($priorities as $priority) {
+            $html .= '<option value="' . (int)$priority->ID . '"'
+                . ((int)$priority->ID === $defaultPriorityID ? ' selected' : '') . '>'
+                . $this->escapeBoardValue((string)$priority->Title) . '</option>';
+        }
+        $html .= '</select></label><label>' . self::translate('BOARD_ENTRY_DATE', 'Datum und Uhrzeit')
+            . '<input type="datetime-local" name="EntryDate"></label></div>';
+        $allowedMemberIDs = MashaFeedlyConfigExtension::memberIDs();
+        if ($allowedMemberIDs) {
+            $html .= '<fieldset class="masha-feedly-board__entry-assignees"><legend>'
+                . self::translate('BOARD_ENTRY_ASSIGNEES', 'Verantwortlich') . '</legend><div>';
+            foreach (Member::get()->filter('ID', $allowedMemberIDs)->sort('Surname ASC, FirstName ASC') as $assignee) {
+                $html .= '<label><input type="checkbox" name="AssignedMemberIDs[]" value="' . (int)$assignee->ID . '">'
+                    . '<span>' . $this->escapeBoardValue((string)$assignee->getName()) . '</span></label>';
+            }
+            $html .= '</div></fieldset>';
+        }
+        $html .= '<p class="masha-feedly-board__dialog-status" data-entry-form-status role="status" aria-live="polite"></p>'
+            . '<footer class="masha-feedly-board__dialog-actions"><button type="button" class="btn btn-default" data-close-entry-modal>'
+            . self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen') . '</button><button type="submit" class="btn btn-primary">'
+            . self::translate('BOARD_CREATE_ENTRY', 'Eintrag hinzufügen') . '</button></footer></form></section></div>';
         $unreadEntryIDs = $member instanceof Member
             ? MashaFeedlyEntryRead::unreadEntryIDs($member)
             : [];
@@ -298,8 +533,21 @@ class MashaFeedlyAdmin extends ModelAdmin
                 ->filter('CategoryID', (int)$category->ID)
                 ->sort('Sort ASC, EntryDate DESC, ID DESC');
             $html .= '<section class="masha-feedly-board__column" data-category-id="' . (int)$category->ID . '">';
-            $html .= '<header class="masha-feedly-board__column-header"><h3>'
-                . $this->escapeBoardValue((string)$category->Title) . '</h3><span>' . $entries->count() . '</span></header>';
+            $html .= '<header class="masha-feedly-board__column-header">';
+            if ($canManageCategories) {
+                $html .= '<button type="button" class="masha-feedly-board__category-drag-handle" draggable="true"'
+                    . ' title="' . $this->escapeBoardValue(self::translate('BOARD_CATEGORY_DRAG_TITLE', 'Kategorie zum Sortieren ziehen'))
+                    . '" aria-label="' . $this->escapeBoardValue(self::translate('BOARD_CATEGORY_DRAG_ARIA', 'Kategorie sortieren')) . '">⠿</button>';
+            }
+            $html .= '<h3>' . $this->escapeBoardValue((string)$category->Title)
+                . '</h3><span data-category-entry-count>' . $entries->count() . '</span>';
+            if ($canManageCategories && !$entries->exists() && $category->canDelete()) {
+                $deleteLabel = self::translate('BOARD_CATEGORY_DELETE', 'Leere Kategorie löschen');
+                $html .= '<button type="button" class="masha-feedly-board__category-delete" data-delete-category'
+                    . ' aria-label="' . $this->escapeBoardValue($deleteLabel) . '" title="'
+                    . $this->escapeBoardValue($deleteLabel) . '">×</button>';
+            }
+            $html .= '</header>';
             $html .= '<div class="masha-feedly-board__list" data-category-id="' . (int)$category->ID . '">';
             foreach ($entries as $entry) {
                 $description = trim(preg_replace('/\s+/u', ' ', html_entity_decode(

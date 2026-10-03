@@ -28,6 +28,8 @@ class MashaFeedlyCategory extends DataObject
 {
     private static $table_name = 'MashaFeedlyCategory';
 
+    private const REQUIRED_SYSTEM_KEYS = ['backlog', 'done', 'feedback'];
+
     private static $db = [
         'Title' => 'Varchar(120)',
         'SystemKey' => 'Varchar(32)',
@@ -205,10 +207,10 @@ class MashaFeedlyCategory extends DataObject
         return $fields;
     }
 
-    /** Verhindert das Löschen einer Kategorie, solange Einträge zugeordnet sind. */
+    /** Schützt Pflichtrollen und Kategorien, denen noch Einträge zugeordnet sind. */
     public function canDelete($member = null): bool
     {
-        return (string)$this->SystemKey === ''
+        return !in_array((string)$this->SystemKey, self::REQUIRED_SYSTEM_KEYS, true)
             && !$this->Entries()->exists()
             && parent::canDelete($member);
     }

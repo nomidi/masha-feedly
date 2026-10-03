@@ -40,6 +40,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
 
         $this->assertSame(200, $response->getStatusCode());
         $body = $response->getBody();
+        // SilverStripe liefert CMS-React-Props teils als JSON mit Unicode-Escapes.
+        $body = str_replace(['\\u003C', '\\u003E', '\\u0022'], ['<', '>', '"'], $body);
         foreach (['Backlog', 'To Do', 'Doing', 'Done', 'Archiv', 'Feedback'] as $categoryTitle) {
             $this->assertStringContainsString($categoryTitle, $body);
         }
@@ -48,14 +50,22 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('aria-label="Normal"', $body);
         $this->assertStringContainsString('viewBox="0 0 24 24"', $body);
         $this->assertStringContainsString('data-masha-feedly-board', $body);
+        $this->assertStringContainsString('data-admin-translations=', $body);
         $this->assertStringContainsString('draggable="true"', $body);
         $this->assertStringContainsString('masha-feedly-admin.js', $body);
-        $this->assertStringContainsString('Eintrag anlegen', $body);
+        $this->assertStringContainsString('data-open-entry-form', $body);
+        $this->assertStringContainsString('data-entry-modal hidden="hidden"', $body);
+        $this->assertStringContainsString('data-admin-create-entry-form', $body);
+        $this->assertStringContainsString('data-create-url="/__masha-feedly/createEntry"', $body);
+        $this->assertStringContainsString('name="Content"', $body);
+        $this->assertStringContainsString('name="CategoryID"', $body);
+        $this->assertStringContainsString('name="PriorityID"', $body);
         $this->assertMatchesRegularExpression(
-            '/<a class="btn btn-primary" href="[^"]*\\?masha-feedly-create=1" target="_blank" rel="noopener noreferrer">Neuen Eintrag anlegen<\\/a>/',
+            '/<button type="button" class="btn btn-primary masha-feedly-board__action-button masha-feedly-board__action-button--entry" data-open-entry-form[^>]*>Eintrag hinzufügen<\\/button>/',
             $body,
-            'Das CMS muss geöffnet bleiben und die Eingabemaske in einem neuen, abgesicherten Tab erscheinen.'
+            'Das Eingabeformular für neue Einträge muss als Dialog im CMS geöffnet werden.'
         );
+        $this->assertStringNotContainsString('masha-feedly-create=1', $body);
         $this->assertStringNotContainsString('/item/new', $body);
         $this->assertStringContainsString('masha-feedly-board__drag-handle', $body);
         $this->assertStringContainsString('data-masha-feedly-assignee-filter', $body);
@@ -68,9 +78,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('Neue Aktivität für alle', $body);
         $this->assertStringContainsString('<svg viewBox="0 0 24 24" aria-hidden="true"', $body);
         $this->assertStringContainsString('Nicht zugeordnet', $body);
-        $this->assertStringContainsString('<option value="' . (int)$member->ID . '"', $body);
-        $blockedMember = $this->objFromFixture(Member::class, 'notAllowed');
-        $this->assertStringNotContainsString('<option value="' . (int)$blockedMember->ID . '"', $body);
+        $this->assertStringContainsString('Erika Muster', $body, 'Freigegebene Mitglieder müssen auswählbar sein.');
+        $this->assertStringNotContainsString('Max Beispiel', $body, 'Nicht freigegebene Mitglieder dürfen nicht auswählbar sein.');
         $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
         $entry->PageURL = 'https://example.test/kontakt?from=cms#formular';
         $entry->write();
@@ -127,6 +136,175 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertNotEmpty((string)$history->Created);
     }
 
+    /** Prüft, dass die Kategorienreihenfolge im Board serverseitig gespeichert wird. */
+    public function testMoveCategoryChangesSortOrder(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $categoryIDs = array_map('intval', MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC')->column('ID'));
+        $reversedIDs = array_reverse($categoryIDs);
+
+        $response = $this->post(
+            '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/moveCategory',
+            [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'CategoryIDs' => $reversedIDs,
+            ]
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringContainsString('"success":true', $response->getBody());
+        $this->assertSame(
+            $reversedIDs,
+            array_map('intval', MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC')->column('ID'))
+        );
+    }
+
+    /** Prüft, dass Administratoren eine benutzerdefinierte Kategorie direkt im Board anlegen können. */
+    public function testCreateCategoryAddsCustomCategory(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $response = $this->post(
+            '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/createCategory',
+            [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'Title' => '  Barrierefreiheit  ',
+            ]
+        );
+        $data = json_decode($response->getBody(), true);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($data['success']);
+        $category = MashaFeedlyCategory::get()->byID((int)$data['category']['id']);
+        $this->assertNotNull($category);
+        $this->assertSame('Barrierefreiheit', (string)$category->Title);
+        $this->assertSame('', (string)$category->SystemKey);
+        $this->assertFalse((bool)$category->IsClosed);
+    }
+
+    /** Prüft, dass leere und zu lange Kategorienamen abgelehnt werden. */
+    public function testCreateCategoryRejectsInvalidTitle(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        foreach (['', str_repeat('x', 121)] as $title) {
+            $response = $this->post(
+                '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/createCategory',
+                [
+                    'SecurityID' => SecurityToken::getSecurityID(),
+                    'Title' => $title,
+                ]
+            );
+            $this->assertSame(200, $response->getStatusCode());
+            $this->assertStringContainsString('"success":false', $response->getBody());
+        }
+    }
+
+    /** Prüft, dass nur leere benutzerdefinierte Kategorien gelöscht werden können. */
+    public function testDeleteCategoryOnlyDeletesEmptyCustomCategory(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $emptyCategory = MashaFeedlyCategory::create([
+            'Title' => 'Leere Testkategorie',
+            'SystemKey' => '',
+            'Sort' => 900,
+        ]);
+        $emptyCategory->write();
+
+        $deleteResponse = $this->post(
+            '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/deleteCategory',
+            [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'CategoryID' => (int)$emptyCategory->ID,
+            ]
+        );
+        $this->assertSame(200, $deleteResponse->getStatusCode());
+        $this->assertStringContainsString('"success":true', $deleteResponse->getBody());
+        $this->assertNull(MashaFeedlyCategory::get()->byID((int)$emptyCategory->ID));
+
+        $occupiedCategory = MashaFeedlyCategory::create([
+            'Title' => 'Kategorie mit Eintrag',
+            'SystemKey' => '',
+            'Sort' => 910,
+        ]);
+        $occupiedCategory->write();
+        $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
+        $entry->CategoryID = (int)$occupiedCategory->ID;
+        $entry->write();
+        $blockedResponse = $this->post(
+            '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/deleteCategory',
+            [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'CategoryID' => (int)$occupiedCategory->ID,
+            ]
+        );
+        $this->assertSame(409, $blockedResponse->getStatusCode());
+        $this->assertNotNull(MashaFeedlyCategory::get()->byID((int)$occupiedCategory->ID));
+
+        $requiredCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'done')->first();
+        $requiredResponse = $this->post(
+            '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/deleteCategory',
+            [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'CategoryID' => (int)$requiredCategory->ID,
+            ]
+        );
+        $this->assertSame(409, $requiredResponse->getStatusCode());
+        $this->assertNotNull(MashaFeedlyCategory::get()->byID((int)$requiredCategory->ID));
+
+        $optionalSystemCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'todo')->first();
+        $optionalResponse = $this->post(
+            '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/deleteCategory',
+            [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'CategoryID' => (int)$optionalSystemCategory->ID,
+            ]
+        );
+        $this->assertSame(200, $optionalResponse->getStatusCode());
+        $this->assertNull(MashaFeedlyCategory::get()->byID((int)$optionalSystemCategory->ID));
+    }
+
+    /** Prüft, dass das Board nur für leere, frei angelegte Kategorien eine Löschaktion zeigt. */
+    public function testBoardShowsCategorySortingAndSafeDeleteControls(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $emptyCategory = MashaFeedlyCategory::create([
+            'Title' => 'Leere Kategorie',
+            'SystemKey' => '',
+            'Sort' => 900,
+        ]);
+        $emptyCategory->write();
+        $occupiedCategory = MashaFeedlyCategory::create([
+            'Title' => 'Belegte Kategorie',
+            'SystemKey' => '',
+            'Sort' => 910,
+        ]);
+        $occupiedCategory->write();
+        $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
+        $entry->CategoryID = (int)$occupiedCategory->ID;
+        $entry->write();
+
+        $response = $this->get('/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry');
+        $body = $response->getBody();
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringContainsString('data-move-category-url=', $body);
+        $this->assertStringContainsString('data-delete-category-url=', $body);
+        $this->assertStringContainsString('data-create-category-url=', $body);
+        $this->assertStringContainsString('masha-feedly-board__category-drag-handle', $body);
+        $this->assertStringContainsString('data-open-category-form', $body);
+        $this->assertStringContainsString('masha-feedly-board__action-button--category', $body);
+        $this->assertStringContainsString('data-create-category-form', $body);
+        $this->assertStringContainsString('data-submit-category-form', $body);
+        $this->assertStringContainsString('class="masha-feedly-board__category-form" data-create-category-form role="form"', $body);
+        $this->assertStringContainsString('data-category-modal hidden="hidden"', $body);
+        $this->assertStringContainsString('placeholder=', $body);
+        $this->assertStringContainsString('data-category-title-input', $body);
+        $this->assertStringContainsString('role="dialog" aria-modal="true" aria-labelledby="masha-feedly-category-title"', $body);
+        $this->assertMatchesRegularExpression('/(?:Kategorie hinzufügen|Add category)/', $body);
+        $this->assertGreaterThan(1, substr_count($body, ' data-delete-category '));
+        $this->assertStringContainsString('Leere Kategorie', $body);
+        $this->assertStringContainsString('Belegte Kategorie', $body);
+    }
+
     /** Prüft, dass nicht freigeschaltete Mitglieder weder das Board öffnen noch Einträge verschieben können. */
     public function testMemberWithoutAccessCannotViewOrMoveEntries(): void
     {
@@ -136,6 +314,12 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->logInAs($blockedMember);
         $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
         $originalCategoryID = (int)$entry->CategoryID;
+        $customCategory = MashaFeedlyCategory::create([
+            'Title' => 'Geschützte Testkategorie',
+            'SystemKey' => '',
+            'Sort' => 900,
+        ]);
+        $customCategory->write();
 
         $boardResponse = $this->get('/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry');
         $moveResponse = $this->post(
@@ -147,9 +331,34 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
                 'EntryIDs' => [(int)$entry->ID],
             ]
         );
+        $sortResponse = $this->post(
+            '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/moveCategory',
+            [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'CategoryIDs' => array_map('intval', MashaFeedlyCategory::get()->column('ID')),
+            ]
+        );
+        $deleteResponse = $this->post(
+            '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/deleteCategory',
+            [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'CategoryID' => (int)$customCategory->ID,
+            ]
+        );
+        $createResponse = $this->post(
+            '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/createCategory',
+            [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'Title' => 'Nicht erlaubt',
+            ]
+        );
 
         $this->assertNotSame(200, $boardResponse->getStatusCode());
         $this->assertNotSame(200, $moveResponse->getStatusCode());
+        $this->assertSame(403, $sortResponse->getStatusCode());
+        $this->assertSame(403, $deleteResponse->getStatusCode());
+        $this->assertSame(403, $createResponse->getStatusCode());
+        $this->assertNotNull(MashaFeedlyCategory::get()->byID((int)$customCategory->ID));
         $this->assertSame($originalCategoryID, (int)MashaFeedlyEntry::get()->byID($entry->ID)->CategoryID);
     }
 

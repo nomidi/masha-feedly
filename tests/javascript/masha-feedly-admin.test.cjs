@@ -38,6 +38,9 @@ class TestElement {
     this.classList = new TestClassList();
     this._textContent = '';
     this.textContentMutationCount = 0;
+    this.value = '';
+    this.hidden = false;
+    this.focusCount = 0;
     Object.defineProperty(this, 'textContent', {
       get: () => this._textContent,
       set: (value) => {
@@ -54,9 +57,15 @@ class TestElement {
   }
 
   closest(selector) {
+    if (selector === '[data-masha-feedly-board]' && this.type === 'board') return this;
+    if (selector === '[data-open-category-form]' && this.type === 'button' && this.isCategoryOpenButton) return this;
     if (selector === '.masha-feedly-board__card' && this.type === 'card') return this;
     if (selector === '.masha-feedly-board__drag-handle' && this.type === 'handle') return this;
     if (selector === '.masha-feedly-board__list' && this.type === 'list') return this;
+    if (selector === '.masha-feedly-board__column' && this.type === 'column') return this;
+    if (selector === '.masha-feedly-board__columns' && this.type === 'columns') return this;
+    if (selector === '.masha-feedly-board__category-drag-handle' && this.type === 'category-handle') return this;
+    if (selector === '[data-delete-category]' && this.type === 'delete-button') return this;
     return this.parentElement?.closest(selector) || null;
   }
 
@@ -64,6 +73,18 @@ class TestElement {
     if (selector === '.masha-feedly-board__status') return this.status;
     if (selector === '[data-masha-feedly-assignee-filter]') return this.assigneeFilter || null;
     if (selector === '.masha-feedly-board__list') return this.list || null;
+    if (selector === '.masha-feedly-board__columns') return this.columnsContainer || null;
+    if (selector === '[data-create-category-form]') return this.categoryForm || null;
+    if (selector === '[data-category-modal]') return this.categoryModal || null;
+    if (selector === '[data-create-category-form]') return this.categoryForm || null;
+    if (selector === '[data-open-category-form]') return this.openCategoryFormButton || null;
+    if (selector === '[data-open-entry-form]') return this.openEntryFormButton || null;
+    if (selector === '[data-entry-modal]') return this.entryModal || null;
+    if (selector === '[data-admin-create-entry-form]') return this.entryForm || null;
+    if (selector === '[data-category-title-input]') return this.categoryNameInput || null;
+    if (selector === '[data-cancel-category-form]') return this.cancelCategoryFormButton || null;
+    if (selector === '[data-entry-form-status]') return this.entryStatus || null;
+    if (selector === '[data-category-title-input]' && this.type === 'form') return this.categoryNameInput || null;
     if (selector === '.masha-feedly-board__column-header span') return this.countSpan || null;
     if (selector === '.text') return this.textElement || null;
     if (selector.startsWith('.masha-feedly-menu__badge--')) {
@@ -81,11 +102,29 @@ class TestElement {
     return this.attributes?.[name] ?? null;
   }
 
+  focus() {
+    this.focusCount++;
+  }
+
+  reset() {
+    if (this.categoryNameInput) this.categoryNameInput.value = '';
+    if (this.formValues) this.formValues = [];
+  }
+
+  append(...elements) {
+    elements.forEach((element) => this.appendChild(element));
+  }
+
   remove() {
     if (this.parentElement?.badges) {
       for (const [type, badge] of Object.entries(this.parentElement.badges)) {
         if (badge === this) this.parentElement.badges[type] = null;
       }
+    }
+    if (this.parentElement) {
+      this.parentElement.children = this.parentElement.children.filter((child) => child !== this);
+      this.parentElement.updateSiblings();
+      this.parentElement = null;
     }
   }
 
@@ -108,7 +147,11 @@ class TestElement {
   }
 
   contains(element) {
-    return this.children.includes(element);
+    return this.children.includes(element) || this.children.some((child) => child.contains(element));
+  }
+
+  getBoundingClientRect() {
+    return this.bounds || { left: 0, width: 100, top: 0, height: 100 };
   }
 
   appendChild(element) {
@@ -151,21 +194,79 @@ class TestElement {
 function createBoardEnvironment(fetchImplementation = async () => ({
   ok: true,
   json: async () => ({ success: true }),
-}), unreadGeneralCount = null, hasBoard = true, serverMenuTitle = null, unreadPersonalCount = 0, formalAddress = 'du') {
+  }), unreadGeneralCount = null, hasBoard = true, serverMenuTitle = null, unreadPersonalCount = 0, formalAddress = 'du', confirmImplementation = () => true, documentReadyState = 'complete', includeGlobalTranslator = true) {
   const board = new TestElement('board', {
     moveUrl: '/move-entry',
+    moveCategoryUrl: '/move-category',
+    deleteCategoryUrl: '/delete-category',
+    createCategoryUrl: '/create-category',
+    createEntryUrl: '/__masha-feedly/createEntry',
     securityId: 'csrf-test-token',
+    adminTranslations: JSON.stringify({
+      MENU_GENERAL_UNREAD: '{count} neue Einträge für alle',
+      MENU_PERSONAL_UNREAD_DU: '{count} neue Einträge für dich',
+      MENU_PERSONAL_UNREAD_SIE: '{count} neue Einträge für Sie',
+      BOARD_CATEGORY_DRAG_ARIA: 'Kategorie sortieren',
+      BOARD_CATEGORY_DRAG_TITLE: 'Kategorie zum Sortieren ziehen',
+      BOARD_CATEGORY_DELETE: 'Leere Kategorie löschen',
+    }),
   });
   board.assigneeFilter = new TestElement('select');
   board.assigneeFilter.value = '';
+  board.columnsContainer = new TestElement('columns');
+  board.appendChild(board.columnsContainer);
+  board.categoryForm = new TestElement('div');
+  board.categoryNameInput = new TestElement('input');
+  board.categorySubmitButton = new TestElement('button');
+  board.categoryForm.categoryNameInput = board.categoryNameInput;
+  board.categoryForm.categorySubmitButton = board.categorySubmitButton;
+  board.categoryModal = new TestElement('modal');
+  board.categoryModal.hidden = true;
+  board.categoryModal.categoryForm = board.categoryForm;
+  board.categoryModal.categoryNameInput = board.categoryNameInput;
+  board.categoryModal.querySelectorAll = () => [];
+  board.openCategoryFormButton = new TestElement('button');
+  board.openCategoryFormButton.isCategoryOpenButton = true;
+  board.openCategoryFormButton.parentElement = board;
+  board.categoryForm.querySelector = (selector) => {
+    if (selector === '[data-category-title-input]') return board.categoryNameInput;
+    if (selector === '[data-submit-category-form]') return board.categorySubmitButton;
+    if (selector === '[data-cancel-category-form]') return board.cancelCategoryFormButton;
+    return null;
+  };
+  board.cancelCategoryFormButton = new TestElement('button');
+  board.categoryForm.cancelCategoryFormButton = board.cancelCategoryFormButton;
+  board.categorySubmitButton.parentElement = board.categoryForm;
+  board.entryModal = new TestElement('modal');
+  board.entryModal.hidden = true;
+  board.entryModal.querySelectorAll = () => [];
+  board.openEntryFormButton = new TestElement('button');
+  board.entryForm = new TestElement('form', { createUrl: '/__masha-feedly/createEntry', securityId: 'csrf-test-token' });
+  board.entryForm.formValues = [['Content', 'Ein Testeintrag']];
+  board.entryForm.submitButton = new TestElement('button');
+  board.entryForm.contentInput = new TestElement('textarea');
+  board.entryForm.contentInput.value = 'Ein Testeintrag';
+  board.entryForm.status = new TestElement('p');
+  board.entryForm.querySelector = (selector) => {
+    if (selector === '[name="Content"]') return board.entryForm.contentInput;
+    if (selector === '[type="submit"]') return board.entryForm.submitButton;
+    if (selector === '[data-entry-form-status]') return board.entryForm.status;
+    return null;
+  };
+  board.entryStatus = board.entryForm.status;
   const formDataInstances = [];
   class TestFormData {
-    constructor() {
-      this.values = [];
+    constructor(form = null) {
+      this.values = form?.formValues ? [...form.formValues] : [];
       formDataInstances.push(this);
     }
 
     append(name, value) {
+      this.values.push([name, String(value)]);
+    }
+
+    set(name, value) {
+      this.values = this.values.filter(([key]) => key !== name);
       this.values.push([name, String(value)]);
     }
   }
@@ -192,15 +293,19 @@ function createBoardEnvironment(fetchImplementation = async () => ({
       mashaFeedlyUnreadPersonalCount: String(unreadPersonalCount),
     },
   };
+  let boardAvailable = hasBoard;
+  const documentListeners = {};
   const document = {
     body: {},
+    readyState: documentReadyState,
+    addEventListener: (name, callback) => { documentListeners[name] = callback; },
     querySelector: (selector) => {
       if (selector === '[data-masha-feedly-unread-general-count]') return marker;
-      if (selector === '[data-masha-feedly-board]') return hasBoard ? board : null;
+      if (selector === '[data-masha-feedly-board]') return boardAvailable ? board : null;
       return null;
     },
     querySelectorAll: (selector) => selector === '#cms-menu a[href*="masha-feedly"]' ? [menuLink] : [],
-    createElement: () => new TestElement('badge'),
+    createElement: (type) => new TestElement(type),
   };
   let mutationCallback = null;
   class TestMutationObserver {
@@ -209,6 +314,7 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     }
 
     observe() {}
+    disconnect() {}
   }
   const dictionary = {
     MENU_GENERAL_UNREAD: '{count} neue Einträge für alle',
@@ -218,14 +324,36 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     BOARD_SAVE_ERROR: 'Speichern fehlgeschlagen.',
     BOARD_SAVE_SUCCESS: 'Eintrag wurde gespeichert.',
     BOARD_SAVE_FAILURE: 'Eintrag konnte nicht gespeichert werden.',
+    BOARD_CATEGORY_SAVING: 'Kategorien werden sortiert …',
+    BOARD_CATEGORY_SAVE_ERROR: 'Sortieren fehlgeschlagen.',
+    BOARD_CATEGORY_SAVE_SUCCESS: 'Kategorienreihenfolge gespeichert.',
+    BOARD_CATEGORY_SAVE_FAILURE: 'Kategorienreihenfolge konnte nicht gespeichert werden.',
+    BOARD_CATEGORY_NAME_REQUIRED: 'Bitte gib einen Kategorienamen ein.',
+    BOARD_CATEGORY_ADDING: 'Kategorie wird angelegt …',
+    BOARD_CATEGORY_ADD_ERROR: 'Kategorie konnte nicht angelegt werden.',
+    BOARD_CATEGORY_ADD_SUCCESS: 'Kategorie wurde angelegt.',
+    BOARD_CATEGORY_DELETE: 'Leere Kategorie löschen',
+    BOARD_CATEGORY_DRAG_ARIA: 'Kategorie sortieren',
+    BOARD_CATEGORY_DRAG_TITLE: 'Kategorie zum Sortieren ziehen',
+    BOARD_CATEGORY_DELETE_CONFIRM: 'Leere Kategorie löschen?',
+    BOARD_CATEGORY_DELETING: 'Kategorie wird gelöscht …',
+    BOARD_CATEGORY_DELETE_ERROR: 'Kategorie konnte nicht gelöscht werden.',
+    BOARD_CATEGORY_DELETE_SUCCESS: 'Leere Kategorie gelöscht.',
+    BOARD_CATEGORY_DELETE_FAILURE: 'Kategorie konnte nicht gelöscht werden.',
+    BOARD_ENTRY_SAVING: 'Eintrag wird gespeichert …',
+    BOARD_ENTRY_SAVE_ERROR: 'Eintrag konnte nicht gespeichert werden.',
+    BOARD_ENTRY_SAVE_SUCCESS: 'Eintrag wurde gespeichert.',
   };
+  let reloadCount = 0;
   vm.runInNewContext(source, {
     document,
     window: {
+      location: { reload: () => { reloadCount++; } },
       KWMashaFeedlyTranslations: { FORMAL_ADDRESS: formalAddress },
-      KWMashaFeedlyTranslate(key, values = {}) {
-        return Object.entries(values).reduce((message, [name, value]) => message.replaceAll(`{${name}}`, String(value)), dictionary[key] || key);
-      },
+      KWMashaFeedlyTranslate: includeGlobalTranslator
+        ? (key, values = {}) => Object.entries(values).reduce((message, [name, value]) => message.replaceAll(`{${name}}`, String(value)), dictionary[key] || key)
+        : undefined,
+      confirm: confirmImplementation,
     },
     FormData: TestFormData,
     fetch: fetchImplementation,
@@ -239,6 +367,10 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     menuTitle,
     triggerMutation: () => mutationCallback?.(),
     titleWrites: () => titleWrites,
+    documentListeners,
+    clickCategoryButton: () => documentListeners.click?.({ target: board.openCategoryFormButton }),
+    setBoardAvailable: (available) => { boardAvailable = available; },
+    reloadCount: () => reloadCount,
   };
 }
 
@@ -346,6 +478,19 @@ function startDragging(board, card) {
   });
 }
 
+/** Beginnt einen simulierten Drag-Vorgang für eine Kategorie. */
+function startDraggingCategory(board, category) {
+  const handle = new TestElement('category-handle');
+  category.appendChild(handle);
+  board.listeners.dragstart({
+    target: handle,
+    dataTransfer: {
+      effectAllowed: '',
+      setData() {},
+    },
+  });
+}
+
 test('entfernt den Drag-Zustand nach dem Loslassen einer Karte', () => {
   const { board } = createBoardEnvironment();
   const list = new TestElement('list', { categoryId: '1' });
@@ -431,4 +576,269 @@ test('stellt die Karte nach einem fehlgeschlagenen Verschieben in der Ursprungsk
   assert.equal(card.parentElement, sourceList);
   assert.equal(card.classList.contains('is-dragging'), false);
   assert.equal(board.status.textContent, 'Speichern fehlgeschlagen.');
+});
+
+test('sortiert Kategorien per Drag-and-drop und speichert ihre vollständige Reihenfolge', async () => {
+  let requestURL = '';
+  let requestOptions = null;
+  const { board, formDataInstances, clickCategoryButton } = createBoardEnvironment(async (url, options) => {
+    requestURL = url;
+    requestOptions = options;
+    return { ok: true, json: async () => ({ success: true }) };
+  });
+  const columns = new TestElement('columns');
+  const first = new TestElement('column', { categoryId: '1' });
+  const second = new TestElement('column', { categoryId: '2' });
+  columns.appendChild(first);
+  columns.appendChild(second);
+  board.appendChild(columns);
+
+  startDraggingCategory(board, first);
+  await board.listeners.dragover({
+    target: second,
+    clientX: 80,
+    preventDefault() {},
+  });
+  await board.listeners.drop({ target: columns, preventDefault() {} });
+
+  assert.equal(requestURL, '/move-category');
+  assert.equal(requestOptions.method, 'POST');
+  assert.equal(requestOptions.credentials, 'same-origin');
+  assert.deepEqual(formDataInstances[0].values, [
+    ['SecurityID', 'csrf-test-token'],
+    ['CategoryIDs[]', '2'],
+    ['CategoryIDs[]', '1'],
+  ]);
+  assert.deepEqual(columns.children, [second, first]);
+  assert.equal(board.status.textContent, 'Kategorienreihenfolge gespeichert.');
+});
+
+test('stellt eine Kategorie nach fehlgeschlagenem Speichern an ihre ursprüngliche Position zurück', async () => {
+  const { board } = createBoardEnvironment(async () => ({
+    ok: false,
+    json: async () => ({ success: false, message: 'Sortieren fehlgeschlagen.' }),
+  }));
+  const columns = new TestElement('columns');
+  const first = new TestElement('column', { categoryId: '1' });
+  const second = new TestElement('column', { categoryId: '2' });
+  columns.appendChild(first);
+  columns.appendChild(second);
+  board.appendChild(columns);
+
+  startDraggingCategory(board, first);
+  await board.listeners.dragover({ target: second, clientX: 80, preventDefault() {} });
+  await board.listeners.drop({ target: columns, preventDefault() {} });
+
+  assert.deepEqual(columns.children, [first, second]);
+  assert.equal(board.status.textContent, 'Sortieren fehlgeschlagen.');
+});
+
+test('löscht eine bestätigte leere Kategorie mit CSRF-Token und blendet sie aus', async () => {
+  let requestURL = '';
+  let requestOptions = null;
+  const { board, formDataInstances, clickCategoryButton } = createBoardEnvironment(async (url, options) => {
+    requestURL = url;
+    requestOptions = options;
+    return { ok: true, json: async () => ({ success: true }) };
+  });
+  const columns = new TestElement('columns');
+  const category = new TestElement('column', { categoryId: '27' });
+  const deleteButton = new TestElement('delete-button');
+  category.appendChild(deleteButton);
+  columns.appendChild(category);
+  board.appendChild(columns);
+
+  await board.listeners.click({ target: deleteButton });
+
+  assert.equal(requestURL, '/delete-category');
+  assert.equal(requestOptions.method, 'POST');
+  assert.equal(requestOptions.credentials, 'same-origin');
+  assert.deepEqual(formDataInstances[0].values, [
+    ['SecurityID', 'csrf-test-token'],
+    ['CategoryID', '27'],
+  ]);
+  assert.deepEqual(columns.children, []);
+  assert.equal(board.status.textContent, 'Leere Kategorie gelöscht.');
+});
+
+test('bricht das Löschen ab, solange die Bestätigung nicht erteilt ist', async () => {
+  let requestCount = 0;
+  const { board } = createBoardEnvironment(async () => {
+    requestCount++;
+    return { ok: true, json: async () => ({ success: true }) };
+  }, null, true, null, 0, 'du', () => false);
+  const category = new TestElement('column', { categoryId: '27' });
+  const deleteButton = new TestElement('delete-button');
+  category.appendChild(deleteButton);
+  board.appendChild(category);
+
+  await board.listeners.click({ target: deleteButton });
+
+  assert.equal(requestCount, 0);
+  assert.equal(category.parentElement, board);
+});
+
+test('öffnet das Formular barrierearm und legt die Kategorie direkt im Board an', async () => {
+  let requestURL = '';
+  let requestOptions = null;
+  const { board, formDataInstances, clickCategoryButton } = createBoardEnvironment(async (url, options) => {
+    requestURL = url;
+    requestOptions = options;
+    return { ok: true, json: async () => ({ success: true, category: { id: 33, title: 'Qualität', sort: 70 } }) };
+  });
+  board.categoryForm.querySelector = (selector) => {
+    if (selector === '[data-category-title-input]') return board.categoryNameInput;
+    if (selector === '[data-cancel-category-form]') return board.cancelCategoryFormButton;
+    return null;
+  };
+  board.categoryNameInput.value = '  Qualität  ';
+  assert.equal(board.categoryModal.hidden, true);
+  clickCategoryButton();
+  assert.equal(board.categoryModal.hidden, false);
+  assert.equal(board.categoryNameInput.focusCount, 1);
+
+  await board.categorySubmitButton.listeners.click();
+
+  assert.equal(requestURL, '/create-category');
+  assert.equal(requestOptions.method, 'POST');
+  assert.equal(requestOptions.credentials, 'same-origin');
+  assert.deepEqual(formDataInstances[0].values, [
+    ['SecurityID', 'csrf-test-token'],
+    ['Title', 'Qualität'],
+  ]);
+  assert.equal(board.columnsContainer.children.length, 1);
+  assert.equal(board.columnsContainer.children[0].dataset.categoryId, '33');
+  assert.equal(board.columnsContainer.children[0].children[0].children[1].textContent, 'Qualität');
+  assert.equal(board.categoryModal.hidden, true);
+  assert.equal(board.status.textContent, 'Kategorie wurde angelegt.');
+});
+
+test('öffnet Kategorie-Overlay durch einen echten delegierten Klick auch ohne Frontend-Übersetzungs-JavaScript', () => {
+  const { board, clickCategoryButton } = createBoardEnvironment(undefined, null, true, null, 0, 'du', () => true, 'complete', false);
+
+  assert.equal(board.categoryModal.hidden, true);
+  clickCategoryButton();
+
+  assert.equal(board.categoryModal.hidden, false);
+  assert.equal(board.categoryNameInput.focusCount, 1);
+});
+
+test('schließt den Kategorie-Dialog mit Abbrechen, Escape und Klick auf den Hintergrund', () => {
+  const { board, clickCategoryButton } = createBoardEnvironment();
+  clickCategoryButton();
+  assert.equal(board.categoryModal.hidden, false);
+  board.cancelCategoryFormButton.listeners.click();
+  assert.equal(board.categoryModal.hidden, true);
+  assert.equal(board.openCategoryFormButton.focusCount, 1);
+
+  clickCategoryButton();
+  board.listeners.keydown({ key: 'Escape' });
+  assert.equal(board.categoryModal.hidden, true);
+
+  clickCategoryButton();
+  board.categoryModal.listeners.click({ target: board.categoryModal });
+  assert.equal(board.categoryModal.hidden, true);
+});
+
+test('öffnet das Kategorie-Overlay auch vor DOMContentLoaded über den delegierten CMS-Klick', () => {
+  const { board, clickCategoryButton } = createBoardEnvironment(undefined, null, true, null, 0, 'du', () => true, 'loading');
+
+  assert.equal(board.openCategoryFormButton.listeners.click, undefined);
+  assert.equal(board.categoryModal.hidden, true);
+  clickCategoryButton();
+
+  assert.equal(board.categoryModal.hidden, false);
+  assert.equal(board.categoryNameInput.focusCount, 1);
+});
+
+test('öffnet das Kategorie-Overlay nach einer SilverStripe-PJAX-Navigation über den delegierten Klick', () => {
+  const { board, setBoardAvailable, triggerMutation, clickCategoryButton } = createBoardEnvironment(undefined, null, false);
+
+  assert.equal(board.openCategoryFormButton.listeners.click, undefined);
+  setBoardAvailable(true);
+  triggerMutation();
+  clickCategoryButton();
+
+  assert.equal(board.categoryModal.hidden, false);
+});
+
+test('behält den Kategorienamen im offenen Formular, wenn das Speichern fehlschlägt', async () => {
+  const { board, clickCategoryButton } = createBoardEnvironment(async () => ({
+    ok: false,
+    json: async () => ({ success: false, message: 'Kategorie konnte nicht angelegt werden.' }),
+  }));
+  board.categoryNameInput.value = 'Support';
+  clickCategoryButton();
+
+  await board.categorySubmitButton.listeners.click();
+
+  assert.equal(board.categoryModal.hidden, false);
+  assert.equal(board.categoryNameInput.value, 'Support');
+  assert.equal(board.categoryNameInput.focusCount, 2);
+  assert.equal(board.status.textContent, 'Kategorie konnte nicht angelegt werden.');
+});
+
+test('sendet keinen leeren Kategorienamen an den Server', async () => {
+  let requestCount = 0;
+  const { board } = createBoardEnvironment(async () => {
+    requestCount++;
+    return { ok: true, json: async () => ({ success: true }) };
+  });
+
+  await board.categorySubmitButton.listeners.click();
+
+  assert.equal(requestCount, 0);
+  assert.equal(board.status.textContent, 'Bitte gib einen Kategorienamen ein.');
+  assert.equal(board.categoryNameInput.focusCount, 1);
+});
+
+test('öffnet und schließt das Formular für neue Einträge als CMS-Overlay', () => {
+  const { board } = createBoardEnvironment();
+  assert.equal(board.entryModal.hidden, true);
+  board.openEntryFormButton.listeners.click();
+  assert.equal(board.entryModal.hidden, false);
+  assert.equal(board.entryForm.contentInput.focusCount, 1);
+  board.entryModal.listeners.click({ target: board.entryModal });
+  assert.equal(board.entryModal.hidden, true);
+  assert.equal(board.openEntryFormButton.focusCount, 1);
+});
+
+test('speichert einen neuen Eintrag aus dem CMS-Overlay mit CSRF-Token und lädt das CMS-Board neu', async () => {
+  let requestURL = '';
+  let requestOptions = null;
+  const { board, formDataInstances, reloadCount } = createBoardEnvironment(async (url, options) => {
+    requestURL = url;
+    requestOptions = options;
+    return { ok: true, json: async () => ({ success: true, message: 'Eintrag wurde gespeichert.' }) };
+  });
+  board.openEntryFormButton.listeners.click();
+
+  await board.entryForm.listeners.submit({ preventDefault() {} });
+
+  assert.equal(requestURL, '/__masha-feedly/createEntry');
+  assert.equal(requestOptions.method, 'POST');
+  assert.equal(requestOptions.credentials, 'same-origin');
+  assert.deepEqual(formDataInstances[0].values, [
+    ['Content', 'Ein Testeintrag'],
+    ['SecurityID', 'csrf-test-token'],
+  ]);
+  assert.equal(board.entryModal.hidden, true);
+  assert.equal(board.status.textContent, 'Eintrag wurde gespeichert.');
+  assert.equal(reloadCount(), 1);
+});
+
+test('lässt das CMS-Overlay bei einem fehlgeschlagenen Eintrag offen und bewahrt den Text', async () => {
+  const { board, reloadCount } = createBoardEnvironment(async () => ({
+    ok: false,
+    json: async () => ({ success: false, message: 'Eintrag konnte nicht gespeichert werden.' }),
+  }));
+  board.openEntryFormButton.listeners.click();
+
+  await board.entryForm.listeners.submit({ preventDefault() {} });
+
+  assert.equal(board.entryModal.hidden, false);
+  assert.equal(board.entryForm.contentInput.value, 'Ein Testeintrag');
+  assert.equal(board.entryForm.status.textContent, 'Eintrag konnte nicht gespeichert werden.');
+  assert.equal(reloadCount(), 0);
+  assert.equal(board.entryForm.submitButton.disabled, false);
 });
