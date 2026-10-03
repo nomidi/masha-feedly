@@ -28,6 +28,8 @@ test('ordnet Admin-Karten als Kopfzeile, Titel-Auszug und Datum darunter an', ()
     /card-topline[\s\S]*?entry-number[\s\S]*?board__priority[\s\S]*?new-indicator[\s\S]*?drag-handle[\s\S]*?card-heading[\s\S]*?card-date/
   );
   assert.match(styles, /&__card-topline\s*\{[\s\S]*?display: flex/);
+  assert.match(styles, /&__card-topline\s*\{[\s\S]*?position: relative[\s\S]*?padding-right: 2rem/);
+  assert.match(styles, /&__drag-handle\s*\{[\s\S]*?position: absolute[\s\S]*?right: 0/);
   assert.match(styles, /&__card-heading\s*\{[\s\S]*?-webkit-line-clamp: 2/);
   assert.match(styles, /&__card-date\s*\{[\s\S]*?display: block/);
   assert.doesNotMatch(renderer, /masha-feedly-board__card-metadata/);

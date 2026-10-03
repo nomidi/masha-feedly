@@ -104,7 +104,10 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('<span class="kw-masha-feedly__sr-only">abgeschlossene Einträge</span>', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertMatchesRegularExpression('/data-masha-feedly-open-news[^>]*aria-label="Neu seit deinem letzten Besuch"/', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('viewBox="0 0 177800 177800"', $this->widgetMarkup($allowedResponse->getBody()));
-        $this->assertStringContainsString('data-masha-feedly-open-feedback title=', $this->widgetMarkup($allowedResponse->getBody()));
+        $widgetMarkup = $this->widgetMarkup($allowedResponse->getBody());
+        $this->assertStringContainsString('data-masha-feedly-open-feedback data-tooltip=', $widgetMarkup);
+        $this->assertStringContainsString('data-masha-feedly-open-closed aria-label="Abgeschlossene Einträge ansehen" data-tooltip=', $widgetMarkup);
+        $this->assertDoesNotMatchRegularExpression('/data-masha-feedly-open-(?:news|feedback|closed)[^>]*\stitle=/', $widgetMarkup);
         $this->assertStringContainsString('data-masha-feedly-closed-count', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-list-mode', $allowedResponse->getBody());
         $this->assertStringContainsString('data-saved-views-url="/__masha-feedly"', $this->widgetMarkup($allowedResponse->getBody()));
