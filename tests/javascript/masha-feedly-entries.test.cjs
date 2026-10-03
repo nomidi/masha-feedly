@@ -1158,8 +1158,10 @@ test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedbac
   assert.equal(env.openPageListButton.dataset.label, 'Aktuelle Seite');
   assert.equal(env.feedbackButton.hidden, false);
   assert.equal(env.feedbackCountDisplay.textContent, '1');
-  assert.equal(env.feedbackButton.attributes.title, 'Einträge anzeigen, bei denen Feedback aussteht · 1');
-  assert.equal(env.openClosedButton.attributes.title, 'Abgeschlossene Einträge ansehen · 0');
+  assert.equal(env.feedbackButton.attributes['data-tooltip'], 'Einträge anzeigen, bei denen Feedback aussteht · 1');
+  assert.equal(env.openClosedButton.attributes['data-tooltip'], 'Abgeschlossene Einträge ansehen · 0');
+  assert.equal(env.feedbackButton.attributes.title, undefined);
+  assert.equal(env.openClosedButton.attributes.title, undefined);
 
   await env.feedbackButton.listeners.click();
   assert.equal(env.requests.at(-1).searchParams.get('mode'), 'feedback');
@@ -1181,7 +1183,7 @@ test('zeigt Neuigkeiten im ersten Panel und öffnet die Liste ungelesener Eintr�
   assert.equal(env.openNewsButton.attributes['data-has-news'], 'true');
   assert.equal(env.newsSummary.textContent, 'Einträge: 1 · Kommentare: 2');
   assert.equal(env.openNewsButton.attributes['aria-label'], 'Neuigkeiten · Einträge: 1 · Kommentare: 2');
-  assert.equal(env.openNewsButton.attributes.title, 'Neuigkeiten · Einträge: 1 · Kommentare: 2');
+  assert.equal(env.openNewsButton.attributes['data-tooltip'], 'Neuigkeiten · Einträge: 1 · Kommentare: 2');
 
   await env.openNewsButton.listeners.click();
   assert.equal(env.requests.at(-1).searchParams.get('mode'), 'unread');
@@ -1200,8 +1202,12 @@ test('zeigt Neuigkeiten im ersten Panel und öffnet die Liste ungelesener Eintr�
   assert.match(scss, /\.kw-masha-feedly__news-copy small\s*\{[^}]*font-size:\s*calc\(12\.8px \* var\(--masha-font-scale, 1\)\)/);
   assert.match(scss, /\.kw-masha-feedly__news-button:focus-visible\s*\{/);
   assert.match(widgetTemplate, /viewBox="0 0 177800 177800"/);
-  assert.match(widgetTemplate, /data-masha-feedly-open-news[^>]*title=/);
-  assert.match(widgetTemplate, /data-masha-feedly-open-feedback[^>]*title=/);
+  assert.match(widgetTemplate, /data-masha-feedly-open-news[^>]*data-tooltip=/);
+  assert.match(widgetTemplate, /data-masha-feedly-open-feedback[^>]*data-tooltip=/);
+  const actionButtons = ['news', 'feedback', 'closed'].map((name) => widgetTemplate.match(new RegExp(`<button\\b(?=[^>]*data-masha-feedly-open-${name})[\\s\\S]*?<\\/button>`))?.[0] || '');
+  assert.ok(actionButtons.every((button) => button.includes('data-tooltip=')));
+  assert.ok(actionButtons.every((button) => !/\stitle=/.test(button)));
+  assert.ok(actionButtons.every((button) => button.includes('aria-label=')));
   assert.match(scss, /actions > \.kw-masha-feedly__news-button strong,[\s\S]*?position: absolute; top: -5\.6px;/);
   assert.match(scss, /Die Zähler bekommen eigene, großzügige Zeilen statt enger Mini-Kacheln/);
   assert.match(scss, /\.kw-masha-feedly__actions \{ grid-template-columns: minmax\(0, 1fr\); gap: 11\.2px; \}/);
@@ -1209,10 +1215,9 @@ test('zeigt Neuigkeiten im ersten Panel und öffnet die Liste ungelesener Eintr�
   assert.match(scss, /Größere Statussymbole mit genug Raum rundherum/);
   assert.match(scss, /\.kw-masha-feedly__news-icon svg \{ width: 74\.4px; height: 74\.4px; \}/);
   assert.match(scss, /actions > \.kw-masha-feedly__feedback-button svg,[\s\S]*?width: 64px; height: 64px;/);
-  assert.match(scss, /Feines Hover-Feedback und ein eigener, gut lesbarer Hinweis/);
-  assert.match(scss, /content: attr\(title\);[^}]*opacity: 0;[^}]*transition: opacity 140ms ease/);
-  assert.match(scss, /news-button:focus-visible::after,[\s\S]*?feedback-button:focus-visible::before/);
-  assert.match(scss, /prefers-reduced-motion: reduce\)[\s\S]*?__news-button::before/);
+  assert.match(scss, /Feines Hover-Feedback; Hinweise zeigt das zentrale Tooltip außerhalb des Buttons/);
+  assert.match(scss, /\.kw-masha-feedly__hover-tooltip\s*\{/);
+  assert.doesNotMatch(scss, /\.kw-masha-feedly__actions > \.kw-masha-feedly__(?:news|feedback|closed)-button::(?:before|after)/);
   assert.match(scss, /\.kw-masha-feedly__sr-only \{ position: absolute !important;/);
   const compiledStyles = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../client/dist/css/masha-feedly.css'), 'utf8');
   assert.match(compiledStyles, /\.kw-masha-feedly__news-button:focus-visible\{outline:3px solid/);

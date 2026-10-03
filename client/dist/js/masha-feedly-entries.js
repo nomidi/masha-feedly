@@ -458,7 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (newsSummary) newsSummary.textContent = t('NEWS_SUMMARY', { entries: unread, comments });
       const description = `${t('NEWS_TITLE')} · ${t('NEWS_SUMMARY', { entries: unread, comments })}`;
       openNewsButton?.setAttribute('aria-label', description);
-      openNewsButton?.setAttribute('title', description);
+      openNewsButton?.setAttribute('data-tooltip', description);
     }
   };
   const renderSavedViews = (views) => {
@@ -1025,10 +1025,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (feedbackCountDisplay) feedbackCountDisplay.textContent = String(feedbackCount);
       if (feedbackButton) {
         feedbackButton.hidden = feedbackCount === 0;
-        feedbackButton.setAttribute('title', `${t('OPEN_FEEDBACK_ENTRIES')} · ${feedbackCount}`);
+        feedbackButton.setAttribute('data-tooltip', `${t('OPEN_FEEDBACK_ENTRIES')} · ${feedbackCount}`);
         feedbackButton.setAttribute('aria-label', `${t('OPEN_FEEDBACK_ENTRIES')} · ${feedbackCount}`);
       }
-      openClosedButton?.setAttribute('title', `${t('OPEN_CLOSED_ENTRIES')} · ${closedCount}`);
+      openClosedButton?.setAttribute('data-tooltip', `${t('OPEN_CLOSED_ENTRIES')} · ${closedCount}`);
       openClosedButton?.setAttribute('aria-label', `${t('OPEN_CLOSED_ENTRIES')} · ${closedCount}`);
       if (rainbow) rainbow.hidden = pageOpenCount !== 0;
       widget.setAttribute('data-success-visible', String(pageOpenCount === 0));

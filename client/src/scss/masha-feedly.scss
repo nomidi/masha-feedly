@@ -1050,34 +1050,16 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__actions > .kw-masha-feedly__feedback-button strong,
 .kw-masha-feedly__actions > .kw-masha-feedly__closed-button strong { min-width: 40px; height: 40px; font-size: calc(19.2px * var(--masha-font-scale, 1)); }
 
-/* Feines Hover-Feedback und ein eigener, gut lesbarer Hinweis. */
+/* Feines Hover-Feedback; Hinweise zeigt das zentrale Tooltip außerhalb des Buttons. */
 .kw-masha-feedly__actions > .kw-masha-feedly__news-button,
 .kw-masha-feedly__actions > .kw-masha-feedly__feedback-button,
 .kw-masha-feedly__actions > .kw-masha-feedly__closed-button { overflow: visible; isolation: isolate; transition: transform 180ms cubic-bezier(.2, .8, .2, 1), box-shadow 180ms ease, border-color 180ms ease, filter 180ms ease; }
-.kw-masha-feedly__actions > .kw-masha-feedly__news-button::after,
-.kw-masha-feedly__actions > .kw-masha-feedly__feedback-button::after,
-.kw-masha-feedly__actions > .kw-masha-feedly__closed-button::after { position: absolute; top: auto; right: auto; bottom: calc(100% + 8.8px); left: 10.4px; z-index: 5; width: max-content; height: auto; max-width: min(304px, calc(100vw - 48px)); padding: 8.8px 12.8px; border: 1px solid #ffffffb8; border-radius: 11.2px; background: #272331f2; color: #fff; box-shadow: 0 8px 20px #19152238; content: attr(title); font-size: calc(14px * var(--masha-font-scale, 1)); font-weight: 650; line-height: 1.35; text-align: left; white-space: normal; opacity: 0; pointer-events: none; transform: translateY(4.8px) scale(.98); transform-origin: bottom left; transition: opacity 140ms ease, transform 160ms ease; }
-.kw-masha-feedly__actions > .kw-masha-feedly__news-button::before,
-.kw-masha-feedly__actions > .kw-masha-feedly__feedback-button::before,
-.kw-masha-feedly__actions > .kw-masha-feedly__closed-button::before { position: absolute; bottom: calc(100% + 4px); left: 21.6px; z-index: 6; width: 8.8px; height: 8.8px; border-right: 1px solid #ffffffb8; border-bottom: 1px solid #ffffffb8; background: #272331f2; content: ''; opacity: 0; transform: rotate(45deg) translateY(3.2px); transition: opacity 140ms ease, transform 160ms ease; }
 .kw-masha-feedly__actions > .kw-masha-feedly__news-button:hover,
 .kw-masha-feedly__actions > .kw-masha-feedly__news-button:focus-visible { z-index: 7; transform: translateY(-3px); border-color: #62a84b; box-shadow: 0 8.8px 19.2px #39882d30, inset 0 1px 0 #fff; }
 .kw-masha-feedly__actions > .kw-masha-feedly__feedback-button:hover,
 .kw-masha-feedly__actions > .kw-masha-feedly__feedback-button:focus-visible { z-index: 7; transform: translateY(-3px); border-color: #9872c1; box-shadow: 0 8.8px 19.2px #7043a236, inset 0 1px 0 #fff; }
 .kw-masha-feedly__actions > .kw-masha-feedly__closed-button:hover,
 .kw-masha-feedly__actions > .kw-masha-feedly__closed-button:focus-visible { z-index: 7; transform: translateY(-3px); border-color: #55a978; box-shadow: 0 8.8px 19.2px #24734b30, inset 0 1px 0 #fff; }
-.kw-masha-feedly__actions > .kw-masha-feedly__news-button:hover::after,
-.kw-masha-feedly__actions > .kw-masha-feedly__news-button:hover::before,
-.kw-masha-feedly__actions > .kw-masha-feedly__feedback-button:hover::after,
-.kw-masha-feedly__actions > .kw-masha-feedly__feedback-button:hover::before,
-.kw-masha-feedly__actions > .kw-masha-feedly__closed-button:hover::after,
-.kw-masha-feedly__actions > .kw-masha-feedly__closed-button:hover::before,
-.kw-masha-feedly__actions > .kw-masha-feedly__news-button:focus-visible::after,
-.kw-masha-feedly__actions > .kw-masha-feedly__news-button:focus-visible::before,
-.kw-masha-feedly__actions > .kw-masha-feedly__feedback-button:focus-visible::after,
-.kw-masha-feedly__actions > .kw-masha-feedly__feedback-button:focus-visible::before,
-.kw-masha-feedly__actions > .kw-masha-feedly__closed-button:focus-visible::after,
-.kw-masha-feedly__actions > .kw-masha-feedly__closed-button:focus-visible::before { opacity: 1; transform: translateY(0) scale(1); }
 .kw-masha-feedly__actions > .kw-masha-feedly__news-button:hover .kw-masha-feedly__news-icon svg,
 .kw-masha-feedly__actions > .kw-masha-feedly__feedback-button:hover > svg,
 .kw-masha-feedly__actions > .kw-masha-feedly__closed-button:hover > svg { transform: scale(1.06); }
@@ -1087,13 +1069,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 @media (prefers-reduced-motion: reduce) {
   .kw-masha-feedly__actions > .kw-masha-feedly__news-button,
   .kw-masha-feedly__actions > .kw-masha-feedly__feedback-button,
-  .kw-masha-feedly__actions > .kw-masha-feedly__closed-button,
-  .kw-masha-feedly__actions > .kw-masha-feedly__news-button::before,
-  .kw-masha-feedly__actions > .kw-masha-feedly__news-button::after,
-  .kw-masha-feedly__actions > .kw-masha-feedly__feedback-button::before,
-  .kw-masha-feedly__actions > .kw-masha-feedly__feedback-button::after,
-  .kw-masha-feedly__actions > .kw-masha-feedly__closed-button::before,
-  .kw-masha-feedly__actions > .kw-masha-feedly__closed-button::after { transition: none; }
+  .kw-masha-feedly__actions > .kw-masha-feedly__closed-button { transition: none; }
 }
 
 /* Kartenraster: feste Titel-/Aktionszeile, darunter Status, Priorität und Zuständige. */
