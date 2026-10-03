@@ -12,6 +12,7 @@ use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
 use SilverStripe\Assets\Image;
 use SilverStripe\Admin\ModelAdmin;
 use SilverStripe\Control\Controller;
+use SilverStripe\Control\Director;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Forms\FieldList;
@@ -257,13 +258,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     /** Rendert alle Kategorien samt sortierbaren Eintragskarten für die Übersicht. */
     private function renderEntryBoard(): string
     {
-        $entryClass = $this->sanitiseClassName(MashaFeedlyEntry::class);
-        $newEntryURL = Controller::join_links(
-            $this->getLinkForModelClass(MashaFeedlyEntry::class),
-            'EditForm/field',
-            $entryClass,
-            'item/new'
-        );
+        $newEntryURL = rtrim(Director::absoluteBaseURL(), '/') . '/?masha-feedly-create=1';
         $html = '<section class="masha-feedly-board" data-masha-feedly-board data-move-url="'
             . $this->escapeBoardValue(Controller::join_links(
                 $this->getLinkForModelClass(MashaFeedlyEntry::class),
@@ -272,7 +267,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             . $this->escapeBoardValue((string)SecurityToken::getSecurityID()) . '">';
         $html .= '<header class="masha-feedly-board__header"><div><h2>' . self::translate('BOARD_HEADER', 'Einträge nach Kategorie') . '</h2>'
             . '<p>' . self::translate('BOARD_HELP', 'Ziehe Einträge in eine andere Kategorie oder sortiere sie innerhalb der Spalte.') . '</p></div>'
-            . '<a class="btn btn-primary" href="' . $this->escapeBoardValue($newEntryURL) . '">' . self::translate('BOARD_CREATE_ENTRY', 'Neuen Eintrag anlegen') . '</a></header>';
+            . '<a class="btn btn-primary" href="' . $this->escapeBoardValue($newEntryURL) . '" target="_blank" rel="noopener noreferrer">' . self::translate('BOARD_CREATE_ENTRY', 'Neuen Eintrag anlegen') . '</a></header>';
         $member = Security::getCurrentUser();
         $unreadEntryIDs = $member instanceof Member
             ? MashaFeedlyEntryRead::unreadEntryIDs($member)

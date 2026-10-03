@@ -1010,7 +1010,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__actions > .kw-masha-feedly__feedback-button strong { background: #7043a2; }
 .kw-masha-feedly__actions > .kw-masha-feedly__closed-button strong { background: #24734b; }
 .kw-masha-feedly__sr-only { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; clip-path: inset(50%) !important; }
-.kw-masha-feedly__entry-activity { display: inline-grid; width: 32px; height: 32px; flex: 0 0 auto; place-items: center; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.kw-masha-feedly__entry-activity { display: inline-grid; width: 20px; height: 20px; flex: 0 0 auto; place-items: center; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .kw-masha-feedly__entry-activity::before { content: none; }
 .kw-masha-feedly__entry-activity svg { display: block; width: 100%; height: 100%; }
 @media (max-width: 40rem) {

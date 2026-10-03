@@ -86,9 +86,9 @@ document.addEventListener('DOMContentLoaded', () => {
     startButton?.focus?.();
   };
 
-  const showEntryDialog = (element) => {
-    const selector = getElementSelector(element);
-    const selectedText = (element.innerText || element.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 220);
+  const showEntryDialog = (element, options = {}) => {
+    const selector = options.elementSelector || getElementSelector(element);
+    const selectedText = options.selectedText ?? (element.innerText || element.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 220);
     context.textContent = selectedText ? t('ENTRY_SELECTED_CONTEXT', { text: selectedText }) : t('ENTRY_CONTEXT_EMPTY');
     ['PageURL', 'ElementSelector', 'ElementText', 'OperatingSystem', 'Browser', 'UserAgent', 'Resolution', 'BrowserWindow', 'ColorDepth']
       .forEach((name) => form.querySelector(`[name="${name}"]`)?.remove());
@@ -123,7 +123,9 @@ document.addEventListener('DOMContentLoaded', () => {
       dateField.value = now.toISOString().slice(0, 16);
     }
     form.querySelector('[name="Content"]').focus();
-    document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-target-selected'));
+    if (options.dispatchOnboarding !== false) {
+      document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-target-selected'));
+    }
   };
 
   startButton?.addEventListener('click', () => {
@@ -231,4 +233,15 @@ document.addEventListener('DOMContentLoaded', () => {
       submit.disabled = false;
     }
   });
+
+  const currentURL = new URL(window.location.href);
+  if (currentURL.searchParams.get('masha-feedly-create') === '1') {
+    currentURL.searchParams.delete('masha-feedly-create');
+    window.history.replaceState({}, '', `${currentURL.pathname}${currentURL.search}${currentURL.hash}`);
+    const panel = widget.querySelector('.kw-masha-feedly__panel');
+    panel.hidden = false;
+    toggleButton?.setAttribute('aria-expanded', 'true');
+    toggleButton?.setAttribute('aria-label', t('CLOSE_WIDGET'));
+    showEntryDialog(document.body, { elementSelector: 'body', selectedText: '', dispatchOnboarding: false });
+  }
 });

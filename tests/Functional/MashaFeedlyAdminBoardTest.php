@@ -51,7 +51,12 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('draggable="true"', $body);
         $this->assertStringContainsString('masha-feedly-admin.js', $body);
         $this->assertStringContainsString('Eintrag anlegen', $body);
-        $this->assertStringContainsString('/item/new', $body);
+        $this->assertMatchesRegularExpression(
+            '/<a class="btn btn-primary" href="[^"]*\\?masha-feedly-create=1" target="_blank" rel="noopener noreferrer">Neuen Eintrag anlegen<\\/a>/',
+            $body,
+            'Das CMS muss geöffnet bleiben und die Eingabemaske in einem neuen, abgesicherten Tab erscheinen.'
+        );
+        $this->assertStringNotContainsString('/item/new', $body);
         $this->assertStringContainsString('masha-feedly-board__drag-handle', $body);
         $this->assertStringContainsString('data-masha-feedly-assignee-filter', $body);
         $this->assertLessThan(
