@@ -210,6 +210,25 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringNotContainsString('data-masha-feedly-start-selection', $restrictedResponse->getBody());
     }
 
+    /** Admins behalten das Widget, erhalten die geführte Einführung aber erst nach expliziter Freigabe. */
+    public function testAdministratorsCanUseWidgetWithoutStartingOnboarding(): void
+    {
+        $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
+        $page->publishRecursive();
+        $allowedMember = $this->objFromFixture(Member::class, 'allowed');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$allowedMember->ID]);
+        $config->write();
+
+        $this->logInWithPermission('ADMIN');
+        $response = $this->get('/masha-feedly-widget-test');
+
+        $this->assertSame(200, $response->getStatusCode());
+        $markup = $this->widgetMarkup($response->getBody());
+        $this->assertNotSame('', $markup, 'Admins behalten das Widget für die Konfiguration.');
+        $this->assertStringNotContainsString('data-onboarding-enabled="1"', $markup);
+    }
+
     /** Dekodiert den serverseitig gerenderten Widget-Markup-String für Inhaltstests. */
     private function widgetMarkup(string $body): string
     {

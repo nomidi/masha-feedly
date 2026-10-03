@@ -1409,6 +1409,10 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(403, $denied->getStatusCode());
         $this->assertFalse((bool)$blocked->MashaFeedlyOnboardingCompleted);
 
+        $this->logInWithPermission('ADMIN');
+        $adminDenied = $this->post('/__masha-feedly/completeOnboarding', ['SecurityID' => SecurityToken::getSecurityID()]);
+        $this->assertSame(403, $adminDenied->getStatusCode(), 'Admins ohne Freigabe dürfen den Onboarding-Status nicht ändern.');
+
         $this->logInAs($allowed);
         $allowed->MashaFeedlyShowOnboarding = true;
         $allowed->write();
@@ -1434,6 +1438,10 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $denied = $this->post('/__masha-feedly/restartOnboarding', ['SecurityID' => SecurityToken::getSecurityID()]);
         $this->assertSame(403, $denied->getStatusCode());
         $this->assertTrue((bool)Member::get()->byID((int)$allowed->ID)->MashaFeedlyOnboardingCompleted);
+
+        $this->logInWithPermission('ADMIN');
+        $adminDenied = $this->post('/__masha-feedly/restartOnboarding', ['SecurityID' => SecurityToken::getSecurityID()]);
+        $this->assertSame(403, $adminDenied->getStatusCode(), 'Admins ohne Freigabe dürfen die Einführung nicht starten.');
 
         $this->logInAs($allowed);
         $restarted = $this->post('/__masha-feedly/restartOnboarding', ['SecurityID' => SecurityToken::getSecurityID()]);

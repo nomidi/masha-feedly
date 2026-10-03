@@ -150,6 +150,21 @@ test('öffnet beim normalen Speichern eines Eintrags keine Einführung und melde
   assert.equal(requests.length, 0);
 });
 
+test('startet ohne serverseitige Freigabe keine Einführung und normale Aktionen bleiben ohne Tour', () => {
+  const { nodes, document, requests } = setup('0');
+  const welcome = nodes.get('[data-masha-feedly-onboarding-welcome]');
+  const tip = nodes.get('[data-masha-feedly-onboarding-tip]');
+  assert.equal(welcome.hidden, true, 'nicht ausdrücklich freigegebene Mitglieder sehen keine Begrüßung');
+  assert.equal(tip.hidden, true);
+
+  document.dispatchEvent({ type: 'kw-masha-feedly:opened' });
+  document.dispatchEvent({ type: 'kw-masha-feedly:onboarding-entry-saved' });
+  document.dispatchEvent({ type: 'kw-masha-feedly:onboarding-entry-updated' });
+
+  assert.equal(tip.hidden, true);
+  assert.equal(requests.length, 0, 'normale Widget-Aktionen starten oder speichern keine Tour');
+});
+
 test('blockiert Ablenkung mit rotem Feedback und lässt den markierten Schritt zu', () => {
   const { nodes, document, timers, appended, documentListeners } = setup();
   nodes.get('[data-masha-feedly-tour-start]').click();

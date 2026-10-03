@@ -80,8 +80,11 @@ class MashaFeedlyWidgetExtension extends Extension
             'DeleteViewURL' => Controller::join_links(Director::baseURL(), '__masha-feedly'),
             'ProfileURL' => CMSProfileController::singleton()->Link() . '#Root_MashaFeedly',
             'TokenValue' => SecurityToken::inst()->getValue(),
-            'OnboardingEnabled' => !((bool)(Security::getCurrentUser()?->MashaFeedlyOnboardingCompleted ?? false))
-                || (bool)(Security::getCurrentUser()?->MashaFeedlyShowOnboarding ?? false),
+            // Admins may use the widget for configuration, but the guided tour is
+            // only for members explicitly added to the Masha:Feedly access list.
+            'OnboardingEnabled' => MashaFeedlyConfigExtension::isExplicitlyAllowed(Security::getCurrentUser())
+                && (!((bool)(Security::getCurrentUser()?->MashaFeedlyOnboardingCompleted ?? false))
+                    || (bool)(Security::getCurrentUser()?->MashaFeedlyShowOnboarding ?? false)),
             'Categories' => $categories,
             'Priorities' => $priorities,
             'Members' => $members,

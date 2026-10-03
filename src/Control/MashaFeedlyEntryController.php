@@ -194,7 +194,7 @@ class MashaFeedlyEntryController extends Controller
     public function completeOnboarding(HTTPRequest $request): HTTPResponse
     {
         $member = Security::getCurrentUser();
-        if (!MashaFeedlyConfigExtension::canUse($member)) {
+        if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($member)) {
             return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
         }
         if (!$request->isPOST()) {
@@ -213,7 +213,7 @@ class MashaFeedlyEntryController extends Controller
     public function restartOnboarding(HTTPRequest $request): HTTPResponse
     {
         $member = Security::getCurrentUser();
-        if (!MashaFeedlyConfigExtension::canUse($member)) {
+        if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($member)) {
             return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
         }
         if (!$request->isPOST()) {
