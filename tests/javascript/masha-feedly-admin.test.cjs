@@ -35,6 +35,17 @@ test('ordnet Admin-Karten als Kopfzeile, Titel-Auszug und Datum darunter an', ()
   assert.doesNotMatch(renderer, /masha-feedly-board__card-metadata/);
 });
 
+test('zentriert das Plus im Admin-Button geometrisch statt über ein Schriftzeichen', () => {
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
+  const compiledStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly-admin.css'), 'utf8');
+  for (const stylesheet of [styles, compiledStyles]) {
+    assert.match(stylesheet, /linear-gradient\(currentColor 0 0\) center\s*\/\s*(?:0)?\.62rem\s+(?:0)?\.1rem no-repeat/);
+    assert.match(stylesheet, /linear-gradient\(currentColor 0 0\) center\s*\/\s*(?:0)?\.1rem\s+(?:0)?\.62rem no-repeat/);
+    assert.match(stylesheet, /background-color:\s*#f8deeb/);
+    assert.doesNotMatch(stylesheet, /content:\s*["']\+["']/);
+  }
+});
+
 /** Simuliert die Klassen eines DOM-Elements für die isolierten Board-Tests. */
 class TestClassList {
   constructor() {
