@@ -22,36 +22,6 @@
   &__hex { color: #77717e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.68rem; }
 }
 
-#cms-menu a[href*="masha-feedly"] {
-  .masha-feedly-menu__badge {
-    display: inline-flex;
-    min-width: 1.35rem;
-    height: 1.35rem;
-    align-items: center;
-    justify-content: center;
-    margin-left: 0.3rem;
-    padding: 0 0.35rem;
-    border: 1px solid #b8dfb3;
-    border-radius: 999px;
-    background: #eaf8e8;
-    color: #286b25;
-    font-size: 0.72rem;
-    font-weight: 700;
-    line-height: 1;
-    box-shadow: 0 1px 2px #27233112;
-  }
-
-  .masha-feedly-menu__badge--new {
-    margin-left: auto;
-  }
-
-  .masha-feedly-menu__badge--feedback {
-    border-color: #cbb9ee;
-    background: #f1edfb;
-    color: #57408d;
-  }
-}
-
 .masha-feedly-board {
   padding: 1.5rem;
   color: #272331;

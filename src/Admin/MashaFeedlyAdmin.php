@@ -64,30 +64,10 @@ class MashaFeedlyAdmin extends ModelAdmin
     ];
 
     /** Liefert die Anzahl offener Einträge in der Feedback-Kategorie. */
-    public static function menuFeedbackCount(): int
+    public static function feedbackCount(): int
     {
         $category = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first();
         return $category && !$category->IsClosed ? $category->Entries()->count() : 0;
-    }
-
-    /** Ergänzt die Menübezeichnung um neue Einträge und ausstehendes Feedback. */
-    public static function menu_title($class = null, $localise = true)
-    {
-        $title = parent::menu_title($class, $localise);
-        if ($class !== null) {
-            return $title;
-        }
-
-        $member = Security::getCurrentUser();
-        if (!$member instanceof Member || !MashaFeedlyConfigExtension::canUse($member)) {
-            return $title;
-        }
-
-        $totalUnread = MashaFeedlyEntryRead::unreadCount($member);
-        $feedbackCount = self::menuFeedbackCount();
-        return $totalUnread > 0 || $feedbackCount > 0
-            ? $title . ' (' . $totalUnread . '/' . $feedbackCount . ')'
-            : $title;
     }
 
     /** Leitet Nicht-Administratoren bei direkten Aufrufen der Konfiguration um. */
@@ -260,7 +240,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         return $this->jsonResponse([
             'success' => true,
             'unreadCount' => $unreadCount,
-            'feedbackCount' => self::menuFeedbackCount(),
+            'feedbackCount' => self::feedbackCount(),
         ]);
     }
 
@@ -384,8 +364,6 @@ class MashaFeedlyAdmin extends ModelAdmin
         $canManageCategories = $member instanceof Member && Permission::checkMember($member, 'ADMIN');
         $adminTranslations = [];
         foreach ([
-            'MENU_NEW_COUNT' => '{count} neue Einträge',
-            'MENU_FEEDBACK_COUNT' => '{count} warten auf Feedback',
             'BOARD_SAVING' => 'Änderung wird gespeichert …',
             'BOARD_SAVE_ERROR' => 'Speichern fehlgeschlagen.',
             'BOARD_SAVE_SUCCESS' => 'Eintrag wurde gespeichert.',

@@ -232,8 +232,6 @@ de:
     ENTRY_CHANGE_FAILED: 'Speichern fehlgeschlagen.'
     ENTRY_CHANGE_SUCCESS: 'Eintrag wurde gespeichert.'
     ENTRY_CHANGE_ERROR: 'Eintrag konnte nicht gespeichert werden.'
-    MENU_NEW_COUNT: '{count} neue Einträge'
-    MENU_FEEDBACK_COUNT: '{count} warten auf Feedback'
     ADMIN_CONFIGURATION: 'Konfiguration'
     ADMIN_ENTRIES: 'Einträge'
     ADMIN_CATEGORIES: 'Kategorien'

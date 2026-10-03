@@ -6,7 +6,7 @@ use SilverStripe\Core\Extension;
 use SilverStripe\View\Requirements;
 
 /**
- * Lädt die Menü-Badge auf allen Seiten des Silverstripe-CMS.
+ * Lädt die Masha-Feedly-Admin-Assets auf allen CMS-Seiten.
  *
  * @package MashaFeedly
  * @author Kooperative Web
@@ -15,7 +15,7 @@ use SilverStripe\View\Requirements;
  */
 class MashaFeedlyAdminAssetsExtension extends Extension
 {
-    /** Registriert die Badge-Assets nach der Initialisierung jeder CMS-Seite. */
+    /** Registriert die Admin-Assets nach der Initialisierung jeder CMS-Seite. */
     public function onAfterInit(): void
     {
         Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly-admin.css');

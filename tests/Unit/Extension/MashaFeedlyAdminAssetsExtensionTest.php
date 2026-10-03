@@ -8,7 +8,7 @@ use SilverStripe\Dev\SapphireTest;
 use SilverStripe\View\Requirements;
 
 /**
- * Prüft, dass die Menü-Badge-Assets auf allen CMS-Seiten geladen werden.
+ * Prüft, dass die Admin-Assets auf allen CMS-Seiten geladen werden.
  *
  * @package MashaFeedly
  * @author Kooperative Web
@@ -17,7 +17,7 @@ use SilverStripe\View\Requirements;
  */
 class MashaFeedlyAdminAssetsExtensionTest extends SapphireTest
 {
-    /** Prüft die globale Registrierung und die eingebundenen Badge-Assets. */
+    /** Prüft die globale Registrierung der Admin-Assets ohne Menü-Zähler-Payload. */
     public function testAssetsAreRegisteredForEveryCMSPage(): void
     {
         $extensions = LeftAndMain::config()->get('extensions');
@@ -30,6 +30,7 @@ class MashaFeedlyAdminAssetsExtensionTest extends SapphireTest
         $javascriptFiles = array_keys(Requirements::backend()->getJavascript());
         $this->assertTrue($this->containsAsset($cssFiles, 'masha-feedly-admin.css'));
         $this->assertTrue($this->containsAsset($javascriptFiles, 'masha-feedly-admin.js'));
+        $this->assertSame([], Requirements::backend()->getCustomScripts());
         Requirements::clear();
     }
 

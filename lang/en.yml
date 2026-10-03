@@ -232,8 +232,6 @@ en:
     ENTRY_CHANGE_FAILED: 'Save failed.'
     ENTRY_CHANGE_SUCCESS: 'Entry saved.'
     ENTRY_CHANGE_ERROR: 'Could not save entry.'
-    MENU_NEW_COUNT: '{count} new entries'
-    MENU_FEEDBACK_COUNT: '{count} awaiting feedback'
     ADMIN_CONFIGURATION: 'Configuration'
     ADMIN_ENTRIES: 'Entries'
     ADMIN_CATEGORIES: 'Categories'

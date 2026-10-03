@@ -180,7 +180,7 @@ class MashaFeedlyEntry extends DataObject
         if ($this->isInDB() && $member instanceof Member && MashaFeedlyConfigExtension::canUse($member)) {
             MashaFeedlyEntryRead::markAsSeen($this, $member);
             $unreadCount = MashaFeedlyEntryRead::unreadCount($member);
-            $feedbackCount = \KW\MashaFeedly\Admin\MashaFeedlyAdmin::menuFeedbackCount();
+            $feedbackCount = \KW\MashaFeedly\Admin\MashaFeedlyAdmin::feedbackCount();
             $fields->addFieldToTab(
                 'Root.Main',
                 LiteralField::create(

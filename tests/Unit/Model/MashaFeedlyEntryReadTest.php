@@ -47,7 +47,7 @@ class MashaFeedlyEntryReadTest extends SapphireTest
         $this->assertSame(1, MashaFeedlyEntryRead::unreadCount($secondMember));
 
         $this->logInAs($firstMember);
-        $this->assertSame('Masha:Feedly (1/0)', MashaFeedlyAdmin::menu_title());
+        $this->assertSame('Masha:Feedly', MashaFeedlyAdmin::menu_title());
         $entry->getCMSFields();
         $this->assertSame(0, MashaFeedlyEntryRead::unreadCount($firstMember));
         $this->assertSame(1, MashaFeedlyEntryRead::unreadCount($secondMember));
@@ -150,12 +150,12 @@ class MashaFeedlyEntryReadTest extends SapphireTest
         $this->assertSame(['general' => 0, 'personal' => 0], MashaFeedlyEntryRead::unreadCounts($firstMember));
         $this->assertSame(['general' => 0, 'personal' => 1], MashaFeedlyEntryRead::unreadCounts($secondMember));
         Security::setCurrentUser($secondMember);
-        $this->assertSame('Masha:Feedly (1/0)', MashaFeedlyAdmin::menu_title());
+        $this->assertSame('Masha:Feedly', MashaFeedlyAdmin::menu_title());
         Security::setCurrentUser(null);
     }
 
     /** Prüft, dass der CMS-Menüpunkt neue Einträge und offene Feedback-Fälle separat zählt. */
-    public function testMenuTitleShowsUnreadAndFeedbackCounts(): void
+    public function testMenuTitleStaysCleanForIconBadges(): void
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
         $this->allowMembers([$member]);
@@ -170,10 +170,7 @@ class MashaFeedlyEntryReadTest extends SapphireTest
         $entry->write();
         Security::setCurrentUser($member);
 
-        $this->assertSame(
-            sprintf('Masha:Feedly (%d/1)', MashaFeedlyEntryRead::unreadCount($member)),
-            MashaFeedlyAdmin::menu_title()
-        );
+        $this->assertSame('Masha:Feedly', MashaFeedlyAdmin::menu_title());
         Security::setCurrentUser(null);
     }
 

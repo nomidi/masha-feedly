@@ -1,6 +1,4 @@
 (() => {
-  let menuObserverStarted = false;
-
   // Category buttons live in SilverStripe's PJAX-managed ModelAdmin content.
   // Delegate in capture phase so the control keeps working even if the board
   // was replaced after its initialisation (or CMS code stops bubbling clicks).
@@ -34,55 +32,6 @@
     });
     return message;
   };
-  /** Aktualisiert den Zähler des Masha-Feedly-Menüpunkts für das aktuelle Mitglied. */
-  const updateUnreadMenuCount = (newCount, feedbackCount) => {
-    const menuLink = [...document.querySelectorAll('#cms-menu a[href*="masha-feedly"]')][0];
-    const title = menuLink?.querySelector('.text');
-    if (!title) return;
-    const baseTitle = title.textContent.replace(/\s+\(\d+\/\d+\)$/, '');
-    if (title.textContent !== baseTitle) title.textContent = baseTitle;
-    const updateBadge = (type, count, label) => {
-      const className = `masha-feedly-menu__badge--${type}`;
-      let badge = menuLink.querySelector(`.${className}`);
-      if (count <= 0) {
-        badge?.remove();
-        return;
-      }
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.classList.add('masha-feedly-menu__badge', className);
-        menuLink.appendChild(badge);
-      }
-      if (badge.textContent !== String(count)) badge.textContent = String(count);
-      if (badge.getAttribute('aria-label') !== label) badge.setAttribute('aria-label', label);
-    };
-    updateBadge('new', newCount, t('MENU_NEW_COUNT', { count: newCount }));
-    updateBadge('feedback', feedbackCount, t('MENU_FEEDBACK_COUNT', { count: feedbackCount }));
-  };
-
-  /** Übernimmt den vom Server gelieferten individuellen Zähler aus dem Eintragsformular. */
-  const refreshUnreadMenuCount = () => {
-    const marker = document.querySelector('[data-masha-feedly-unread-count]');
-    if (marker) {
-      updateUnreadMenuCount(
-        Number(marker.dataset.mashaFeedlyUnreadCount || 0),
-        Number(marker.dataset.mashaFeedlyFeedbackCount || 0)
-      );
-      return;
-    }
-    const title = [...document.querySelectorAll('#cms-menu a[href*="masha-feedly"]')][0]?.querySelector('.text');
-    const serverCounts = title?.textContent.match(/\((\d+)\/(\d+)\)$/);
-    if (serverCounts) updateUnreadMenuCount(Number(serverCounts[1]), Number(serverCounts[2]));
-  };
-
-  if (!menuObserverStarted) {
-    refreshUnreadMenuCount();
-    if (typeof MutationObserver !== 'undefined' && document.body) {
-      new MutationObserver(refreshUnreadMenuCount).observe(document.body, { childList: true, subtree: true });
-    }
-    menuObserverStarted = true;
-  }
-
   if (!board) {
     // SilverStripe can replace ModelAdmin content through PJAX after this file
     // has executed. Keep watching until the board arrives, then bind its actions.
@@ -414,9 +363,6 @@
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || t('BOARD_SAVE_ERROR'));
-      if (Number.isFinite(Number(result.unreadCount))) {
-        updateUnreadMenuCount(Number(result.unreadCount), Number(result.feedbackCount || 0));
-      }
       board.querySelectorAll('.masha-feedly-board__column').forEach((column) => {
         const columnList = column.querySelector('.masha-feedly-board__list');
         column.querySelector('.masha-feedly-board__column-header span').textContent =

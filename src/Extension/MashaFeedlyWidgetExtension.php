@@ -214,8 +214,6 @@ class MashaFeedlyWidgetExtension extends Extension
             'BOARD_SAVE_ERROR' => 'Speichern fehlgeschlagen.',
             'BOARD_SAVE_SUCCESS' => 'Eintrag wurde gespeichert.',
             'BOARD_SAVE_FAILURE' => 'Eintrag konnte nicht gespeichert werden.',
-            'MENU_NEW_COUNT' => '{count} neue Einträge',
-            'MENU_FEEDBACK_COUNT' => '{count} warten auf Feedback',
             'EDIT_SAVING' => 'Änderungen werden gespeichert …',
             'EDIT_SAVE_ERROR' => 'Änderungen konnten nicht gespeichert werden.',
             'CREATE_SAVING' => 'Eintrag wird gespeichert …',

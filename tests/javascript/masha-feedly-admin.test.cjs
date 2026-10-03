@@ -20,6 +20,12 @@ test('zeigt im CMS-Board das grüne Neu-Icon statt eines Aktivität-Sterns', () 
   assert.match(styles, /\.masha-feedly-board__new-icon[\s\S]*?path:first-child \{ fill: #48b02c; \}[\s\S]*?path:last-child \{ fill: #fff; \}/);
 });
 
+test('Admin-Menü und Breadcrumb erhalten keine Masha-Feedly-Zähler-Badges', () => {
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
+  assert.doesNotMatch(source, /masha-feedly-menu__badge|KWMashaFeedlyMenuCounts|RenderMenuCounts/);
+  assert.doesNotMatch(styles, /masha-feedly-menu__badge/);
+});
+
 test('ordnet Admin-Karten als Kopfzeile, Titel-Auszug und Datum darunter an', () => {
   const renderer = fs.readFileSync(path.resolve(__dirname, '../../src/Admin/MashaFeedlyAdmin.php'), 'utf8');
   const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
@@ -125,9 +131,6 @@ class TestElement {
     if (selector === '[data-category-title-input]' && this.type === 'form') return this.categoryNameInput || null;
     if (selector === '.masha-feedly-board__column-header span') return this.countSpan || null;
     if (selector === '.text') return this.textElement || null;
-    if (selector.startsWith('.masha-feedly-menu__badge--')) {
-      return this.badges?.[selector.replace('.masha-feedly-menu__badge--', '')] || null;
-    }
     return null;
   }
 
@@ -154,11 +157,6 @@ class TestElement {
   }
 
   remove() {
-    if (this.parentElement?.badges) {
-      for (const [type, badge] of Object.entries(this.parentElement.badges)) {
-        if (badge === this) this.parentElement.badges[type] = null;
-      }
-    }
     if (this.parentElement) {
       this.parentElement.children = this.parentElement.children.filter((child) => child !== this);
       this.parentElement.updateSiblings();
@@ -198,14 +196,6 @@ class TestElement {
     }
     this.children.push(element);
     element.parentElement = this;
-    if (element.classList.contains('masha-feedly-menu__badge--new')) {
-      this.badges ??= {};
-      this.badges.new = element;
-    }
-    if (element.classList.contains('masha-feedly-menu__badge--feedback')) {
-      this.badges ??= {};
-      this.badges.feedback = element;
-    }
     this.updateSiblings();
   }
 
@@ -232,7 +222,7 @@ class TestElement {
 function createBoardEnvironment(fetchImplementation = async () => ({
   ok: true,
   json: async () => ({ success: true }),
-  }), unreadCount = null, hasBoard = true, serverMenuTitle = null, feedbackCount = 0, formalAddress = 'du', confirmImplementation = () => true, documentReadyState = 'complete', includeGlobalTranslator = true) {
+  }), hasBoard = true, formalAddress = 'du', confirmImplementation = () => true, documentReadyState = 'complete', includeGlobalTranslator = true) {
   const board = new TestElement('board', {
     moveUrl: '/move-entry',
     moveCategoryUrl: '/move-category',
@@ -241,8 +231,6 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     createEntryUrl: '/__masha-feedly/createEntry',
     securityId: 'csrf-test-token',
     adminTranslations: JSON.stringify({
-      MENU_NEW_COUNT: '{count} neue Einträge',
-      MENU_FEEDBACK_COUNT: '{count} warten auf Feedback',
       BOARD_CATEGORY_DRAG_ARIA: 'Kategorie sortieren',
       BOARD_CATEGORY_DRAG_TITLE: 'Kategorie zum Sortieren ziehen',
       BOARD_CATEGORY_DELETE: 'Leere Kategorie löschen',
@@ -308,41 +296,27 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     }
   }
 
-  const menuTitle = {
-    value: serverMenuTitle ?? (unreadCount === null
-      ? 'Masha:Feedly'
-      : `Masha:Feedly (${unreadCount}/${feedbackCount})`),
-  };
-  let titleWrites = 0;
-  Object.defineProperty(menuTitle, 'textContent', {
-    get() { return this.value; },
-    set(value) {
-      if (this.value !== value) titleWrites++;
-      this.value = value;
-    },
-    configurable: true,
-  });
-  const menuLink = new TestElement('menu-link');
-  menuLink.textElement = menuTitle;
-  const marker = unreadCount === null ? null : {
-    dataset: {
-      mashaFeedlyUnreadCount: String(unreadCount),
-      mashaFeedlyFeedbackCount: String(feedbackCount),
-    },
-  };
   let boardAvailable = hasBoard;
   const documentListeners = {};
+  const simulatedWindow = {
+    location: { reload: () => { reloadCount++; } },
+    KWMashaFeedlyTranslations: { FORMAL_ADDRESS: formalAddress },
+    KWMashaFeedlyTranslate: includeGlobalTranslator
+      ? (key, values = {}) => Object.entries(values).reduce((message, [name, value]) => message.replaceAll(`{${name}}`, String(value)), dictionary[key] || key)
+      : undefined,
+    confirm: confirmImplementation,
+  };
   const document = {
     body: {},
     readyState: documentReadyState,
     addEventListener: (name, callback) => { documentListeners[name] = callback; },
     querySelector: (selector) => {
-      if (selector === '[data-masha-feedly-unread-count]') return marker;
       if (selector === '[data-masha-feedly-board]') return boardAvailable ? board : null;
       return null;
     },
-    querySelectorAll: (selector) => selector === '#cms-menu a[href*="masha-feedly"]' ? [menuLink] : [],
+    querySelectorAll: () => [],
     createElement: (type) => new TestElement(type),
+    createElementNS: (_namespace, type) => new TestElement(type),
   };
   let mutationCallback = null;
   class TestMutationObserver {
@@ -354,8 +328,6 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     disconnect() {}
   }
   const dictionary = {
-    MENU_NEW_COUNT: '{count} neue Einträge',
-    MENU_FEEDBACK_COUNT: '{count} warten auf Feedback',
     BOARD_SAVING: 'Änderung wird gespeichert …',
     BOARD_SAVE_ERROR: 'Speichern fehlgeschlagen.',
     BOARD_SAVE_SUCCESS: 'Eintrag wurde gespeichert.',
@@ -383,14 +355,7 @@ function createBoardEnvironment(fetchImplementation = async () => ({
   let reloadCount = 0;
   vm.runInNewContext(source, {
     document,
-    window: {
-      location: { reload: () => { reloadCount++; } },
-      KWMashaFeedlyTranslations: { FORMAL_ADDRESS: formalAddress },
-      KWMashaFeedlyTranslate: includeGlobalTranslator
-        ? (key, values = {}) => Object.entries(values).reduce((message, [name, value]) => message.replaceAll(`{${name}}`, String(value)), dictionary[key] || key)
-        : undefined,
-      confirm: confirmImplementation,
-    },
+    window: simulatedWindow,
     FormData: TestFormData,
     fetch: fetchImplementation,
     MutationObserver: TestMutationObserver,
@@ -398,68 +363,14 @@ function createBoardEnvironment(fetchImplementation = async () => ({
 
   return {
     board,
-    menuLink,
     formDataInstances,
-    menuTitle,
     triggerMutation: () => mutationCallback?.(),
-    titleWrites: () => titleWrites,
     documentListeners,
     clickCategoryButton: () => documentListeners.click?.({ target: board.openCategoryFormButton }),
     setBoardAvailable: (available) => { boardAvailable = available; },
     reloadCount: () => reloadCount,
   };
 }
-
-test('zeigt Zähler für neue Einträge und Feedback ohne MutationObserver-Schleife', () => {
-  const { menuTitle, menuLink, triggerMutation, titleWrites } = createBoardEnvironment(async () => ({}), 3, true, null, 2);
-
-  assert.equal(menuTitle.textContent, 'Masha:Feedly');
-  assert.equal(menuLink.badges.new.textContent, '3');
-  assert.equal(menuLink.badges.new.attributes['aria-label'], '3 neue Einträge');
-  assert.equal(menuLink.badges.feedback.textContent, '2');
-  assert.equal(menuLink.badges.feedback.attributes['aria-label'], '2 warten auf Feedback');
-  const writesAfterInitialBadge = titleWrites();
-  const badgeWritesAfterInitialRender = menuLink.badges.new.textContentMutationCount;
-  triggerMutation();
-  triggerMutation();
-  assert.equal(titleWrites(), writesAfterInitialBadge);
-  assert.equal(menuLink.badges.new.textContentMutationCount, badgeWritesAfterInitialRender);
-});
-
-test('zeigt beide Menü-Zähler auch auf anderen CMS-Seiten ohne Masha-Feedly-Board', () => {
-  const { menuTitle, menuLink } = createBoardEnvironment(async () => ({}), null, false, 'Masha:Feedly (4/2)');
-
-  assert.equal(menuLink.badges?.new?.textContent, '4');
-  assert.equal(menuLink.badges?.feedback?.textContent, '2');
-  assert.equal(menuTitle.textContent, 'Masha:Feedly');
-});
-
-test('entfernt den Neu-Zähler bei null und lässt ausstehendes Feedback stehen', () => {
-  const { menuLink } = createBoardEnvironment(async () => ({}), 0, true, null, 2);
-  assert.equal(menuLink.badges?.new ?? null, null);
-  assert.equal(menuLink.badges.feedback.textContent, '2');
-});
-
-test('zeigt keine Menü-Zähler, wenn weder Neuigkeiten noch Feedback offen sind', () => {
-  const { menuLink } = createBoardEnvironment(async () => ({}), 0);
-  assert.equal(menuLink.badges?.new ?? null, null);
-  assert.equal(menuLink.badges?.feedback ?? null, null);
-});
-
-test('blendet die Menü-Badge nach dem Lesen des letzten Eintrags aus', async () => {
-  const { board, menuLink } = createBoardEnvironment(async () => ({
-    ok: true,
-    json: async () => ({ success: true, unreadCount: 0, feedbackCount: 0 }),
-  }), 1);
-  const list = new TestElement('list', { categoryId: '1' });
-  const card = new TestElement('card', { entryId: '42' });
-  list.appendChild(card);
-
-  startDragging(board, card);
-  await board.listeners.drop({ target: list, preventDefault() {} });
-
-  assert.equal(menuLink.badges?.new ?? null, null);
-});
 
 test('filtert das Board nach nicht zugeordneten und ausgewählten persönlichen Einträgen', () => {
   const { board } = createBoardEnvironment();
@@ -558,7 +469,7 @@ test('lässt den Eintragslink beim Klicken aus dem Drag-Verhalten heraus', () =>
 test('sendet beim Verschieben Kategorie und Reihenfolge und macht die Karte wieder klickbar', async () => {
   let requestURL = '';
   let requestOptions = null;
-  const { board, formDataInstances, menuTitle, menuLink } = createBoardEnvironment(async (url, options) => {
+  const { board, formDataInstances } = createBoardEnvironment(async (url, options) => {
     requestURL = url;
     requestOptions = options;
     return { ok: true, json: async () => ({ success: true, unreadCount: 2, feedbackCount: 1 }) };
@@ -586,9 +497,6 @@ test('sendet beim Verschieben Kategorie und Reihenfolge und macht die Karte wied
   assert.equal(card.parentElement, targetList);
   assert.equal(card.classList.contains('is-dragging'), false);
   assert.equal(board.status.textContent, 'Eintrag wurde gespeichert.');
-  assert.equal(menuTitle.textContent, 'Masha:Feedly');
-  assert.equal(menuLink.badges.new.textContent, '2');
-  assert.equal(menuLink.badges.feedback.textContent, '1');
 });
 
 test('stellt die Karte nach einem fehlgeschlagenen Verschieben in der Ursprungskategorie wieder her', async () => {
@@ -697,7 +605,7 @@ test('bricht das Löschen ab, solange die Bestätigung nicht erteilt ist', async
   const { board } = createBoardEnvironment(async () => {
     requestCount++;
     return { ok: true, json: async () => ({ success: true }) };
-  }, null, true, null, 0, 'du', () => false);
+  }, true, 'du', () => false);
   const category = new TestElement('column', { categoryId: '27' });
   const deleteButton = new TestElement('delete-button');
   category.appendChild(deleteButton);
@@ -745,7 +653,7 @@ test('öffnet das Formular barrierearm und legt die Kategorie direkt im Board an
 });
 
 test('öffnet Kategorie-Overlay durch einen echten delegierten Klick auch ohne Frontend-Übersetzungs-JavaScript', () => {
-  const { board, clickCategoryButton } = createBoardEnvironment(undefined, null, true, null, 0, 'du', () => true, 'complete', false);
+  const { board, clickCategoryButton } = createBoardEnvironment(undefined, true, 'du', () => true, 'complete', false);
 
   assert.equal(board.categoryModal.hidden, true);
   clickCategoryButton();
@@ -772,7 +680,7 @@ test('schließt den Kategorie-Dialog mit Abbrechen, Escape und Klick auf den Hin
 });
 
 test('öffnet das Kategorie-Overlay auch vor DOMContentLoaded über den delegierten CMS-Klick', () => {
-  const { board, clickCategoryButton } = createBoardEnvironment(undefined, null, true, null, 0, 'du', () => true, 'loading');
+  const { board, clickCategoryButton } = createBoardEnvironment(undefined, true, 'du', () => true, 'loading');
 
   assert.equal(board.openCategoryFormButton.listeners.click, undefined);
   assert.equal(board.categoryModal.hidden, true);
@@ -783,7 +691,7 @@ test('öffnet das Kategorie-Overlay auch vor DOMContentLoaded über den delegier
 });
 
 test('öffnet das Kategorie-Overlay nach einer SilverStripe-PJAX-Navigation über den delegierten Klick', () => {
-  const { board, setBoardAvailable, triggerMutation, clickCategoryButton } = createBoardEnvironment(undefined, null, false);
+  const { board, setBoardAvailable, triggerMutation, clickCategoryButton } = createBoardEnvironment(undefined, false);
 
   assert.equal(board.openCategoryFormButton.listeners.click, undefined);
   setBoardAvailable(true);
