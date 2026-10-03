@@ -101,13 +101,13 @@
             <div class="kw-masha-feedly__entries-list" data-masha-feedly-entries-list aria-live="polite"></div>
         </section>
     </div>
-    <div class="kw-masha-feedly__modal" data-masha-feedly-modal hidden>
+    <div class="kw-masha-feedly__modal kw-masha-feedly__create-modal" data-masha-feedly-modal hidden>
         <div class="kw-masha-feedly__dialog" role="dialog" aria-modal="true" aria-labelledby="kw-masha-feedly-dialog-title">
             <header class="kw-masha-feedly__dialog-header">
                 <div><span class="kw-masha-feedly__eyebrow"><%t KW\MashaFeedly\Translations.NEW_ENTRY_EYEBROW 'NEUER EINTRAG' %></span><h2 id="kw-masha-feedly-dialog-title" tabindex="-1"><% if $Address == 'sie' %><%t KW\MashaFeedly\Translations.NEW_ENTRY_TITLE_SIE 'Was ist Ihnen aufgefallen?' %><% else %><%t KW\MashaFeedly\Translations.NEW_ENTRY_TITLE_DU 'Was ist dir aufgefallen?' %><% end_if %></h2></div>
                 <button type="button" class="kw-masha-feedly__close" data-masha-feedly-close-modal aria-label="<%t KW\MashaFeedly\Translations.DIALOG_CLOSE 'Dialog schließen' %>">×</button>
             </header>
-            <form data-masha-feedly-entry-form data-create-url="$CreateEntryURL" data-list-url="$ListEntriesURL" data-security-id="$TokenValue">
+            <form id="kw-masha-feedly-create-form" data-masha-feedly-entry-form data-create-url="$CreateEntryURL" data-list-url="$ListEntriesURL" data-security-id="$TokenValue">
                 <div class="kw-masha-feedly__selected-context" data-masha-feedly-selected-context></div>
                 <label><%t KW\MashaFeedly\Translations.ENTRY_DESCRIPTION_LABEL 'Beschreibung' %><textarea name="Content" rows="5" required placeholder="<% if $Address == 'sie' %><%t KW\MashaFeedly\Translations.ENTRY_DESCRIPTION_PLACEHOLDER_SIE 'Beschreiben Sie den Fehler oder Hinweis …' %><% else %><%t KW\MashaFeedly\Translations.ENTRY_DESCRIPTION_PLACEHOLDER_DU 'Beschreibe den Fehler oder Hinweis …' %><% end_if %>"></textarea></label>
                 <label class="kw-masha-feedly__attachment-field">
@@ -126,8 +126,8 @@
                     <fieldset class="kw-masha-feedly__assignees"><legend><%t KW\MashaFeedly\Translations.ASSIGNEES_LABEL 'Verantwortlich' %></legend><div><% loop $Members %><label class="kw-masha-feedly__assignee-choice" title="$Name"><input type="checkbox" name="AssignedMemberIDs[]" value="$ID"><span class="kw-masha-feedly__assignee-avatar" style="background-color: $Color" aria-label="$Name"><% if $ImageURL %><img src="$ImageURL" alt=""><% else %>$Initials<% end_if %></span><span class="kw-masha-feedly__assignee-name">$Name</span></label><% end_loop %></div></fieldset>
                 <% end_if %>
                 <p class="kw-masha-feedly__form-status" data-masha-feedly-form-status role="status" aria-live="polite" aria-atomic="true"></p>
-                <footer class="kw-masha-feedly__dialog-actions"><button type="button" class="kw-masha-feedly__secondary" data-masha-feedly-close-modal><%t KW\MashaFeedly\Translations.ENTRY_CANCEL 'Abbrechen' %></button><button type="submit" class="kw-masha-feedly__submit"><%t KW\MashaFeedly\Translations.ENTRY_SAVE 'Eintrag speichern' %> <span aria-hidden="true">→</span></button></footer>
             </form>
+            <footer class="kw-masha-feedly__dialog-actions"><button type="button" class="kw-masha-feedly__secondary" data-masha-feedly-close-modal><%t KW\MashaFeedly\Translations.ENTRY_CANCEL 'Abbrechen' %></button><button type="submit" form="kw-masha-feedly-create-form" class="kw-masha-feedly__submit"><%t KW\MashaFeedly\Translations.ENTRY_SAVE 'Eintrag speichern' %> <span aria-hidden="true">→</span></button></footer>
         </div>
     </div>
     <div class="kw-masha-feedly__modal kw-masha-feedly__edit-modal" data-masha-feedly-edit-modal hidden>
