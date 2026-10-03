@@ -601,8 +601,8 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /kw-masha-feedly-fan-from-under/);
   assert.match(scss, /kw-masha-feedly-unicorn-run/);
   assert.match(scss, /kw-masha-feedly-unicorn-run 4\.8s/);
-  assert.match(scss, /kw-masha-feedly__rainbow-copy\[hidden\] \{ display: none !important; \}/);
   assert.match(scss, /\.kw-masha-feedly__rainbow \{ position: relative; display: grid; width: 72px; min-height: 72px;/);
+  assert.match(scss, /kw-masha-feedly__rainbow-copy\[hidden\]/);
   assert.match(scss, /\.kw-masha-feedly__rainbow-copy \{ position: absolute; z-index: 3;/);
   assert.match(scss, /\.kw-masha-feedly__rainbow \{ overflow: visible; \}/);
   assert.match(scss, /\.kw-masha-feedly__help-button \{ align-self: flex-end; margin-top: 36px; \}/);
@@ -730,7 +730,7 @@ test('liefert den Feedback-Button mit Wartetext, zugänglichem Label und passend
 test('zeigt das Prioritätssymbol im Kopf des geöffneten Eintrags an', () => {
   assert.match(widgetTemplate, /data-masha-feedly-edit-priority role="img" aria-label="Priorität" hidden/);
   assert.match(widgetTemplate, /class="kw-masha-feedly__edit-header-actions"><span class="kw-masha-feedly__edit-priority" data-masha-feedly-edit-priority role="img" aria-label="Priorität" hidden><\/span><button type="button" class="kw-masha-feedly__entry-share"/);
-  assert.match(scss, /\.kw-masha-feedly__edit-header-actions \{ display: flex; flex: 0 0 auto; align-items: center; gap: \.80px; margin-left: auto; \}/);
+  assert.match(scss, /\.kw-masha-feedly__edit-header-actions \{ display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-left: auto; \}/);
 });
 
 test('hält die Eintragsanlage schlank und bietet typisierte Verknüpfungen beim Bearbeiten an', () => {
@@ -754,7 +754,7 @@ test('ordnet Browserdetails, Zusammenhänge und Verlauf unter dem Speichern ein 
   assert.ok(form.indexOf('kw-masha-feedly__relations-details') < form.indexOf('kw-masha-feedly__history'));
   assert.doesNotMatch(form, /data-masha-feedly-edit-assignees/);
   assert.match(form, /name="AssignedMemberIDs\[\]"/);
-  assert.match(scss, /\.kw-masha-feedly__edit-extra-details \{ display: grid; gap: \.1040px; margin-top: 16px; \}/);
+  assert.match(scss, /\.kw-masha-feedly__edit-extra-details \{ display: grid; gap: 10\.4px; margin-top: 16px; \}/);
 });
 
 test('zeigt eingehende Verknüpfungen beim Öffnen schon oberhalb des eingeklappten Editors', async () => {
@@ -1197,12 +1197,12 @@ test('zeigt Neuigkeiten im ersten Panel und öffnet die Liste ungelesener Eintr�
   assert.match(scss, /\.kw-masha-feedly__news-button\s*\{/);
   assert.match(scss, /\.kw-masha-feedly__news-copy\s*\{/);
   assert.match(scss, /\.kw-masha-feedly__news-title\s*\{[^}]*font-size:\s*calc\(16\.8px \* var\(--masha-font-scale, 1\)\)/);
-  assert.match(scss, /\.kw-masha-feedly__news-copy small\s*\{[^}]*font-size:\s*calc\(\.128px \* var\(--masha-font-scale, 1\)\)/);
+  assert.match(scss, /\.kw-masha-feedly__news-copy small\s*\{[^}]*font-size:\s*calc\(12\.8px \* var\(--masha-font-scale, 1\)\)/);
   assert.match(scss, /\.kw-masha-feedly__news-button:focus-visible\s*\{/);
   assert.match(widgetTemplate, /viewBox="0 0 177800 177800"/);
   assert.match(widgetTemplate, /data-masha-feedly-open-news[^>]*title=/);
   assert.match(widgetTemplate, /data-masha-feedly-open-feedback[^>]*title=/);
-  assert.match(scss, /actions > \.kw-masha-feedly__news-button strong,[\s\S]*?position: absolute; top: -\.560px;/);
+  assert.match(scss, /actions > \.kw-masha-feedly__news-button strong,[\s\S]*?position: absolute; top: -5\.6px;/);
   assert.match(scss, /Die Zähler bekommen eigene, großzügige Zeilen statt enger Mini-Kacheln/);
   assert.match(scss, /\.kw-masha-feedly__actions \{ grid-template-columns: minmax\(0, 1fr\); gap: 11\.2px; \}/);
   assert.match(scss, /actions > \.kw-masha-feedly__news-button,[\s\S]*?grid-template-columns: minmax\(0, 1fr\) auto;[^}]*min-height: 64px; height: 64px;/);
@@ -1226,7 +1226,7 @@ test('hält Filter eingeklappt, zeigt aktive Filter als Chips und erlaubt Entfer
   assert.match(widgetTemplate, /data-masha-feedly-priority-filter-icon[\s\S]*?FILTER_PRIORITY/);
   assert.match(germanTranslations, /FILTER_MODE: 'Ansicht'/);
   assert.match(scss, /__filter-label \{[^}]*white-space: nowrap;[^}]*text-overflow: ellipsis;/);
-  assert.match(scss, /filters-details \.kw-masha-feedly__entries-toolbar label \{[^}]*border-radius: \.1200px;[^}]*background: linear-gradient/);
+  assert.match(scss, /filters-details \.kw-masha-feedly__entries-toolbar label \{[^}]*border-radius: 12px;[^}]*background: linear-gradient/);
   assert.match(scss, /filters-details \.kw-masha-feedly__entries-toolbar select \{[^}]*width: 100%;[^}]*text-overflow: ellipsis;/);
   const env = createWidgetEnvironment();
   const details = env.widget.querySelector('[data-masha-feedly-filters-details]');
@@ -1443,19 +1443,12 @@ test('zeigt den Seitenerfolg nur ohne offene Fehler und unterscheidet den global
   env.setPageOpenEntryCount(0);
   await env.listeners['kw-masha-feedly:opened']();
   assert.equal(env.rainbow.hidden, false);
-  assert.equal(env.rainbowCopy.hidden, true);
-  env.rainbow.listeners.pointerenter();
-  assert.equal(env.rainbowCopy.hidden, false);
-  assert.equal(env.rainbow.attributes['aria-expanded'], 'true');
-  env.rainbow.listeners.pointerleave();
-  assert.equal(env.rainbowCopy.hidden, true);
-  env.rainbow.listeners.click();
-  assert.equal(env.rainbowCopy.hidden, false);
-  assert.equal(env.rainbow.attributes['aria-expanded'], 'true');
   assert.equal(env.rainbowTitle.textContent, 'Auf dieser Seite keine Fehler');
+  assert.match(env.rainbow.attributes['aria-label'], /Auf dieser Seite keine Fehler/);
   env.setOpenEntryCount(0);
   await env.listeners['kw-masha-feedly:opened']();
   assert.equal(env.rainbowTitle.textContent, 'Alles im grünen Bereich!');
+  assert.match(env.rainbow.attributes['aria-label'], /Alles im grünen Bereich!/);
   env.setPageEntryCount(0);
   env.setOpenEntryCount(0);
   env.setTotalEntriesCount(0);

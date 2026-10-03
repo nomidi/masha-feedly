@@ -61,8 +61,18 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const createForm = creatorWidget.locator('[data-masha-feedly-entry-form]');
     await expect(createForm).toBeVisible();
     await createForm.locator('[name="Content"]').fill(unique);
-    await createForm.locator('[data-masha-feedly-emoji-toggle]').click();
-    await createForm.locator('[data-emoji="😎"]').click();
+    const createEmojiToggle = createForm.locator('[data-masha-feedly-emoji-toggle]');
+    await createEmojiToggle.click();
+    const createEmojiPicker = creatorPage.locator('.kw-masha-feedly__emoji-picker:not([hidden])');
+    await expect(createEmojiPicker).toBeVisible();
+    const createPickerBounds = await createEmojiPicker.boundingBox();
+    assert.ok(createPickerBounds.x >= 0 && createPickerBounds.y >= 0, 'Emoji-Auswahl bleibt im sichtbaren Fenster.');
+    const viewportWidth = await creatorPage.evaluate(() => window.innerWidth);
+    const viewportHeight = await creatorPage.evaluate(() => window.innerHeight);
+    assert.ok(createPickerBounds.x + createPickerBounds.width <= viewportWidth, 'Emoji-Auswahl wird nicht rechts abgeschnitten.');
+    assert.ok(createPickerBounds.y + createPickerBounds.height <= viewportHeight, 'Emoji-Auswahl wird nicht unten abgeschnitten.');
+    assert.equal(await createEmojiToggle.locator('svg').evaluate((icon) => icon.getBoundingClientRect().width <= 24), true, 'Das Smiley-Icon bleibt kompakt.');
+    await createEmojiPicker.locator('[data-emoji="😎"]').click();
     const createResponsePromise = creatorPage.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/createEntry'));
     await createForm.locator('[type="submit"]').click();
@@ -108,8 +118,15 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     await expect(commentForm).toBeVisible();
     await commentForm.locator('[name="CommentText"]').fill(commentText);
     await commentForm.locator('[data-masha-feedly-emoji-toggle]').click();
-    await commentForm.locator('[data-category="PEOPLE"]').click();
-    await commentForm.locator('[data-emoji="👍"]').click();
+    const commentEmojiPicker = commenterPage.locator('.kw-masha-feedly__emoji-picker:not([hidden])');
+    await expect(commentEmojiPicker).toBeVisible();
+    const commentPickerBounds = await commentEmojiPicker.boundingBox();
+    const commentViewport = await commenterPage.evaluate(() => ({ width: window.innerWidth, height: window.innerHeight }));
+    assert.ok(commentPickerBounds.x >= 0 && commentPickerBounds.y >= 0, 'Emoji-Auswahl im Kommentar bleibt im Fenster sichtbar.');
+    assert.ok(commentPickerBounds.x + commentPickerBounds.width <= commentViewport.width, 'Kommentar-Auswahl wird nicht rechts abgeschnitten.');
+    assert.ok(commentPickerBounds.y + commentPickerBounds.height <= commentViewport.height, 'Kommentar-Auswahl wird nicht unten abgeschnitten.');
+    await commentEmojiPicker.locator('[data-category="PEOPLE"]').click();
+    await commentEmojiPicker.locator('[data-emoji="👍"]').click();
     const commentResponsePromise = commenterPage.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/__masha-feedly-comment'));
     await commentForm.locator('[type="submit"]').click();

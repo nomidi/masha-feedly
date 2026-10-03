@@ -108,6 +108,7 @@ test('zeigt Hover-Hinweise als schwebendes Tooltip außerhalb des scrollenden Pa
   }
   assert.match(source, /document\.body\.append\(hoverHint\)/);
   assert.match(source, /aria-describedby/);
+  assert.match(source, /\[data-masha-feedly-rainbow\]/);
 });
 
 test('blendet einen vollständig im Viewport platzierten Tooltip ein und stellt ARIA wieder her', () => {

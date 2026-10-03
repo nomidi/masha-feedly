@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     '[data-masha-feedly-open-feedback]',
     '[data-masha-feedly-open-closed]',
     '[data-masha-feedly-open-help]',
+    '[data-masha-feedly-rainbow]',
   ].join(', ');
   let hoverHint;
   let hoverHintTarget;

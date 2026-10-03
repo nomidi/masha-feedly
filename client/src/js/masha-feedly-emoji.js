@@ -1,4 +1,5 @@
 (() => {
+  let pickerNumber = 0;
   const categories = [
     ['SMILEYS', [['😀', 'lachen'], ['😃', 'freude'], ['😄', 'grinsen'], ['😁', 'lächeln'], ['😅', 'schwitzen'], ['😂', 'tränen lachen'], ['🤣', 'rofl'], ['🥲', 'gerührt'], ['😊', 'freundlich'], ['😇', 'engel'], ['🙂', 'lächeln'], ['🙃', 'umgedreht'], ['😉', 'zwinkern'], ['😍', 'liebe'], ['🥰', 'herz'], ['😘', 'kuss'], ['😋', 'lecker'], ['😎', 'cool'], ['🤓', 'nerd'], ['🧐', 'prüfen'], ['🤔', 'denken'], ['🤨', 'skeptisch'], ['😐', 'neutral'], ['😑', 'genervt'], ['🙄', 'augen rollen'], ['😏', 'frech'], ['😟', 'sorge'], ['🙁', 'traurig'], ['😮', 'überrascht'], ['😱', 'schock'], ['😴', 'schlafen'], ['🤒', 'krank'], ['🤕', 'verletzt'], ['🤢', 'übel'], ['🥳', 'party'], ['😭', 'weinen'], ['😡', 'wütend'], ['🤬', 'fluchen'], ['😈', 'teufel'], ['💀', 'tot'], ['🤡', 'clown'], ['👻', 'geist'], ['🤖', 'roboter'], ['💩', 'mist']]],
     ['PEOPLE', [['👋', 'winken'], ['🤚', 'hand'], ['✋', 'stopp'], ['🖐️', 'handfläche'], ['👌', 'ok'], ['🤌', 'gesten'], ['✌️', 'frieden'], ['🤞', 'daumen drücken'], ['🤟', 'liebe'], ['🤘', 'rock'], ['👉', 'rechts'], ['👆', 'oben'], ['👇', 'unten'], ['👍', 'daumen hoch'], ['👎', 'daumen runter'], ['👏', 'applaus'], ['🙌', 'jubel'], ['🫶', 'herz hände'], ['🙏', 'danke'], ['💪', 'stark'], ['🧠', 'gehirn'], ['👀', 'sehen'], ['👨‍💻', 'programmierer'], ['👩‍💻', 'programmiererin'], ['🧑‍🔧', 'reparatur'], ['🧑‍🚀', 'astronaut']]],
@@ -10,12 +11,9 @@
     ['SYMBOLS', [['❤️', 'rotes herz'], ['🩷', 'rosa herz'], ['🧡', 'oranges herz'], ['💛', 'gelbes herz'], ['💚', 'grünes herz'], ['💙', 'blaues herz'], ['💜', 'lila herz'], ['🖤', 'schwarzes herz'], ['💔', 'gebrochenes herz'], ['💯', 'hundert'], ['💬', 'kommentar'], ['💭', 'gedanke'], ['✅', 'erledigt'], ['❌', 'kreuz'], ['⚠️', 'warnung'], ['❓', 'frage'], ['❗', 'ausrufezeichen'], ['➕', 'plus'], ['➖', 'minus'], ['🔄', 'aktualisieren'], ['🔔', 'glocke'], ['🔗', 'link'], ['💤', 'müde']]],
   ];
 
-  const translate = (key, fallback) => window.KWMashaFeedlyTranslate?.(key) || fallback;
-  const labels = {
-    SMILEYS: translate('EMOJI_CATEGORY_SMILEYS', 'Smileys'), PEOPLE: translate('EMOJI_CATEGORY_PEOPLE', 'Menschen'),
-    NATURE: translate('EMOJI_CATEGORY_NATURE', 'Natur'), FOOD: translate('EMOJI_CATEGORY_FOOD', 'Essen'),
-    ACTIVITY: translate('EMOJI_CATEGORY_ACTIVITY', 'Aktivität'), PLACES: translate('EMOJI_CATEGORY_PLACES', 'Orte'),
-    OBJECTS: translate('EMOJI_CATEGORY_OBJECTS', 'Objekte'), SYMBOLS: translate('EMOJI_CATEGORY_SYMBOLS', 'Symbole'),
+  const translate = (key, fallback) => {
+    const translated = window.KWMashaFeedlyTranslate?.(key);
+    return translated && translated !== key ? translated : fallback;
   };
 
   const decorate = (textarea) => {
@@ -23,6 +21,14 @@
     const host = textarea.closest('[data-kw-masha-feedly]');
     if (!host || !['Content', 'CommentText'].includes(textarea.name)) return;
     textarea.dataset.emojiReady = 'true';
+    // SilverStripe injects its translation map after external scripts have loaded.
+    // Resolve labels here, when the widget textarea is decorated, not at file evaluation.
+    const labels = {
+      SMILEYS: translate('EMOJI_CATEGORY_SMILEYS', 'Smileys'), PEOPLE: translate('EMOJI_CATEGORY_PEOPLE', 'Menschen'),
+      NATURE: translate('EMOJI_CATEGORY_NATURE', 'Natur'), FOOD: translate('EMOJI_CATEGORY_FOOD', 'Essen'),
+      ACTIVITY: translate('EMOJI_CATEGORY_ACTIVITY', 'Aktivität'), PLACES: translate('EMOJI_CATEGORY_PLACES', 'Orte'),
+      OBJECTS: translate('EMOJI_CATEGORY_OBJECTS', 'Objekte'), SYMBOLS: translate('EMOJI_CATEGORY_SYMBOLS', 'Symbole'),
+    };
     const field = document.createElement('div');
     field.className = 'kw-masha-feedly__emoji-field';
     textarea.parentNode.insertBefore(field, textarea);
@@ -40,6 +46,8 @@
     const picker = document.createElement('div');
     picker.className = 'kw-masha-feedly__emoji-picker';
     picker.hidden = true;
+    picker.id = `kw-masha-feedly-emoji-picker-${++pickerNumber}`;
+    toggle.setAttribute('aria-controls', picker.id);
     picker.setAttribute('role', 'dialog');
     picker.setAttribute('aria-label', translate('EMOJI_PICKER_TITLE', 'Emoji auswählen'));
     const search = document.createElement('input');
@@ -54,7 +62,24 @@
     grid.className = 'kw-masha-feedly__emoji-grid';
     grid.setAttribute('role', 'listbox');
     picker.append(search, tabs, grid);
-    field.append(toggle, picker);
+    field.append(toggle);
+    document.body.append(picker);
+
+    const positionPicker = () => {
+      if (picker.hidden) return;
+      const rect = toggle.getBoundingClientRect();
+      const edge = 12;
+      const gap = 10;
+      const width = picker.offsetWidth;
+      const height = picker.offsetHeight;
+      const left = Math.min(Math.max(edge, rect.right - width), window.innerWidth - width - edge);
+      const above = rect.top - height - gap;
+      const top = above >= edge ? above : Math.min(rect.bottom + gap, window.innerHeight - height - edge);
+      picker.style.left = `${left}px`;
+      picker.style.top = `${Math.max(edge, top)}px`;
+    };
+    window.addEventListener('resize', positionPicker);
+    document.addEventListener('scroll', positionPicker, true);
 
     let selectedCategory = 'SMILEYS';
     const render = () => {
@@ -89,11 +114,11 @@
       const isOpen = !picker.hidden;
       document.querySelectorAll('.kw-masha-feedly__emoji-picker:not([hidden])').forEach((openPicker) => {
         openPicker.hidden = true;
-        openPicker.parentElement?.querySelector('.kw-masha-feedly__emoji-toggle')?.setAttribute('aria-expanded', 'false');
+        document.querySelector(`[aria-controls="${openPicker.id}"]`)?.setAttribute('aria-expanded', 'false');
       });
       picker.hidden = isOpen;
       toggle.setAttribute('aria-expanded', String(!isOpen));
-      if (!isOpen) { render(); search.focus(); }
+      if (!isOpen) { render(); positionPicker(); search.focus(); }
     });
     grid.addEventListener('click', (event) => {
       const choice = event.target.closest('[data-emoji]');
@@ -116,7 +141,7 @@
       }
     });
     document.addEventListener('pointerdown', (event) => {
-      if (!field.contains(event.target)) { picker.hidden = true; toggle.setAttribute('aria-expanded', 'false'); }
+      if (!field.contains(event.target) && !picker.contains(event.target)) { picker.hidden = true; toggle.setAttribute('aria-expanded', 'false'); }
     });
   };
 

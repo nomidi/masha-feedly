@@ -1047,6 +1047,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ? t(seriousTheme ? 'SUCCESS_EMPTY_PAGE_MESSAGE' : 'RAINBOW_EMPTY_PAGE_MESSAGE')
             : t(seriousTheme ? 'SUCCESS_PAGE_MESSAGE' : 'RAINBOW_PAGE_MESSAGE');
         }
+        const rainbowLabel = [rainbowTitle?.textContent, rainbowMessage?.textContent].filter(Boolean).join(' ');
+        if (rainbowLabel) rainbow.setAttribute('aria-label', rainbowLabel);
       }
       if (mode === 'page') {
         renderMarkers(data.entries || []);
@@ -1105,21 +1107,6 @@ document.addEventListener('DOMContentLoaded', () => {
     event.stopPropagation();
     await shareEntryLink(activeEntry, shareActiveEntryButton);
   });
-  if (rainbow && rainbowCopy) {
-    let rainbowHovered = false;
-    let rainbowFocused = false;
-    let rainbowPinned = false;
-    const updateRainbowCopy = () => {
-      const expanded = rainbowHovered || rainbowFocused || rainbowPinned;
-      rainbowCopy.hidden = !expanded;
-      rainbow.setAttribute('aria-expanded', String(expanded));
-    };
-    rainbow.addEventListener('pointerenter', () => { rainbowHovered = true; updateRainbowCopy(); });
-    rainbow.addEventListener('pointerleave', () => { rainbowHovered = false; updateRainbowCopy(); });
-    rainbow.addEventListener('focus', () => { rainbowFocused = true; updateRainbowCopy(); });
-    rainbow.addEventListener('blur', () => { rainbowFocused = false; updateRainbowCopy(); });
-    rainbow.addEventListener('click', () => { rainbowPinned = !rainbowPinned; updateRainbowCopy(); });
-  }
   closeHelpButton?.addEventListener('click', () => { helpModal.hidden = true; helpReturnFocus?.focus?.(); });
   helpModal?.addEventListener('click', (event) => {
     if (event.target === helpModal) { helpModal.hidden = true; helpReturnFocus?.focus(); }
