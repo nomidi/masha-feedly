@@ -256,6 +256,43 @@ test('speichert den Klickpunkt relativ zum ausgewählten Seitenelement', () => {
   assert.equal(env.form.fields['[name="ElementPositionY"]'].value, '0.75000');
 });
 
+test('erfasst die Klickstelle vor einer Layoutänderung beim Beenden der Auswahl', () => {
+  const env = createEnvironment();
+  const target = new TestElement('main', { id: 'content' });
+  target.getBoundingClientRect = () => ({
+    left: env.body.classList.contains('kw-masha-feedly-is-selecting') ? 100 : 300,
+    top: 50, width: 200, height: 100,
+  });
+  env.startButton.listeners.click();
+  env.documentListeners.click({ target, clientX: 150, clientY: 125, preventDefault() {}, stopPropagation() {} });
+  assert.equal(env.form.fields['[name="ElementPositionX"]'].value, '0.25000');
+  assert.equal(env.form.fields['[name="ElementPositionY"]'].value, '0.75000');
+});
+
+test('unterscheidet identische Bausteine auch oberhalb der früheren fünf Ebenen', () => {
+  const env = createEnvironment();
+  const content = new TestElement('main', { id: 'content' });
+  const targets = [];
+  for (const text of ['agnen', 'Design']) {
+    const section = new TestElement('div');
+    content.append(section);
+    let parent = section;
+    for (const tag of ['div', 'a', 'div', 'h2', 'span']) {
+      const child = new TestElement(tag);
+      parent.append(child);
+      parent = child;
+    }
+    const target = new TestElement('span', { text });
+    target.classList.add('animated');
+    target.classList.add('kw-masha-feedly-selected-target');
+    parent.append(target);
+    targets.push(target);
+  }
+  const selector = env.window.KWMashaFeedlyEnvironment.getElementSelector;
+  assert.equal(selector(targets[0]), '#content > div:nth-of-type(1) > div > a > div > h2 > span > span');
+  assert.equal(selector(targets[1]), '#content > div:nth-of-type(2) > div > a > div > h2 > span > span');
+});
+
 test('startet die Bereichsauswahl, übernimmt Seitenelement und Browserdaten', () => {
   const env = createEnvironment();
   env.startButton.listeners.click();

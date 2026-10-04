@@ -13,7 +13,7 @@ Neue berechtigte Personen erhalten eine Willkommens-E-Mail. Beim ersten Besuch f
 1. Öffne Masha:Feedly über das Symbol unten rechts.
 2. Wähle **+** und klicke auf den betroffenen Bereich der Seite.
 3. Gib einen Titel und eine Beschreibung ein. Ergänze bei Bedarf Status, Priorität, zuständige Personen und Anhänge.
-4. Speichere den Eintrag. Ein nummerierter Marker zeigt die angeklickte Stelle am ausgewählten Element. Die Stelle bleibt auch bei anderer Fenstergröße relativ zum Element erhalten.
+4. Speichere den Eintrag. Ein nummerierter Marker zeigt die angeklickte Stelle am ausgewählten Element. Die Stelle bleibt auch bei anderer Fenstergröße relativ zum Element erhalten. Während das Widget geöffnet ist, folgt der Marker dem Element auch bei Animationen und nachträglichen Layoutänderungen. Neue Einträge speichern einen vollständigen Auswahlpfad, damit gleich aufgebaute Seitenbereiche unterscheidbar bleiben. Bei älteren mehrdeutigen Auswahlpfaden wird der gespeicherte Elementtext zur Zuordnung verwendet; bleibt die Stelle mehrdeutig, erscheint kein Marker.
 
 Kommentare unterstützen Links. Bilder werden im Eintrag angezeigt; PDF- und ZIP-Dateien erscheinen als geschützte Downloadlinks. Nur Personen mit Zugriff auf Masha:Feedly können Einträge und Anhänge aufrufen.
 

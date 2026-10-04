@@ -39,7 +39,29 @@ window.KWMashaFeedlyEnvironment = (() => {
     };
     return { x: ratio(clientX, bounds.left, bounds.width), y: ratio(clientY, bounds.top, bounds.height) };
   };
-  return { collect, elementPosition };
+  /**
+   * Verankert den Auswahlpfad am nächsten Vorfahren mit ID oder am Dokumentkörper.
+   * Die vollständige Hierarchie unterscheidet auch wiederholte Layoutbausteine.
+   * @param {Element} element Angeklicktes Seitenelement.
+   * @return {string} CSS-Auswahlpfad ohne veränderliche Animations- oder Auswahlklassen.
+   */
+  const getElementSelector = (element) => {
+    const parts = [];
+    let current = element;
+    while (current && current.nodeType === 1) {
+      if (current.id) {
+        parts.unshift(`#${CSS.escape(current.id)}`);
+        break;
+      }
+      let part = current.tagName.toLowerCase();
+      const siblings = current.parentElement ? [...current.parentElement.children].filter((sibling) => sibling.tagName === current.tagName) : [];
+      if (siblings.length > 1) part += `:nth-of-type(${siblings.indexOf(current) + 1})`;
+      parts.unshift(part);
+      current = current.parentElement;
+    }
+    return parts.join(' > ');
+  };
+  return { collect, elementPosition, getElementSelector };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -90,20 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateCreateEstimate();
   let selecting = false;
   let highlighted = null;
-  const getElementSelector = (element) => {
-    if (element.id) return `#${CSS.escape(element.id)}`;
-    const parts = [];
-    let current = element;
-    while (current && current.nodeType === 1 && current !== document.body && parts.length < 5) {
-      let part = current.tagName.toLowerCase();
-      if (current.classList.length) part += `.${[...current.classList].slice(0, 2).map((name) => CSS.escape(name)).join('.')}`;
-      const siblings = current.parentElement ? [...current.parentElement.children].filter((sibling) => sibling.tagName === current.tagName) : [];
-      if (siblings.length > 1) part += `:nth-of-type(${siblings.indexOf(current) + 1})`;
-      parts.unshift(part);
-      current = current.parentElement;
-    }
-    return parts.join(' > ');
-  };
+  const getElementSelector = window.KWMashaFeedlyEnvironment.getElementSelector;
 
   const stopSelection = () => {
     selecting = false;
@@ -214,10 +223,11 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     event.stopPropagation();
     const element = event.target.closest('body *');
+    const elementPosition = window.KWMashaFeedlyEnvironment.elementPosition(element, event.clientX, event.clientY);
     stopSelection();
     if (element && element !== document.body) {
       showEntryDialog(element, {
-        elementPosition: window.KWMashaFeedlyEnvironment.elementPosition(element, event.clientX, event.clientY),
+        elementPosition,
       });
     }
   }, true);

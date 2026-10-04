@@ -707,6 +707,66 @@ test('erstellt eine sichtbare Blase am Element und lässt sie anklicken', () => 
   assert.deepEqual(opened, [44]);
 });
 
+test('führt Marker ohne Scrollereignis bei Bewegung und Größenänderung nach und stoppt vollständig', () => {
+  const pendingFrames = new Map();
+  let nextFrame = 0;
+  const window = {
+    innerWidth: 800, innerHeight: 600,
+    requestAnimationFrame(callback) { pendingFrames.set(++nextFrame, callback); return nextFrame; },
+    cancelAnimationFrame(frame) { pendingFrames.delete(frame); },
+  };
+  const marker = {
+    dataset: {}, style: { setProperty() {} }, setAttribute() {}, addEventListener() {},
+  };
+  let bounds = { left: 100, top: 50, width: 200, height: 100 };
+  entriesUI.createMarker(
+    { id: 44, elementPositionX: '0.25', elementPositionY: '0.75' }, 0,
+    { getBoundingClientRect: () => bounds }, { createElement: () => marker }, window, () => {}
+  );
+  const stop = entriesUI.trackMarkers([marker], window);
+  assert.equal(pendingFrames.size, 1);
+  const firstFrame = pendingFrames.get(1);
+  pendingFrames.delete(1);
+  bounds = { left: 300, top: 150, width: 400, height: 200 };
+  firstFrame();
+  assert.equal(marker.style.left, '400px');
+  assert.equal(marker.style.top, '300px');
+  assert.equal(pendingFrames.size, 1);
+  const lateFrame = pendingFrames.get(2);
+  stop();
+  assert.equal(pendingFrames.size, 0);
+  bounds.left = 500;
+  lateFrame();
+  assert.equal(marker.style.left, '400px');
+  assert.equal(pendingFrames.size, 0);
+  entriesUI.trackMarkers([], window);
+  assert.equal(pendingFrames.size, 0);
+});
+
+test('ordnet Fehler Nr. 6 bei identischen Auswahlpfaden dem Wort Design statt agnen zu', () => {
+  const campaign = { innerText: 'AGNEN', textContent: 'agnen' };
+  const design = { innerText: 'DESIGN', textContent: 'Design' };
+  const document = { querySelector: () => campaign, querySelectorAll: () => [campaign, design] };
+  assert.equal(entriesUI.resolveTarget({ selector: 'a > div > h2 > span > span', elementText: 'DESIGN' }, document), design);
+  assert.equal(entriesUI.resolveTarget({ selector: 'a > div > h2 > span > span', elementText: 'Design' }, document), design);
+  assert.equal(entriesUI.resolveTarget({ selector: 'a > div > h2 > span > span', elementText: '' }, document), null);
+  assert.equal(entriesUI.resolveTarget({ selector: 'a > div > h2 > span > span', elementText: 'Unbekannt' }, document), null);
+  document.querySelectorAll = () => [design, { innerText: 'DESIGN' }];
+  assert.equal(entriesUI.resolveTarget({ selector: 'span', elementText: 'DESIGN' }, document), null);
+  assert.equal(entriesUI.resolveTarget({ selector: '[' }, { querySelector() { throw new Error('Ungültiger Selektor'); } }), null);
+});
+
+test('verschiebt die gespeicherte Klickstelle nicht zum Fensterrand', () => {
+  const marker = { dataset: {}, style: { setProperty() {} }, setAttribute() {}, addEventListener() {} };
+  entriesUI.createMarker(
+    { id: 6, elementPositionX: '0.9', elementPositionY: '0.8' }, 0,
+    { getBoundingClientRect: () => ({ left: 700, top: 550, width: 200, height: 100 }) },
+    { createElement: () => marker }, { innerWidth: 800, innerHeight: 600 }, () => {}
+  );
+  assert.equal(marker.style.left, '880px');
+  assert.equal(marker.style.top, '630px');
+});
+
 test('verwendet für Seitenmarkierungen nur gültige Prioritätsfarben', () => {
   const marker = {
     dataset: {}, style: { setProperty(name, value) { this[name] = value; } },

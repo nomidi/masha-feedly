@@ -373,6 +373,30 @@ window.KWMashaFeedlyEntries = (() => {
   const previewCompletionAnimation = (document, window, animation, imageURL) =>
     effects.preview?.(animation, document, window, imageURL) || null;
 
+  /**
+   * Unterscheidet bei älteren, verkürzten Auswahlpfaden wiederholte Seitenbereiche anhand ihres Textes.
+   * Mehrdeutige Treffer bleiben ohne Marker, damit kein fremder Bereich als Fehlerstelle erscheint.
+   * @param {{selector: string, elementText?: string}} entry Gespeicherter Bereich des Eintrags.
+   * @param {Document} document Seitendokument zur Auflösung des Auswahlpfads.
+   * @return {Element|null} Eindeutig zugeordneter Bereich oder kein Treffer.
+   */
+  const resolveTarget = (entry, document) => {
+    if (!entry.selector) return null;
+    try {
+      const first = document.querySelector(entry.selector);
+      if (!first) return null;
+      const candidates = [...(document.querySelectorAll?.(entry.selector) || [first])];
+      if (candidates.length <= 1) return first;
+      const normalize = (text) => String(text || '').trim().replace(/\s+/g, ' ').slice(0, 220).toLowerCase();
+      const savedText = normalize(entry.elementText);
+      if (!savedText) return null;
+      const matches = candidates.filter((element) => normalize(element.innerText || element.textContent) === savedText);
+      return matches.length === 1 ? matches[0] : null;
+    } catch (_) {
+      return null;
+    }
+  };
+
   /** Erstellt eine anklickbare, am passenden Seitenelement verankerte Markierung. */
   const createMarker = (entry, index, target, document, window, onClick) => {
     const marker = document.createElement('button');
@@ -393,9 +417,10 @@ window.KWMashaFeedlyEntries = (() => {
         && Number.isFinite(Number(entry.elementPositionX)) && Number.isFinite(Number(entry.elementPositionY));
       const xRatio = hasPosition ? Math.max(0, Math.min(1, Number(entry.elementPositionX))) : 0.5;
       const yRatio = hasPosition ? Math.max(0, Math.min(1, Number(entry.elementPositionY))) : 0.5;
-      const edge = 24;
-      marker.style.left = `${Math.max(edge, Math.min(bounds.left + bounds.width * xRatio, window.innerWidth - edge))}px`;
-      marker.style.top = `${Math.max(edge, Math.min(bounds.top + bounds.height * yRatio, window.innerHeight - edge))}px`;
+      const left = `${bounds.left + bounds.width * xRatio}px`;
+      const top = `${bounds.top + bounds.height * yRatio}px`;
+      if (marker.style.left !== left) marker.style.left = left;
+      if (marker.style.top !== top) marker.style.top = top;
     };
     marker.reposition = reposition;
     marker.addEventListener('click', onClick);
@@ -409,6 +434,30 @@ window.KWMashaFeedlyEntries = (() => {
     marker.classList?.toggle?.('is-active', active);
     marker.setAttribute?.('aria-pressed', String(active));
   });
+
+  /**
+   * Führt sichtbare Marker auch bei Animationen und nachträglichen Layoutänderungen nach.
+   * Ein gemeinsamer Frame verhindert einen eigenen Animationszyklus pro Eintrag.
+   * @param {Array<HTMLButtonElement & {reposition: function(): void}>} markers Aktuelle Seitenmarker.
+   * @param {Window} window Browserfenster für die Frame-Verwaltung.
+   * @return {function(): void} Stoppt die Nachführung beim Schließen oder erneuten Rendern.
+   */
+  const trackMarkers = (markers, window) => {
+    let frame = null;
+    let stopped = false;
+    const update = () => {
+      if (stopped || !markers.length) return;
+      markers.forEach((marker) => marker.reposition());
+      frame = window.requestAnimationFrame(update);
+    };
+    if (markers.length && typeof window.requestAnimationFrame === 'function') {
+      frame = window.requestAnimationFrame(update);
+    }
+    return () => {
+      stopped = true;
+      if (frame !== null) window.cancelAnimationFrame?.(frame);
+    };
+  };
 
   /** Rendert HTTP(S)-Links als Links und jeden übrigen Text weiterhin als reinen Text. */
   const renderLinks = (container, value, documentRef = document) => {
@@ -442,7 +491,7 @@ window.KWMashaFeedlyEntries = (() => {
     else if (offset < text.length) container.append(documentRef.createTextNode(text.slice(offset)));
   };
 
-  return { sortEntries, toggleSorting, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, renderCommentReactions, priorityIconSVG, createMarker, setActiveMarker, celebrateDone, celebrateClosedCategory, celebrateRocketLaunch, celebrateCompletion, previewCompletionAnimation, trapFocus };
+  return { sortEntries, toggleSorting, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, renderCommentReactions, priorityIconSVG, resolveTarget, createMarker, setActiveMarker, trackMarkers, celebrateDone, celebrateClosedCategory, celebrateRocketLaunch, celebrateCompletion, previewCompletionAnimation, trapFocus };
 })();
 
 /** Lädt Einträge, zeichnet Seitenmarkierungen und zeigt die filterbare Übersicht. */
@@ -857,8 +906,7 @@ document.addEventListener('DOMContentLoaded', () => {
     editHeading?.focus?.();
     widget.setAttribute('data-edit-open', 'true');
     document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-entry-opened'));
-    let target = null;
-    try { target = entry.selector ? document.querySelector(entry.selector) : null; } catch (_) { /* Ungültige gespeicherte CSS-Selektoren überspringen. */ }
+    const target = window.KWMashaFeedlyEntries.resolveTarget(entry, document);
     target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
@@ -1045,7 +1093,10 @@ document.addEventListener('DOMContentLoaded', () => {
     return result;
   };
 
+  let stopMarkerTracking = null;
   const clearMarkers = () => {
+    stopMarkerTracking?.();
+    stopMarkerTracking = null;
     window.KWMashaFeedlyEntries.setActiveMarker(markers);
     markers.forEach((marker) => marker.remove());
     markers.length = 0;
@@ -1073,8 +1124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     pageEntries.forEach((entry) => {
       if (entry.isClosed) return;
       if (!entry.selector) return;
-      let target;
-      try { target = document.querySelector(entry.selector); } catch (_) { return; }
+      const target = window.KWMashaFeedlyEntries.resolveTarget(entry, document);
       if (!target || widget.contains(target)) return;
       const marker = window.KWMashaFeedlyEntries.createMarker(entry, markers.length, target, document, window, (event) => {
         event.preventDefault();
@@ -1086,6 +1136,7 @@ document.addEventListener('DOMContentLoaded', () => {
       markers.push(marker);
     });
     if (activeEntry) window.KWMashaFeedlyEntries.setActiveMarker(markers, activeEntry.id);
+    stopMarkerTracking = window.KWMashaFeedlyEntries.trackMarkers(markers, window);
   };
 
   const activityBadge = () => {
@@ -1528,8 +1579,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     openEntry(entry, card);
-    let target = null;
-    try { target = entry.selector ? document.querySelector(entry.selector) : null; } catch (_) { /* Ungültige gespeicherte CSS-Selektoren überspringen. */ }
+    const target = window.KWMashaFeedlyEntries.resolveTarget(entry, document);
     target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   listContainer?.addEventListener('keydown', (event) => {
