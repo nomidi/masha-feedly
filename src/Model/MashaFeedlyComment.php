@@ -43,6 +43,7 @@ class MashaFeedlyComment extends DataObject
 
     private static $has_many = [
         'Attachments' => MashaFeedlyAttachment::class,
+        'Reactions' => MashaFeedlyCommentReaction::class,
     ];
 
     private static $summary_fields = [

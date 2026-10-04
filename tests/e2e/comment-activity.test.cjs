@@ -61,6 +61,13 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const createForm = creatorWidget.locator('[data-masha-feedly-entry-form]');
     await expect(createForm).toBeVisible();
     await createForm.locator('[name="Content"]').fill(unique);
+    await expect(createForm.locator('[name="AssignedMemberIDs[]"]').first()).toBeAttached();
+    const image = {
+      name: 'e2e-anlage.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/7WQAAAAASUVORK5CYII=', 'base64'),
+    };
+    await createForm.locator('[name="Attachments[]"]').setInputFiles(image);
     const createEmojiToggle = createForm.locator('[data-masha-feedly-emoji-toggle]');
     await createEmojiToggle.click();
     const createEmojiPicker = creatorPage.locator('.kw-masha-feedly__emoji-picker:not([hidden])');
@@ -73,9 +80,12 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     assert.ok(createPickerBounds.y + createPickerBounds.height <= viewportHeight, 'Emoji-Auswahl wird nicht unten abgeschnitten.');
     assert.equal(await createEmojiToggle.locator('svg').evaluate((icon) => icon.getBoundingClientRect().width <= 24), true, 'Das Smiley-Icon bleibt kompakt.');
     await createEmojiPicker.locator('[data-emoji="😎"]').click();
+    const createButton = creatorWidget.locator('[data-masha-feedly-modal] button[type="submit"][form="kw-masha-feedly-create-form"]');
+    await expect(createButton).toBeEnabled();
+    const createURL = await createForm.getAttribute('data-create-url');
     const createResponsePromise = creatorPage.waitForResponse((response) =>
-      response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/createEntry'));
-    await createForm.locator('[type="submit"]').click();
+      response.request().method() === 'POST' && new URL(response.url()).pathname === new URL(createURL, config.baseURL).pathname);
+    await createButton.click();
     const createResponse = await createResponsePromise;
     const created = await createResponse.json();
     assert.equal(createResponse.ok(), true, `Eintrag anlegen: ${created.message || createResponse.status()}`);
@@ -83,6 +93,7 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     assert.match(created.title, /😎/u, 'Das Emoji aus dem Eintragsformular muss gespeichert werden.');
     const entryID = Number(created.entryID);
     assert.ok(entryID > 0, 'Der Server muss die neue Eintrags-ID zurückgeben.');
+    assert.ok(created.attachments.some((attachment) => attachment.name === image.name), 'Der Bildanhang wird beim Erstellen gespeichert.');
 
     await creatorWidget.locator('[data-masha-feedly-open-list]').click();
     const ownCard = creatorWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
@@ -112,9 +123,24 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     assert.ok(commenterUnreadCount > 0, 'Der neue Eintrag muss im Neuigkeiten-Zähler erscheinen.');
     await commenterCard.click();
     await expect(commenterCard).not.toHaveAttribute('data-entry-unread', 'true');
+    await expect(commenterWidget.locator('[data-masha-feedly-edit-attachments] img')).toBeVisible();
     await expect(commenterWidget.locator('[data-masha-feedly-unread-count]'))
       .toHaveText(String(commenterUnreadCount - 1));
     const commentForm = commenterWidget.locator('[data-masha-feedly-comment-form]');
+    const editForm = commenterWidget.locator('[data-masha-feedly-edit-form]');
+    const assignee = editForm.locator('[name="AssignedMemberIDs[]"]').first();
+    await assignee.check();
+    const assigneeID = await assignee.getAttribute('value');
+    const updateURL = await editForm.getAttribute('data-update-url');
+    const updateResponsePromise = commenterPage.waitForResponse((response) =>
+      response.request().method() === 'POST' && new URL(response.url()).pathname === new URL(updateURL, config.baseURL).pathname);
+    await editForm.locator('[type="submit"]').click();
+    const updateResponse = await updateResponsePromise;
+    const updated = await updateResponse.json();
+    assert.equal(updateResponse.ok(), true, `Zuständigkeit speichern: ${updated.message || updateResponse.status()}`);
+    assert.equal(updated.success, true);
+    await expect(editForm.locator(`[name="AssignedMemberIDs[]"][value="${assigneeID}"]`)).toBeChecked();
+    await expect(commenterWidget.locator('[data-masha-feedly-edit-status]')).toContainText('gespeichert');
     await expect(commentForm).toBeVisible();
     await commentForm.locator('[name="CommentText"]').fill(commentText);
     await commentForm.locator('[data-masha-feedly-emoji-toggle]').click();
@@ -150,6 +176,29 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     await unreadCard.click();
     await expect(reloadedCreatorWidget.locator('[data-masha-feedly-comments]')).toContainText(commentText);
     await expect(unreadCount).toHaveText(String(unreadBeforeOpen - 1));
+    const comment = reloadedCreatorWidget.locator('[data-masha-feedly-comments] .kw-masha-feedly__comment').filter({ hasText: commentText });
+    const react = async (emoji) => {
+      const responsePromise = creatorPage.waitForResponse((response) =>
+        response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/__masha-feedly-comment'));
+      await comment.locator('.kw-masha-feedly__comment-reaction-picker-toggle').click();
+      const picker = comment.locator('.kw-masha-feedly__comment-reaction-picker');
+      await expect(picker).toBeVisible();
+      await picker.locator(`[data-reaction-emoji="${emoji}"]`).click();
+      const response = await responsePromise;
+      const result = await response.json();
+      assert.equal(response.ok(), true, `Reaktion ${emoji} speichern: ${result.message || response.status()}`);
+      assert.equal(result.success, true);
+      return result.reactions.find((reaction) => reaction.emoji === emoji);
+    };
+    const heart = await react('❤️');
+    assert.equal(heart.count, 1);
+    assert.equal(heart.selected, true);
+    const laugh = await react('😂');
+    assert.equal(laugh.count, 1);
+    assert.equal(laugh.selected, true);
+    assert.equal(await comment.locator('.kw-masha-feedly__comment-reaction-summary [data-reaction-emoji="❤️"]').count(), 0, 'Pro Person und Kommentar bleibt nur eine Reaktion aktiv.');
+    await react('😂');
+    assert.equal(await comment.locator('.kw-masha-feedly__comment-reaction-summary [data-reaction-emoji="😂"]').count(), 0, 'Ein erneuter Klick entfernt die eigene Reaktion.');
   } finally {
     await creatorContext.close();
     await commenterContext.close();

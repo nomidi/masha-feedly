@@ -4,6 +4,7 @@ namespace KW\MashaFeedly\Control;
 
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use KW\MashaFeedly\Model\MashaFeedlyComment;
+use KW\MashaFeedly\Model\MashaFeedlyCommentReaction;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
@@ -42,6 +43,9 @@ class MashaFeedlyCommentController extends Controller
         if (in_array($action, ['edit', 'delete'], true)) {
             return $this->manageComment($request, $member, $action);
         }
+        if ($action === 'react') {
+            return $this->toggleReaction($request, $entry, $member);
+        }
         $text = trim((string)$request->postVar('CommentText'));
         if ($text === '' || mb_strlen($text) > 5000) {
             return $this->respond(['success' => false, 'message' => $this->translate('COMMENT_INVALID', 'Bitte gib einen Kommentar mit höchstens 5000 Zeichen ein.')], 400);
@@ -68,8 +72,46 @@ class MashaFeedlyCommentController extends Controller
                 'created' => (string)$comment->Created,
                 'edited' => false,
                 'canManage' => true,
+                'reactions' => MashaFeedlyCommentReaction::summaryForComment($comment, $member),
             ],
             'history' => MashaFeedlyEntryHistory::dataForEntry($entry),
+        ]);
+    }
+
+    /** Schaltet eine erlaubte Reaktion auf einem freigegebenen Kommentar um. */
+    private function toggleReaction(HTTPRequest $request, MashaFeedlyEntry $entry, Member $member): HTTPResponse
+    {
+        $comment = MashaFeedlyComment::get()->byID((int)$request->postVar('CommentID'));
+        if (!$comment || (int)$comment->EntryID !== (int)$entry->ID || !(bool)$comment->IsApproved) {
+            return $this->respond(['success' => false, 'message' => $this->translate('COMMENT_NOT_FOUND', 'Der Kommentar wurde nicht gefunden.')], 404);
+        }
+        $emoji = trim((string)$request->postVar('ReactionEmoji'));
+        if (!in_array($emoji, MashaFeedlyCommentReaction::supportedEmojis(), true)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('COMMENT_REACTION_INVALID', 'Diese Reaktion ist nicht verfügbar.')], 400);
+        }
+
+        $existing = MashaFeedlyCommentReaction::get()->filter([
+            'CommentID' => (int)$comment->ID,
+            'MemberID' => (int)$member->ID,
+        ]);
+        $current = $existing->first();
+        if ($current && (string)$current->Emoji === $emoji) {
+            $current->delete();
+        } else {
+            foreach ($existing as $oldReaction) {
+                $oldReaction->delete();
+            }
+            MashaFeedlyCommentReaction::create([
+                'CommentID' => (int)$comment->ID,
+                'MemberID' => (int)$member->ID,
+                'Emoji' => $emoji,
+            ])->write();
+        }
+
+        return $this->respond([
+            'success' => true,
+            'commentID' => (int)$comment->ID,
+            'reactions' => MashaFeedlyCommentReaction::summaryForComment($comment, $member),
         ]);
     }
 
@@ -89,6 +131,9 @@ class MashaFeedlyCommentController extends Controller
             if ($entry) {
                 MashaFeedlyEntryHistory::record($entry, 'comment_deleted', (string)$comment->CommentText, '', $member, $commentID);
                 MashaFeedlyEntryRead::markAsSeen($entry, $member);
+            }
+            foreach ($comment->Reactions() as $reaction) {
+                $reaction->delete();
             }
             $comment->delete();
             return $this->respond([
@@ -117,6 +162,7 @@ class MashaFeedlyCommentController extends Controller
             'created' => (string)$comment->Created,
             'edited' => true,
             'canManage' => true,
+            'reactions' => MashaFeedlyCommentReaction::summaryForComment($comment, $member),
         ], 'history' => $entry ? MashaFeedlyEntryHistory::dataForEntry($entry) : []]);
     }
 

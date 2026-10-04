@@ -24,13 +24,14 @@ const messages = {
   MEMBER_FALLBACK: 'Mitglied', ENTRY_MARKER_ARIA: 'Eintrag {number}: {title}', ENTRY_MARKER_TITLE: '{category} · {title}',
   HISTORY_STATUS_CHANGE: 'Status: {oldValue} → {newValue}', HISTORY_ASSIGNEES_CHANGE: 'Zuständigkeit: {oldValue} → {newValue}',
   HISTORY_RELATIONS_CHANGE: 'Verknüpfungen: {oldValue} → {newValue}', HISTORY_NO_RELATIONS: 'Keine Verknüpfungen',
+  HISTORY_REPORTED_BY: 'Meldeperson: {oldValue} → {newValue}',
   HISTORY_CREATED: 'Eintrag erstellt: {title}', HISTORY_COMMENT: 'Kommentar: {text}',
   HISTORY_ATTACHMENT: 'Datei hochgeladen: {text}',
   HISTORY_COMMENT_EDITED: 'Kommentar bearbeitet: {oldValue} → {newValue}',
   HISTORY_COMMENT_DELETED: 'Kommentar gelöscht: {text}',
   HISTORY_NOBODY: 'Niemand', HISTORY_META: '{actor} · {when}', HISTORY_PRIORITY_CHANGE: 'Priorität: {oldValue} → {newValue}',
   HISTORY_DUE_DATE_CHANGE: 'Fälligkeit: {oldValue} → {newValue}', NO_DUE_DATE: 'Kein Termin', ENTRY_DUE_DATE: 'Fällig am {date}',
-  ENTRY_NUMBER: 'Eintrag #{id}', ENTRY_CREATED_BY: 'Erstellt von {author}', ENTRY_CREATED_UNKNOWN: 'Unbekannt', CATEGORY_ALL: 'Alle Kategorien', LIST_COUNT_MINE_DU: 'für dich',
+  ENTRY_NUMBER: 'Eintrag #{id}', ENTRY_REPORTED_BY: 'Gemeldet von {author}', ENTRY_CREATED_UNKNOWN: 'Unbekannt', CATEGORY_ALL: 'Alle Kategorien', LIST_COUNT_MINE_DU: 'für dich',
   LIST_COUNT_MINE_SIE: 'für Sie', LIST_COUNT_ALL: 'insgesamt', LIST_COUNT_PAGE: 'auf dieser Seite',
   LIST_COUNT_UNREAD: 'mit neuen Aktivitäten', NEWS_BUTTON_DU: 'Neu seit deinem letzten Besuch',
   NEWS_BUTTON_SIE: 'Neu seit Ihrem letzten Besuch', NEWS_EMPTY: 'Alles ist auf dem neuesten Stand.',
@@ -78,9 +79,18 @@ const messages = {
   FILTERS_TITLE: 'Filter', FILTERS_NONE: 'Keine aktiv', FILTERS_ACTIVE: '{count} aktiv',
   FILTER_REMOVE: 'Filter entfernen: {label}', FILTERS_CLEAR: 'Alle Filter zurücksetzen',
   FILTER_MODE: 'Ansicht', FILTER_OPEN: 'Offene Einträge', FILTER_PAGE_OPEN: 'Offene Fehler hier',
+  SORTING_TITLE: 'Sortierung', SORT_DUE: 'Fälligkeit', SORT_CREATED: 'Erstellt am', SORT_PRIORITY: 'Priorität', SORT_ASSIGNEE: 'Zuständigkeit', SORT_ACTIVITY: 'Letzte Aktivität', SORT_ASCENDING: 'aufsteigend', SORT_DESCENDING: 'absteigend',
   FILTER_FEEDBACK: 'Wartet auf Feedback', FILTER_CLOSED: 'Abgeschlossene Einträge', FILTER_ALL: 'Alle Einträge',
   FILTER_PAGE: 'Alle Einträge auf dieser Seite', FILTER_MINE: 'Für mich', FILTER_UNREAD: 'Neuigkeiten',
   FILTER_CATEGORY: 'Kategorie', FILTER_PRIORITY: 'Priorität',
+  COMMENT_REACTIONS: 'Reaktionen auf diesen Kommentar', COMMENT_REACTION_LIKE: 'Gefällt mir',
+  COMMENT_REACTION_LOVE: 'Herz', COMMENT_REACTION_LAUGH: 'Lachen', COMMENT_REACTION_CRY: 'Weinen',
+  COMMENT_REACTION_SURPRISED: 'Überrascht', COMMENT_REACTION_THANKS: 'Danke',
+  COMMENT_REACTION_ADD: '{reaction}: Reaktion hinzufügen. Bisher {count}.',
+  COMMENT_REACTION_REMOVE: '{reaction}: eigene Reaktion entfernen. Insgesamt {count}.',
+  COMMENT_REACTION_SAVED: 'Reaktion gespeichert.', COMMENT_REACTION_ERROR: 'Reaktion konnte nicht gespeichert werden.',
+  COMMENT_REACTION_PICKER_OPEN: 'Mit diesem Kommentar reagieren',
+  COMMENT_REACTION_PICKER_CLOSE: 'Reaktionsauswahl schließen', COMMENT_REACTION_PICKER_TITLE: 'Reaktion auswählen',
 };
 const translate = (key, values = {}) => Object.entries(values).reduce(
   (message, [name, value]) => message.replaceAll(`{${name}}`, String(value)), messages[key] || key
@@ -126,6 +136,28 @@ test('zeigt Urheber und lokalen Erstellungszeitpunkt direkt am geöffneten Eintr
   assert.match(compiledStyles, /\.kw-masha-feedly__entry-created-avatar img\{width:100%;height:100%;object-fit:cover\}/);
 });
 
+test('zeigt die konfigurierte Meldeperson statt des technischen Erstellers und rendert deren Änderung im Verlauf', () => {
+  const meta = entriesUI.entryCreationMeta({
+    reportedByName: 'Historische Meldung von Ada',
+    createdBy: 'Historische Meldung von Ada',
+    history: [
+      { type: 'created', actor: 'CMS Betreiber', created: '2026-10-04T12:00:00Z' },
+    ],
+  });
+  assert.equal(meta.author, 'Historische Meldung von Ada');
+
+  const rows = [];
+  const container = { replaceChildren() { rows.length = 0; }, append(row) { rows.push(row); } };
+  const doc = {
+    createElement(tag) {
+      return { tag, children: [], append(...children) { this.children.push(...children); }, set textContent(value) { this.text = value; }, get textContent() { return this.text; } };
+    },
+  };
+  entriesUI.renderHistory(container, [{ type: 'reported_by', oldValue: 'CMS Betreiber', newValue: 'Historische Meldung von Ada', actor: 'Betreiber', created: '2026-10-04T12:00:00Z' }], doc);
+  assert.equal(rows[0].className, 'kw-masha-feedly__history-item is-reported-by');
+  assert.equal(rows[0].children[0].text, 'Meldeperson: CMS Betreiber → Historische Meldung von Ada');
+});
+
 test('zeigt beim Ersteller dasselbe Profilbild wie bei Zuständigkeiten und nutzt Initialen als Fallback', () => {
   const images = [];
   const fakeDocument = { createElement: () => { const image = {}; images.push(image); return image; } };
@@ -165,6 +197,57 @@ test('sortiert die Einträge zuerst nach Kategorien und danach nach Datum', () =
     { id: 3, categoryID: 2, entryDate: '2026-10-01 15:00:00' },
   ], [{ id: 1 }, { id: 2 }]);
   assert.deepEqual(Array.from(sorted, (entry) => entry.id), [2, 3, 1]);
+});
+
+test('sortiert Fälligkeiten zuerst, bald fällige Einträge zuerst und Einträge ohne Termin danach', () => {
+  const sorted = entriesUI.sortEntries([
+    { id: 1, categoryID: 1, dueDate: '', createdAt: '2026-10-04T10:00:00Z' },
+    { id: 2, categoryID: 1, dueDate: '2026-10-20', createdAt: '2026-10-04T11:00:00Z' },
+    { id: 3, categoryID: 1, dueDate: '2026-10-05', createdAt: '2026-10-04T09:00:00Z' },
+  ], [{ id: 1 }], [], { key: 'due', direction: 'asc' });
+  assert.deepEqual(Array.from(sorted, (entry) => entry.id), [3, 2, 1]);
+  const reverse = entriesUI.sortEntries([
+    { id: 1, categoryID: 1, dueDate: '', createdAt: '2026-10-04T10:00:00Z' },
+    { id: 2, categoryID: 1, dueDate: '2026-10-20', createdAt: '2026-10-04T11:00:00Z' },
+    { id: 3, categoryID: 1, dueDate: '2026-10-05', createdAt: '2026-10-04T09:00:00Z' },
+  ], [{ id: 1 }], [], { key: 'due', direction: 'desc' });
+  assert.deepEqual(Array.from(reverse, (entry) => entry.id), [2, 3, 1]);
+});
+
+test('sortiert nach Erstellungszeit, Priorität und letzter Aktivität und kehrt ein aktives Kriterium beim erneuten Klick um', () => {
+  const entries = [
+    { id: 1, categoryID: 1, priorityID: 2, createdAt: '2026-10-01T10:00:00Z', history: [{ created: '2026-10-01T10:00:00Z' }] },
+    { id: 2, categoryID: 1, priorityID: 1, createdAt: '2026-10-03T10:00:00Z', history: [{ created: '2026-10-04T10:00:00Z' }] },
+    { id: 3, categoryID: 1, priorityID: 1, createdAt: '2026-10-02T10:00:00Z', history: [{ created: '2026-10-02T10:00:00Z' }] },
+  ];
+  const categories = [{ id: 1 }];
+  const priorities = [{ id: 1 }, { id: 2 }];
+  assert.deepEqual(Array.from(entriesUI.sortEntries(entries, categories, priorities, { key: 'created', direction: 'desc' }), (entry) => entry.id), [2, 3, 1]);
+  assert.deepEqual(Array.from(entriesUI.sortEntries(entries, categories, priorities, { key: 'priority', direction: 'asc' }), (entry) => entry.id), [2, 3, 1]);
+  assert.deepEqual(Array.from(entriesUI.sortEntries(entries, categories, priorities, { key: 'activity', direction: 'desc' }), (entry) => entry.id), [2, 3, 1]);
+  assert.deepEqual(JSON.parse(JSON.stringify(entriesUI.toggleSorting({ key: 'activity', direction: 'desc' }, 'activity'))), { key: 'activity', direction: 'asc' });
+  assert.deepEqual(JSON.parse(JSON.stringify(entriesUI.toggleSorting({ key: 'activity', direction: 'asc' }, 'due'))), { key: 'due', direction: 'asc' });
+  assert.match(widgetTemplate, /data-masha-feedly-sort-details[\s\S]*?data-masha-feedly-sort-option="due"[\s\S]*?data-masha-feedly-sort-option="created"[\s\S]*?data-masha-feedly-sort-option="priority"[\s\S]*?data-masha-feedly-sort-option="activity"/);
+  assert.match(widgetTemplate, /data-masha-feedly-sort-current[\s\S]*?data-masha-feedly-sort-label/);
+  assert.match(scss, /\.kw-masha-feedly__sort-popover \{ position: absolute;[^}]*box-shadow:/);
+  assert.match(scss, /\.kw-masha-feedly__sort-current \{ position: absolute;[^}]*border-radius: 50%;/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__sort-popover\{position:absolute;[^}]*box-shadow:/);
+});
+
+test('sortiert alphabetisch nach Zuständigkeit, behandelt Mehrfachzuweisungen stabil und lässt Niemand am Ende', () => {
+  const sorted = entriesUI.sortEntries([
+    { id: 1, categoryID: 1, assignees: [] },
+    { id: 2, categoryID: 1, assignees: [{ name: 'Zoe Beispiel' }, { name: 'Ada Muster' }] },
+    { id: 3, categoryID: 1, assignees: [{ name: 'Berta Beispiel' }] },
+  ], [{ id: 1 }], [], { key: 'assignee', direction: 'asc' });
+  assert.deepEqual(Array.from(sorted, (entry) => entry.id), [2, 3, 1]);
+  const reverse = entriesUI.sortEntries([
+    { id: 1, categoryID: 1, assignees: [] },
+    { id: 2, categoryID: 1, assignees: [{ name: 'Zoe Beispiel' }, { name: 'Ada Muster' }] },
+    { id: 3, categoryID: 1, assignees: [{ name: 'Berta Beispiel' }] },
+  ], [{ id: 1 }], [], { key: 'assignee', direction: 'desc' });
+  assert.deepEqual(Array.from(reverse, (entry) => entry.id), [3, 2, 1]);
+  assert.match(widgetTemplate, /data-masha-feedly-sort-option="assignee"/);
 });
 
 test('hält Tab und Umschalt+Tab im Fokusbereich eines Dialogs', () => {
@@ -302,6 +385,50 @@ test('filtert die Übersicht nach einer ausgewählten Kategorie', () => {
   assert.deepEqual(Array.from(entriesUI.filterByCategory(entries, ''), (entry) => entry.id), [1, 2]);
 });
 
+test('zeigt Reaktionen kompakt und öffnet die sechs Optionen erst auf Klick', async () => {
+  const makeNode = (tagName) => ({
+    tagName, dataset: {}, attributes: {}, children: [], listeners: {},
+    append(...items) { this.children.push(...items); },
+    replaceChildren(...items) { this.children = items; },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    addEventListener(name, callback) { this.listeners[name] = callback; },
+  });
+  const documentRef = { createElement: makeNode };
+  const container = makeNode('div');
+  let reactedTo = '';
+  entriesUI.renderCommentReactions(container, [
+    { emoji: '👍', count: 2, selected: true },
+    { emoji: '❤️', count: 1, selected: false },
+  ], documentRef, (emoji) => { reactedTo = emoji; });
+
+  assert.equal(container.attributes.role, 'group');
+  assert.equal(container.attributes['aria-label'], 'Reaktionen auf diesen Kommentar');
+  assert.equal(container.children.length, 2, 'Die Auswahl ist beim ersten Anzeigen eingeklappt.');
+  const summary = container.children[0];
+  const picker = container.children[1];
+  assert.equal(picker.hidden, true);
+  const like = summary.children[0];
+  assert.equal(like.dataset.reactionEmoji, '👍');
+  assert.equal(like.attributes['aria-pressed'], 'true');
+  assert.match(like.attributes['aria-label'], /Gefällt mir.*2/);
+  assert.equal(like.children[1].textContent, '2');
+  const heart = summary.children[1];
+  assert.equal(heart.attributes['aria-pressed'], 'false');
+  assert.equal(heart.children[1].textContent, '1');
+  const pickerToggle = summary.children[2];
+  assert.equal(pickerToggle.children[0].className, 'kw-masha-feedly__comment-reaction-picker-face');
+  assert.equal(pickerToggle.children[0].textContent, '☺');
+  pickerToggle.listeners.click();
+  assert.equal(picker.hidden, false);
+  assert.equal(pickerToggle.attributes['aria-expanded'], 'true');
+  assert.equal(picker.children.length, 6);
+  assert.equal(picker.children[0].attributes['aria-pressed'], 'true');
+  picker.children[2].listeners.click();
+  assert.equal(reactedTo, '😂', 'Eine Auswahl wird zum Speichervorgang übergeben und ersetzt die bisherige eigene Reaktion.');
+  assert.match(scss, /comment-reaction-picker-toggle\s*\{[^}]*place-items:\s*center/);
+  assert.match(scss, /comment-reaction-picker-face\s*\{[^}]*line-height:\s*1[^}]*transform:\s*translateY\(-1px\)/);
+});
+
 test('führt eine Eintragskarte zur Originalseite und übergibt die Eintragskennung', () => {
   const target = new URL(entriesUI.entryTargetURL(
     { id: 71, pageURL: 'https://feedly:8890/about-us?from=cms#kontakt' },
@@ -394,7 +521,7 @@ test('zeigt Status, Priorität und Zuständige in stabiler Reihenfolge und hält
   assert.match(scss, /entry-card\[data-has-assignees="true"\] \{ position: relative; margin-bottom: 24px; padding-bottom: 30px; \}/);
   assert.match(scss, /entry-assignees \{ position: absolute; z-index: 2; right: 14px; bottom: 0; gap: 0; margin: 0; transform: translateY\(50%\); \}/);
   assert.match(compiledAdminStyles, /masha-feedly-board__card\[data-has-assignees=true\][^{]*\{[^}]*padding-bottom:1\.8rem/);
-  assert.match(compiledAdminStyles, /masha-feedly-board__assignees\{position:absolute;z-index:2;right:\.75rem;bottom:0;transform:translateY\(50%\)\}/);
+  assert.match(compiledAdminStyles, /masha-feedly-board__assignees\{position:absolute;z-index:2;right:\.75rem;bottom:-(?:0)?\.55rem;[^}]*transform:none\}/);
   assert.doesNotMatch(source, /entry-assignee-empty|ASSIGNEES_NONE/, 'Ohne Zuständige wird kein Platzhalter gerendert.');
   const unassignedEnv = createWidgetEnvironment();
   unassignedEnv.setEntryAssignees([]);
@@ -621,6 +748,11 @@ test('färbt das Website-Symbol in Prioritätsfarbe und zeigt es immer als Fehle
   assert.match(scss, /\.kw-masha-feedly__page-marker\.is-active \.kw-masha-feedly__page-marker-icon\s*\{[^}]*animation: kw-masha-feedly-marker-selected/);
   assert.match(scss, /\.kw-masha-feedly__page-marker::after\s*\{[^}]*opacity: 0/);
   assert.match(scss, /\.kw-masha-feedly__page-marker\.is-active::after\s*\{[^}]*animation: kw-masha-feedly-marker-pulse/);
+  assert.match(scss, /\.kw-masha-feedly__page-marker:focus-visible\s*\{[^}]*outline-color: var\(--masha-feedly-priority-color/);
+  assert.match(scss, /\.kw-masha-feedly__page-marker:focus-visible\s*\{[^}]*box-shadow: 0 0 0 6px color-mix\(in srgb, var\(--masha-feedly-priority-color/);
+  assert.match(scss, /:focus-visible:not\(\.kw-masha-feedly__page-marker\)\s*\{[^}]*outline-color: #334155/);
+  assert.match(compiledStyles, /\.kw-masha-feedly\[data-theme=serious\] \.kw-masha-feedly__page-marker:focus-visible\{outline-color:var\(--masha-feedly-priority-color/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__page-marker:focus-visible\{outline-color:var\(--masha-feedly-priority-color/);
 });
 
 test('erzeugt 128 Konfettiteile aus allen Richtungen für Done und räumt sie wieder auf', () => {
@@ -1567,9 +1699,12 @@ test('zeigt Kommentare als abwechselnde sichere Sprechblasen und sendet neue Kom
   assert.equal(env.commentList.children[1].children[1].textContent, '<script>zweiter</script><img src=x onerror=alert(2)> <svg onload=alert(3)> javascript:alert(4)');
   assert.equal(env.commentCount.textContent, '2');
   assert.equal(env.commentList.children[0].children[1].children.find((node) => node.tagName === 'a').href, 'https://example.test/kommentar');
-  assert.deepEqual(env.commentList.children[0].children[3].children.map((button) => button.textContent), ['Bearbeiten', 'Löschen']);
+  const firstActions = env.commentList.children[0].children.find((child) => child.className === 'kw-masha-feedly__comment-actions');
+  assert.equal(env.commentList.children[0].children[3].children.length, 2, 'Die Reaktionsauswahl bleibt zunächst eingeklappt.');
+  assert.equal(env.commentList.children[0].children[3].children[1].hidden, true);
+  assert.deepEqual(firstActions.children.map((button) => button.textContent), ['Bearbeiten', 'Löschen']);
 
-  env.commentList.children[0].children[3].children[0].listeners.click();
+  firstActions.children[0].listeners.click();
   const editor = env.commentList.children[0].children[1];
   assert.deepEqual(editor.children[3].children.map((button) => button.textContent), ['Abbrechen', 'Änderungen speichern']);
   editor.children[2].value = 'Kommentar aktualisiert';
@@ -1599,11 +1734,47 @@ test('zeigt Kommentare als abwechselnde sichere Sprechblasen und sendet neue Kom
   assert.match(env.editHistory.children[0].children[0].textContent, /Kommentar: Noch ein Hinweis/);
 
   env.postResponses.push({ ok: true, json: async () => ({ success: true, commentID: 2, history: [{ type: 'comment_deleted', oldValue: '<script>zweiter</script>', newValue: '', actor: 'Erika Muster', created: '2026-10-01T10:40:00Z' }] }) });
-  await env.commentList.children[1].children[3].children[1].listeners.click();
+  const secondActions = env.commentList.children[1].children.find((child) => child.className === 'kw-masha-feedly__comment-actions');
+  await secondActions.children[1].listeners.click();
   assert.equal(env.postCalls[2].options.body.values.CommentAction, 'delete');
   assert.equal(env.postCalls[2].options.body.values.CommentID, '2');
   assert.equal(env.commentCount.textContent, '2');
   assert.match(env.editHistory.children[0].children[0].textContent, /Kommentar gelöscht: <script>zweiter<\/script>/);
+});
+
+test('sendet eine Kommentarreaktion an den geschützten Kommentar-Endpunkt und aktualisiert die Anzeige', async () => {
+  const env = createWidgetEnvironment();
+  await env.listeners['kw-masha-feedly:opened']();
+  await env.openListButton.listeners.click();
+  const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
+  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  const comment = env.commentList.children[0];
+  const reactions = comment.children[3];
+  const reactionToggle = reactions.children[0].children.at(-1);
+  reactionToggle.listeners.click();
+  const reactionButton = reactions.children[1].children[0];
+  env.postResponses.push({ ok: true, json: async () => ({
+    success: true, commentID: 1,
+    reactions: [
+      { emoji: '👍', count: 1, selected: true },
+      { emoji: '❤️', count: 0, selected: false },
+      { emoji: '😂', count: 0, selected: false },
+      { emoji: '😢', count: 0, selected: false },
+      { emoji: '😮', count: 0, selected: false },
+      { emoji: '🙏', count: 0, selected: false },
+    ],
+  }) });
+  await reactionButton.listeners.click();
+  assert.equal(env.postCalls[0].url.pathname, '/__masha-feedly-comment');
+  assert.equal(env.postCalls[0].options.body.values.SecurityID, 'test-token');
+  assert.equal(env.postCalls[0].options.body.values.EntryID, '71');
+  assert.equal(env.postCalls[0].options.body.values.CommentID, '1');
+  assert.equal(env.postCalls[0].options.body.values.CommentAction, 'react');
+  assert.equal(env.postCalls[0].options.body.values.ReactionEmoji, '👍');
+  assert.equal(env.commentList.children[0].children[3].children[0].children[0].attributes['aria-pressed'], 'true');
+  assert.equal(env.commentList.children[0].children[3].children[0].children[0].children[1].textContent, '1');
+  assert.equal(env.commentList.children[0].children[3].children[1].hidden, true, 'Nach dem Auswählen klappt die Emoji-Auswahl wieder zu.');
+  assert.equal(env.commentStatus.textContent, 'Reaktion gespeichert.');
 });
 
 test('markiert neue Kommentaraktivität sichtbar in der rechten Liste und beim Öffnen als gelesen', async () => {

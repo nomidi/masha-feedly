@@ -50,8 +50,11 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('"HISTORY_COMMENT":"Kommentar: {text}"', $allowedResponse->getBody());
         $this->assertStringContainsString('"HISTORY_META":"{actor} · {when}"', $allowedResponse->getBody());
         $this->assertStringContainsString('"HISTORY_CREATED":"Eintrag erstellt: {title}"', $allowedResponse->getBody());
-        $this->assertStringContainsString('"ENTRY_CREATED_BY":"Erstellt von {author}"', $allowedResponse->getBody());
+        $this->assertStringContainsString('"ENTRY_REPORTED_BY":"Gemeldet von {author}"', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-entry-created-avatar', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertStringContainsString('data-masha-feedly-sort-details', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertStringContainsString('data-masha-feedly-sort-option="due"', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertStringContainsString('Sortierung', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('"SIMILAR_OPEN_ENTRY":"Eintrag ansehen"', $allowedResponse->getBody());
         $this->assertStringContainsString('"RELATION_DUPLICATE_OF":"Duplikat von"', $allowedResponse->getBody());
         $this->assertStringContainsString('"RELATION_BLOCKED_BY":"Blockiert durch"', $allowedResponse->getBody());
@@ -159,6 +162,8 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('kw-masha-feedly__onboarding-logo', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-tour-start', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-tour-cancel', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertStringContainsString('data-masha-feedly-onboarding-escape-hint', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertStringContainsString('Tipp: Esc beendet die Einführung jederzeit.', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('masha-feedly-onboarding.js', $allowedResponse->getBody());
         $this->assertStringContainsString('Schritt 1 von 8: Klicke auf das runde Masha:Feedly-Symbol ganz unten rechts', $allowedResponse->getBody());
         $this->assertStringContainsString('Schritt 2 von 8: Das Fenster ist offen. Klicke jetzt auf das pinke Plus', $allowedResponse->getBody());

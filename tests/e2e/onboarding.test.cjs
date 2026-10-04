@@ -45,7 +45,13 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     const toggle = widget.locator('.kw-masha-feedly__toggle');
     if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
     await widget.locator('[data-masha-feedly-open-help]').click();
+    const restartResponsePromise = page.waitForResponse((response) =>
+      response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/restartOnboarding'));
     await widget.locator('[data-masha-feedly-restart-onboarding]').click();
+    const restartResponse = await restartResponsePromise;
+    const restartResult = await restartResponse.json();
+    assert.equal(restartResponse.ok(), true, `Onboarding-Neustart: HTTP ${restartResponse.status()} (${restartResult.message || 'keine Servermeldung'})`);
+    assert.equal(restartResult.success, true, 'Der Server muss den Onboarding-Neustart bestätigen.');
     await expect(widget.locator('[data-masha-feedly-onboarding-welcome]')).toBeVisible();
     await widget.locator('[data-masha-feedly-tour-start]').click();
 
@@ -91,9 +97,13 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     assert.equal(commentResponse.ok(), true, `Kommentar speichern: ${savedComment.message || commentResponse.status()}`);
     assert.equal(savedComment.success, true);
     await expect(tip).toContainText('Schritt 8 von 8');
+    await expect(widget.locator('.kw-masha-feedly__onboarding-escape-hint')).toContainText('Esc beendet die Einführung jederzeit');
 
     const editForm = widget.locator('[data-masha-feedly-edit-form]');
     const statusSelect = editForm.locator('[name="CategoryID"]');
+    await expect(statusSelect).toBeEnabled();
+    await expect(editForm.locator('[name="PriorityID"]')).toBeEnabled();
+    await expect(editForm.locator('[name="DueDate"]')).toBeEnabled();
     const feedback = statusSelect.locator('option').filter({ hasText: /^Feedback$/ }).first();
     await statusSelect.selectOption(await feedback.getAttribute('value'));
     const assignee = editForm.locator('[name="AssignedMemberIDs[]"]').first();

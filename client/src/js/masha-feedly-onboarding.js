@@ -28,7 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentMessage = '';
   let feedbackTimer = null;
   let spotlight = null;
-  const controlStates = new Map();
+  // Die ursprünglichen Zustände einmal merken. Würden wir sie bei jedem
+  // Schritt neu aufnehmen, könnten bereits gesperrte Felder dauerhaft
+  // deaktiviert bleiben, wenn der nächste Schritt dieselben Felder freigibt.
+  const originalControlStates = new Map();
 
   const matches = (element, selector) => element?.closest?.(selector)
     || (element?.matches?.(selector) ? element : null);
@@ -59,8 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }[currentStep] || '');
 
   const restoreControls = () => {
-    controlStates.forEach((disabled, control) => { control.disabled = disabled; });
-    controlStates.clear();
+    originalControlStates.forEach((disabled, control) => { control.disabled = disabled; });
   };
 
   const trapDialogFocus = (dialog, event) => {
@@ -85,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const allowed = interactionSelector(step);
     widget.querySelectorAll('button, input, select, textarea').forEach((control) => {
       if (matches(control, '[data-masha-feedly-tour-cancel]')) return;
-      controlStates.set(control, Boolean(control.disabled));
+      if (!originalControlStates.has(control)) originalControlStates.set(control, Boolean(control.disabled));
       // Formular-Buttons dürfen außerhalb des <form> stehen und über form="…"
       // zugeordnet sein (z. B. im Dialog-Footer). Sie gehören trotzdem zum Schritt.
       if (!allowed || (!matches(control, allowed) && !matches(control.form, allowed))) control.disabled = true;
@@ -203,6 +205,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (finished || step === 'welcome') return;
     if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopImmediatePropagation();
       complete();
       return;
     }

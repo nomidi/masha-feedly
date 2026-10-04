@@ -1,6 +1,87 @@
 /** Hilfsfunktionen für Sortierung und Filterung der Masha-Feedly-Seitenübersicht. */
 window.KWMashaFeedlyEntries = (() => {
   const t = (key, values = {}) => window.KWMashaFeedlyTranslate(key, values);
+  const commentReactionOptions = [
+    { emoji: '👍', label: 'COMMENT_REACTION_LIKE' },
+    { emoji: '❤️', label: 'COMMENT_REACTION_LOVE' },
+    { emoji: '😂', label: 'COMMENT_REACTION_LAUGH' },
+    { emoji: '😢', label: 'COMMENT_REACTION_CRY' },
+    { emoji: '😮', label: 'COMMENT_REACTION_SURPRISED' },
+    { emoji: '🙏', label: 'COMMENT_REACTION_THANKS' },
+  ];
+  /** Zeichnet die sechs erlaubten Reaktionen mit Zähler und eigenem Auswahlzustand. */
+  const renderCommentReactions = (container, reactions, documentRef, onReact) => {
+    if (!container) return;
+    container.replaceChildren();
+    container.className = 'kw-masha-feedly__comment-reactions';
+    container.setAttribute('role', 'group');
+    container.setAttribute('aria-label', t('COMMENT_REACTIONS'));
+    const byEmoji = new Map((Array.isArray(reactions) ? reactions : []).map((reaction) => [reaction.emoji, reaction]));
+    const currentSelection = Array.from(byEmoji.values()).find((reaction) => reaction.selected)?.emoji || '';
+    const summary = documentRef.createElement('div');
+    summary.className = 'kw-masha-feedly__comment-reaction-summary';
+    commentReactionOptions.forEach(({ emoji, label }) => {
+      const reaction = byEmoji.get(emoji) || { count: 0, selected: false };
+      if (!Number(reaction.count)) return;
+      const pill = documentRef.createElement('button');
+      pill.type = 'button';
+      pill.className = 'kw-masha-feedly__comment-reaction';
+      pill.dataset.reactionEmoji = emoji;
+      pill.setAttribute('aria-pressed', reaction.selected ? 'true' : 'false');
+      pill.setAttribute('aria-label', t(reaction.selected ? 'COMMENT_REACTION_REMOVE' : 'COMMENT_REACTION_ADD', {
+        reaction: t(label), count: Number(reaction.count) || 0,
+      }));
+      const icon = documentRef.createElement('span');
+      icon.className = 'kw-masha-feedly__comment-reaction-emoji';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.textContent = emoji;
+      const count = documentRef.createElement('span');
+      count.className = 'kw-masha-feedly__comment-reaction-count';
+      count.textContent = String(Number(reaction.count) || 0);
+      pill.append(icon, count);
+      pill.addEventListener('click', () => onReact?.(emoji, pill));
+      summary.append(pill);
+    });
+    const pickerButton = documentRef.createElement('button');
+    pickerButton.type = 'button';
+    pickerButton.className = 'kw-masha-feedly__comment-reaction-picker-toggle';
+    const pickerFace = documentRef.createElement('span');
+    pickerFace.className = 'kw-masha-feedly__comment-reaction-picker-face';
+    pickerFace.setAttribute('aria-hidden', 'true');
+    pickerFace.textContent = '☺';
+    pickerButton.append(pickerFace);
+    pickerButton.setAttribute('aria-expanded', 'false');
+    pickerButton.setAttribute('aria-label', t('COMMENT_REACTION_PICKER_OPEN'));
+
+    const picker = documentRef.createElement('div');
+    picker.className = 'kw-masha-feedly__comment-reaction-picker';
+    picker.hidden = true;
+    picker.setAttribute('role', 'group');
+    picker.setAttribute('aria-label', t('COMMENT_REACTION_PICKER_TITLE'));
+    commentReactionOptions.forEach(({ emoji, label }) => {
+      const reaction = byEmoji.get(emoji) || { count: 0, selected: false };
+      const choice = documentRef.createElement('button');
+      choice.type = 'button';
+      choice.className = 'kw-masha-feedly__comment-reaction-choice';
+      choice.dataset.reactionEmoji = emoji;
+      choice.setAttribute('aria-pressed', reaction.selected ? 'true' : 'false');
+      choice.setAttribute('aria-label', t(reaction.selected ? 'COMMENT_REACTION_REMOVE' : 'COMMENT_REACTION_ADD', {
+        reaction: t(label), count: Number(reaction.count) || 0,
+      }));
+      choice.textContent = emoji;
+      choice.addEventListener('click', () => onReact?.(emoji, choice));
+      picker.append(choice);
+    });
+    pickerButton.addEventListener('click', () => {
+      picker.hidden = !picker.hidden;
+      pickerButton.setAttribute('aria-expanded', picker.hidden ? 'false' : 'true');
+      pickerButton.setAttribute('aria-label', t(picker.hidden ? 'COMMENT_REACTION_PICKER_OPEN' : 'COMMENT_REACTION_PICKER_CLOSE'));
+    });
+    summary.append(pickerButton);
+    container.append(summary, picker);
+    if (currentSelection) container.dataset.selectedReaction = currentSelection;
+    else delete container.dataset.selectedReaction;
+  };
   /** Hält die Tab-Tastaturbedienung innerhalb eines geöffneten Dialogs. */
   const trapFocus = (container, event) => {
     if (!container || !event || event.key !== 'Tab') return false;
@@ -25,10 +106,38 @@ window.KWMashaFeedlyEntries = (() => {
   const priorityIconSVG = (iconType) => iconType === 'info'
     ? '<svg viewBox="0 0 512 512" aria-hidden="true" focusable="false"><path d="M256 0C114.509 0 0 114.496 0 256s114.496 256 256 256 256-114.496 256-256S397.504 0 256 0zm0 476.279c-121.462 0-220.279-98.816-220.279-220.279S134.538 35.721 256 35.721 476.279 134.537 476.279 256 377.462 476.279 256 476.279z"/><path d="M256.006 213.397c-15.164 0-25.947 6.404-25.947 15.839v128.386c0 8.088 10.783 16.174 25.947 16.174 14.49 0 26.283-8.086 26.283-16.174V229.234c0-9.434-11.793-15.837-26.283-15.837z"/><path d="M256.006 134.208c-15.501 0-27.631 11.12-27.631 23.925s12.131 24.263 27.631 24.263c15.164 0 27.296-11.457 27.296-24.263s-12.132-23.925-27.296-23.925z"/></svg>'
     : '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="kw-masha-feedly__priority-shape" d="m14.45 4a2.86 2.86 0 0 0-4.9 0l-7.88 12.87a2.87 2.87 0 0 0 2.45 4.36h15.76a2.87 2.87 0 0 0 2.45-4.36z"/><path class="kw-masha-feedly__priority-mark" d="M12 14.75a.76.76 0 0 1-.75-.75v-4.5a.75.75 0 0 1 1.5 0V14a.76.76 0 0 1-.75.75z"/><circle class="kw-masha-feedly__priority-mark" cx="12" cy="16.5" r="1"/></svg>';
-  /** Sortiert Einträge nach Kategorie und innerhalb der Kategorie nach Datum. */
-  const sortEntries = (entries, categories, priorities = []) => {
+  /** Sortiert nach dem gewählten Kriterium; ohne Auswahl bleibt die bisherige Standardsortierung erhalten. */
+  const sortEntries = (entries, categories, priorities = [], sorting = null) => {
     const order = new Map(categories.map((category, index) => [Number(category.id), index]));
     const priorityOrder = new Map(priorities.map((priority, index) => [Number(priority.id), index]));
+    if (sorting?.key && sorting.key !== 'default') {
+      const direction = sorting.direction === 'desc' ? -1 : 1;
+      const compareDate = (a, b) => String(a || '').localeCompare(String(b || ''));
+      return [...entries].sort((left, right) => {
+        let comparison = 0;
+        if (sorting.key === 'due') {
+          const leftHasDueDate = Boolean(left.dueDate);
+          const rightHasDueDate = Boolean(right.dueDate);
+          if (leftHasDueDate !== rightHasDueDate) return leftHasDueDate ? -1 : 1;
+          comparison = compareDate(left.dueDate, right.dueDate);
+        }
+        if (sorting.key === 'created') comparison = compareDate(left.createdAt || left.loggedAt || left.entryDate, right.createdAt || right.loggedAt || right.entryDate);
+        if (sorting.key === 'priority') comparison = (priorityOrder.get(Number(left.priorityID)) ?? Number.MAX_SAFE_INTEGER) - (priorityOrder.get(Number(right.priorityID)) ?? Number.MAX_SAFE_INTEGER);
+        if (sorting.key === 'assignee') {
+          const assigneeName = (entry) => (entry.assignees || []).map((member) => String(member.name || '').trim()).filter(Boolean).sort((a, b) => a.localeCompare(b, 'de', { sensitivity: 'base' }))[0] || '';
+          const leftName = assigneeName(left);
+          const rightName = assigneeName(right);
+          if (Boolean(leftName) !== Boolean(rightName)) return leftName ? -1 : 1;
+          comparison = leftName.localeCompare(rightName, 'de', { sensitivity: 'base' });
+        }
+        if (sorting.key === 'activity') comparison = compareDate(left.history?.[0]?.created || left.createdAt || left.loggedAt, right.history?.[0]?.created || right.createdAt || right.loggedAt);
+        return comparison * direction
+          || (order.get(Number(left.categoryID)) ?? Number.MAX_SAFE_INTEGER) - (order.get(Number(right.categoryID)) ?? Number.MAX_SAFE_INTEGER)
+          || (priorityOrder.get(Number(left.priorityID)) ?? Number.MAX_SAFE_INTEGER) - (priorityOrder.get(Number(right.priorityID)) ?? Number.MAX_SAFE_INTEGER)
+          || String(right.createdAt || right.loggedAt || right.entryDate || '').localeCompare(String(left.createdAt || left.loggedAt || left.entryDate || ''))
+          || Number(right.id) - Number(left.id);
+      });
+    }
     return [...entries].sort((left, right) =>
       (order.get(Number(left.categoryID)) ?? Number.MAX_SAFE_INTEGER)
         - (order.get(Number(right.categoryID)) ?? Number.MAX_SAFE_INTEGER)
@@ -37,6 +146,11 @@ window.KWMashaFeedlyEntries = (() => {
       || String(right.entryDate).localeCompare(String(left.entryDate))
       || Number(right.id) - Number(left.id));
   };
+
+  /** Aktiviert ein Sortierkriterium oder kehrt die Richtung des aktiven Kriteriums um. */
+  const toggleSorting = (current, key) => current?.key === key
+    ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+    : { key, direction: ['created', 'activity'].includes(key) ? 'desc' : 'asc' };
 
   /** Filtert eine Eintragsliste nach Kategorie oder lässt alle Kategorien sichtbar. */
   const filterByCategory = (entries, categoryID) => !categoryID
@@ -123,7 +237,7 @@ window.KWMashaFeedlyEntries = (() => {
   /** Formatiert Urheber und Erstellungszeit aus dem unveränderlichen Erstellungspunkt. */
   const entryCreationMeta = (entry) => {
     const creation = (entry?.history || []).find((item) => item?.type === 'created');
-    const author = String(creation?.actor || entry?.createdBy || '').trim() || t('ENTRY_CREATED_UNKNOWN');
+    const author = String(entry?.reportedByName || creation?.actor || entry?.createdBy || '').trim() || t('ENTRY_CREATED_UNKNOWN');
     const rawDate = String(creation?.created || entry?.createdAt || entry?.loggedAt || '').trim();
     const normalizedDate = rawDate.replace(' ', 'T');
     const dateWithZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalizedDate) ? normalizedDate : `${normalizedDate}Z`;
@@ -220,7 +334,7 @@ window.KWMashaFeedlyEntries = (() => {
     container.replaceChildren();
     (history || []).forEach((item) => {
       const row = document.createElement('li');
-      row.className = `kw-masha-feedly__history-item is-${['status', 'priority', 'relations'].includes(item.type) ? item.type : item.type === 'due_date' ? 'due-date' : 'assignees'}`;
+      row.className = `kw-masha-feedly__history-item is-${['status', 'priority', 'relations', 'reported_by'].includes(item.type) ? (item.type === 'reported_by' ? 'reported-by' : item.type) : item.type === 'due_date' ? 'due-date' : 'assignees'}`;
       const change = document.createElement('p');
       const historyText = {
         status: () => t('HISTORY_STATUS_CHANGE', { oldValue: item.oldValue, newValue: item.newValue }),
@@ -233,6 +347,7 @@ window.KWMashaFeedlyEntries = (() => {
         comment_deleted: () => t('HISTORY_COMMENT_DELETED', { text: item.oldValue }),
         assignees: () => t('HISTORY_ASSIGNEES_CHANGE', { oldValue: item.oldValue || t('HISTORY_NOBODY'), newValue: item.newValue || t('HISTORY_NOBODY') }),
         relations: () => t('HISTORY_RELATIONS_CHANGE', { oldValue: item.oldValue || t('HISTORY_NO_RELATIONS'), newValue: item.newValue || t('HISTORY_NO_RELATIONS') }),
+        reported_by: () => t('HISTORY_REPORTED_BY', { oldValue: item.oldValue, newValue: item.newValue }),
       }[item.type] || (() => t('HISTORY_ASSIGNEES_CHANGE', { oldValue: item.oldValue || t('HISTORY_NOBODY'), newValue: item.newValue || t('HISTORY_NOBODY') }));
       change.textContent = historyText();
       const meta = document.createElement('small');
@@ -319,7 +434,7 @@ window.KWMashaFeedlyEntries = (() => {
     else if (offset < text.length) container.append(documentRef.createTextNode(text.slice(offset)));
   };
 
-  return { sortEntries, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, priorityIconSVG, createMarker, setActiveMarker, celebrateDone, celebrateClosedCategory, celebrateRocketLaunch, celebrateCompletion, previewCompletionAnimation, trapFocus };
+  return { sortEntries, toggleSorting, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, renderCommentReactions, priorityIconSVG, createMarker, setActiveMarker, celebrateDone, celebrateClosedCategory, celebrateRocketLaunch, celebrateCompletion, previewCompletionAnimation, trapFocus };
 })();
 
 /** Lädt Einträge, zeichnet Seitenmarkierungen und zeigt die filterbare Übersicht. */
@@ -352,6 +467,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const categoryFilter = widget.querySelector('[data-masha-feedly-category-filter]');
   const priorityFilter = widget.querySelector('[data-masha-feedly-priority-filter]');
   const filtersDetails = widget.querySelector('[data-masha-feedly-filters-details]');
+  const sortDetails = widget.querySelector('[data-masha-feedly-sort-details]');
+  const sortCurrent = widget.querySelector('[data-masha-feedly-sort-current]');
+  const sortLabel = widget.querySelector('[data-masha-feedly-sort-label]');
+  const sortOptions = Array.from(widget.querySelectorAll('[data-masha-feedly-sort-option]'));
   const filterCount = widget.querySelector('[data-masha-feedly-filter-count]');
   const filterState = widget.querySelector('[data-masha-feedly-filter-state]');
   const activeFilters = widget.querySelector('[data-masha-feedly-active-filters]');
@@ -397,6 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let entries = [];
   let savedViews = [];
   let loadedMode = '';
+  let sorting = { key: 'due', direction: 'asc' };
   let panelOpen = false;
   let listRequest = 0;
   let activeEntry = null;
@@ -600,7 +720,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (createdMeta && createdAvatar && createdBy && createdAt) {
       const creation = window.KWMashaFeedlyEntries.entryCreationMeta(entry);
       window.KWMashaFeedlyEntries.renderEntryCreatorAvatar(createdAvatar, creation, document);
-      createdBy.textContent = t('ENTRY_CREATED_BY', { author: creation.author });
+      createdBy.textContent = t('ENTRY_REPORTED_BY', { author: creation.author });
       createdAt.textContent = creation.when;
       createdAt.dateTime = creation.dateTime;
       createdMeta.setAttribute('aria-label', `${createdBy.textContent} · ${creation.when}`.trim());
@@ -699,7 +819,26 @@ document.addEventListener('DOMContentLoaded', () => {
         editedLabel.setAttribute('aria-label', 'Kommentar wurde bearbeitet');
         date.append(editedLabel);
       }
-      bubble.append(author, body, date);
+      const reactions = document.createElement('div');
+      window.KWMashaFeedlyEntries.renderCommentReactions(reactions, comment.reactions, document, async (emoji, button) => {
+        button.disabled = true;
+        try {
+          const data = new FormData(commentForm);
+          data.set('SecurityID', commentForm.dataset.securityId);
+          data.set('EntryID', String(activeEntry.id));
+          data.set('CommentID', String(comment.id));
+          data.set('CommentAction', 'react');
+          data.set('ReactionEmoji', emoji);
+          const result = await postCommentData(data);
+          comment.reactions = result.reactions;
+          renderComments(activeEntry.comments || []);
+          commentStatus.textContent = t('COMMENT_REACTION_SAVED');
+        } catch (error) {
+          commentStatus.textContent = error.message || t('COMMENT_REACTION_ERROR');
+          button.disabled = false;
+        }
+      });
+      bubble.append(author, body, date, reactions);
       if (comment.canManage) {
         const actions = document.createElement('div');
         actions.className = 'kw-masha-feedly__comment-actions';
@@ -906,8 +1045,23 @@ document.addEventListener('DOMContentLoaded', () => {
       priorityFilterIcon.innerHTML = window.KWMashaFeedlyEntries.priorityIconSVG(selectedPriority?.iconType === 'info' ? 'info' : 'warning');
       priorityFilterIcon.style.setProperty('--masha-feedly-priority-color', selectedPriority?.color || '#64748b');
     }
+    sortOptions.forEach((item) => {
+      const active = item.dataset.mashaFeedlySortOption === sorting.key;
+      item.setAttribute('aria-pressed', String(active));
+      const direction = item.querySelector('[data-sort-direction]');
+      if (direction) direction.textContent = active ? (sorting.direction === 'asc' ? '↑' : '↓') : '';
+    });
+    const sortName = t(`SORT_${sorting.key.toUpperCase()}`);
+    const directionName = t(sorting.direction === 'asc' ? 'SORT_ASCENDING' : 'SORT_DESCENDING');
+    if (sortCurrent) sortCurrent.textContent = sorting.direction === 'asc' ? '↑' : '↓';
+    if (sortLabel) sortLabel.textContent = `${t('SORTING_TITLE')}: ${sortName}, ${directionName}`;
+    const sortSummary = sortDetails?.querySelector('summary');
+    if (sortSummary && sortLabel) {
+      sortSummary.setAttribute('aria-label', sortLabel.textContent);
+      sortSummary.title = sortLabel.textContent;
+    }
 
-    const sorted = window.KWMashaFeedlyEntries.sortEntries(data.entries || [], categories, priorities);
+    const sorted = window.KWMashaFeedlyEntries.sortEntries(data.entries || [], categories, priorities, sorting);
     const modeEntries = ['open', 'page-open'].includes(data.mode)
       ? sorted.filter((entry) => !entry.isClosed)
       : (data.mode === 'closed' ? sorted.filter((entry) => entry.isClosed) : sorted);
@@ -1164,6 +1318,17 @@ document.addEventListener('DOMContentLoaded', () => {
     savedViewSelect.value = '';
     deleteViewButton.disabled = true;
     renderList({ mode: loadedMode, entries, categories, priorities });
+  });
+  sortOptions.forEach((option) => option.addEventListener('click', () => {
+    const key = option.dataset.mashaFeedlySortOption;
+    sorting = window.KWMashaFeedlyEntries.toggleSorting(sorting, key);
+    renderList({ mode: loadedMode, entries, categories, priorities });
+  }));
+  sortDetails?.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && sortDetails.open) {
+      sortDetails.open = false;
+      sortDetails.querySelector('summary')?.focus();
+    }
   });
   savedViewSelect?.addEventListener('change', async () => {
     const view = savedViews.find((item) => String(item.id) === savedViewSelect.value);

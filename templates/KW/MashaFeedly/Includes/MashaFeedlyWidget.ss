@@ -51,6 +51,7 @@
     </div>
     <aside class="kw-masha-feedly__onboarding-tip" data-masha-feedly-onboarding-tip hidden role="status" aria-live="polite">
         <p data-masha-feedly-onboarding-text></p>
+        <small class="kw-masha-feedly__onboarding-escape-hint" data-masha-feedly-onboarding-escape-hint><%t KW\MashaFeedly\Translations.TOUR_ESCAPE_HINT 'Tipp: Esc beendet die Einführung jederzeit.' %></small>
         <button type="button" data-masha-feedly-tour-cancel><%t KW\MashaFeedly\Translations.TOUR_CANCEL 'Einführung abbrechen' %></button>
     </aside>
     <div class="kw-masha-feedly__modal kw-masha-feedly__help-modal" data-masha-feedly-help-modal hidden>
@@ -76,6 +77,7 @@
                 <div><span class="kw-masha-feedly__eyebrow"><%t KW\MashaFeedly\Translations.LIST_BRAND 'Masha:Feedly' %></span><h2 id="kw-masha-feedly-entries-title" data-masha-feedly-list-heading tabindex="-1"><%t KW\MashaFeedly\Translations.LIST_TITLE 'Alle Einträge' %></h2></div>
                 <button type="button" class="kw-masha-feedly__close" data-masha-feedly-close-list aria-label="<%t KW\MashaFeedly\Translations.HELP_CLOSE_LIST 'Übersicht schließen' %>">×</button>
             </header>
+            <div class="kw-masha-feedly__list-controls">
             <details class="kw-masha-feedly__filters-details" data-masha-feedly-filters-details>
                 <summary><svg class="kw-masha-feedly__filter-summary-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.25A1.25 1.25 0 0 1 4.25 4h15.5a1.25 1.25 0 0 1 .95 2.06L14 13.75v5a1.25 1.25 0 0 1-1.82 1.12l-2.5-1.25A1.25 1.25 0 0 1 9 17.5v-3.75L3.3 6.06A1.25 1.25 0 0 1 3 5.25Z"/></svg><span><%t KW\MashaFeedly\Translations.FILTERS_TITLE 'Filter' %></span><strong data-masha-feedly-filter-count>0</strong><small data-masha-feedly-filter-state><%t KW\MashaFeedly\Translations.FILTERS_NONE 'Keine aktiv' %></small></summary>
                 <div class="kw-masha-feedly__entries-toolbar">
@@ -96,6 +98,17 @@
                     </div>
                 </details>
             </details>
+            <details class="kw-masha-feedly__sort-details" data-masha-feedly-sort-details>
+                <summary aria-label="<%t KW\MashaFeedly\Translations.SORTING_TITLE 'Sortierung' %>" title="<%t KW\MashaFeedly\Translations.SORTING_TITLE 'Sortierung' %>"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v2H4zm3 6h10v2H7zm3 6h4v2h-4z"/><path d="M18 3v5m0 0 2-2m-2 2-2-2"/></svg><span class="kw-masha-feedly__sort-current" data-masha-feedly-sort-current aria-hidden="true">↑</span><span class="kw-masha-feedly__sr-only" data-masha-feedly-sort-label><%t KW\MashaFeedly\Translations.SORTING_TITLE 'Sortierung' %></span></summary>
+                <div class="kw-masha-feedly__sort-popover" role="group" aria-label="<%t KW\MashaFeedly\Translations.SORTING_TITLE 'Sortierung' %>">
+                    <button type="button" data-masha-feedly-sort-option="due"><span><%t KW\MashaFeedly\Translations.SORT_DUE 'Fälligkeit' %></span><span data-sort-direction aria-hidden="true"></span></button>
+                    <button type="button" data-masha-feedly-sort-option="created"><span><%t KW\MashaFeedly\Translations.SORT_CREATED 'Erstellt am' %></span><span data-sort-direction aria-hidden="true"></span></button>
+                    <button type="button" data-masha-feedly-sort-option="priority"><span><%t KW\MashaFeedly\Translations.SORT_PRIORITY 'Priorität' %></span><span data-sort-direction aria-hidden="true"></span></button>
+                    <button type="button" data-masha-feedly-sort-option="assignee"><span><%t KW\MashaFeedly\Translations.SORT_ASSIGNEE 'Zuständigkeit' %></span><span data-sort-direction aria-hidden="true"></span></button>
+                    <button type="button" data-masha-feedly-sort-option="activity"><span><%t KW\MashaFeedly\Translations.SORT_ACTIVITY 'Letzte Aktivität' %></span><span data-sort-direction aria-hidden="true"></span></button>
+                </div>
+            </details>
+            </div>
             <div class="kw-masha-feedly__active-filters" data-masha-feedly-active-filters role="status" aria-live="polite" hidden></div>
             <p class="kw-masha-feedly__entries-count" data-masha-feedly-list-count role="status" aria-live="polite" aria-atomic="true"></p>
             <div class="kw-masha-feedly__entries-list" data-masha-feedly-entries-list aria-live="polite"></div>

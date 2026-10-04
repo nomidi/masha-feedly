@@ -30,6 +30,7 @@ function setup(enabled = '1', fetchResult = { ok: true, json: async () => ({ suc
   for (const selector of [
     '[data-masha-feedly-onboarding-welcome]', '[data-masha-feedly-tour-start]', '[data-masha-feedly-tour-skip]',
     '[data-masha-feedly-onboarding-tip]', '[data-masha-feedly-onboarding-text]', '[data-masha-feedly-selection-message]',
+    '[data-masha-feedly-onboarding-escape-hint]',
     '[data-masha-feedly-tour-cancel]', '[data-masha-feedly-cancel-selection]',
     '[data-masha-feedly-restart-onboarding]', '[data-masha-feedly-restart-status]', '[data-masha-feedly-help-modal]',
     '[data-masha-feedly-modal]', '[data-masha-feedly-entry-form]', '[data-masha-feedly-onboarding-thanks]', '[data-masha-feedly-thanks-close]',
@@ -138,6 +139,7 @@ test('führt beim ersten Besuch durch Plus, Bereichsauswahl und Formular bis zum
   assert.equal(nodes.get('[data-masha-feedly-onboarding-text]').textContent, 'TOUR_STEP_MANAGE_ENTRY');
   assert.equal(scopedControls[1].disabled, true, 'Kommentarfeld ist im Bearbeitungsschritt nativ gesperrt');
   assert.equal(scopedControls[3].disabled, false, 'Statusauswahl ist im Bearbeitungsschritt aktiv');
+  assert.equal(scopedControls[4].disabled, false, 'Zuständigkeit bleibt im Bearbeitungsschritt bedienbar');
   let commentBlockedDuringEdit = false;
   documentListeners.click({ target: commentTarget, preventDefault() { commentBlockedDuringEdit = true; }, stopImmediatePropagation() {} });
   assert.equal(commentBlockedDuringEdit, true, 'Kommentare dürfen nicht vom geführten Status-/Zuweisungsschritt ablenken');
@@ -262,11 +264,52 @@ test('Tastatur kann die Einführung im Begrüßungsdialog und bei der Bereichsau
   assert.equal(unrelatedKeyPrevented, true, 'andere Tastaturaktionen bleiben während der Führung gesperrt');
 });
 
+test('Escape beendet die Einführung auch in Schritt 8 und gibt die Felder wieder frei', () => {
+  const tour = setup();
+  const { nodes, document, requests, documentListeners, scopedControls } = tour;
+  nodes.get('[data-masha-feedly-tour-start]').click();
+  document.dispatchEvent({ type: 'kw-masha-feedly:opened' });
+  document.dispatchEvent({ type: 'kw-masha-feedly:onboarding-selection-started' });
+  document.dispatchEvent({ type: 'kw-masha-feedly:onboarding-target-selected' });
+  document.dispatchEvent({ type: 'kw-masha-feedly:onboarding-entry-saved' });
+  document.dispatchEvent({ type: 'kw-masha-feedly:onboarding-list-opened' });
+  document.dispatchEvent({ type: 'kw-masha-feedly:onboarding-entry-opened' });
+  document.dispatchEvent({ type: 'kw-masha-feedly:onboarding-comment-saved' });
+  assert.equal(nodes.get('[data-masha-feedly-onboarding-text]').textContent, 'TOUR_STEP_MANAGE_ENTRY');
+  assert.equal(scopedControls[3].disabled, false, 'Statusauswahl ist vor dem Abbruch nutzbar');
+
+  let prevented = false;
+  let stopped = false;
+  documentListeners.keydown({
+    key: 'Escape',
+    target: scopedControls[3],
+    preventDefault() { prevented = true; },
+    stopImmediatePropagation() { stopped = true; },
+  });
+
+  assert.equal(prevented, true, 'Escape schließt nicht zusätzlich den Eintragsdialog');
+  assert.equal(stopped, true, 'Escape wird nicht an andere Dialog-Handler weitergereicht');
+  assert.equal(nodes.get('[data-masha-feedly-onboarding-tip]').hidden, true);
+  assert.equal(requests.length, 1, 'Abbruch speichert den Onboarding-Abschluss');
+  assert.equal(scopedControls[3].disabled, false, 'Statusauswahl bleibt nach dem Abbruch bedienbar');
+  assert.equal(scopedControls[1].disabled, false, 'Kommentarfeld bleibt nach dem Abbruch bedienbar');
+});
+
 test('Anleitungstexte nennen Priorität, Anhänge, Neuigkeiten, Verknüpfungen und Profileinstellungen', () => {
   const translations = fs.readFileSync(path.resolve(__dirname, '../../lang/de.yml'), 'utf8');
   for (const feature of ['Priorität', 'Dateien anhängen', 'Neuigkeiten-Symbol', 'Einträge verknüpfen', 'E-Mail-Benachrichtigungen']) {
     assert.ok(translations.includes(feature), `Onboarding/Hilfe sollte ${feature} erklären`);
   }
+});
+
+test('Escape-Abbruch ist als sichtbarer Hinweis in Deutsch und Englisch vorhanden', () => {
+  const template = fs.readFileSync(path.resolve(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
+  const german = fs.readFileSync(path.resolve(__dirname, '../../lang/de.yml'), 'utf8');
+  const english = fs.readFileSync(path.resolve(__dirname, '../../lang/en.yml'), 'utf8');
+  assert.match(template, /data-masha-feedly-onboarding-escape-hint/);
+  assert.match(template, /Translations\.TOUR_ESCAPE_HINT/);
+  assert.match(german, /TOUR_ESCAPE_HINT: 'Tipp: Esc beendet die Einführung jederzeit\.'/);
+  assert.match(english, /TOUR_ESCAPE_HINT: 'Tip: Press Esc to stop the tour at any time\.'/);
 });
 
 test('zeigt eine abgeschlossene Einführung nicht erneut an', () => {
