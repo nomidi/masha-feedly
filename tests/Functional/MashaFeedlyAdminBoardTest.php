@@ -8,6 +8,7 @@ use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
 use SilverStripe\Dev\FunctionalTest;
+use SilverStripe\Core\Config\Config;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\SecurityToken;
@@ -106,6 +107,62 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             $body,
             'Der Titel muss die Originalseite mit Eintragskennung in einem neuen, abgesicherten Tab öffnen.'
         );
+    }
+
+    /** Nur das freigegebene CMS-Admin-Konto sieht die Meldepersonen-Ansicht und kann Änderungen speichern. */
+    public function testAllowlistedAdminCanManageDisplayedReportersFromBoardTab(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $manager = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $manager);
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$manager->Email]);
+
+        $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
+        $reporter = $this->objFromFixture(Member::class, 'allowed');
+        $url = '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry';
+        $response = $this->get($url);
+        $body = str_replace(['\\u003C', '\\u003E', '\\u0022'], ['<', '>', '"'], $response->getBody());
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringContainsString('data-admin-view-tab="reporters"', $body);
+        $this->assertStringContainsString('data-admin-view-panel="reporters"', $body);
+        $this->assertStringContainsString('data-reporter-form', $body);
+        $this->assertStringContainsString('name="ReportedByID"', $body);
+
+        $saved = $this->post($url . '/saveReporter', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$entry->ID,
+            'ReportedByID' => (int)$reporter->ID,
+        ]);
+        $this->assertSame(200, $saved->getStatusCode());
+        $this->assertStringContainsString('"success":true', $saved->getBody());
+        $this->assertSame((int)$reporter->ID, (int)MashaFeedlyEntry::get()->byID($entry->ID)->ReportedByID);
+        $this->assertSame(1, MashaFeedlyEntryHistory::get()->filter([
+            'EntryID' => (int)$entry->ID,
+            'ChangeType' => 'reported_by',
+        ])->count());
+    }
+
+    /** Ein CMS-Admin ohne passende Allowlist-E-Mail sieht den Tab nicht und kann den Schreib-Endpunkt nicht nutzen. */
+    public function testCmsAdminWithoutReporterAllowlistCannotSeeTabOrSave(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $manager = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $manager);
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['other@example.test']);
+        $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
+        $reporter = $this->objFromFixture(Member::class, 'allowed');
+        $url = '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry';
+
+        $response = $this->get($url);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringNotContainsString('data-admin-view-tab="reporters"', $response->getBody());
+        $saved = $this->post($url . '/saveReporter', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$entry->ID,
+            'ReportedByID' => (int)$reporter->ID,
+        ]);
+        $this->assertSame(403, $saved->getStatusCode());
+        $this->assertSame(0, (int)MashaFeedlyEntry::get()->byID($entry->ID)->ReportedByID);
     }
 
     /** Stellt sicher, dass CMS-Neu-Markierungen mit dem Website-Zähler desselben Admins übereinstimmen. */

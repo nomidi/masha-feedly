@@ -6,6 +6,7 @@ namespace KW\MashaFeedly\Control;
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyComment;
+use KW\MashaFeedly\Model\MashaFeedlyCommentReaction;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
@@ -785,6 +786,9 @@ class MashaFeedlyEntryController extends Controller
             }
         }
         $creator = $entry->creatorMemberID() > 0 ? Member::get()->byID($entry->creatorMemberID()) : null;
+        $reporter = $entry->reportedByMember();
+        $reportedBy = $entry->reportedByName() ?: (string)($creationEvent['actor'] ?? '');
+        $reporterImage = $reporter?->MashaFeedlyIconImage();
         $creatorImage = $creator?->MashaFeedlyIconImage();
         $assignees = [];
         $assigneeIDs = [];
@@ -809,11 +813,12 @@ class MashaFeedlyEntryController extends Controller
             'selector' => (string)$entry->ElementSelector,
             'elementText' => (string)$entry->ElementText,
             'loggedAt' => (string)$entry->Created,
-            'createdBy' => (string)($creationEvent['actor'] ?? ''),
+            'createdBy' => $reportedBy,
             'createdAt' => (string)($creationEvent['created'] ?? ''),
-            'createdByInitials' => $creator ? (string)$creator->getMashaFeedlyInitials() : '',
-            'createdByColor' => $creator ? (string)$creator->getMashaFeedlyDisplayColor() : '',
-            'createdByImageURL' => $creatorImage instanceof Image && $creatorImage->exists() ? (string)$creatorImage->getURL() : '',
+            'reportedByName' => $reportedBy,
+            'createdByInitials' => $reporter ? (string)$reporter->getMashaFeedlyInitials() : ($creator ? (string)$creator->getMashaFeedlyInitials() : ''),
+            'createdByColor' => $reporter ? (string)$reporter->getMashaFeedlyDisplayColor() : ($creator ? (string)$creator->getMashaFeedlyDisplayColor() : ''),
+            'createdByImageURL' => $reporterImage instanceof Image && $reporterImage->exists() ? (string)$reporterImage->getURL() : ($creatorImage instanceof Image && $creatorImage->exists() ? (string)$creatorImage->getURL() : ''),
             'operatingSystem' => (string)$entry->OperatingSystem,
             'browser' => (string)$entry->Browser,
             'userAgent' => (string)$entry->UserAgent,
@@ -883,6 +888,7 @@ class MashaFeedlyEntryController extends Controller
             'created' => (string)$comment->Created,
             'edited' => (bool)$comment->WasEdited || ($createdAt !== false && $editedAt !== false && $editedAt > $createdAt),
             'canManage' => Permission::checkMember($currentMember, 'ADMIN') || (int)$comment->AuthorMemberID === (int)$currentMember->ID,
+            'reactions' => MashaFeedlyCommentReaction::summaryForComment($comment, $currentMember),
         ];
     }
 

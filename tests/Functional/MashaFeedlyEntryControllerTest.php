@@ -5,6 +5,7 @@ namespace KW\MashaFeedly\Tests\Functional;
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyComment;
+use KW\MashaFeedly\Model\MashaFeedlyCommentReaction;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
@@ -16,9 +17,12 @@ use SilverStripe\Dev\FunctionalTest;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Assets\Dev\TestAssetStore;
 use SilverStripe\Assets\File;
+use SilverStripe\Core\Config\Config;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\ORM\DB;
 use SilverStripe\Security\Member;
+use SilverStripe\Security\Permission;
+use SilverStripe\Security\Security;
 use SilverStripe\Security\SecurityToken;
 use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\MailerInterface;
@@ -39,6 +43,62 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
     {
         parent::setUp();
         i18n::set_locale('de_DE');
+    }
+
+    /** Die Widgetdaten zeigen die Meldeperson, während technischer Ersteller und Erstellungszeit erhalten bleiben. */
+    public function testEntryResponseUsesReportedByOverrideAndKeepsCreationAudit(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $manager = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $manager);
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$manager->Email]);
+        $reporter = $this->objFromFixture(Member::class, 'notAllowed');
+        MashaFeedlyCategory::ensureDefaultCategories();
+        $this->assertTrue(MashaFeedlyEntry::canManageReporter($manager));
+
+        $entry = MashaFeedlyEntry::create(['Content' => 'Manuell übertragener älterer Fehler']);
+        $entry->write();
+        $creationEvent = MashaFeedlyEntryHistory::get()->filter([
+            'EntryID' => (int)$entry->ID,
+            'ChangeType' => 'created',
+        ])->first();
+        $entry->ReportedByID = (int)$reporter->ID;
+        $entry->write();
+
+        $response = $this->get('/__masha-feedly/listEntries?mode=all');
+        $data = json_decode($response->getBody(), true);
+        $listedEntry = array_values(array_filter($data['entries'], static fn(array $item): bool => (int)$item['id'] === (int)$entry->ID))[0];
+
+        $this->assertSame($reporter->getName(), $listedEntry['createdBy']);
+        $this->assertSame($reporter->getName(), $listedEntry['reportedByName']);
+        $listedCreationEvent = array_values(array_filter($listedEntry['history'], static fn(array $item): bool => $item['type'] === 'created'))[0];
+        $this->assertSame((string)$creationEvent->ActorName, $listedCreationEvent['actor']);
+        $this->assertSame($listedCreationEvent['created'], $listedEntry['createdAt']);
+        $this->assertSame((int)$manager->ID, $entry->creatorMemberID());
+        $this->assertTrue((bool)array_filter($listedEntry['history'], static fn(array $item): bool => $item['type'] === 'reported_by'));
+    }
+
+    /** Das allgemeine CMS-ADMIN-Recht darf Kundenadmins keinen Zugriff auf die Melder-Auswahl geben. */
+    public function testCmsAdminWithoutConfiguredEmailCannotSeeOrChangeReporter(): void
+    {
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['allowed@example.test']);
+        $reporter = $this->objFromFixture(Member::class, 'allowed');
+        $this->logInWithPermission('ADMIN');
+        $cmsAdmin = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $cmsAdmin);
+        $this->assertTrue(Permission::checkMember($cmsAdmin, 'ADMIN'));
+        $this->assertFalse(MashaFeedlyEntry::canManageReporter($cmsAdmin));
+
+        $entry = MashaFeedlyEntry::create(['Content' => 'Eintrag eines Kundenadmins']);
+        $entry->write();
+        $this->assertNull($entry->getCMSFields()->dataFieldByName('ReportedByID'));
+        $entry->ReportedByID = (int)$reporter->ID;
+        $entry->write();
+        $this->assertSame(0, (int)$entry->ReportedByID);
+        $this->assertSame(0, MashaFeedlyEntryHistory::get()->filter([
+            'EntryID' => (int)$entry->ID,
+            'ChangeType' => 'reported_by',
+        ])->count());
     }
 
     /** Prüft, dass ein berechtigter Benutzer Formularwerte und Elementkontext speichern kann. */
@@ -482,6 +542,12 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
                     'EntryID' => (int)$entry->ID,
                     'CommentID' => (int)$comment->ID,
                     'CommentAction' => 'delete',
+                ]],
+                ['/__masha-feedly-comment', [
+                    'EntryID' => (int)$entry->ID,
+                    'CommentID' => (int)$comment->ID,
+                    'CommentAction' => 'react',
+                    'ReactionEmoji' => '👍',
                 ]],
             ];
             foreach ($postRoutes as [$route, $fields]) {
@@ -1208,6 +1274,94 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNull(MashaFeedlyComment::get()->byID((int)$comment->ID));
         $deletedHistory = MashaFeedlyEntryHistory::get()->filter(['EntryID' => (int)$entry->ID, 'ChangeType' => 'comment_deleted'])->first();
         $this->assertSame('Aktualisierter Kommentar', (string)$deletedHistory->OldValue);
+    }
+
+    /** Prüft Reaktionsauswahl, Umschalten, Berechtigungen und sichere Zuordnung zum Kommentar. */
+    public function testCommentReactionsArePersonalToggleableAndRestricted(): void
+    {
+        $author = $this->objFromFixture(Member::class, 'allowed');
+        $reactor = $this->objFromFixture(Member::class, 'notAllowed');
+        $this->allowMember($author, $reactor);
+        $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
+        $comment = MashaFeedlyComment::create([
+            'EntryID' => (int)$entry->ID,
+            'AuthorMemberID' => (int)$author->ID,
+            'AuthorName' => $author->getName(),
+            'CommentText' => 'Das prüfen wir gleich 🙂',
+            'IsApproved' => true,
+        ]);
+        $comment->write();
+
+        $this->logInAs($reactor);
+        $send = fn(string $emoji, int $entryID = 0) => $this->post('/__masha-feedly-comment', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => $entryID ?: (int)$entry->ID,
+            'CommentAction' => 'react',
+            'CommentID' => (int)$comment->ID,
+            'ReactionEmoji' => $emoji,
+        ]);
+
+        $added = $send('👍');
+        $this->assertSame(200, $added->getStatusCode());
+        $summary = json_decode($added->getBody(), true)['reactions'];
+        $thumbsUp = array_values(array_filter($summary, static fn(array $item): bool => $item['emoji'] === '👍'))[0];
+        $this->assertSame(1, $thumbsUp['count']);
+        $this->assertTrue($thumbsUp['selected']);
+        $this->assertSame(1, MashaFeedlyCommentReaction::get()->count());
+
+        $replaced = $send('❤️');
+        $replacementSummary = json_decode($replaced->getBody(), true)['reactions'];
+        $thumbsUp = array_values(array_filter($replacementSummary, static fn(array $item): bool => $item['emoji'] === '👍'))[0];
+        $heart = array_values(array_filter($replacementSummary, static fn(array $item): bool => $item['emoji'] === '❤️'))[0];
+        $this->assertSame(0, $thumbsUp['count'], 'Die vorherige eigene Reaktion wird beim Wechsel entfernt.');
+        $this->assertFalse($thumbsUp['selected']);
+        $this->assertSame(1, $heart['count']);
+        $this->assertTrue($heart['selected']);
+        $this->assertSame(1, MashaFeedlyCommentReaction::get()->count(), 'Pro Person und Kommentar bleibt genau eine Reaktion gespeichert.');
+
+        $removed = $send('❤️');
+        $heart = array_values(array_filter(json_decode($removed->getBody(), true)['reactions'], static fn(array $item): bool => $item['emoji'] === '❤️'))[0];
+        $this->assertSame(0, $heart['count']);
+        $this->assertFalse($heart['selected']);
+        $send('😂');
+        $this->assertSame(1, MashaFeedlyCommentReaction::get()->count());
+        $invalid = $send('<script>');
+        $this->assertSame(400, $invalid->getStatusCode());
+
+        $this->logInAs($author);
+        $visible = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true)['entries'];
+        $listed = array_values(array_filter($visible, static fn(array $item): bool => $item['id'] === (int)$entry->ID))[0]['comments'][0];
+        $this->assertCount(6, $listed['reactions']);
+        $authorHeart = array_values(array_filter($listed['reactions'], static fn(array $item): bool => $item['emoji'] === '❤️'))[0];
+        $this->assertSame(0, $authorHeart['count']);
+        $this->assertFalse($authorHeart['selected'], 'Die Auswahl eines anderen Mitglieds bleibt persönlich.');
+        $laugh = array_values(array_filter($listed['reactions'], static fn(array $item): bool => $item['emoji'] === '😂'))[0];
+        $this->assertSame(1, $laugh['count']);
+        $this->assertFalse($laugh['selected']);
+
+        $wrongEntry = MashaFeedlyEntry::create([
+            'Content' => 'Anderer Eintrag', 'PageURL' => 'https://example.test/',
+            'CategoryID' => (int)$entry->CategoryID, 'PriorityID' => (int)$entry->PriorityID,
+        ]);
+        $wrongEntry->write();
+        $mismatch = $this->post('/__masha-feedly-comment', [
+            'SecurityID' => SecurityToken::getSecurityID(), 'EntryID' => (int)$wrongEntry->ID,
+            'CommentAction' => 'react', 'CommentID' => (int)$comment->ID, 'ReactionEmoji' => '🙏',
+        ]);
+        $this->assertSame(404, $mismatch->getStatusCode(), 'Ein Kommentar darf nicht über einen fremden Eintrag adressiert werden.');
+        $this->assertSame(1, MashaFeedlyCommentReaction::get()->count());
+
+        $authorReaction = $this->post('/__masha-feedly-comment', [
+            'SecurityID' => SecurityToken::getSecurityID(), 'EntryID' => (int)$entry->ID,
+            'CommentAction' => 'react', 'CommentID' => (int)$comment->ID, 'ReactionEmoji' => '🙏',
+        ]);
+        $this->assertSame(200, $authorReaction->getStatusCode());
+        $deleted = $this->post('/__masha-feedly-comment', [
+            'SecurityID' => SecurityToken::getSecurityID(), 'EntryID' => (int)$entry->ID,
+            'CommentAction' => 'delete', 'CommentID' => (int)$comment->ID,
+        ]);
+        $this->assertSame(200, $deleted->getStatusCode());
+        $this->assertSame(0, MashaFeedlyCommentReaction::get()->count(), 'Beim Löschen des Kommentars werden seine Reaktionen entfernt.');
     }
 
     /** Prüft, dass Kommentaraktivität im Frontend-Listenpayload erscheint und dort gelesen werden kann. */

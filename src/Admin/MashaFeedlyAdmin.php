@@ -9,6 +9,7 @@ use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyPriority;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
+use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
 use SilverStripe\Assets\Image;
 use SilverStripe\Admin\ModelAdmin;
 use SilverStripe\Control\Controller;
@@ -62,6 +63,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         'moveCategory',
         'createCategory',
         'deleteCategory',
+        'saveReporter',
     ];
 
     /** Liefert die Anzahl offener Einträge in der Feedback-Kategorie. */
@@ -491,6 +493,16 @@ class MashaFeedlyAdmin extends ModelAdmin
                 . self::translate('BOARD_CATEGORY_ADD', 'Kategorie hinzufügen') . '</button>';
         }
         $html .= '</div></header>';
+        $canManageReporter = MashaFeedlyEntry::canManageReporter($member);
+        if ($canManageReporter) {
+            $html .= '<nav class="masha-feedly-board__views" role="tablist" aria-label="'
+                . $this->escapeBoardValue(self::translate('REPORTER_TABS_LABEL', 'Masha:Feedly-Ansichten')) . '">'
+                . '<button type="button" class="masha-feedly-board__view-tab is-active" role="tab" aria-selected="true" aria-controls="masha-feedly-entry-board-panel" data-admin-view-tab="entries">'
+                . self::translate('ADMIN_ENTRIES', 'Einträge') . '</button>'
+                . '<button type="button" class="masha-feedly-board__view-tab" role="tab" aria-selected="false" aria-controls="masha-feedly-reporter-panel" data-admin-view-tab="reporters">'
+                . self::translate('REPORTER_TAB', 'Meldepersonen') . '</button></nav>';
+        }
+        $html .= '<div id="masha-feedly-entry-board-panel" data-admin-view-panel="entries" role="tabpanel">';
         if ($canManageCategories) {
             $html .= '<div class="masha-feedly-board__modal" data-category-modal hidden="hidden">'
                 . '<section class="masha-feedly-board__dialog" role="dialog" aria-modal="true" aria-labelledby="masha-feedly-category-title">'
@@ -692,8 +704,114 @@ class MashaFeedlyAdmin extends ModelAdmin
             $html .= '</div></section>';
         }
 
-        $html .= '</div><p class="masha-feedly-board__status" aria-live="polite"></p></section>';
+        $html .= '</div></div>';
+        if ($canManageReporter) {
+            $html .= $this->renderReporterManager();
+        }
+        $html .= '<p class="masha-feedly-board__status" aria-live="polite"></p></section>';
         return $html;
+    }
+
+    /** Rendert die geschützte Übersicht zum Ändern der angezeigten Meldeperson. */
+    private function renderReporterManager(): string
+    {
+        if (!MashaFeedlyEntry::canManageReporter()) {
+            return '';
+        }
+        $reporters = Member::get()->sort('Surname ASC, FirstName ASC');
+        $entries = MashaFeedlyEntry::get()->sort('EntryDate DESC, ID DESC');
+        $entryIDs = array_map('intval', $entries->column('ID'));
+        $creatorNames = [];
+        $creatorMemberIDs = [];
+        $creatorIDsByEntry = [];
+        $creatorNamesByID = [];
+        if ($entryIDs) {
+            foreach (MashaFeedlyEntryHistory::get()->filter('EntryID', $entryIDs)
+                ->filter('ChangeType', 'created')->sort('Created ASC, ID ASC') as $creationEvent) {
+                $entryID = (int)$creationEvent->EntryID;
+                if (isset($creatorNames[$entryID])) {
+                    continue;
+                }
+                $creatorNames[$entryID] = (string)$creationEvent->ActorName;
+                if ((int)$creationEvent->ActorMemberID > 0) {
+                    $creatorMemberIDs[(int)$creationEvent->ActorMemberID] = true;
+                    $creatorIDsByEntry[$entryID] = (int)$creationEvent->ActorMemberID;
+                }
+            }
+            if ($creatorMemberIDs) {
+                foreach (Member::get()->byIDs(array_keys($creatorMemberIDs)) as $creator) {
+                    $creatorNamesByID[(int)$creator->ID] = (string)$creator->getName();
+                }
+            }
+            foreach ($creatorIDsByEntry as $entryID => $creatorID) {
+                if (isset($creatorNamesByID[$creatorID])) {
+                    $creatorNames[$entryID] = $creatorNamesByID[$creatorID];
+                }
+            }
+        }
+        $html = '<section id="masha-feedly-reporter-panel" class="masha-feedly-reporter-manager" data-admin-view-panel="reporters" role="tabpanel" hidden>'
+            . '<header class="masha-feedly-reporter-manager__header"><div><span class="masha-feedly-board__eyebrow">'
+            . self::translate('REPORTER_TAB_EYEBROW', 'VERWALTUNG') . '</span><h2>'
+            . self::translate('REPORTER_TAB_TITLE', 'Angezeigte Meldeperson ändern') . '</h2><p>'
+            . self::translate('REPORTER_TAB_DESCRIPTION', 'Wähle, wessen Name bei einem Eintrag angezeigt wird. Der technische Ersteller bleibt im Verlauf erhalten.')
+            . '</p></div><label class="masha-feedly-reporter-manager__search">'
+            . self::translate('REPORTER_SEARCH', 'Einträge durchsuchen')
+            . '<input type="search" data-reporter-search placeholder="'
+            . $this->escapeBoardValue(self::translate('REPORTER_SEARCH_PLACEHOLDER', 'Titel oder ID eingeben …')) . '"></label></header>'
+            . '<div class="masha-feedly-reporter-manager__table-wrap"><table class="masha-feedly-reporter-manager__table"><thead><tr><th>'
+            . self::translate('REPORTER_ENTRY', 'Eintrag') . '</th><th>' . self::translate('REPORTER_CREATOR', 'Technisch erstellt von')
+            . '</th><th>' . self::translate('REPORTER_DISPLAYED', 'Angezeigte Meldeperson') . '</th></tr></thead><tbody>';
+        foreach ($entries as $entry) {
+            $title = $entry->getTitle() ?: self::translate('BOARD_ENTRY_NO_DESCRIPTION', 'Eintrag ohne Beschreibung');
+            $creatorName = $creatorNames[(int)$entry->ID] ?? '';
+            $html .= '<tr data-reporter-row data-search="' . $this->escapeBoardValue(mb_strtolower('#' . $entry->ID . ' ' . $title))
+                . '"><td><strong>#' . (int)$entry->ID . '</strong><span>' . $this->escapeBoardValue($title) . '</span></td><td>'
+                . $this->escapeBoardValue($creatorName ?: self::translate('REPORTER_UNKNOWN_CREATOR', 'Unbekannt')) . '</td><td>'
+                . '<form data-reporter-form data-save-url="' . $this->escapeBoardValue(Controller::join_links(
+                    $this->getLinkForModelClass(MashaFeedlyEntry::class), 'saveReporter'
+                )) . '" data-security-id="' . $this->escapeBoardValue((string)SecurityToken::getSecurityID()) . '" data-saving-message="'
+                . $this->escapeBoardValue(self::translate('REPORTER_SAVING', 'Meldeperson wird gespeichert …')) . '" data-error-message="'
+                . $this->escapeBoardValue(self::translate('REPORTER_SAVE_ERROR', 'Meldeperson konnte nicht gespeichert werden.')) . '"><input type="hidden" name="EntryID" value="'
+                . (int)$entry->ID . '"><select name="ReportedByID" aria-label="'
+                . $this->escapeBoardValue(self::translate('REPORTER_SELECT_ARIA', 'Angezeigte Meldeperson für Eintrag {id}', ['id' => (string)$entry->ID]))
+                . '"><option value="0"' . ((int)$entry->ReportedByID === 0 ? ' selected' : '') . '>'
+                . self::translate('REPORTER_USE_CREATOR', 'Technischen Ersteller verwenden') . '</option>';
+            foreach ($reporters as $reporter) {
+                $html .= '<option value="' . (int)$reporter->ID . '"'
+                    . ((int)$entry->ReportedByID === (int)$reporter->ID ? ' selected' : '') . '>'
+                    . $this->escapeBoardValue((string)$reporter->getName()) . '</option>';
+            }
+            $html .= '</select><button type="submit" class="masha-feedly-board__view-tab masha-feedly-reporter-manager__save">'
+                . self::translate('REPORTER_SAVE', 'Speichern') . '</button><span class="masha-feedly-reporter-manager__status" data-reporter-status role="status" aria-live="polite"></span></form></td></tr>';
+        }
+        return $html . '</tbody></table></div></section>';
+    }
+
+    /** Speichert eine Meldeperson nur für das explizit freigegebene CMS-Admin-Konto. */
+    public function saveReporter(HTTPRequest $request): HTTPResponse
+    {
+        if (!MashaFeedlyEntry::canManageReporter()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung.'], 403);
+        }
+        if (!$request->isPOST()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'POST erforderlich.'], 405);
+        }
+        if (!SecurityToken::inst()->checkRequest($request)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Ungültiges Sicherheitstoken.'], 400);
+        }
+        $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
+        $reporterID = (int)$request->postVar('ReportedByID');
+        $reporter = $reporterID > 0 ? Member::get()->byID($reporterID) : null;
+        if (!$entry || ($reporterID > 0 && !$reporter)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Eintrag oder Meldeperson nicht gefunden.'], 404);
+        }
+        $entry->ReportedByID = $reporterID;
+        $entry->write();
+        return $this->jsonResponse([
+            'success' => true,
+            'message' => self::translate('REPORTER_SAVED', 'Meldeperson gespeichert.'),
+            'reportedByName' => $entry->reportedByName(),
+        ]);
     }
 
     /**

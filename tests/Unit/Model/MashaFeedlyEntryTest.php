@@ -7,12 +7,15 @@ use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
 use SilverStripe\Dev\SapphireTest;
+use SilverStripe\Core\Config\Config;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Forms\DatetimeField;
 use SilverStripe\Forms\DateField;
+use SilverStripe\Forms\DropdownField;
 use SilverStripe\Forms\ListboxField;
 use SilverStripe\ORM\FieldType\DBDatetime;
 use SilverStripe\Security\Member;
+use SilverStripe\Security\Security;
 
 /**
  * Tests für das Masha-Feedly-Eintragsdatenobjekt.
@@ -165,5 +168,30 @@ class MashaFeedlyEntryTest extends SapphireTest
         $validation = $entry->validate();
         $this->assertFalse($validation->isValid());
         $this->assertSame('AssignedMembers', $validation->getMessages()[0]['fieldName']);
+    }
+
+    /** Eine konfigurierte E-Mail allein reicht ohne SilverStripe-ADMIN-Recht nicht für die Melder-Auswahl. */
+    public function testAllowlistedNonAdminCannotSeeOrChangeReportedBy(): void
+    {
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['allowed@example.test']);
+        $allowlistedNonAdmin = $this->objFromFixture(Member::class, 'allowed');
+        $reporter = $this->objFromFixture(Member::class, 'notAllowed');
+
+        $this->assertFalse(MashaFeedlyEntry::canManageReporter($allowlistedNonAdmin));
+        Security::setCurrentUser($allowlistedNonAdmin);
+        $entry = MashaFeedlyEntry::create(['Content' => 'Manuell übertragener älterer Eintrag']);
+        $entry->write();
+        $creatorID = $entry->creatorMemberID();
+        $field = $entry->getCMSFields()->dataFieldByName('ReportedByID');
+        $this->assertNull($field);
+        $entry->ReportedByID = (int)$reporter->ID;
+        $entry->write();
+
+        $this->assertSame($creatorID, $entry->creatorMemberID());
+        $this->assertSame(0, (int)$entry->ReportedByID);
+        $this->assertSame(0, MashaFeedlyEntryHistory::get()->filter([
+            'EntryID' => (int)$entry->ID,
+            'ChangeType' => 'reported_by',
+        ])->count());
     }
 }

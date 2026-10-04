@@ -10,6 +10,7 @@ use SilverStripe\Assets\File;
 use SilverStripe\ORM\FieldType\DBDatetime;
 use SilverStripe\Core\Validation\ValidationResult;
 use SilverStripe\Security\Member;
+use SilverStripe\Security\Permission;
 use SilverStripe\Security\Security;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\TextareaField;
@@ -60,6 +61,9 @@ class MashaFeedlyEntry extends DataObject
 
     private static $entry_timezone = 'Europe/Berlin';
 
+    /** E-Mail-Adressen der Betreiberkonten, die die angezeigte Meldeperson ändern dürfen. */
+    private static $reporter_manager_emails = [];
+
     private static $db = [
         'Content' => 'HTMLText',
         'EntryDate' => 'Datetime',
@@ -87,6 +91,7 @@ class MashaFeedlyEntry extends DataObject
     private static $has_one = [
         'Category' => MashaFeedlyCategory::class,
         'Priority' => MashaFeedlyPriority::class,
+        'ReportedBy' => Member::class,
     ];
 
     private static $many_many = [
@@ -115,6 +120,10 @@ class MashaFeedlyEntry extends DataObject
 
     private bool $historyDueDateChanged = false;
 
+    private ?string $historyOldReporter = null;
+
+    private ?string $historyNewReporter = null;
+
 
     /**
      * Erstellt die im CMS bearbeitbaren Felder des Eintrags.
@@ -124,7 +133,7 @@ class MashaFeedlyEntry extends DataObject
     public function getCMSFields(): FieldList
     {
         $fields = parent::getCMSFields();
-        $fields->removeByName(['Comments', 'ClassName', 'Title', 'Sort']);
+        $fields->removeByName(['Comments', 'ClassName', 'Title', 'Sort', 'ReportedByID']);
         $fields->replaceField('Content', TextareaField::create('Content', $this->translate('FIELD_DESCRIPTION', 'Bug-Beschreibung')));
         $dateField = DatetimeField::create('EntryDate', $this->translate('FIELD_DATETIME', 'Datum und Uhrzeit'));
         if (!$this->isInDB() && !$this->EntryDate) {
@@ -135,6 +144,19 @@ class MashaFeedlyEntry extends DataObject
             'DueDate',
             $this->translate('FIELD_DUE_DATE', 'Fällig am')
         ));
+        $member = Security::getCurrentUser();
+        if (self::canManageReporter($member)) {
+            $reporterOptions = ['0' => $this->translate('REPORTER_USE_CREATOR', 'Technischen Ersteller verwenden')];
+            foreach (Member::get()->sort('Surname ASC, FirstName ASC') as $reporter) {
+                $reporterOptions[(string)$reporter->ID] = (string)$reporter->getName();
+            }
+            $fields->addFieldToTab('Root.Main', DropdownField::create(
+                'ReportedByID',
+                $this->translate('FIELD_REPORTED_BY', 'Gemeldet von'),
+                $reporterOptions
+            )->setValue((int)$this->ReportedByID)
+                ->setDescription($this->translate('FIELD_REPORTED_BY_DESCRIPTION', 'Ändert nur die angezeigte Meldeperson. Der technische Ersteller bleibt im Verlauf erhalten.')));
+        }
         $fields->fieldByName('PageURL')?->setTitle($this->translate('FIELD_PAGE_URL', 'Seitenadresse'))->setReadonly(true);
         $fields->fieldByName('ElementSelector')?->setTitle($this->translate('FIELD_SELECTOR', 'Ausgewählter Bereich'))->setReadonly(true);
         $fields->fieldByName('ElementText')?->setTitle($this->translate('FIELD_ELEMENT_TEXT', 'Text im ausgewählten Bereich'))->setReadonly(true);
@@ -189,7 +211,6 @@ class MashaFeedlyEntry extends DataObject
             $this->Comments(),
             GridFieldConfig_RelationEditor::create()
         ));
-        $member = Security::getCurrentUser();
         if ($this->isInDB() && $member instanceof Member && MashaFeedlyConfigExtension::canUse($member)) {
             MashaFeedlyEntryRead::markAsSeen($this, $member);
             $unreadCount = MashaFeedlyEntryRead::unreadCount($member);
@@ -264,6 +285,69 @@ class MashaFeedlyEntry extends DataObject
         return (int)($createdEvent?->ActorMemberID ?? 0);
     }
 
+    /** Prüft die explizite Betreiberfreigabe; CMS-ADMIN-Rechte allein reichen absichtlich nicht. */
+    public static function canManageReporter($member = null): bool
+    {
+        $member ??= Security::getCurrentUser();
+        if (!$member instanceof Member || !$member->Email || !Permission::checkMember($member, 'ADMIN')) {
+            return false;
+        }
+        $emails = static::config()->get('reporter_manager_emails');
+        if (!is_array($emails)) {
+            return false;
+        }
+        $emails = array_map(static fn($email): string => mb_strtolower(trim((string)$email)), $emails);
+        return in_array(mb_strtolower(trim((string)$member->Email)), $emails, true);
+    }
+
+    /** Liefert die ausgewählte Meldeperson oder fällt auf den tatsächlichen Ersteller zurück. */
+    public function reportedByMember(): ?Member
+    {
+        if ((int)$this->ReportedByID > 0) {
+            $reporter = Member::get()->byID((int)$this->ReportedByID);
+            if ($reporter instanceof Member) {
+                return $reporter;
+            }
+        }
+        $creatorID = $this->creatorMemberID();
+        $creator = $creatorID > 0 ? Member::get()->byID($creatorID) : null;
+        return $creator instanceof Member ? $creator : null;
+    }
+
+    /** Name für die Anzeige, mit historischem Fallback falls das Konto gelöscht wurde. */
+    public function reportedByName(): string
+    {
+        $reporter = $this->reportedByMember();
+        if ($reporter instanceof Member) {
+            return (string)$reporter->getName();
+        }
+        $createdEvent = MashaFeedlyEntryHistory::get()
+            ->filter(['EntryID' => (int)$this->ID, 'ChangeType' => 'created'])
+            ->sort('Created ASC, ID ASC')
+            ->first();
+        return (string)($createdEvent?->ActorName ?: '');
+    }
+
+    private function resolveReporterName(int $memberID): string
+    {
+        if ($memberID > 0) {
+            $reporter = Member::get()->byID($memberID);
+            if ($reporter instanceof Member) {
+                return (string)$reporter->getName();
+            }
+        }
+        $creatorID = $this->creatorMemberID();
+        $creator = $creatorID > 0 ? Member::get()->byID($creatorID) : null;
+        if ($creator instanceof Member) {
+            return (string)$creator->getName();
+        }
+        $createdEvent = MashaFeedlyEntryHistory::get()
+            ->filter(['EntryID' => (int)$this->ID, 'ChangeType' => 'created'])
+            ->sort('Created ASC, ID ASC')
+            ->first();
+        return (string)($createdEvent?->ActorName ?: '');
+    }
+
     /** Merkt sich, ob der Eintrag neu angelegt wird. */
     protected function onBeforeWrite(): void
     {
@@ -271,8 +355,22 @@ class MashaFeedlyEntry extends DataObject
         $this->historyOldPriorityTitle = null;
         $this->historyOldDueDate = null;
         $this->historyDueDateChanged = false;
+        $this->historyOldReporter = null;
+        $this->historyNewReporter = null;
         if ($this->isInDB()) {
             $storedEntry = self::get()->byID((int)$this->ID);
+            if ($storedEntry && (int)$storedEntry->ReportedByID !== (int)$this->ReportedByID) {
+                if (!self::canManageReporter()) {
+                    $this->ReportedByID = (int)$storedEntry->ReportedByID;
+                } else {
+                    $oldReporter = $storedEntry->reportedByName();
+                    $newReporter = $this->resolveReporterName((int)$this->ReportedByID);
+                    if ((int)$storedEntry->ReportedByID !== (int)$this->ReportedByID || $oldReporter !== $newReporter) {
+                        $this->historyOldReporter = $oldReporter ?: 'Unbekannt';
+                        $this->historyNewReporter = $newReporter ?: 'Unbekannt';
+                    }
+                }
+            }
             if ($storedEntry && (int)$storedEntry->CategoryID !== (int)$this->CategoryID) {
                 $this->historyOldCategoryTitle = (string)$storedEntry->Category()->Title;
             }
@@ -284,6 +382,8 @@ class MashaFeedlyEntry extends DataObject
                 $this->historyDueDateChanged = true;
                 $this->DueDateReminderSentAt = null;
             }
+        } elseif ((int)$this->ReportedByID > 0 && !self::canManageReporter()) {
+            $this->ReportedByID = 0;
         }
         if (!$this->EntryDate) {
             $this->EntryDate = self::currentEntryDateTime();
@@ -315,6 +415,9 @@ class MashaFeedlyEntry extends DataObject
         $unauthorizedIDs = array_diff($assignedMemberIDs, MashaFeedlyConfigExtension::memberIDs());
         if ($unauthorizedIDs) {
             $result->addFieldError('AssignedMembers', $this->translate('ALL_ASSIGNEES_ALLOWED', 'Alle zugeordneten Benutzer müssen für Masha:Feedly freigegeben sein.'));
+        }
+        if ((int)$this->ReportedByID > 0 && !Member::get()->byID((int)$this->ReportedByID)) {
+            $result->addFieldError('ReportedByID', $this->translate('REPORTER_MUST_EXIST', 'Die Meldeperson muss ein vorhandenes Benutzerkonto sein.'));
         }
         return $result;
     }
@@ -372,6 +475,17 @@ class MashaFeedlyEntry extends DataObject
             }
             $this->historyOldDueDate = null;
             $this->historyDueDateChanged = false;
+        }
+        if ($this->historyOldReporter !== null && $this->historyNewReporter !== null) {
+            MashaFeedlyEntryHistory::record(
+                $this,
+                'reported_by',
+                $this->historyOldReporter,
+                $this->historyNewReporter,
+                Security::getCurrentUser()
+            );
+            $this->historyOldReporter = null;
+            $this->historyNewReporter = null;
         }
         if ($this->notifyMembersAfterWrite) {
             MashaFeedlyEntryHistory::record($this, 'created', '', $this->getTitle(), Security::getCurrentUser());

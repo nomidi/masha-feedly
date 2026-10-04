@@ -45,6 +45,21 @@ vendor/bin/sake dev/tasks/MashaFeedlyDueDateReminderTask
 
 The Masha:Feedly board groups entries by category. Users with access can edit entries and reorder them with drag and drop. Categories, priorities, and general widget settings are also managed in the CMS.
 
+When manually recreating older entries, a designated operator can change the displayed reporter. Add only that operator account's email address to your project's `app/_config.php`:
+
+```php
+use KW\MashaFeedly\Model\MashaFeedlyEntry;
+use SilverStripe\Core\Config\Config;
+
+Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [
+    'your-account@example.org',
+]);
+```
+
+The account must also be a Silverstripe CMS administrator. Customer CMS administrators without the configured email do not receive access to the selector. The actual creator remains unchanged, and reporter changes are recorded in history.
+
+In the CMS, open **Masha:Feedly → Entries → Change reporter**. Search by entry ID or title and save the displayed reporter directly in the row.
+
 ## Installation and tests
 
 See the [project README](../../../README.md) for installation and PHP and JavaScript test commands. Browser-based end-to-end tests are documented in [`../../tests/e2e/README.md`](../../tests/e2e/README.md).

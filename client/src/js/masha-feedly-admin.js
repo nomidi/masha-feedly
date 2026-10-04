@@ -20,6 +20,20 @@
   // Delegate in capture phase so the control keeps working even if the board
   // was replaced after its initialisation (or CMS code stops bubbling clicks).
   document.addEventListener('click', (event) => {
+    const viewTab = event.target?.closest?.('[data-admin-view-tab]');
+    if (viewTab) {
+      const board = viewTab.closest('[data-masha-feedly-board]');
+      const selectedView = viewTab.dataset.adminViewTab;
+      board?.querySelectorAll('[data-admin-view-tab]').forEach((tab) => {
+        const active = tab === viewTab;
+        tab.classList.toggle('is-active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      board?.querySelectorAll('[data-admin-view-panel]').forEach((panel) => {
+        panel.hidden = panel.dataset.adminViewPanel !== selectedView;
+      });
+      return;
+    }
     const previewButton = event.target?.closest?.('[data-masha-feedly-animation-preview]');
     if (previewButton) {
       const preview = previewButton.closest('[data-masha-feedly-animation-previews]');
@@ -45,6 +59,42 @@
     if (!modal) return;
     modal.hidden = false;
     modal.querySelector('[data-category-title-input]')?.focus();
+  }, true);
+
+  document.addEventListener('input', (event) => {
+    const search = event.target?.closest?.('[data-reporter-search]');
+    if (!search) return;
+    const query = search.value.trim().toLocaleLowerCase();
+    search.closest('[data-admin-view-panel]')?.querySelectorAll('[data-reporter-row]').forEach((row) => {
+      row.hidden = query !== '' && !row.dataset.search.includes(query);
+    });
+  }, true);
+
+  document.addEventListener('submit', async (event) => {
+    const form = event.target?.closest?.('[data-reporter-form]');
+    if (!form) return;
+    event.preventDefault();
+    const button = form.querySelector('[type="submit"]');
+    const status = form.querySelector('[data-reporter-status]');
+    button.disabled = true;
+    if (status) status.textContent = form.dataset.savingMessage || 'Meldeperson wird gespeichert …';
+    const data = new FormData(form);
+    data.set('SecurityID', form.dataset.securityId || form.closest('[data-masha-feedly-board]')?.dataset.securityId || '');
+    try {
+      const response = await fetch(form.dataset.saveUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: data,
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || form.dataset.errorMessage || 'Meldeperson konnte nicht gespeichert werden.');
+      if (status) status.textContent = result.message || 'Meldeperson gespeichert.';
+    } catch (error) {
+      if (status) status.textContent = error.message || form.dataset.errorMessage || 'Meldeperson konnte nicht gespeichert werden.';
+    } finally {
+      button.disabled = false;
+    }
   }, true);
 
   const initialiseMashaFeedlyAdmin = () => {

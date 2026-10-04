@@ -534,6 +534,35 @@
   }
 }
 
+.masha-feedly-board__views { display: flex; gap: .45rem; margin: 0 0 1rem; padding: .3rem; border: 1px solid #ece6ed; border-radius: 999px; background: #f8f6f9; width: fit-content; }
+.masha-feedly-board__view-tab { display: inline-flex; min-height: 2.5rem; align-items: center; justify-content: center; padding: .55rem 1rem; border: 1px solid transparent; border-radius: 999px; background: transparent; color: #655e6b; font: inherit; font-size: .9rem; font-weight: 700; text-decoration: none; cursor: pointer; transition: color 150ms ease, background 150ms ease, box-shadow 150ms ease, transform 150ms ease; }
+.masha-feedly-board__view-tab:hover { transform: translateY(-1px); background: #fff; color: #9b155a; box-shadow: 0 3px 10px #27233117; }
+.masha-feedly-board__view-tab.is-active { border-color: #efc8dc; background: #fff; color: #a51660; box-shadow: 0 2px 8px #27233112; }
+.masha-feedly-board__view-tab:focus-visible { outline: 3px solid #e6007e55; outline-offset: 2px; }
+[data-admin-view-panel][hidden] { display: none !important; }
+.masha-feedly-reporter-manager { overflow: hidden; border: 1px solid #ebe5ed; border-radius: .9rem; background: #fff; box-shadow: 0 8px 28px #2723310d; }
+.masha-feedly-reporter-manager__header { display: flex; align-items: end; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.4rem; border-bottom: 1px solid #eee9f0; background: linear-gradient(135deg,#fff 0%,#fff8fc 100%); }
+.masha-feedly-reporter-manager__header h2 { margin: .25rem 0; color: #30283b; font-size: 1.25rem; }
+.masha-feedly-reporter-manager__header p { max-width: 42rem; margin: 0; color: #6b6471; }
+.masha-feedly-reporter-manager__search { display: grid; min-width: min(18rem, 35%); gap: .35rem; color: #514b58; font-size: .82rem; font-weight: 700; }
+.masha-feedly-reporter-manager__search input,.masha-feedly-reporter-manager select { min-height: 2.55rem; padding: .5rem .7rem; border: 1px solid #ded7e1; border-radius: .55rem; background: #fff; color: #30283b; font: inherit; }
+.masha-feedly-reporter-manager__search input:focus,.masha-feedly-reporter-manager select:focus { border-color: #e6007e; outline: 3px solid #e6007e26; }
+.masha-feedly-reporter-manager__table-wrap { overflow: auto; max-height: 70vh; }
+.masha-feedly-reporter-manager__table { width: 100%; border-collapse: collapse; text-align: left; }
+.masha-feedly-reporter-manager__table th { position: sticky; top: 0; z-index: 1; padding: .7rem .85rem; background: #f8f6f9; color: #6b6471; font-size: .78rem; letter-spacing: .035em; text-transform: uppercase; }
+.masha-feedly-reporter-manager__table td { padding: .7rem .85rem; border-top: 1px solid #f0edf1; color: #514b58; vertical-align: middle; }
+.masha-feedly-reporter-manager__table tbody tr:hover { background: #fffafd; }
+.masha-feedly-reporter-manager__table td:first-child { display: flex; max-width: 32rem; gap: .55rem; align-items: baseline; }
+.masha-feedly-reporter-manager__table td:first-child strong { flex: 0 0 auto; color: #a51660; font-variant-numeric: tabular-nums; }
+.masha-feedly-reporter-manager__table td:first-child span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.masha-feedly-reporter-manager__table form { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
+.masha-feedly-reporter-manager__table select { min-width: 12rem; max-width: 20rem; }
+.masha-feedly-reporter-manager__save { min-height: 2.2rem; padding: .4rem .8rem; border-color: #efc8dc; color: #9b155a; font-size: .82rem; }
+.masha-feedly-reporter-manager__save:hover { background: #fff0f7; }
+.masha-feedly-reporter-manager__save:disabled { opacity: .6; cursor: wait; }
+.masha-feedly-reporter-manager__status { color: #286b42; font-size: .8rem; }
+@media (max-width: 760px) { .masha-feedly-reporter-manager__header { align-items: stretch; flex-direction: column; } .masha-feedly-reporter-manager__search { min-width: 0; } .masha-feedly-reporter-manager__table { min-width: 48rem; } }
+
 .masha-feedly-board .kw-masha-feedly__modal { z-index: 100000; }
 
 @media (max-width: 700px) {

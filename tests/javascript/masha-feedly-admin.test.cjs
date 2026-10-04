@@ -26,6 +26,55 @@ test('Admin-Menü und Breadcrumb erhalten keine Masha-Feedly-Zähler-Badges', ()
   assert.doesNotMatch(styles, /masha-feedly-menu__badge/);
 });
 
+test('Meldepersonen-Ansicht schaltet CMS-Tabs um, durchsucht Einträge und speichert mit CSRF-Token', () => {
+  const renderer = fs.readFileSync(path.resolve(__dirname, '../../src/Admin/MashaFeedlyAdmin.php'), 'utf8');
+  assert.match(renderer, /MashaFeedlyEntry::canManageReporter\(\$member\)[\s\S]*?data-admin-view-tab="reporters"/);
+  assert.match(renderer, /data-reporter-form[\s\S]*?name="EntryID"[\s\S]*?name="ReportedByID"/);
+  assert.match(renderer, /'saveReporter'/);
+  assert.match(source, /\[data-admin-view-tab\][\s\S]*?aria-selected[\s\S]*?data-admin-view-panel/);
+  assert.match(source, /\[data-reporter-search\][\s\S]*?data-reporter-row/);
+  assert.match(source, /\[data-reporter-form\][\s\S]*?data\.set\('SecurityID'[\s\S]*?fetch\(form\.dataset\.saveUrl,[\s\S]*?method: 'POST'/);
+});
+
+test('speichert eine ausgewählte Meldeperson aus der CMS-Übersicht mit Statusmeldung', async () => {
+  let requestURL = '';
+  let requestOptions = null;
+  const { documentListeners, formDataInstances } = createBoardEnvironment(async (url, options) => {
+    requestURL = url;
+    requestOptions = options;
+    return { ok: true, json: async () => ({ success: true, message: 'Meldeperson gespeichert.' }) };
+  });
+  const button = { disabled: false };
+  const status = { textContent: '' };
+  const form = {
+    dataset: { saveUrl: '/admin/saveReporter', securityId: 'csrf-report-token', savingMessage: 'Speichere …' },
+    formValues: [['EntryID', '42'], ['ReportedByID', '7']],
+    closest(selector) {
+      if (selector === '[data-reporter-form]') return this;
+      if (selector === '[data-masha-feedly-board]') return { dataset: { securityId: 'csrf-board-token' } };
+      return null;
+    },
+    querySelector(selector) {
+      if (selector === '[type="submit"]') return button;
+      if (selector === '[data-reporter-status]') return status;
+      return null;
+    },
+  };
+
+  await documentListeners.submit({ target: form, preventDefault() {} });
+
+  assert.equal(requestURL, '/admin/saveReporter');
+  assert.equal(requestOptions.method, 'POST');
+  assert.equal(requestOptions.credentials, 'same-origin');
+  assert.deepEqual(formDataInstances[0].values, [
+    ['EntryID', '42'],
+    ['ReportedByID', '7'],
+    ['SecurityID', 'csrf-report-token'],
+  ]);
+  assert.equal(status.textContent, 'Meldeperson gespeichert.');
+  assert.equal(button.disabled, false);
+});
+
 test('spielt die im Konfigurationsbereich angeklickte Animationsvorschau ab', () => {
   const previewCalls = [];
   const entriesAPI = {
