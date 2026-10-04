@@ -241,4 +241,48 @@ class MashaFeedlyNotificationService
                 ->send();
         }
     }
+
+    /** Benachrichtigt zugewiesene, freigegebene Mitglieder einmal beim Wechsel zur Kostenschätzung. */
+    public static function notifyCostEstimateRequested(MashaFeedlyEntry $entry): int
+    {
+        $allowedIDs = array_map('intval', MashaFeedlyConfigExtension::memberIDs());
+        $assignedIDs = array_map('intval', $entry->AssignedMembers()->column('ID'));
+        $recipientIDs = array_values(array_intersect($assignedIDs, $allowedIDs));
+        if (!$recipientIDs) {
+            return 0;
+        }
+
+        $siteTitle = trim((string)SiteConfig::current_site_config()->Title) ?: 'Masha:Feedly';
+        $entryURL = Director::absoluteURL(
+            Director::baseURL() . '?masha-feedly-entry=' . (int)$entry->ID
+        );
+        $sent = 0;
+        foreach (Member::get()->filter('ID', $recipientIDs) as $member) {
+            if (
+                !(bool)$member->MashaFeedlyEmailNotifications
+                || !(bool)$member->MashaFeedlyNotifyCostEstimates
+                || !Email::is_valid_address((string)$member->Email)
+            ) {
+                continue;
+            }
+
+            Email::create()
+                ->setTo((string)$member->Email)
+                ->setSubject(i18n::_t(
+                    'KW\\MashaFeedly\\Translations.EMAIL_ESTIMATE_REQUEST_SUBJECT',
+                    '{siteTitle}: Kostenschätzung zur Freigabe – {title}',
+                    ['siteTitle' => $siteTitle, 'title' => $entry->getTitle()]
+                ))
+                ->setHTMLTemplate('KW/MashaFeedly/Email/CostEstimateRequestedEmail')
+                ->setPlainTemplate('KW/MashaFeedly/Email/CostEstimateRequestedEmailPlain')
+                ->setData([
+                    'SiteTitle' => $siteTitle,
+                    'EntryTitle' => $entry->getTitle(),
+                    'EntryURL' => $entryURL,
+                ])
+                ->send();
+            $sent++;
+        }
+        return $sent;
+    }
 }

@@ -6,6 +6,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-onboarding.js'), 'utf8');
 const dist = fs.readFileSync(path.resolve(__dirname, '../../client/dist/js/masha-feedly-onboarding.js'), 'utf8');
+const e2eOnboardingSource = fs.readFileSync(path.resolve(__dirname, '../e2e/onboarding.test.cjs'), 'utf8');
 
 class Element {
   constructor(dataset = {}, selector = '') {
@@ -367,4 +368,9 @@ test('zeigt einen Fehler, wenn der Neustart-Button den Server nicht erreicht', a
 
 test('liefert dieselbe Einführungslogik aus wie getestet wird', () => {
   assert.equal(dist, source);
+});
+
+test('verwendet für den Onboarding-E2E-Test ersatzweise das vorhandene Creator-Testkonto', () => {
+  assert.match(e2eOnboardingSource, /onboardingEmail:[\s\S]*?MASHA_FEEDLY_E2E_CREATOR_EMAIL/);
+  assert.match(e2eOnboardingSource, /onboardingPassword:[\s\S]*?MASHA_FEEDLY_E2E_CREATOR_PASSWORD/);
 });

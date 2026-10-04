@@ -25,6 +25,7 @@ use SilverStripe\Forms\DropdownField;
 use SilverStripe\Forms\LiteralField;
 use SilverStripe\Forms\HiddenField;
 use SilverStripe\Forms\ListboxField;
+use SilverStripe\Forms\NumericField;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\Security;
@@ -135,6 +136,7 @@ class MashaFeedlyAdmin extends ModelAdmin
 
         $members = [];
         $authorizedMemberIDs = MashaFeedlyConfigExtension::memberIDs();
+        $canManageSensitiveSettings = MashaFeedlyEntry::canManageReporter(Security::getCurrentUser());
         foreach (Member::get()->sort('Surname ASC, FirstName ASC') as $member) {
             $members[(string)$member->ID] = (string)$member->getName();
         }
@@ -158,18 +160,24 @@ class MashaFeedlyAdmin extends ModelAdmin
             ])
                 ->setValue(MashaFeedlyConfigExtension::theme())
                 ->setDescription(self::translate('CONFIG_THEME_DESCRIPTION', 'Legt Farben, Erfolgsmeldungen und Abschlussanimationen im Widget fest.')),
-            DropdownField::create('MashaFeedlyDueDateReminderMode', self::translate('CONFIG_DUE_DATE_REMINDER_MODE', 'Fälligkeitserinnerungen ausführen'), [
-                'cron' => self::translate('CONFIG_DUE_DATE_REMINDER_CRON', 'Serverseitig per Cronjob'),
-                'visitor' => self::translate('CONFIG_DUE_DATE_REMINDER_VISITOR', 'Bei Websitebesuchen'),
-            ])
-                ->setValue(MashaFeedlyConfigExtension::dueDateReminderMode())
-                ->setDescription(self::translate('CONFIG_DUE_DATE_REMINDER_MODE_DESCRIPTION', 'Cronjob: tägliche Prüfung unabhängig von Websitebesuchen. Bei Websitebesuchen: erster Seitenaufruf pro Tag startet die Prüfung; ohne Besuch werden keine Erinnerungen versendet.')),
-            LiteralField::create('MashaFeedlyAnimationPreviews', $this->renderCompletionAnimationPreviews()),
             ListboxField::create('AllowedMemberIDs', self::translate('CONFIG_ALLOWED_MEMBERS', 'Benutzer mit Zugriff'), $members)
                 ->setValue(MashaFeedlyConfigExtension::memberIDs())
                 ->setDescription(self::translate('CONFIG_ALLOWED_MEMBERS_DESCRIPTION', 'Wähle alle Benutzer aus, die Einträge und Kommentare verwalten dürfen. Administratoren behalten immer Zugriff.'))
         );
-        foreach ($authorizedMemberIDs ? Member::get()->filter('ID', $authorizedMemberIDs)->sort('Surname ASC, FirstName ASC') : [] as $authorizedMember) {
+        if ($canManageSensitiveSettings) {
+            $fields->insertBefore('AllowedMemberIDs', DropdownField::create('MashaFeedlyDueDateReminderMode', self::translate('CONFIG_DUE_DATE_REMINDER_MODE', 'Fälligkeitserinnerungen ausführen'), [
+                'cron' => self::translate('CONFIG_DUE_DATE_REMINDER_CRON', 'Serverseitig per Cronjob'),
+                'visitor' => self::translate('CONFIG_DUE_DATE_REMINDER_VISITOR', 'Bei Websitebesuchen'),
+            ])
+                ->setValue(MashaFeedlyConfigExtension::dueDateReminderMode())
+                ->setDescription(self::translate('CONFIG_DUE_DATE_REMINDER_MODE_DESCRIPTION', 'Cronjob: tägliche Prüfung unabhängig von Websitebesuchen. Bei Websitebesuchen: erster Seitenaufruf pro Tag startet die Prüfung; ohne Besuch werden keine Erinnerungen versendet.')));
+            $fields->insertBefore('AllowedMemberIDs', NumericField::create('MashaFeedlyHourlyRate', self::translate('CONFIG_HOURLY_RATE', 'Stundensatz für Kostenschätzungen (EUR)'))
+                ->setAttribute('min', '0')->setAttribute('step', '0.01')
+                ->setValue(MashaFeedlyConfigExtension::hourlyRate())
+                ->setDescription(self::translate('CONFIG_HOURLY_RATE_DESCRIPTION', 'Aus der eingetragenen Dauer wird automatisch der Preis berechnet.')));
+            $fields->insertBefore('AllowedMemberIDs', LiteralField::create('MashaFeedlyAnimationPreviews', $this->renderCompletionAnimationPreviews()));
+        }
+        foreach ($canManageSensitiveSettings && $authorizedMemberIDs ? Member::get()->filter('ID', $authorizedMemberIDs)->sort('Surname ASC, FirstName ASC') : [] as $authorizedMember) {
             $colorFieldName = 'MashaFeedlyMemberColor_' . (int)$authorizedMember->ID;
             $fields->push(CompositeField::create(
                 LiteralField::create(
@@ -285,6 +293,17 @@ class MashaFeedlyAdmin extends ModelAdmin
         $category = MashaFeedlyCategory::get()->byID((int)$request->postVar('CategoryID'));
         if (!$entry || !$category) {
             return $this->jsonResponse(['success' => false, 'message' => 'Eintrag oder Kategorie nicht gefunden.'], 404);
+        }
+        if ((string)$entry->Category()->SystemKey === 'estimate_pending'
+            && !in_array((string)$category->SystemKey, ['estimate_pending', 'estimate_approved'], true)
+        ) {
+            return $this->jsonResponse([
+                'success' => false,
+                'message' => i18n::_t(
+                    'KW\\MashaFeedly\\Translations.ESTIMATE_APPROVAL_REQUIRED',
+                    'Dieser Eintrag wartet auf die Freigabe der Kostenschätzung. Er kann nur in „Kostenschätzung freigegeben“ verschoben werden.'
+                ),
+            ], 409);
         }
 
         $entry->CategoryID = (int)$category->ID;
@@ -902,8 +921,15 @@ class MashaFeedlyAdmin extends ModelAdmin
         $siteConfig->MashaFeedlyFontSize = in_array($fontSize, ['small', 'medium', 'large'], true) ? $fontSize : 'small';
         $theme = strtolower((string)($data['MashaFeedlyTheme'] ?? 'playful'));
         $siteConfig->MashaFeedlyTheme = in_array($theme, ['playful', 'serious'], true) ? $theme : 'playful';
-        $reminderMode = strtolower((string)($data['MashaFeedlyDueDateReminderMode'] ?? 'cron'));
-        $siteConfig->MashaFeedlyDueDateReminderMode = in_array($reminderMode, ['cron', 'visitor'], true) ? $reminderMode : 'cron';
+        $canManageSensitiveSettings = MashaFeedlyEntry::canManageReporter($member);
+        if ($canManageSensitiveSettings) {
+            $reminderMode = strtolower((string)($data['MashaFeedlyDueDateReminderMode'] ?? MashaFeedlyConfigExtension::dueDateReminderMode()));
+            $siteConfig->MashaFeedlyDueDateReminderMode = in_array($reminderMode, ['cron', 'visitor'], true) ? $reminderMode : 'cron';
+            $hourlyRate = str_replace(',', '.', trim((string)($data['MashaFeedlyHourlyRate'] ?? MashaFeedlyConfigExtension::hourlyRate())));
+            $siteConfig->MashaFeedlyHourlyRate = is_numeric($hourlyRate) && (float)$hourlyRate >= 0
+                ? number_format(min((float)$hourlyRate, 99999999.99), 2, '.', '')
+                : 0;
+        }
         $siteConfig->write();
 
         $usedColors = [];
@@ -913,26 +939,30 @@ class MashaFeedlyAdmin extends ModelAdmin
                 continue;
             }
 
-            $colorField = 'MashaFeedlyMemberColor_' . $authorizedMemberID;
-            $colorValue = array_key_exists($colorField, $data)
-                ? (string)$data[$colorField]
-                : (string)$authorizedMember->MashaFeedlyColor;
-            $color = MashaFeedlyMemberExtension::normalizeColor($colorValue)
-                ?? MashaFeedlyMemberExtension::nextAvailableColor($usedColors);
-            $authorizedMember->MashaFeedlyColor = $color;
+            if ($canManageSensitiveSettings) {
+                $colorField = 'MashaFeedlyMemberColor_' . $authorizedMemberID;
+                $colorValue = array_key_exists($colorField, $data)
+                    ? (string)$data[$colorField]
+                    : (string)$authorizedMember->MashaFeedlyColor;
+                $color = MashaFeedlyMemberExtension::normalizeColor($colorValue)
+                    ?? MashaFeedlyMemberExtension::nextAvailableColor($usedColors);
+                $authorizedMember->MashaFeedlyColor = $color;
 
-            $authorizedMember->write();
-            $authorizedMember->protectMashaFeedlyIconImage();
-            $usedColors[] = $color;
+                $authorizedMember->write();
+                $authorizedMember->protectMashaFeedlyIconImage();
+                $usedColors[] = $color;
+            }
         }
 
-        $folder = MashaFeedlyMemberExtension::protectedIconFolder();
-        foreach (Image::get()->filter('ParentID', (int)$folder->ID) as $profileImage) {
-            $profileImage->CanViewType = \SilverStripe\Security\InheritedPermissions::ONLY_THESE_MEMBERS;
-            $profileImage->ViewerMembers()->setByIDList($memberIDs);
-            $profileImage->write();
-            $profileImage->publishSingle();
-            $profileImage->protectFile();
+        if ($canManageSensitiveSettings) {
+            $folder = MashaFeedlyMemberExtension::protectedIconFolder();
+            foreach (Image::get()->filter('ParentID', (int)$folder->ID) as $profileImage) {
+                $profileImage->CanViewType = \SilverStripe\Security\InheritedPermissions::ONLY_THESE_MEMBERS;
+                $profileImage->ViewerMembers()->setByIDList($memberIDs);
+                $profileImage->write();
+                $profileImage->publishSingle();
+                $profileImage->protectFile();
+            }
         }
 
         $form->sessionMessage(self::translate('CONFIG_SAVED', 'Die Masha-Feedly-Konfiguration wurde gespeichert.'), 'good');

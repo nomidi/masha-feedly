@@ -13,8 +13,10 @@ use SilverStripe\Forms\LiteralField;
 use SilverStripe\Forms\HiddenField;
 use SilverStripe\Core\Manifest\ModuleResourceLoader;
 use SilverStripe\Security\Security;
+use SilverStripe\Security\Member;
 use SilverStripe\Security\InheritedPermissions;
 use KW\MashaFeedly\Service\MashaFeedlyFolderService;
+use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use SilverStripe\i18n\i18n;
 use SilverStripe\View\Requirements;
 
@@ -27,6 +29,7 @@ use SilverStripe\View\Requirements;
  * @property bool $MashaFeedlyNotifyOwnEntryChanges Benachrichtigung bei eigenen Einträgen und Änderungen.
  * @property bool $MashaFeedlyNotifyComments Benachrichtigung bei neuen Kommentaren.
  * @property bool $MashaFeedlyNotifyDueDateReminders Benachrichtigung bei Fälligkeitsterminen.
+ * @property bool $MashaFeedlyNotifyCostEstimates Benachrichtigung bei angefragten Kostenschätzungen.
  * @property int $MashaFeedlyIconImageID ID des geschützten Profilbildes für Masha Feedly.
  * @property Image $MashaFeedlyIconImage Geschütztes Masha-Feedly-Profilbild.
  * @property string $MashaFeedlyColor Individuelle Avatarfarbe im Masha-Feedly-Board.
@@ -44,6 +47,8 @@ class MashaFeedlyMemberExtension extends Extension
         'MashaFeedlyNotifyOwnEntryChanges' => 'Boolean',
         'MashaFeedlyNotifyComments' => 'Boolean',
         'MashaFeedlyNotifyDueDateReminders' => 'Boolean',
+        'MashaFeedlyNotifyCostEstimates' => 'Boolean',
+        'MashaFeedlyCanManageEstimates' => 'Boolean',
         'MashaFeedlyColor' => 'Varchar(7)',
         'MashaFeedlyOnboardingCompleted' => 'Boolean',
         'MashaFeedlyShowOnboarding' => 'Boolean',
@@ -60,6 +65,7 @@ class MashaFeedlyMemberExtension extends Extension
         'MashaFeedlyNotifyOwnEntryChanges' => false,
         'MashaFeedlyNotifyComments' => true,
         'MashaFeedlyNotifyDueDateReminders' => true,
+        'MashaFeedlyNotifyCostEstimates' => true,
     ];
 
     /** Liefert die kräftigen, gut unterscheidbaren Farben für Mitglieder-Avatare. */
@@ -154,6 +160,12 @@ class MashaFeedlyMemberExtension extends Extension
     /** Aktiviert die Einführung erneut, wenn das Profil die Wiederholung anfordert. */
     protected function onBeforeWrite(): void
     {
+        if (!MashaFeedlyEntry::canManageReporter(Security::getCurrentUser())) {
+            $persisted = $this->owner->isInDB() ? Member::get()->byID((int)$this->owner->ID) : null;
+            $this->owner->MashaFeedlyCanManageEstimates = $persisted
+                ? (bool)$persisted->MashaFeedlyCanManageEstimates
+                : false;
+        }
         if ((bool)$this->owner->MashaFeedlyShowOnboarding) {
             $this->owner->MashaFeedlyOnboardingCompleted = false;
         }
@@ -204,13 +216,28 @@ class MashaFeedlyMemberExtension extends Extension
             'MashaFeedlyNotifyOwnEntryChanges',
             'MashaFeedlyNotifyComments',
             'MashaFeedlyNotifyDueDateReminders',
+            'MashaFeedlyNotifyCostEstimates',
+            'MashaFeedlyCanManageEstimates',
             'MashaFeedlyOnboardingCompleted',
             'MashaFeedlyShowOnboarding',
             'MashaFeedlyIconImage',
             'MashaFeedlyColor',
         ]);
 
-        if (!MashaFeedlyConfigExtension::isExplicitlyAllowed(Security::getCurrentUser())) {
+        $currentUser = Security::getCurrentUser();
+        $isEstimateManager = MashaFeedlyEntry::canManageReporter($currentUser);
+        if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($currentUser) && !$isEstimateManager) {
+            return;
+        }
+
+        if ($isEstimateManager) {
+            $fields->addFieldToTab('Root.MashaFeedly', CheckboxField::create(
+                'MashaFeedlyCanManageEstimates',
+                self::translate('PROFILE_CAN_MANAGE_ESTIMATES', 'Darf Kostenschätzungen und Freigaben verwalten')
+            )->setDescription(self::translate('PROFILE_CAN_MANAGE_ESTIMATES_DESCRIPTION', 'Nur der konfigurierte Masha:Feedly-Superadmin kann diese Berechtigung vergeben.')));
+        }
+
+        if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($currentUser)) {
             return;
         }
 
@@ -238,6 +265,10 @@ class MashaFeedlyMemberExtension extends Extension
         $dueDateReminders = CheckboxField::create(
             'MashaFeedlyNotifyDueDateReminders',
             self::translate('PROFILE_NOTIFY_DUE_DATE_REMINDERS', 'An Fälligkeitstermine erinnern')
+        )->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        $costEstimates = CheckboxField::create(
+            'MashaFeedlyNotifyCostEstimates',
+            self::translate('PROFILE_NOTIFY_COST_ESTIMATES', 'Bei angefragten Kostenschätzungen benachrichtigen')
         )->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $entryUpdates = CheckboxField::create(
             'MashaFeedlyNotifyEntryUpdates',
@@ -278,7 +309,8 @@ class MashaFeedlyMemberExtension extends Extension
                 $entryUpdates,
                 $ownEntryUpdates,
                 $comments,
-                $dueDateReminders
+                $dueDateReminders,
+                $costEstimates
             )->setName('MashaFeedlyEmailSettings')->setTitle(self::translate('PROFILE_EMAIL_SETTINGS', 'E-Mail-Benachrichtigungen'))->addExtraClass('masha-feedly-email-settings'),
             CheckboxField::create(
                 'MashaFeedlyShowOnboarding',

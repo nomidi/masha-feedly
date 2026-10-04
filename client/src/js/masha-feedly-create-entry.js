@@ -47,7 +47,37 @@ document.addEventListener('DOMContentLoaded', () => {
   const toast = widget.querySelector('[data-masha-feedly-save-toast]');
   const toastMessage = widget.querySelector('[data-masha-feedly-save-message]');
   const contentField = form?.querySelector('[name="Content"]');
+  const createCategory = form?.querySelector('[data-masha-feedly-create-category]');
+  const estimateSection = form?.querySelector('[data-masha-feedly-create-estimate]');
+  const estimateDuration = form?.elements.EstimatedCostDuration;
+  const estimateNote = form?.elements.EstimatedCostNote;
+  const estimatePrice = estimateSection?.querySelector('[data-masha-feedly-estimate-price]');
   const t = (key, values = {}) => window.KWMashaFeedlyTranslate(key, values);
+  const calculatePreview = (text) => {
+    const match = String(text).trim().match(/^([0-9]+(?:[.,][0-9]+)?)(?:\s*(?:-|–|bis)\s*([0-9]+(?:[.,][0-9]+)?))?\s*(stunden?|std\.?|h|minuten?|min)$/i);
+    if (!match) return '';
+    const first = Number(match[1].replace(',', '.'));
+    const last = Number((match[2] || match[1]).replace(',', '.'));
+    const unit = match[3].toLowerCase();
+    const factor = ['minute', 'minuten', 'min'].includes(unit) ? 1 / 60 : 1;
+    const rate = Math.max(0, Number(widget.dataset.estimateHourlyRate) || 0);
+    if (rate <= 0) return t('ESTIMATE_RATE_REQUIRED');
+    if (first <= 0 || last < first) return '';
+    const money = (hours) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Math.round(hours * factor * rate * 100) / 100);
+    return first === last ? money(first) : `${money(first)} – ${money(last)}`;
+  };
+  const updateCreateEstimate = () => {
+    if (!createCategory || !estimateSection) return;
+    const show = widget.dataset.canManageEstimate === '1'
+      && createCategory.selectedOptions[0]?.dataset.systemKey === 'estimate_pending';
+    estimateSection.hidden = !show;
+    [estimateDuration, estimateNote].forEach((field) => { if (field) field.disabled = !show; });
+    if (estimatePrice) estimatePrice.textContent = show ? (calculatePreview(estimateDuration?.value || '') || (Number(widget.dataset.estimateHourlyRate) > 0 ? t('ESTIMATE_PRICE_HINT') : t('ESTIMATE_RATE_REQUIRED'))) : '';
+  };
+  createCategory?.addEventListener('change', updateCreateEstimate);
+  estimateDuration?.addEventListener('input', updateCreateEstimate);
+  form?.addEventListener('reset', () => setTimeout(updateCreateEstimate, 0));
+  updateCreateEstimate();
   let selecting = false;
   let highlighted = null;
   const getElementSelector = (element) => {

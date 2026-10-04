@@ -55,9 +55,21 @@ class MashaFeedlyWidgetExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-entries.js');
         MashaFeedlyCategory::ensureDefaultCategories();
         MashaFeedlyPriority::ensureDefaultPriorities();
+        $canManageEstimate = \KW\MashaFeedly\Model\MashaFeedlyEntry::canManageEstimate(Security::getCurrentUser());
         $categories = [];
         foreach (MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC') as $category) {
-            $categories[] = ['ID' => (int)$category->ID, 'Title' => (string)$category->Title];
+            $systemKey = (string)$category->SystemKey;
+            $estimateRole = in_array($systemKey, ['estimate_pending', 'estimate_approved'], true);
+            $categories[] = [
+                'ID' => (int)$category->ID,
+                'Title' => $estimateRole && !$canManageEstimate
+                    ? i18n::_t('KW\\MashaFeedly\\Translations.ESTIMATE_HIDDEN_CATEGORY', 'In Bearbeitung')
+                    : (string)$category->Title,
+                'SystemKey' => $estimateRole && !$canManageEstimate ? 'restricted_estimate' : $systemKey,
+                'CanSelectForNewEntry' => $systemKey === 'estimate_pending'
+                    ? $canManageEstimate
+                    : $systemKey !== 'estimate_approved',
+            ];
         }
         $members = [];
         $priorities = [];
@@ -106,6 +118,8 @@ class MashaFeedlyWidgetExtension extends Extension
             'Address' => MashaFeedlyConfigExtension::address(),
             'FontSize' => MashaFeedlyConfigExtension::fontSize(),
             'Theme' => MashaFeedlyConfigExtension::theme(),
+            'CanManageEstimate' => $canManageEstimate,
+            'EstimateHourlyRate' => $canManageEstimate ? MashaFeedlyConfigExtension::hourlyRate() : 0,
         ])->forTemplate();
         $translationDefaults = [
             'EMOJI_PICKER_OPEN' => 'Emoji auswählen',
@@ -246,6 +260,14 @@ class MashaFeedlyWidgetExtension extends Extension
             'SUCCESS_PAGE_TITLE' => 'Keine offenen Einträge auf dieser Seite',
             'SUCCESS_PAGE_MESSAGE' => 'Auf dieser Seite gibt es derzeit keine offenen Einträge.',
             'SUCCESS_EMPTY_PAGE_MESSAGE' => 'Für diese Seite wurden noch keine Einträge erfasst.',
+            'ESTIMATE_TITLE' => 'Kostenschätzung',
+            'ESTIMATE_PENDING' => 'Kostenschätzung wartet auf Freigabe',
+            'ESTIMATE_APPROVED' => 'Kostenschätzung freigegeben',
+            'ESTIMATE_NOT_ENTERED' => 'Noch keine Kostenschätzung eingetragen',
+            'ESTIMATE_TRANSITION_LOCKED' => 'Der Eintrag kann erst nach Freigabe der Kostenschätzung weiter verschoben werden.',
+            'ESTIMATE_MANAGER_ONLY' => 'Die Kostenschätzung wird von der zuständigen Ansprechperson ergänzt.',
+            'ESTIMATE_PRICE_HINT' => 'Dauer eingeben, Preis erscheint hier',
+            'ESTIMATE_RATE_REQUIRED' => 'Bitte zuerst den Stundensatz in den Masha:Feedly-Einstellungen festlegen.',
             'BOARD_NEW_FOR_DU' => 'Neue Aktivität für dich',
             'BOARD_NEW_FOR_SIE' => 'Neue Aktivität für Sie',
             'BOARD_NEW_FOR_ALL' => 'Neue Aktivität für alle',
@@ -309,6 +331,8 @@ class MashaFeedlyWidgetExtension extends Extension
             'HISTORY_ATTACHMENT' => 'Datei hochgeladen: {text}',
             'HISTORY_COMMENT_EDITED' => 'Kommentar bearbeitet: {oldValue} → {newValue}',
             'HISTORY_COMMENT_DELETED' => 'Kommentar gelöscht: {text}',
+            'HISTORY_COMMENT_REACTION' => 'Reaktion auf Kommentar geändert: {oldValue} → {newValue}',
+            'HISTORY_NO_REACTION' => 'Keine Reaktion',
             'HISTORY_STATUS_CHANGE' => 'Status: {oldValue} → {newValue}',
             'HISTORY_DUE_DATE_CHANGE' => 'Fälligkeit: {oldValue} → {newValue}',
             'NO_DUE_DATE' => 'Kein Termin',

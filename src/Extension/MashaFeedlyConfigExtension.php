@@ -30,8 +30,15 @@ class MashaFeedlyConfigExtension extends Extension
         'MashaFeedlyFontSize' => 'Varchar(10)',
         'MashaFeedlyTheme' => 'Varchar(20)',
         'MashaFeedlyDueDateReminderMode' => 'Varchar(20)',
+        'MashaFeedlyHourlyRate' => 'Decimal(10,2)',
+        'MashaFeedlyEstimateCategoriesSeeded' => 'Boolean',
         'MashaFeedlyDueDateReminderLastRunDate' => 'Date',
         'MashaFeedlyClosedCategoriesMigrated' => 'Boolean',
+    ];
+
+    private static $defaults = [
+        'MashaFeedlyHourlyRate' => 0,
+        'MashaFeedlyEstimateCategoriesSeeded' => false,
     ];
 
     /** Ermittelt neue Freigaben, bevor SiteConfig die bisherige Liste überschreibt. */
@@ -93,6 +100,12 @@ class MashaFeedlyConfigExtension extends Extension
         return strtolower((string)self::currentSiteConfig()->MashaFeedlyDueDateReminderMode) === 'visitor'
             ? 'visitor'
             : 'cron';
+    }
+
+    /** Liefert den konfigurierten Stundensatz in Euro. */
+    public static function hourlyRate(): float
+    {
+        return max(0.0, (float)self::currentSiteConfig()->MashaFeedlyHourlyRate);
     }
 
     /**

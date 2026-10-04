@@ -45,6 +45,200 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         i18n::set_locale('de_DE');
     }
 
+    /** Nur Schätzungsmanager erhalten Warteschlangen-Zähler und dürfen ihre gefilterten Listen abrufen. */
+    public function testEstimateQueuesAreCountedAndRestrictedToEstimateManagers(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $manager = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $manager);
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$manager->Email]);
+        MashaFeedlyCategory::ensureDefaultCategories();
+        $pending = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_pending')->first();
+        $approved = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_approved')->first();
+        $this->assertNotNull($pending);
+        $this->assertNotNull($approved);
+        $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
+        $siteConfig->MashaFeedlyHourlyRate = 100;
+        $siteConfig->write();
+
+        $pendingEntry = MashaFeedlyEntry::create([
+            'Content' => 'Wartet auf Freigabe – Testwarteschlange',
+            'CategoryID' => (int)$pending->ID,
+            'EstimatedCostDuration' => '2 Stunden',
+            'EstimatedCostAmount' => 200,
+        ]);
+        $pendingEntry->write();
+        $approvedEntry = MashaFeedlyEntry::create([
+            'Content' => 'Freigegeben und noch offen – Testwarteschlange',
+            'CategoryID' => (int)$approved->ID,
+            'EstimatedCostDuration' => '1 Stunde',
+            'EstimatedCostAmount' => 100,
+        ]);
+        $approvedEntry->write();
+
+        $pendingResponse = $this->get('/__masha-feedly/listEntries?mode=estimate-pending');
+        $pendingData = json_decode($pendingResponse->getBody(), true);
+        $this->assertSame(200, $pendingResponse->getStatusCode());
+        $this->assertSame(1, $pendingData['estimatePendingCount']);
+        $this->assertSame(1, $pendingData['estimateApprovedCount']);
+        $this->assertSame('estimate-pending', $pendingData['mode']);
+        $this->assertSame([(int)$pendingEntry->ID], array_map('intval', array_column($pendingData['entries'], 'id')));
+
+        $approvedResponse = $this->get('/__masha-feedly/listEntries?mode=estimate-approved');
+        $approvedData = json_decode($approvedResponse->getBody(), true);
+        $this->assertSame(200, $approvedResponse->getStatusCode());
+        $this->assertSame('estimate-approved', $approvedData['mode']);
+        $this->assertSame([(int)$approvedEntry->ID], array_map('intval', array_column($approvedData['entries'], 'id')));
+
+        $ordinaryMember = $this->objFromFixture(Member::class, 'notAllowed');
+        $this->allowMember($ordinaryMember);
+        $this->logInAs($ordinaryMember);
+        $denied = $this->get('/__masha-feedly/listEntries?mode=estimate-pending');
+        $this->assertSame(403, $denied->getStatusCode());
+        $ordinaryData = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $this->assertSame(0, $ordinaryData['estimatePendingCount']);
+        $this->assertSame(0, $ordinaryData['estimateApprovedCount']);
+    }
+
+    /** Kostenschätzungen samt Freigabestatus und Betrag sind nur Superadmin und einzeln freigegebenen Mitgliedern zugänglich. */
+    public function testEstimateDataAndCategoriesAreHiddenFromUnprivilegedFeedlyMembers(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $superadmin = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $superadmin);
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$superadmin->Email]);
+
+        $approvedMember = $this->objFromFixture(Member::class, 'allowed');
+        $unapprovedMember = $this->objFromFixture(Member::class, 'notAllowed');
+        $this->allowMember($approvedMember, $unapprovedMember);
+        $this->assertNotNull($approvedMember->getCMSFields()->dataFieldByName('MashaFeedlyCanManageEstimates'));
+        $approvedMember->MashaFeedlyCanManageEstimates = true;
+        $approvedMember->write();
+
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyHourlyRate = 120;
+        $config->write();
+        $pending = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_pending')->first();
+        $this->assertNotNull($pending);
+
+        $entry = MashaFeedlyEntry::create([
+            'Content' => 'Interner Kostenschätzungsdatensatz',
+            'CategoryID' => (int)$pending->ID,
+            'EstimatedCostDuration' => '2 Stunden',
+            'EstimatedCostAmount' => 240,
+            'EstimatedCostAmountMax' => 240,
+            'EstimatedCostCurrency' => 'EUR',
+            'EstimatedCostNote' => 'Nur für berechtigte Personen',
+        ]);
+        $entry->write();
+        MashaFeedlyEntryHistory::record($entry, 'estimate', '1 Stunde · 120 €', '2 Stunden · 240 €', $superadmin);
+
+        $this->logInAs($unapprovedMember);
+        $response = $this->get('/__masha-feedly/listEntries?mode=all');
+        $data = json_decode($response->getBody(), true);
+        $listed = array_values(array_filter($data['entries'], static fn(array $item): bool => (int)$item['id'] === (int)$entry->ID))[0];
+        $this->assertFalse($data['canManageEstimate']);
+        $this->assertNull($data['estimateHourlyRate']);
+        $this->assertNotContains('estimate_pending', array_column($data['categories'], 'systemKey'));
+        $this->assertNotContains('estimate_approved', array_column($data['categories'], 'systemKey'));
+        $this->assertSame('In Bearbeitung', $listed['categoryTitle']);
+        $this->assertSame('restricted_estimate', $listed['categoryRole']);
+        foreach (['estimateAmount', 'estimateAmountMax', 'estimateDuration', 'estimateCurrency', 'estimateNote'] as $field) {
+            $this->assertArrayNotHasKey($field, $listed);
+        }
+        $this->assertNotContains('estimate', array_column($listed['history'], 'type'));
+        $deniedChange = $this->post('/__masha-feedly/updateEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$entry->ID,
+            'CategoryID' => (int)MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_approved')->first()->ID,
+        ]);
+        $this->assertSame(403, $deniedChange->getStatusCode());
+        $forgedEntry = MashaFeedlyEntry::create([
+            'Content' => 'Unberechtigte direkte ORM-Freigabe',
+            'CategoryID' => (int)$pending->ID,
+            'EstimatedCostDuration' => '99 Stunden',
+            'EstimatedCostAmount' => 1,
+        ]);
+        $forgedEntry->write();
+        $this->assertSame('backlog', (string)$forgedEntry->Category()->SystemKey);
+        $this->assertSame('', (string)$forgedEntry->EstimatedCostDuration);
+        $this->assertSame(0.0, (float)$forgedEntry->EstimatedCostAmount);
+        $unapprovedMember->MashaFeedlyCanManageEstimates = true;
+        $unapprovedMember->write();
+        $this->assertFalse((bool)$unapprovedMember->MashaFeedlyCanManageEstimates, 'A member cannot grant estimate permissions to themselves with a forged CMS field.');
+
+        $this->logInAs($approvedMember);
+        $allowedData = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $allowedEntry = array_values(array_filter($allowedData['entries'], static fn(array $item): bool => (int)$item['id'] === (int)$entry->ID))[0];
+        $this->assertTrue($allowedData['canManageEstimate']);
+        $this->assertSame(120.0, (float)$allowedData['estimateHourlyRate']);
+        $this->assertSame('estimate_pending', $allowedEntry['categoryRole']);
+        $this->assertSame('240', $allowedEntry['estimateAmount']);
+        $this->assertSame('2 Stunden', $allowedEntry['estimateDuration']);
+        $this->assertContains('estimate', array_column($allowedEntry['history'], 'type'));
+
+        $backlogEntry = MashaFeedlyEntry::create([
+            'Content' => 'Kostenschätzung nur im passenden Status',
+            'CategoryID' => (int)MashaFeedlyCategory::defaultCategory()->ID,
+        ]);
+        $backlogEntry->write();
+        $requestWithoutEstimate = $this->post('/__masha-feedly/updateEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$backlogEntry->ID,
+            'CategoryID' => (int)$pending->ID,
+        ]);
+        $this->assertSame(400, $requestWithoutEstimate->getStatusCode());
+        $this->assertSame('backlog', (string)MashaFeedlyEntry::get()->byID($backlogEntry->ID)->Category()->SystemKey);
+
+        $savedEstimate = $this->post('/__masha-feedly/updateEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$backlogEntry->ID,
+            'CategoryID' => (int)$pending->ID,
+            'EstimatedCostDuration' => '3 Stunden',
+            'EstimatedCostNote' => 'Schätzung zur Freigabe',
+        ]);
+        $this->assertSame(200, $savedEstimate->getStatusCode());
+        $savedEstimateData = json_decode($savedEstimate->getBody(), true);
+        $this->assertSame('estimate_pending', $savedEstimateData['categoryRole']);
+        $this->assertSame('3 Stunden', $savedEstimateData['estimateDuration']);
+        $this->assertSame(360.0, (float)$savedEstimateData['estimateAmount']);
+        $reloadedEstimateEntry = MashaFeedlyEntry::get()->byID($backlogEntry->ID);
+        $this->assertSame((int)$pending->ID, (int)$reloadedEstimateEntry->CategoryID);
+        $this->assertSame('estimate_pending', (string)$reloadedEstimateEntry->Category()->SystemKey);
+        $this->assertSame('3 Stunden', (string)$reloadedEstimateEntry->EstimatedCostDuration);
+        $this->assertSame(360.0, (float)$reloadedEstimateEntry->EstimatedCostAmount);
+        $estimateHistory = MashaFeedlyEntryHistory::get()->filter([
+            'EntryID' => (int)$backlogEntry->ID,
+            'ChangeType' => 'estimate',
+        ])->first();
+        $this->assertNotNull($estimateHistory, 'Die Dauer, der berechnete Betrag und die Erläuterung müssen protokolliert werden.');
+        $this->assertStringContainsString('3 Stunden', (string)$estimateHistory->NewValue);
+        $this->assertStringContainsString('360,00 €', (string)$estimateHistory->NewValue);
+        $this->assertStringContainsString('Schätzung zur Freigabe', (string)$estimateHistory->NewValue);
+        $statusHistory = MashaFeedlyEntryHistory::get()->filter([
+            'EntryID' => (int)$backlogEntry->ID,
+            'ChangeType' => 'status',
+        ])->first();
+        $this->assertNotNull($statusHistory, 'Das Anfordern der Kostenschätzung muss mit Statuswechsel protokolliert werden.');
+        $this->assertSame((string)$pending->Title, (string)$statusHistory->NewValue);
+
+        $wrongCategoryEntry = MashaFeedlyEntry::create([
+            'Content' => 'Kostenschätzung darf im Backlog nicht gespeichert werden',
+            'CategoryID' => (int)MashaFeedlyCategory::defaultCategory()->ID,
+        ]);
+        $wrongCategoryEntry->write();
+        $wrongCategoryEstimate = $this->post('/__masha-feedly/updateEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$wrongCategoryEntry->ID,
+            'CategoryID' => (int)MashaFeedlyCategory::defaultCategory()->ID,
+            'EstimatedCostDuration' => '3 Stunden',
+            'EstimatedCostNote' => 'Darf im Backlog nicht gespeichert werden',
+        ]);
+        $this->assertSame(409, $wrongCategoryEstimate->getStatusCode());
+        $this->assertSame('backlog', (string)MashaFeedlyEntry::get()->byID($wrongCategoryEntry->ID)->Category()->SystemKey);
+        $this->assertSame('', (string)MashaFeedlyEntry::get()->byID($wrongCategoryEntry->ID)->EstimatedCostDuration);
+    }
+
     /** Die Widgetdaten zeigen die Meldeperson, während technischer Ersteller und Erstellungszeit erhalten bleiben. */
     public function testEntryResponseUsesReportedByOverrideAndKeepsCreationAudit(): void
     {
@@ -482,13 +676,13 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $savedViewCount = MashaFeedlySavedView::get()->count();
         $readCount = MashaFeedlyEntryRead::get()->count();
         $relationCount = MashaFeedlyEntryRelation::get()->count();
+        $attachmentCount = \KW\MashaFeedly\Model\MashaFeedlyAttachment::get()->count();
         $originalCategoryID = (int)$entry->CategoryID;
         $originalCommentText = (string)$comment->CommentText;
         $originalOnboarding = [(bool)$blocked->MashaFeedlyOnboardingCompleted, (bool)$blocked->MashaFeedlyShowOnboarding];
 
         $getRoutes = [
             '/__masha-feedly',
-            '/__masha-feedly/listEntries?mode=all',
             '/__masha-feedly/savedViews',
             '/__masha-feedly/createEntry',
             '/__masha-feedly/updateEntry',
@@ -500,6 +694,14 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             '/__masha-feedly/markEntryRead',
             '/__masha-feedly-comment',
         ];
+        // Jede öffentliche Listenansicht muss dieselbe Berechtigungsgrenze haben.
+        // Dabei sind auch manager-exklusive Warteschlangen und ungelesene Aktivitäten enthalten.
+        foreach ([
+            'all', 'open', 'closed', 'page', 'page-open', 'mine', 'feedback', 'unread',
+            'estimate-pending', 'estimate-approved',
+        ] as $mode) {
+            $getRoutes[] = '/__masha-feedly/listEntries?mode=' . $mode;
+        }
 
         foreach (['anonymous', 'unapproved'] as $audience) {
             if ($audience === 'anonymous') {
@@ -555,6 +757,32 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
                 $this->assertSame(403, $response->getStatusCode(), "$audience POST $route muss gesperrt sein.");
                 $this->assertStringNotContainsString('GESCHUETZTER-MATRIX-', $response->getBody());
             }
+
+            // Uploads dürfen die Berechtigungsprüfung nicht umgehen oder Datensätze anlegen.
+            $temporaryUpload = tempnam(sys_get_temp_dir(), 'masha-feedly-denied-upload-');
+            file_put_contents($temporaryUpload, 'not-an-image');
+            try {
+                $_FILES['Attachments'] = [
+                    'name' => ['unauthorized.png'],
+                    'type' => ['image/png'],
+                    'tmp_name' => [$temporaryUpload],
+                    'error' => [UPLOAD_ERR_OK],
+                    'size' => [filesize($temporaryUpload)],
+                ];
+                foreach ([
+                    ['/__masha-feedly/createEntry', ['Content' => 'Unbefugter Upload-Eintrag']],
+                    ['/__masha-feedly/updateEntry', [
+                        'EntryID' => (int)$entry->ID,
+                        'CategoryID' => (int)$otherCategory->ID,
+                    ]],
+                ] as [$route, $fields]) {
+                    $response = $this->post($route, ['SecurityID' => $securityID] + $fields);
+                    $this->assertSame(403, $response->getStatusCode(), "$audience POST $route mit Anhang muss gesperrt sein.");
+                }
+            } finally {
+                unset($_FILES['Attachments']);
+                unlink($temporaryUpload);
+            }
         }
 
         $this->assertSame($entryCount, MashaFeedlyEntry::get()->count());
@@ -563,6 +791,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame($savedViewCount, MashaFeedlySavedView::get()->count());
         $this->assertSame($readCount, MashaFeedlyEntryRead::get()->count());
         $this->assertSame($relationCount, MashaFeedlyEntryRelation::get()->count());
+        $this->assertSame($attachmentCount, \KW\MashaFeedly\Model\MashaFeedlyAttachment::get()->count());
         $this->assertSame($originalCategoryID, (int)MashaFeedlyEntry::get()->byID((int)$entry->ID)->CategoryID);
         $this->assertSame($originalCommentText, (string)MashaFeedlyComment::get()->byID((int)$comment->ID)->CommentText);
         $blockedAfterRequests = Member::get()->byID((int)$blocked->ID);
@@ -1002,7 +1231,18 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(2, $mineData['mineCount']);
         $this->assertCount(2, $mineData['entries']);
         $this->assertSame((int)$elsewhereAssigned->ID, $mineData['entries'][0]['id']);
-        $this->assertCount(6, $mineData['categories']);
+        $categoryRoles = array_column($mineData['categories'], 'systemKey');
+        sort($categoryRoles);
+        $this->assertSame([
+            'archive',
+            'backlog',
+            'doing',
+            'done',
+            'feedback',
+            'restricted_estimate',
+            'restricted_estimate',
+            'todo',
+        ], $categoryRoles);
         $doneCategoryData = array_values(array_filter(
             $mineData['categories'],
             static fn(array $category): bool => $category['title'] === 'Done'
@@ -1308,6 +1548,14 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(1, $thumbsUp['count']);
         $this->assertTrue($thumbsUp['selected']);
         $this->assertSame(1, MashaFeedlyCommentReaction::get()->count());
+        $addedHistory = MashaFeedlyEntryHistory::get()->filter([
+            'EntryID' => (int)$entry->ID,
+            'ChangeType' => 'comment_reaction',
+        ])->first();
+        $this->assertSame('', (string)$addedHistory->OldValue);
+        $this->assertSame('👍', (string)$addedHistory->NewValue);
+        $this->assertSame((int)$comment->ID, (int)$addedHistory->RelatedID);
+        $this->assertSame($reactor->getName(), (string)$addedHistory->ActorName);
 
         $replaced = $send('❤️');
         $replacementSummary = json_decode($replaced->getBody(), true)['reactions'];
@@ -1318,11 +1566,23 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(1, $heart['count']);
         $this->assertTrue($heart['selected']);
         $this->assertSame(1, MashaFeedlyCommentReaction::get()->count(), 'Pro Person und Kommentar bleibt genau eine Reaktion gespeichert.');
+        $switchedHistory = MashaFeedlyEntryHistory::get()->filter([
+            'EntryID' => (int)$entry->ID,
+            'ChangeType' => 'comment_reaction',
+        ])->sort('ID DESC')->first();
+        $this->assertSame('👍', (string)$switchedHistory->OldValue);
+        $this->assertSame('❤️', (string)$switchedHistory->NewValue);
 
         $removed = $send('❤️');
         $heart = array_values(array_filter(json_decode($removed->getBody(), true)['reactions'], static fn(array $item): bool => $item['emoji'] === '❤️'))[0];
         $this->assertSame(0, $heart['count']);
         $this->assertFalse($heart['selected']);
+        $removedHistory = MashaFeedlyEntryHistory::get()->filter([
+            'EntryID' => (int)$entry->ID,
+            'ChangeType' => 'comment_reaction',
+        ])->sort('ID DESC')->first();
+        $this->assertSame('❤️', (string)$removedHistory->OldValue);
+        $this->assertSame('', (string)$removedHistory->NewValue);
         $send('😂');
         $this->assertSame(1, MashaFeedlyCommentReaction::get()->count());
         $invalid = $send('<script>');

@@ -534,6 +534,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $member = $this->objFromFixture(Member::class, 'allowed');
         $this->allowMember($member);
         $this->logInWithPermission('ADMIN');
+        $superAdmin = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $superAdmin);
+        \SilverStripe\Core\Config\Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$superAdmin->Email]);
 
         $response = $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig');
 
@@ -609,6 +612,51 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $automaticallyColoredMember = Member::get()->byID((int)$this->objFromFixture(Member::class, 'notAllowed')->ID);
         $this->assertNotSame('', (string)$automaticallyColoredMember->MashaFeedlyColor);
         $this->assertNotSame('#B5A0E0', (string)$automaticallyColoredMember->MashaFeedlyColor);
+    }
+
+    /** Normale CMS-Admins erhalten weder sensible Einstellungen im Formular noch per manipuliertem POST Schreibzugriff. */
+    public function testOrdinaryCmsAdminCannotSeeOrChangeSensitiveSettingsAndColors(): void
+    {
+        $allowed = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($allowed);
+        $this->logInWithPermission('ADMIN');
+        $admin = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $admin);
+        \SilverStripe\Core\Config\Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['super-admin@example.test']);
+
+        $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
+        $siteConfig->MashaFeedlyDueDateReminderMode = 'cron';
+        $siteConfig->MashaFeedlyHourlyRate = 125;
+        $siteConfig->write();
+        $allowed->MashaFeedlyColor = '#E95DAB';
+        $allowed->write();
+
+        $response = $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig');
+        $this->assertSame(200, $response->getStatusCode());
+        $body = $response->getBody();
+        $this->assertStringNotContainsString('name="MashaFeedlyDueDateReminderMode"', $body);
+        $this->assertStringNotContainsString('name="MashaFeedlyHourlyRate"', $body);
+        $this->assertStringNotContainsString('data-masha-feedly-animation-previews', $body);
+        $this->assertStringNotContainsString('MashaFeedlyMemberColor_' . (int)$allowed->ID, $body);
+        $this->assertStringNotContainsString('masha-feedly-color-palette__swatch', $body);
+        $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $body, $matches));
+
+        $saveResponse = $this->post(
+            html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'AllowedMemberIDs' => [(int)$allowed->ID],
+                'MashaFeedlyDueDateReminderMode' => 'visitor',
+                'MashaFeedlyHourlyRate' => '9999',
+                'MashaFeedlyMemberColor_' . (int)$allowed->ID => '#00FF00',
+                'action_saveConfiguration' => 'Konfiguration speichern',
+            ]
+        );
+
+        $this->assertSame(200, $saveResponse->getStatusCode());
+        $this->assertSame('cron', MashaFeedlyConfigExtension::dueDateReminderMode());
+        $this->assertSame(125.0, MashaFeedlyConfigExtension::hourlyRate());
+        $this->assertSame('#E95DAB', (string)Member::get()->byID($allowed->ID)->MashaFeedlyColor);
     }
 
     /** Schreibt eine Testfreigabe, ohne produktive Silverstripe-Mitglieder anzulegen. */

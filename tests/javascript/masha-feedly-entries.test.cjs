@@ -29,6 +29,7 @@ const messages = {
   HISTORY_ATTACHMENT: 'Datei hochgeladen: {text}',
   HISTORY_COMMENT_EDITED: 'Kommentar bearbeitet: {oldValue} → {newValue}',
   HISTORY_COMMENT_DELETED: 'Kommentar gelöscht: {text}',
+  HISTORY_COMMENT_REACTION: 'Reaktion auf Kommentar geändert: {oldValue} → {newValue}', HISTORY_NO_REACTION: 'Keine Reaktion',
   HISTORY_NOBODY: 'Niemand', HISTORY_META: '{actor} · {when}', HISTORY_PRIORITY_CHANGE: 'Priorität: {oldValue} → {newValue}',
   HISTORY_DUE_DATE_CHANGE: 'Fälligkeit: {oldValue} → {newValue}', NO_DUE_DATE: 'Kein Termin', ENTRY_DUE_DATE: 'Fällig am {date}',
   ENTRY_NUMBER: 'Eintrag #{id}', ENTRY_REPORTED_BY: 'Gemeldet von {author}', ENTRY_CREATED_UNKNOWN: 'Unbekannt', CATEGORY_ALL: 'Alle Kategorien', LIST_COUNT_MINE_DU: 'für dich',
@@ -751,7 +752,7 @@ test('färbt das Website-Symbol in Prioritätsfarbe und zeigt es immer als Fehle
   assert.match(scss, /\.kw-masha-feedly__page-marker:focus-visible\s*\{[^}]*outline-color: var\(--masha-feedly-priority-color/);
   assert.match(scss, /\.kw-masha-feedly__page-marker:focus-visible\s*\{[^}]*box-shadow: 0 0 0 6px color-mix\(in srgb, var\(--masha-feedly-priority-color/);
   assert.match(scss, /:focus-visible:not\(\.kw-masha-feedly__page-marker\)\s*\{[^}]*outline-color: #334155/);
-  assert.match(compiledStyles, /\.kw-masha-feedly\[data-theme=serious\] \.kw-masha-feedly__page-marker:focus-visible\{outline-color:var\(--masha-feedly-priority-color/);
+  assert.match(compiledStyles, /\.kw-masha-feedly\[data-theme=serious\] :focus-visible:not\(\.kw-masha-feedly__page-marker\)\{outline-color:#334155/);
   assert.match(compiledStyles, /\.kw-masha-feedly__page-marker:focus-visible\{outline-color:var\(--masha-feedly-priority-color/);
 });
 
@@ -1100,6 +1101,30 @@ test('liefert den Feedback-Button mit Wartetext, zugänglichem Label und passend
   assert.match(compiledStyles, /\.kw-masha-feedly__feedback-button\[hidden\]\{display:none !important\}/);
 });
 
+test('zeigt Schätzungswarteschlangen nur für Manager, mit passenden Icons, Zählern und Listenaktionen', () => {
+  assert.match(widgetTemplate, /<% if \$CanManageEstimate %>[\s\S]*?data-masha-feedly-open-estimate-pending[\s\S]*?data-masha-feedly-estimate-pending-count[\s\S]*?data-masha-feedly-open-estimate-approved[\s\S]*?data-masha-feedly-estimate-approved-count[\s\S]*?<% end_if %>/);
+  for (const buttonName of ['pending', 'approved']) {
+    const button = widgetTemplate.match(new RegExp(`<button\\b(?=[^>]*data-masha-feedly-open-estimate-${buttonName})[\\s\\S]*?<\\/button>`))?.[0] || '';
+    assert.match(button, /\shidden>/);
+  }
+  assert.match(widgetTemplate, /data-masha-feedly-open-estimate-pending[\s\S]*?viewBox="0 0 512 512"[\s\S]*?data-masha-feedly-estimate-pending-count/);
+  assert.match(widgetTemplate, /data-masha-feedly-open-estimate-approved[\s\S]*?viewBox="0 0 512\.12 512\.12"[\s\S]*?data-masha-feedly-estimate-approved-count/);
+  assert.match(widgetTemplate, /<option value="estimate-pending">/);
+  assert.match(widgetTemplate, /<option value="estimate-approved">/);
+  assert.match(source, /estimatePendingButton\.hidden = !data\.canManageEstimate \|\| estimatePendingCount === 0/);
+  assert.match(source, /estimateApprovedButton\.hidden = !data\.canManageEstimate \|\| estimateApprovedCount === 0/);
+  assert.match(source, /estimatePendingButton\?\.addEventListener\('click', \(event\) => openList\('estimate-pending'/);
+  assert.match(source, /estimateApprovedButton\?\.addEventListener\('click', \(event\) => openList\('estimate-approved'/);
+  assert.match(source, /'estimate-pending': 'ESTIMATE_PENDING_BUTTON', 'estimate-approved': 'ESTIMATE_APPROVED_BUTTON'/);
+  assert.match(scss, /\.kw-masha-feedly__estimate-queue-button\[hidden\] \{ display: none !important; \}/);
+});
+
+test('hält das Kostenschätzungsfeld bis zur passenden Statusauswahl visuell verborgen', () => {
+  const hiddenRule = /\.kw-masha-feedly__estimate\[hidden\]\s*\{\s*display:\s*none\s*!important;?\s*\}/;
+  assert.match(scss, hiddenRule);
+  assert.match(compiledStyles, hiddenRule);
+});
+
 test('zeigt das Prioritätssymbol im Kopf des geöffneten Eintrags an', () => {
   assert.match(widgetTemplate, /data-masha-feedly-edit-priority role="img" aria-label="Priorität" hidden/);
   assert.match(widgetTemplate, /class="kw-masha-feedly__edit-header-actions"><span class="kw-masha-feedly__edit-priority" data-masha-feedly-edit-priority role="img" aria-label="Priorität" hidden><\/span><button type="button" class="kw-masha-feedly__entry-share"/);
@@ -1441,7 +1466,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
     unreadCount: entryIsUnread ? 1 : 0,
     unreadCommentCount: entryIsUnread ? 2 : 0,
     mineCount: 1,
-    categories: [{ id: 1, title: 'Backlog', isClosed: false }, { id: 4, title: 'Done', isClosed: true }, { id: 5, title: 'Archiv', isClosed: true }, { id: 6, title: 'Feedback', isClosed: false }],
+    categories: [{ id: 1, title: 'Backlog', isClosed: false }, { id: 4, title: 'Done', isClosed: true }, { id: 5, title: 'Archiv', isClosed: true }, { id: 6, title: 'Feedback', isClosed: false }, { id: 8, title: 'In Bearbeitung', systemKey: 'restricted_estimate', isClosed: false }],
     priorities: [{ id: 1, title: 'Sofort bearbeiten', iconType: 'warning' }, { id: 2, title: 'Zeitnah bearbeiten', iconType: 'warning' }, { id: 3, title: 'Normal', iconType: 'warning' }, { id: 4, title: 'Bei Gelegenheit', iconType: 'warning' }, { id: 5, title: 'Info', iconType: 'info' }],
     entries: (totalEntriesCount === 0 || (mode === 'unread' && !entryIsUnread)) ? [] : [{
       id: 71,
@@ -1529,6 +1554,7 @@ test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedbac
   assert.ok(widgetTemplate.indexOf('data-masha-feedly-open-closed') < widgetTemplate.indexOf('</div>', widgetTemplate.indexOf('data-masha-feedly-open-closed')), 'Der Button bleibt in der Aktionsgruppe des ersten Panels.');
   const env = createWidgetEnvironment();
   await env.listeners['kw-masha-feedly:opened']();
+  assert.equal(env.categoryFilter.options.some((option) => option.text === 'In Bearbeitung'), false, 'restricted estimate states do not become filter choices');
   assert.equal(env.openListButton.dataset.label, 'Gesamte Website');
   assert.equal(env.openPageListButton.dataset.label, 'Aktuelle Seite');
   assert.equal(env.feedbackButton.hidden, false);
@@ -1761,8 +1787,9 @@ test('sendet eine Kommentarreaktion an den geschützten Kommentar-Endpunkt und a
       { emoji: '😂', count: 0, selected: false },
       { emoji: '😢', count: 0, selected: false },
       { emoji: '😮', count: 0, selected: false },
-      { emoji: '🙏', count: 0, selected: false },
-    ],
+    { emoji: '🙏', count: 0, selected: false },
+  ],
+    history: [{ type: 'comment_reaction', oldValue: '', newValue: '👍', actor: 'Testmitglied', created: '2026-10-04T10:00:00Z' }],
   }) });
   await reactionButton.listeners.click();
   assert.equal(env.postCalls[0].url.pathname, '/__masha-feedly-comment');
@@ -1775,6 +1802,7 @@ test('sendet eine Kommentarreaktion an den geschützten Kommentar-Endpunkt und a
   assert.equal(env.commentList.children[0].children[3].children[0].children[0].children[1].textContent, '1');
   assert.equal(env.commentList.children[0].children[3].children[1].hidden, true, 'Nach dem Auswählen klappt die Emoji-Auswahl wieder zu.');
   assert.equal(env.commentStatus.textContent, 'Reaktion gespeichert.');
+  assert.equal(env.editHistory.children[0].children[0].textContent, 'Reaktion auf Kommentar geändert: Keine Reaktion → 👍');
 });
 
 test('markiert neue Kommentaraktivität sichtbar in der rechten Liste und beim Öffnen als gelesen', async () => {

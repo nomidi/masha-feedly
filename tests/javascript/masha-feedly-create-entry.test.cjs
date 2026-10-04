@@ -64,7 +64,7 @@ function createEnvironment(fetchImplementation = async () => ({
   ok: true,
   json: async () => ({ success: true, title: 'Button wird abgeschnitten', message: 'Eintrag gespeichert.' }),
 })) {
-  const widget = new TestElement('aside');
+  const widget = new TestElement('aside', { dataset: { canManageEstimate: '1', estimateHourlyRate: '120' } });
   const startButton = new TestElement('button');
   const banner = new TestElement('div'); banner.hidden = true;
   const modal = new TestElement('div'); modal.hidden = true;
@@ -84,7 +84,16 @@ function createEnvironment(fetchImplementation = async () => ({
   const pageURL = new TestElement('input');
   const selector = new TestElement('input');
   const selectedText = new TestElement('input');
+  const createCategory = new TestElement('select');
+  createCategory.selectedOptions = [{ dataset: { systemKey: 'backlog' } }];
+  const estimateDuration = new TestElement('input'); estimateDuration.name = 'EstimatedCostDuration'; estimateDuration.disabled = true;
+  const estimateNote = new TestElement('textarea'); estimateNote.name = 'EstimatedCostNote'; estimateNote.disabled = true;
+  const estimatePrice = new TestElement('output');
+  const estimateSection = new TestElement('section'); estimateSection.hidden = true;
+  estimateSection.fields = { '[data-masha-feedly-estimate-price]': estimatePrice };
   const form = new TestElement('form', { id: 'kw-masha-feedly-create-form', dataset: { createUrl: '/__masha-feedly/createEntry', similarUrl: '/__masha-feedly/findSimilarEntries', securityId: 'csrf-token' } });
+  // Native HTMLFormElement.elements is present even when the optional estimate fields are absent.
+  form.elements = { EstimatedCostDuration: estimateDuration, EstimatedCostNote: estimateNote };
   const similarSection = new TestElement('section'); similarSection.hidden = true;
   const similarResults = new TestElement('div');
   form.fields = {
@@ -93,6 +102,8 @@ function createEnvironment(fetchImplementation = async () => ({
     '[name="ElementText"]': selectedText,
     '[name="EntryDate"]': date,
     '[name="Content"]': content,
+    '[data-masha-feedly-create-category]': createCategory,
+    '[data-masha-feedly-create-estimate]': estimateSection,
     '[data-masha-feedly-similar]': similarSection,
     '[data-masha-feedly-similar-results]': similarResults,
   };
@@ -103,12 +114,14 @@ function createEnvironment(fetchImplementation = async () => ({
   };
   form.reset = () => { content.value = ''; };
   widget.children = [panel, column];
+  form.append(estimateSection);
   panel.children = [startButton, toggle, close, cancel, modal, form, banner, context, status, toast, toastMessage, dismissToast, similarSection, similarResults];
   const lookup = new Map([
     ['[data-masha-feedly-start-selection]', startButton],
     ['[data-masha-feedly-selection-banner]', banner],
     ['[data-masha-feedly-modal]', modal],
     ['[data-masha-feedly-entry-form]', form],
+    ['[data-masha-feedly-create-category]', createCategory],
     ['[data-masha-feedly-similar]', similarSection],
     ['[data-masha-feedly-similar-results]', similarResults],
     ['[data-masha-feedly-selected-context]', context],
@@ -180,8 +193,35 @@ function createEnvironment(fetchImplementation = async () => ({
   };
   vm.runInNewContext(source, contextObject);
   documentListeners.DOMContentLoaded();
-  return { widget, startButton, banner, modal, context, status, toast, toastMessage, dismissToast, panel, toggle, form, content, date, pageURL, selector, selectedText, submit, column, body, documentListeners, dispatchedEvents, calls, formData, similarSection, similarResults, window: contextObject.window };
+  return { widget, startButton, banner, modal, context, status, toast, toastMessage, dismissToast, panel, toggle, form, content, date, pageURL, selector, selectedText, submit, column, body, documentListeners, dispatchedEvents, calls, formData, similarSection, similarResults, createCategory, estimateSection, estimateDuration, estimateNote, estimatePrice, window: contextObject.window };
 }
+
+test('Kostenschätzungsformular erscheint nur für Berechtigte bei der Kategorie „Wartet auf Freigabe“', () => {
+  const env = createEnvironment();
+
+  assert.equal(env.estimateSection.hidden, true, 'Backlog zeigt das Schätzungsformular nicht.');
+  assert.equal(env.estimateDuration.disabled, true);
+  env.createCategory.selectedOptions = [{ dataset: { systemKey: 'estimate_approved' } }];
+  env.createCategory.listeners.change();
+  assert.equal(env.estimateSection.hidden, true, 'Auch ein anderer Schätzungsstatus zeigt kein Eingabeformular.');
+  env.createCategory.selectedOptions = [{ dataset: { systemKey: 'estimate_pending' } }];
+  env.createCategory.listeners.change();
+  assert.equal(env.estimateSection.hidden, false);
+  assert.equal(env.estimateDuration.disabled, false);
+  assert.equal(env.estimateNote.disabled, false);
+  env.createCategory.selectedOptions = [{ dataset: { systemKey: 'backlog' } }];
+  env.createCategory.listeners.change();
+  assert.equal(env.estimateSection.hidden, true, 'Beim Wechsel zurück aus der Freigabekategorie wird das Formular wieder verborgen.');
+  assert.equal(env.estimateDuration.disabled, true);
+  assert.equal(env.estimateNote.disabled, true);
+
+  env.widget.dataset.canManageEstimate = '0';
+  env.createCategory.selectedOptions = [{ dataset: { systemKey: 'estimate_pending' } }];
+  env.createCategory.listeners.change();
+  assert.equal(env.estimateSection.hidden, true, 'Ein nicht berechtigter CMS-Admin kann es auch bei passender Kategorie nicht einblenden.');
+  assert.equal(env.estimateDuration.disabled, true);
+  assert.equal(env.estimateNote.disabled, true);
+});
 
 test('erkennt Betriebssystem und Browser samt Version, Auflösung, Fenstergröße und Farbtiefe', () => {
   const env = createEnvironment();

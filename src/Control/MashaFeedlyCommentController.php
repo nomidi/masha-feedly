@@ -95,8 +95,10 @@ class MashaFeedlyCommentController extends Controller
             'MemberID' => (int)$member->ID,
         ]);
         $current = $existing->first();
+        $oldEmoji = $current ? (string)$current->Emoji : '';
         if ($current && (string)$current->Emoji === $emoji) {
             $current->delete();
+            $newEmoji = '';
         } else {
             foreach ($existing as $oldReaction) {
                 $oldReaction->delete();
@@ -106,12 +108,23 @@ class MashaFeedlyCommentController extends Controller
                 'MemberID' => (int)$member->ID,
                 'Emoji' => $emoji,
             ])->write();
+            $newEmoji = $emoji;
         }
+
+        MashaFeedlyEntryHistory::record(
+            $entry,
+            'comment_reaction',
+            $oldEmoji,
+            $newEmoji,
+            $member,
+            (int)$comment->ID
+        );
 
         return $this->respond([
             'success' => true,
             'commentID' => (int)$comment->ID,
             'reactions' => MashaFeedlyCommentReaction::summaryForComment($comment, $member),
+            'history' => MashaFeedlyEntryHistory::dataForEntry($entry),
         ]);
     }
 

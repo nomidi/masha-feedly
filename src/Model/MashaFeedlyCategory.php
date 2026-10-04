@@ -9,7 +9,10 @@ use SilverStripe\Forms\DropdownField;
 use SilverStripe\Forms\TextField;
 use SilverStripe\i18n\i18n;
 use SilverStripe\ORM\DataObject;
+use SilverStripe\ORM\DB;
+use SilverStripe\ORM\Connect\DatabaseException;
 use SilverStripe\Core\Validation\ValidationResult;
+use SilverStripe\SiteConfig\SiteConfig;
 
 /**
  * Bearbeitbare GTD-Kategorie für Masha-Feedly-Einträge.
@@ -104,6 +107,81 @@ class MashaFeedlyCategory extends DataObject
                 $category->write();
             }
         }
+
+        foreach (array_column($categories, 0) as $key) {
+            self::collapseDuplicateRoleCategories($key);
+        }
+
+        self::ensureEstimateCategoriesOnce();
+        self::collapseDuplicateRoleCategories('estimate_pending');
+        self::collapseDuplicateRoleCategories('estimate_approved');
+    }
+
+    /** Führt versehentlich doppelt angelegte Systemkategorien zusammen und erhält ihre Einträge. */
+    private static function collapseDuplicateRoleCategories(string $key): void
+    {
+        $duplicates = self::get()->filter('SystemKey', $key)->sort('ID ASC')->toArray();
+        if (count($duplicates) < 2) {
+            return;
+        }
+
+        // Die älteste Kategorie behält ihren Namen und ihre Identität.
+        $canonical = array_shift($duplicates);
+
+        foreach ($duplicates as $duplicate) {
+            $entryTable = DB::get_conn()->escapeIdentifier(DataObject::getSchema()->tableName(MashaFeedlyEntry::class));
+            $categoryField = DB::get_conn()->escapeIdentifier('CategoryID');
+            DB::prepared_query(
+                "UPDATE {$entryTable} SET {$categoryField} = ? WHERE {$categoryField} = ?",
+                [(int)$canonical->ID, (int)$duplicate->ID]
+            );
+            $duplicate->delete();
+        }
+    }
+
+    /** Ergänzt optionale Freigabekategorien einmalig, ohne später gelöschte Kategorien neu anzulegen. */
+    private static function ensureEstimateCategoriesOnce(): void
+    {
+        // Während dev/build werden requireDefaultRecords teils ausgeführt,
+        // bevor die SiteConfig-Erweiterungsspalten in der Datenbank existieren.
+        if (!DB::get_schema()->hasField('SiteConfig', 'MashaFeedlyEstimateCategoriesSeeded')) {
+            return;
+        }
+        try {
+            $config = SiteConfig::get()->first();
+        } catch (DatabaseException $exception) {
+            // Ein laufender dev/build kann die neue SiteConfig-Spalte erst nach
+            // requireDefaultRecords anlegen. In diesem Durchlauf später erneut versuchen.
+            return;
+        }
+        if (!$config || (bool)$config->MashaFeedlyEstimateCategoriesSeeded) {
+            return;
+        }
+
+        foreach ([
+            ['estimate_pending', 'Kostenschätzung wartet auf Freigabe', 70],
+            ['estimate_approved', 'Kostenschätzung freigegeben', 80],
+        ] as [$key, $title, $sort]) {
+            $category = self::get()->filter('SystemKey', $key)->first()
+                ?? self::get()->filter(['Title' => $title, 'SystemKey' => ''])->first();
+            if ($category) {
+                if ((string)$category->SystemKey === '') {
+                    $category->SystemKey = $key;
+                    $category->Sort = $sort;
+                    $category->write();
+                }
+                continue;
+            }
+            self::create([
+                'Title' => $title,
+                'SystemKey' => $key,
+                'Sort' => $sort,
+                'IsClosed' => false,
+            ])->write();
+        }
+
+        $config->MashaFeedlyEstimateCategoriesSeeded = true;
+        $config->write();
     }
 
     /** Legt die Standardkategorien beim Datenbankaufbau an. */
@@ -152,6 +230,8 @@ class MashaFeedlyCategory extends DataObject
             'done' => i18n::_t('KW\\MashaFeedly\\Translations.CATEGORY_ROLE_DONE', 'Erledigt (erforderlich)'),
             'feedback' => i18n::_t('KW\\MashaFeedly\\Translations.CATEGORY_ROLE_FEEDBACK', 'Wartet auf Freigabe (erforderlich)'),
             'archive' => i18n::_t('KW\\MashaFeedly\\Translations.CATEGORY_ROLE_ARCHIVE', 'Archiv'),
+            'estimate_pending' => i18n::_t('KW\\MashaFeedly\\Translations.CATEGORY_ROLE_ESTIMATE_PENDING', 'Kostenschätzung wartet auf Freigabe (optional)'),
+            'estimate_approved' => i18n::_t('KW\\MashaFeedly\\Translations.CATEGORY_ROLE_ESTIMATE_APPROVED', 'Kostenschätzung freigegeben (optional)'),
         ];
     }
 
@@ -171,7 +251,7 @@ class MashaFeedlyCategory extends DataObject
         }
         if (in_array($role, ['done', 'archive'], true)) {
             $this->IsClosed = true;
-        } elseif (in_array($role, ['backlog', 'todo', 'doing', 'feedback'], true)) {
+        } elseif (in_array($role, ['backlog', 'todo', 'doing', 'feedback', 'estimate_pending', 'estimate_approved'], true)) {
             $this->IsClosed = false;
         }
         parent::onBeforeWrite();

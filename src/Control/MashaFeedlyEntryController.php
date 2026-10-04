@@ -14,6 +14,7 @@ use KW\MashaFeedly\Model\MashaFeedlyEntryRelation;
 use KW\MashaFeedly\Model\MashaFeedlyPriority;
 use KW\MashaFeedly\Model\MashaFeedlySavedView;
 use KW\MashaFeedly\Service\MashaFeedlyAttachmentService;
+use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
 use SilverStripe\Control\Controller;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse;
@@ -256,8 +257,31 @@ class MashaFeedlyEntryController extends Controller
         if (!$category) {
             return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'INVALID_STATUS_SIE' : 'INVALID_STATUS_DU', 'Bitte wähle einen gültigen Status.')], 400);
         }
+        if (in_array((string)$category->SystemKey, ['estimate_pending', 'estimate_approved'], true)
+            && !MashaFeedlyEntry::canManageEstimate($member)
+        ) {
+            return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_FORBIDDEN', 'Du darfst Kostenschätzungen nicht bearbeiten.')], 403);
+        }
         $sentToFeedback = false;
         $previousCategoryKey = (string)$entry->Category()->SystemKey;
+        if (in_array($previousCategoryKey, ['estimate_pending', 'estimate_approved'], true)
+            && !MashaFeedlyEntry::canManageEstimate($member)
+        ) {
+            return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_FORBIDDEN', 'Du darfst Kostenschätzungen nicht bearbeiten.')], 403);
+        }
+        if ($previousCategoryKey === 'estimate_pending'
+            && !in_array((string)$category->SystemKey, ['estimate_pending', 'estimate_approved'], true)
+        ) {
+            return $this->respond(['success' => false, 'message' => $this->translate(
+                'ESTIMATE_APPROVAL_REQUIRED',
+                'Dieser Eintrag wartet auf die Freigabe der Kostenschätzung. Er kann nur in „Kostenschätzung freigegeben“ verschoben werden.'
+            )], 409);
+        }
+        if ((string)$category->SystemKey === 'estimate_approved'
+            && ($previousCategoryKey !== 'estimate_pending' || trim((string)$entry->EstimatedCostDuration) === '')
+        ) {
+            return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_APPROVAL_REQUIRED', 'Eine Freigabe kann nur für eine vorhandene Kostenschätzung erfolgen.')], 409);
+        }
         $wasWaitingForFeedback = $previousCategoryKey === 'feedback';
         $wasAlreadyClosed = (bool)$entry->Category()->IsClosed;
         $creatorMemberID = $entry->creatorMemberID();
@@ -289,17 +313,47 @@ class MashaFeedlyEntryController extends Controller
             }
             $entry->DueDate = $dueDate !== '' ? $dueDate : null;
         }
+        $estimateInputPresent = $request->postVar('EstimatedCostDuration') !== null
+            || $request->postVar('EstimatedCostNote') !== null;
+        if ($estimateInputPresent) {
+            if (!MashaFeedlyEntry::canManageEstimate($member)) {
+                return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_FORBIDDEN', 'Du darfst Kostenschätzungen nicht bearbeiten.')], 403);
+            }
+            if ((string)$category->SystemKey !== 'estimate_pending') {
+                return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_ONLY_WHILE_PENDING', 'Eine Kostenschätzung kann nur bearbeitet werden, solange sie aussteht.')], 409);
+            }
+            if (MashaFeedlyConfigExtension::hourlyRate() <= 0) {
+                return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_RATE_REQUIRED', 'Der Stundensatz muss zuerst in den Masha:Feedly-Einstellungen hinterlegt werden.')], 400);
+            }
+            $duration = trim((string)$request->postVar('EstimatedCostDuration'));
+            $note = trim((string)$request->postVar('EstimatedCostNote'));
+            $calculated = MashaFeedlyEntry::calculateEstimate($duration, MashaFeedlyConfigExtension::hourlyRate());
+            if (!$calculated || mb_strlen($duration) > 80 || mb_strlen($note) > 2000) {
+                return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_INVALID', 'Bitte prüfe Dauer und Erläuterung der Kostenschätzung.')], 400);
+            }
+            $entry->EstimatedCostDuration = $duration;
+            $entry->EstimatedCostAmount = $calculated['minimum'];
+            $entry->EstimatedCostAmountMax = $calculated['maximum'];
+            $entry->EstimatedCostCurrency = 'EUR';
+            $entry->EstimatedCostNote = $note;
+        }
+        if ((string)$category->SystemKey === 'estimate_pending' && trim((string)$entry->EstimatedCostDuration) === '') {
+            return $this->respond(['success' => false, 'message' => $this->translate(
+                'ESTIMATE_AMOUNT_REQUIRED',
+                'Gib zuerst eine gültige geschätzte Dauer ein, bevor du die Freigabe anforderst.'
+            )], 400);
+        }
         $newAttachments = MashaFeedlyAttachmentService::attachUploads($uploads, $entry);
         $this->recordAttachmentHistory($entry, $newAttachments, $member);
         $oldAssigneeIDs = array_map('intval', $entry->AssignedMembers()->column('ID'));
         $oldAssigneeNames = $this->memberNames($oldAssigneeIDs);
-        $entry->CategoryID = (int)$category->ID;
-        $entry->PriorityID = (int)$priority->ID;
-        $entry->write();
         $assignedIDs = MashaFeedlyConfigExtension::normalizeMemberIDs((array)$request->postVar('AssignedMemberIDs'));
         $allowedIDs = MashaFeedlyConfigExtension::memberIDs();
         $newAssigneeIDs = array_values(array_intersect($assignedIDs, $allowedIDs));
+        $entry->CategoryID = (int)$category->ID;
+        $entry->PriorityID = (int)$priority->ID;
         $entry->AssignedMembers()->setByIDList($newAssigneeIDs);
+        $entry->write();
         $oldRelations = $this->relationsSignature($entry);
         $relationType = (string)$request->postVar('RelationType');
         if (!in_array($relationType, ['blocked_by', 'duplicate_of', 'related'], true)) {
@@ -379,7 +433,10 @@ class MashaFeedlyEntryController extends Controller
             'message' => $message,
             'closedDuplicateCount' => $closedDuplicateCount,
             'categoryID' => (int)$entry->CategoryID,
-            'categoryTitle' => (string)$entry->Category()->Title,
+            'categoryTitle' => $this->visibleCategoryTitle($entry, $member),
+            'categoryRole' => $this->visibleCategoryRole($entry, $member),
+            ...(MashaFeedlyEntry::canManageEstimate($member) ? $this->estimatePayload($entry) : []),
+            'canManageEstimate' => MashaFeedlyEntry::canManageEstimate($member),
             'categoryIsClosed' => (bool)$entry->Category()->IsClosed,
             'celebrateCompletion' => (string)$entry->Category()->SystemKey === 'done'
                 && !$wasAlreadyClosed
@@ -397,7 +454,7 @@ class MashaFeedlyEntryController extends Controller
                     'url' => $file && $file->exists() ? (string)$file->getURL() : '',
                 ];
             }, $entry->Attachments()->toArray()),
-            'history' => MashaFeedlyEntryHistory::dataForEntry($entry),
+            'history' => $this->historyForMember($entry, $member),
             'relations' => $this->relationsData($entry),
         ]);
     }
@@ -444,7 +501,7 @@ class MashaFeedlyEntryController extends Controller
                 'id' => (int)$candidate->ID,
                 'title' => (string)$candidate->Title,
                 'content' => mb_strimwidth($candidateText, 0, 180, '…'),
-                'categoryTitle' => (string)$candidate->Category()->Title,
+                'categoryTitle' => $this->visibleCategoryTitle($candidate, $member),
                 'priorityTitle' => (string)$candidate->Priority()->Title,
                 'priorityColor' => (string)$candidate->Priority()->Color,
                 'score' => $score,
@@ -478,10 +535,16 @@ class MashaFeedlyEntryController extends Controller
         $openCategoryIDs = [];
         foreach (MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC') as $category) {
             $isClosed = (bool)$category->IsClosed;
+            $estimateRole = in_array((string)$category->SystemKey, ['estimate_pending', 'estimate_approved'], true);
             $categories[] = [
                 'id' => (int)$category->ID,
-                'title' => (string)$category->Title,
+                'title' => $estimateRole && !MashaFeedlyEntry::canManageEstimate($member)
+                    ? $this->translate('ESTIMATE_HIDDEN_CATEGORY', 'In Bearbeitung')
+                    : (string)$category->Title,
                 'isClosed' => $isClosed,
+                'systemKey' => $estimateRole && !MashaFeedlyEntry::canManageEstimate($member)
+                    ? 'restricted_estimate'
+                    : (string)$category->SystemKey,
             ];
             if ($isClosed) {
                 $closedCategoryIDs[] = (int)$category->ID;
@@ -494,7 +557,11 @@ class MashaFeedlyEntryController extends Controller
             : MashaFeedlyEntry::get()->filter('ID', 0);
         $unreadEntryIDs = MashaFeedlyEntryRead::unreadEntryIDs($member);
         $requestedMode = (string)$request->getVar('mode');
-        $mode = in_array($requestedMode, ['all', 'open', 'closed', 'page', 'page-open', 'mine', 'feedback', 'unread'], true) ? $requestedMode : 'page';
+        $estimateModes = ['estimate-pending', 'estimate-approved'];
+        if (in_array($requestedMode, $estimateModes, true) && !MashaFeedlyEntry::canManageEstimate($member)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_FORBIDDEN', 'Du darfst Kostenschätzungen nicht ansehen.')], 403);
+        }
+        $mode = in_array($requestedMode, ['all', 'open', 'closed', 'page', 'page-open', 'mine', 'feedback', 'unread', ...$estimateModes], true) ? $requestedMode : 'page';
         $entries = match ($mode) {
             'all' => $allEntries,
             'open' => $openCategoryIDs
@@ -507,6 +574,12 @@ class MashaFeedlyEntryController extends Controller
             'page-open' => $pageOpenEntries,
             'feedback' => ($feedbackCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first())
                 ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$feedbackCategory->ID)
+                : MashaFeedlyEntry::get()->filter('ID', 0),
+            'estimate-pending' => ($estimatePendingCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_pending')->first())
+                ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimatePendingCategory->ID)
+                : MashaFeedlyEntry::get()->filter('ID', 0),
+            'estimate-approved' => ($estimateApprovedCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_approved')->first())
+                ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimateApprovedCategory->ID)
                 : MashaFeedlyEntry::get()->filter('ID', 0),
             'unread' => MashaFeedlyEntry::get()->filter('ID', $unreadEntryIDs ?: [0]),
             default => $pageEntries,
@@ -524,6 +597,14 @@ class MashaFeedlyEntryController extends Controller
         $feedbackCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first();
         $feedbackCount = $feedbackCategory && !(bool)$feedbackCategory->IsClosed
             ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$feedbackCategory->ID)->count()
+            : 0;
+        $estimatePendingCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_pending')->first();
+        $estimateApprovedCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_approved')->first();
+        $estimatePendingCount = MashaFeedlyEntry::canManageEstimate($member) && $estimatePendingCategory
+            ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimatePendingCategory->ID)->count()
+            : 0;
+        $estimateApprovedCount = MashaFeedlyEntry::canManageEstimate($member) && $estimateApprovedCategory
+            ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimateApprovedCategory->ID)->count()
             : 0;
         $pageEntryIDs = array_fill_keys(array_map('intval', $pageEntries->column('ID')), true);
         foreach ($allEntries as $entry) {
@@ -545,10 +626,14 @@ class MashaFeedlyEntryController extends Controller
             'mineCount' => (int)$mineEntries->count(),
             'openCount' => $openCount,
             'feedbackCount' => $feedbackCount,
+            'estimatePendingCount' => $estimatePendingCount,
+            'estimateApprovedCount' => $estimateApprovedCount,
             'unreadCount' => $activityCounts['entries'],
             'unreadCommentCount' => $activityCounts['comments'],
             'pageOpenCount' => $pageOpenCount,
             'categories' => $categories,
+            'canManageEstimate' => MashaFeedlyEntry::canManageEstimate($member),
+            'estimateHourlyRate' => MashaFeedlyEntry::canManageEstimate($member) ? MashaFeedlyConfigExtension::hourlyRate() : null,
             'priorities' => array_map(static fn(MashaFeedlyPriority $priority): array => [
                 'id' => (int)$priority->ID,
                 'title' => (string)$priority->Title,
@@ -589,6 +674,29 @@ class MashaFeedlyEntryController extends Controller
         MashaFeedlyPriority::ensureDefaultPriorities();
         $category = MashaFeedlyCategory::get()->byID((int)$request->postVar('CategoryID'))
             ?? MashaFeedlyCategory::defaultCategory();
+        if ((string)$category->SystemKey === 'estimate_approved') {
+            return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_APPROVAL_REQUIRED', 'Eine Freigabe kann nur für eine vorhandene Kostenschätzung erfolgen.')], 409);
+        }
+        if ((string)$category->SystemKey === 'estimate_pending' && !MashaFeedlyEntry::canManageEstimate($member)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_FORBIDDEN', 'Du darfst Kostenschätzungen nicht bearbeiten.')], 403);
+        }
+        $estimateDuration = '';
+        $estimateAmounts = null;
+        $estimateNote = '';
+        if ((string)$category->SystemKey === 'estimate_pending') {
+            if (!MashaFeedlyEntry::canManageEstimate($member)) {
+                return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_FORBIDDEN', 'Du darfst Kostenschätzungen nicht bearbeiten.')], 403);
+            }
+            if (MashaFeedlyConfigExtension::hourlyRate() <= 0) {
+                return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_RATE_REQUIRED', 'Der Stundensatz muss zuerst in den Masha:Feedly-Einstellungen hinterlegt werden.')], 400);
+            }
+            $estimateDuration = trim((string)$request->postVar('EstimatedCostDuration'));
+            $estimateNote = trim((string)$request->postVar('EstimatedCostNote'));
+            $estimateAmounts = MashaFeedlyEntry::calculateEstimate($estimateDuration, MashaFeedlyConfigExtension::hourlyRate());
+            if (!$estimateAmounts || mb_strlen($estimateDuration) > 80 || mb_strlen($estimateNote) > 2000) {
+                return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_AMOUNT_REQUIRED', 'Bitte gib eine gültige Dauer für die Kostenschätzung ein.')], 400);
+            }
+        }
         $entry = MashaFeedlyEntry::create();
         $entry->Content = nl2br(htmlspecialchars($content, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
         $entry->CategoryID = (int)$category->ID;
@@ -603,6 +711,13 @@ class MashaFeedlyEntryController extends Controller
             return $this->respond(['success' => false, 'message' => $this->translate('INVALID_DUE_DATE', 'Bitte prüfe den Fälligkeitstermin.')], 400);
         }
         $entry->DueDate = $postedDueDate !== '' ? $postedDueDate : null;
+        if ($estimateAmounts) {
+            $entry->EstimatedCostDuration = $estimateDuration;
+            $entry->EstimatedCostAmount = $estimateAmounts['minimum'];
+            $entry->EstimatedCostAmountMax = $estimateAmounts['maximum'];
+            $entry->EstimatedCostCurrency = 'EUR';
+            $entry->EstimatedCostNote = $estimateNote;
+        }
         $entry->PageURL = $this->safePageURL((string)$request->postVar('PageURL'));
         $entry->ElementSelector = mb_substr(trim((string)$request->postVar('ElementSelector')), 0, 512);
         $entry->ElementText = mb_substr(trim((string)$request->postVar('ElementText')), 0, 5000);
@@ -630,6 +745,9 @@ class MashaFeedlyEntryController extends Controller
         $assignedIDs = MashaFeedlyConfigExtension::normalizeMemberIDs((array)$request->postVar('AssignedMemberIDs'));
         $allowedIDs = MashaFeedlyConfigExtension::memberIDs();
         $entry->AssignedMembers()->setByIDList(array_values(array_intersect($assignedIDs, $allowedIDs)));
+        if ((string)$category->SystemKey === 'estimate_pending') {
+            MashaFeedlyNotificationService::notifyCostEstimateRequested($entry);
+        }
 
         return $this->respond([
             'success' => true,
@@ -637,6 +755,7 @@ class MashaFeedlyEntryController extends Controller
             'title' => $entry->Title,
             'entryID' => (int)$entry->ID,
             'dueDate' => (string)$entry->DueDate,
+            ...(MashaFeedlyEntry::canManageEstimate($member) ? $this->estimatePayload($entry) : []),
             'attachments' => array_map(static function ($attachment): array {
                 $file = $attachment->File();
                 return [
@@ -645,7 +764,7 @@ class MashaFeedlyEntryController extends Controller
                     'url' => $file && $file->exists() ? (string)$file->getURL() : '',
                 ];
             }, $attachments),
-            'history' => MashaFeedlyEntryHistory::dataForEntry($entry),
+            'history' => $this->historyForMember($entry, $member),
         ]);
     }
 
@@ -657,6 +776,60 @@ class MashaFeedlyEntryController extends Controller
         return $date !== false
             && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))
             && $date->format('Y-m-d') === $value;
+    }
+
+    /** Schätzungsbeträge werden ausschließlich an freigegebene Schätzungsmanager ausgegeben. */
+    private function estimatePayload(MashaFeedlyEntry $entry): array
+    {
+        return [
+            'estimateAmount' => (string)$entry->EstimatedCostAmount,
+            'estimateAmountMax' => (string)$entry->EstimatedCostAmountMax,
+            'estimateDuration' => (string)$entry->EstimatedCostDuration,
+            'estimateCurrency' => (string)($entry->EstimatedCostCurrency ?: 'EUR'),
+            'estimateNote' => (string)$entry->EstimatedCostNote,
+        ];
+    }
+
+    private function visibleCategoryTitle(MashaFeedlyEntry $entry, Member $member): string
+    {
+        return $this->isEstimateCategory($entry) && !MashaFeedlyEntry::canManageEstimate($member)
+            ? $this->translate('ESTIMATE_HIDDEN_CATEGORY', 'In Bearbeitung')
+            : (string)$entry->Category()->Title;
+    }
+
+    private function visibleCategoryRole(MashaFeedlyEntry $entry, Member $member): string
+    {
+        return $this->isEstimateCategory($entry) && !MashaFeedlyEntry::canManageEstimate($member)
+            ? 'restricted_estimate'
+            : (string)$entry->Category()->SystemKey;
+    }
+
+    private function isEstimateCategory(MashaFeedlyEntry $entry): bool
+    {
+        return in_array((string)$entry->Category()->SystemKey, ['estimate_pending', 'estimate_approved'], true);
+    }
+
+    /** Blendet Änderungsdetails aus dem Verlauf für nicht berechtigte Personen aus. */
+    private function historyForMember(MashaFeedlyEntry $entry, Member $member): array
+    {
+        $history = MashaFeedlyEntryHistory::dataForEntry($entry);
+        if (MashaFeedlyEntry::canManageEstimate($member)) {
+            return $history;
+        }
+        $estimateCategoryTitles = array_fill_keys(
+            MashaFeedlyCategory::get()->filter('SystemKey', ['estimate_pending', 'estimate_approved'])->column('Title'),
+            true
+        );
+        return array_values(array_filter($history, static function (array $item) use ($estimateCategoryTitles): bool {
+            if ($item['type'] === 'estimate') {
+                return false;
+            }
+            if ($item['type'] === 'category'
+                && (isset($estimateCategoryTitles[$item['oldValue']]) || isset($estimateCategoryTitles[$item['newValue']]))) {
+                return false;
+            }
+            return true;
+        }));
     }
 
     /** Vereinheitlicht Seitenadressen ohne Query und Fragment für zuverlässige Seitenfilter. */
@@ -834,7 +1007,10 @@ class MashaFeedlyEntryController extends Controller
                 ];
             }, $entry->Attachments()->toArray()),
             'categoryID' => (int)$entry->CategoryID,
-            'categoryTitle' => (string)$entry->Category()->Title,
+            'categoryTitle' => $this->visibleCategoryTitle($entry, $currentMember),
+            'categoryRole' => $this->visibleCategoryRole($entry, $currentMember),
+            ...(MashaFeedlyEntry::canManageEstimate($currentMember) ? $this->estimatePayload($entry) : []),
+            'canManageEstimate' => MashaFeedlyEntry::canManageEstimate($currentMember),
             'sort' => (int)$entry->Sort,
             'priorityID' => (int)$entry->PriorityID,
             'priorityTitle' => (string)$entry->Priority()->Title,
@@ -844,7 +1020,7 @@ class MashaFeedlyEntryController extends Controller
             'assignees' => $assignees,
             'assignedMemberIDs' => $assigneeIDs,
             'comments' => array_map(fn (MashaFeedlyComment $comment): array => $this->commentData($comment, $currentMember), $entry->Comments()->filter('IsApproved', true)->sort('Created ASC')->toArray()),
-            'history' => $history,
+            'history' => $this->historyForMember($entry, $currentMember),
             'relations' => $this->relationsData($entry),
         ];
     }

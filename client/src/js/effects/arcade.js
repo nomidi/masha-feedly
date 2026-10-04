@@ -30,7 +30,7 @@
     }
     const message = document.createElement('strong');
     message.className = 'kw-masha-feedly__arcade-message';
-    message.textContent = '8-BIT!';
+    message.textContent = 'MISSION COMPLETE!';
     screen.append(message);
     layer.append(screen);
     document.body.append(layer);

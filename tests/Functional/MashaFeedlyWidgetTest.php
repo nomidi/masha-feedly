@@ -3,6 +3,8 @@
 namespace KW\MashaFeedly\Tests\Functional;
 
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
+use KW\MashaFeedly\Model\MashaFeedlyEntry;
+use SilverStripe\Core\Config\Config;
 use SilverStripe\Dev\FunctionalTest;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Security\Member;
@@ -238,6 +240,35 @@ class MashaFeedlyWidgetTest extends FunctionalTest
             (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Berlin')))->format('Y-m-d'),
             (string)$reloadedConfig->MashaFeedlyDueDateReminderLastRunDate
         );
+    }
+
+    /** Das Frontend rendert Kostenschätzungsfelder nur für den Betreiberzugang; die Kategorie wird im Formular dynamisch geprüft. */
+    public function testEstimateFormMarkupIsLimitedToConfiguredSuperAdmin(): void
+    {
+        $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
+        $page->publishRecursive();
+        $this->logInWithPermission('ADMIN');
+        $superAdmin = \SilverStripe\Security\Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $superAdmin);
+        $superAdmin->Email = 'super-admin@example.test';
+        $superAdmin->write();
+
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$superAdmin->Email]);
+        $superAdminResponse = $this->get('/masha-feedly-widget-test');
+        $this->assertSame(200, $superAdminResponse->getStatusCode());
+        $superAdminMarkup = $this->widgetMarkup($superAdminResponse->getBody());
+        $this->assertStringContainsString('data-can-manage-estimate="1"', $superAdminMarkup);
+        $this->assertStringContainsString('data-masha-feedly-create-estimate hidden', $superAdminMarkup);
+        $this->assertStringContainsString('data-system-key="estimate_pending"', $superAdminMarkup);
+
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['someone-else@example.test']);
+        $ordinaryAdminResponse = $this->get('/masha-feedly-widget-test');
+        $this->assertSame(200, $ordinaryAdminResponse->getStatusCode());
+        $ordinaryAdminMarkup = $this->widgetMarkup($ordinaryAdminResponse->getBody());
+        $this->assertStringContainsString('data-can-manage-estimate="0"', $ordinaryAdminMarkup);
+        $this->assertStringNotContainsString('data-masha-feedly-create-estimate', $ordinaryAdminMarkup);
+        $this->assertStringNotContainsString('name="EstimatedCostDuration"', $ordinaryAdminMarkup);
+        $this->assertStringNotContainsString('name="EstimatedCostNote"', $ordinaryAdminMarkup);
     }
 
     /** Admins behalten das Widget, erhalten die geführte Einführung aber erst nach expliziter Freigabe. */

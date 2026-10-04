@@ -334,7 +334,7 @@ window.KWMashaFeedlyEntries = (() => {
     container.replaceChildren();
     (history || []).forEach((item) => {
       const row = document.createElement('li');
-      row.className = `kw-masha-feedly__history-item is-${['status', 'priority', 'relations', 'reported_by'].includes(item.type) ? (item.type === 'reported_by' ? 'reported-by' : item.type) : item.type === 'due_date' ? 'due-date' : 'assignees'}`;
+      row.className = `kw-masha-feedly__history-item is-${['status', 'priority', 'relations', 'reported_by', 'comment_reaction'].includes(item.type) ? (item.type === 'reported_by' ? 'reported-by' : item.type) : item.type === 'due_date' ? 'due-date' : 'assignees'}`;
       const change = document.createElement('p');
       const historyText = {
         status: () => t('HISTORY_STATUS_CHANGE', { oldValue: item.oldValue, newValue: item.newValue }),
@@ -345,9 +345,11 @@ window.KWMashaFeedlyEntries = (() => {
         attachment: () => t('HISTORY_ATTACHMENT', { text: item.newValue }),
         comment_edited: () => t('HISTORY_COMMENT_EDITED', { oldValue: item.oldValue, newValue: item.newValue }),
         comment_deleted: () => t('HISTORY_COMMENT_DELETED', { text: item.oldValue }),
+        comment_reaction: () => t('HISTORY_COMMENT_REACTION', { oldValue: item.oldValue || t('HISTORY_NO_REACTION'), newValue: item.newValue || t('HISTORY_NO_REACTION') }),
         assignees: () => t('HISTORY_ASSIGNEES_CHANGE', { oldValue: item.oldValue || t('HISTORY_NOBODY'), newValue: item.newValue || t('HISTORY_NOBODY') }),
         relations: () => t('HISTORY_RELATIONS_CHANGE', { oldValue: item.oldValue || t('HISTORY_NO_RELATIONS'), newValue: item.newValue || t('HISTORY_NO_RELATIONS') }),
         reported_by: () => t('HISTORY_REPORTED_BY', { oldValue: item.oldValue, newValue: item.newValue }),
+        estimate: () => t('HISTORY_ESTIMATE_CHANGE', { oldValue: item.oldValue, newValue: item.newValue }),
       }[item.type] || (() => t('HISTORY_ASSIGNEES_CHANGE', { oldValue: item.oldValue || t('HISTORY_NOBODY'), newValue: item.newValue || t('HISTORY_NOBODY') }));
       change.textContent = historyText();
       const meta = document.createElement('small');
@@ -448,6 +450,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const closedCountDisplay = widget.querySelector('[data-masha-feedly-closed-count]');
   const feedbackButton = widget.querySelector('[data-masha-feedly-open-feedback]');
   const feedbackCountDisplay = widget.querySelector('[data-masha-feedly-feedback-count]');
+  const estimatePendingButton = widget.querySelector('[data-masha-feedly-open-estimate-pending]');
+  const estimatePendingCountDisplay = widget.querySelector('[data-masha-feedly-estimate-pending-count]');
+  const estimateApprovedButton = widget.querySelector('[data-masha-feedly-open-estimate-approved]');
+  const estimateApprovedCountDisplay = widget.querySelector('[data-masha-feedly-estimate-approved-count]');
   const unreadCountDisplay = widget.querySelector('[data-masha-feedly-unread-count]');
   const newsSummary = widget.querySelector('[data-masha-feedly-news-summary]');
   const openListButton = widget.querySelector('[data-masha-feedly-open-list]');
@@ -500,6 +506,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const editAttachments = widget.querySelector('[data-masha-feedly-edit-attachments]');
   const editEnvironment = widget.querySelector('[data-masha-feedly-edit-environment]');
   const editEnvironmentDetails = widget.querySelector('[data-masha-feedly-edit-environment-details]');
+  const estimateSection = widget.querySelector('[data-masha-feedly-estimate]');
+  const estimateFields = widget.querySelector('[data-masha-feedly-estimate-fields]');
+  const estimateSummary = widget.querySelector('[data-masha-feedly-estimate-summary]');
+  const estimateReadonly = widget.querySelector('[data-masha-feedly-estimate-readonly]');
+  const estimateState = widget.querySelector('[data-masha-feedly-estimate-state]');
+  const estimateLock = widget.querySelector('[data-masha-feedly-estimate-lock]');
+  const estimatePrice = estimateSection?.querySelector('[data-masha-feedly-estimate-price]');
   const relationType = widget.querySelector('[data-masha-feedly-relation-type]');
   const relatedEntries = widget.querySelector('[data-masha-feedly-related-entries]');
   const relationSearch = widget.querySelector('[data-masha-feedly-relation-search]');
@@ -528,6 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modeLabels = {
       unread: 'FILTER_UNREAD', open: 'FILTER_OPEN', 'page-open': 'FILTER_PAGE_OPEN',
       feedback: 'FILTER_FEEDBACK', closed: 'FILTER_CLOSED', all: 'FILTER_ALL', page: 'FILTER_PAGE', mine: 'FILTER_MINE',
+      'estimate-pending': 'ESTIMATE_PENDING_BUTTON', 'estimate-approved': 'ESTIMATE_APPROVED_BUTTON',
     };
     const active = [];
     if (modeField?.value && modeField.value !== 'page') {
@@ -687,6 +701,66 @@ document.addEventListener('DOMContentLoaded', () => {
     editPriorityIcon.hidden = false;
   };
 
+  const renderEstimate = (entry = activeEntry) => {
+    if (!estimateSection || !entry || !editForm) return;
+    const categoryID = editForm.elements.CategoryID?.value || entry.categoryID;
+    const category = categories.find((item) => String(item.id) === String(categoryID));
+    const role = category?.systemKey || entry.categoryRole || '';
+    const relevant = ['estimate_pending', 'estimate_approved'].includes(role);
+    estimateSection.hidden = !relevant;
+    if (!relevant) return;
+    const transitionLocked = entry.categoryRole === 'estimate_pending';
+    [...editForm.elements.CategoryID.options].forEach((option) => {
+      const optionRole = categories.find((item) => String(item.id) === option.value)?.systemKey || '';
+      option.disabled = (transitionLocked && !['estimate_pending', 'estimate_approved'].includes(optionRole))
+        || (optionRole === 'estimate_pending' && !entry.canManageEstimate);
+    });
+    estimateLock.hidden = !transitionLocked;
+    const canEdit = Boolean(entry.canManageEstimate) && role === 'estimate_pending';
+    const hasEstimate = Boolean(entry.estimateDuration);
+    const amount = entry.estimateAmount
+      ? (entry.estimateAmountMax && entry.estimateAmountMax !== entry.estimateAmount
+        ? `${entry.estimateAmount}–${entry.estimateAmountMax} €`
+        : `${entry.estimateAmount} €`)
+      : t('ESTIMATE_NOT_ENTERED');
+    estimateState.textContent = t(role === 'estimate_approved'
+      ? 'ESTIMATE_APPROVED'
+      : (role === 'estimate_pending' ? 'ESTIMATE_PENDING' : 'ESTIMATE_TITLE'));
+    estimateFields.hidden = !canEdit;
+    ['EstimatedCostDuration', 'EstimatedCostNote'].forEach((fieldName) => {
+      if (editForm.elements[fieldName]) editForm.elements[fieldName].disabled = !canEdit;
+    });
+    estimateReadonly.hidden = canEdit || role !== 'estimate_pending';
+    estimateSummary.hidden = canEdit || !hasEstimate;
+    estimateSummary.textContent = hasEstimate
+      ? `${entry.estimateDuration} · ${amount}${entry.estimateNote ? ` · ${entry.estimateNote}` : ''}`
+      : '';
+    estimateReadonly.hidden = canEdit || role !== 'estimate_pending';
+    if (canEdit) {
+      editForm.elements.EstimatedCostDuration.value = entry.estimateDuration || '';
+      editForm.elements.EstimatedCostNote.value = entry.estimateNote || '';
+    }
+    if (estimatePrice) {
+      estimatePrice.textContent = canEdit
+        ? (estimatePricePreview(editForm.elements.EstimatedCostDuration?.value || '') || t('ESTIMATE_PRICE_HINT'))
+        : (hasEstimate ? amount : '');
+    }
+  };
+
+  const estimatePricePreview = (text) => {
+    const match = String(text).trim().match(/^([0-9]+(?:[.,][0-9]+)?)(?:\s*(?:-|–|bis)\s*([0-9]+(?:[.,][0-9]+)?))?\s*(stunden?|std\.?|h|minuten?|min)$/i);
+    if (!match) return '';
+    const first = Number(match[1].replace(',', '.'));
+    const last = Number((match[2] || match[1]).replace(',', '.'));
+    const unit = match[3].toLowerCase();
+    const factor = ['minute', 'minuten', 'min'].includes(unit) ? 1 / 60 : 1;
+    const rate = Math.max(0, Number(widget.dataset.estimateHourlyRate) || 0);
+    if (rate <= 0) return t('ESTIMATE_RATE_REQUIRED');
+    if (first <= 0 || last < first) return '';
+    const money = (hours) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Math.round(hours * factor * rate * 100) / 100);
+    return first === last ? money(first) : `${money(first)} – ${money(last)}`;
+  };
+
   let editReturnFocus = null;
   let listReturnFocus = null;
   let helpReturnFocus = null;
@@ -716,6 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
     editForm.elements.CategoryID.value = String(editable.categoryID);
     editForm.elements.PriorityID.value = String(editable.priorityID);
     if (editForm.elements.DueDate) editForm.elements.DueDate.value = editable.dueDate;
+    renderEstimate(entry);
     editHeading.textContent = t('ENTRY_NUMBER', { id: editable.id });
     if (createdMeta && createdAvatar && createdBy && createdAt) {
       const creation = window.KWMashaFeedlyEntries.entryCreationMeta(entry);
@@ -768,6 +843,13 @@ document.addEventListener('DOMContentLoaded', () => {
     try { target = entry.selector ? document.querySelector(entry.selector) : null; } catch (_) { /* Ungültige gespeicherte CSS-Selektoren überspringen. */ }
     target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
+
+  editForm?.elements.CategoryID?.addEventListener('change', () => renderEstimate(activeEntry));
+  editForm?.elements.EstimatedCostDuration?.addEventListener('input', () => {
+    if (!estimatePrice) return;
+    estimatePrice.textContent = estimatePricePreview(editForm.elements.EstimatedCostDuration.value)
+      || (Number(widget.dataset.estimateHourlyRate) > 0 ? t('ESTIMATE_PRICE_HINT') : t('ESTIMATE_RATE_REQUIRED'));
+  });
 
   relatedEntries?.addEventListener('focus', async () => {
     if (relationCandidatesLoaded) return;
@@ -831,6 +913,10 @@ document.addEventListener('DOMContentLoaded', () => {
           data.set('ReactionEmoji', emoji);
           const result = await postCommentData(data);
           comment.reactions = result.reactions;
+          if (Array.isArray(result.history)) {
+            activeEntry.history = result.history;
+            window.KWMashaFeedlyEntries.renderHistory(editHistory, activeEntry.history, document);
+          }
           renderComments(activeEntry.comments || []);
           commentStatus.textContent = t('COMMENT_REACTION_SAVED');
         } catch (error) {
@@ -1033,7 +1119,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentCategory = categoryFilter.value;
     const currentPriority = priorityFilter.value;
     categoryFilter.replaceChildren(new Option(t('CATEGORY_ALL'), ''));
-    categories.forEach((category) => categoryFilter.append(new Option(category.title, String(category.id))));
+    categories.filter((category) => category.systemKey !== 'restricted_estimate')
+      .forEach((category) => categoryFilter.append(new Option(category.title, String(category.id))));
     if ([...categoryFilter.options].some((option) => option.value === currentCategory)) categoryFilter.value = currentCategory;
     priorityFilter.replaceChildren(new Option(t('FILTER_ALL_PRIORITIES'), ''));
     priorities.forEach((priority) => priorityFilter.append(new Option(priority.title, String(priority.id))));
@@ -1070,10 +1157,14 @@ document.addEventListener('DOMContentLoaded', () => {
     );
     entries = data.entries || [];
     loadedMode = data.mode;
-    const modeLabel = data.mode === 'unread' ? t('LIST_COUNT_UNREAD') : (data.mode === 'mine' ? t(formalAddress ? 'LIST_COUNT_MINE_SIE' : 'LIST_COUNT_MINE_DU') : t(data.mode === 'all' ? 'LIST_COUNT_ALL' : (data.mode === 'feedback' ? 'LIST_COUNT_FEEDBACK' : (data.mode === 'page-open' ? 'LIST_COUNT_PAGE_OPEN' : 'LIST_COUNT_PAGE'))));
+    const modeLabel = ['estimate-pending', 'estimate-approved'].includes(data.mode)
+      ? t(data.mode === 'estimate-pending' ? 'ESTIMATE_PENDING_BUTTON' : 'ESTIMATE_APPROVED_BUTTON')
+      : (data.mode === 'unread' ? t('LIST_COUNT_UNREAD') : (data.mode === 'mine' ? t(formalAddress ? 'LIST_COUNT_MINE_SIE' : 'LIST_COUNT_MINE_DU') : t(data.mode === 'all' ? 'LIST_COUNT_ALL' : (data.mode === 'feedback' ? 'LIST_COUNT_FEEDBACK' : (data.mode === 'page-open' ? 'LIST_COUNT_PAGE_OPEN' : 'LIST_COUNT_PAGE')))));
     const closedCount = visible.filter((entry) => entry.isClosed).length;
     const openCount = visible.length - closedCount;
     listCount.textContent = data.mode === 'unread'
+      ? `${visible.length} ${t(visible.length === 1 ? 'ENTRY_SINGULAR' : 'ENTRY_PLURAL')} ${modeLabel}`
+      : (['estimate-pending', 'estimate-approved'].includes(data.mode)
       ? `${visible.length} ${t(visible.length === 1 ? 'ENTRY_SINGULAR' : 'ENTRY_PLURAL')} ${modeLabel}`
       : (data.mode === 'feedback'
       ? `${visible.length} ${t(visible.length === 1 ? 'ENTRY_SINGULAR' : 'ENTRY_PLURAL')} ${t('LIST_COUNT_FEEDBACK')}`
@@ -1081,18 +1172,20 @@ document.addEventListener('DOMContentLoaded', () => {
       ? `${visible.length} ${t(visible.length === 1 ? 'ENTRY_SINGULAR' : 'ENTRY_PLURAL')} ${t('LIST_COUNT_OPEN')}`
       : (data.mode === 'closed'
         ? `${visible.length} ${t(visible.length === 1 ? 'ENTRY_SINGULAR' : 'ENTRY_PLURAL')} ${t('LIST_COUNT_CLOSED')}`
-        : `${openCount} ${t('LIST_COUNT_OPEN')} · ${closedCount} ${t('LIST_COUNT_CLOSED')} · ${visible.length} ${modeLabel}`)));
+        : `${openCount} ${t('LIST_COUNT_OPEN')} · ${closedCount} ${t('LIST_COUNT_CLOSED')} · ${visible.length} ${modeLabel}`))));
     listContainer.replaceChildren();
     if (!visible.length) {
       const empty = document.createElement('p');
       empty.className = 'kw-masha-feedly__entries-empty';
       empty.textContent = data.mode === 'mine'
         ? t(formalAddress ? 'EMPTY_MINE_SIE' : 'EMPTY_MINE_DU')
-        : (data.mode === 'unread'
+        : (['estimate-pending', 'estimate-approved'].includes(data.mode)
+          ? t('EMPTY_ESTIMATE_QUEUE')
+          : (data.mode === 'unread'
           ? t('NEWS_EMPTY')
           : (data.mode === 'open'
           ? t('EMPTY_OPEN')
-          : (data.mode === 'closed' ? t('EMPTY_CLOSED') : t(data.mode === 'all' ? 'EMPTY_ALL' : 'EMPTY_PAGE'))));
+          : (data.mode === 'closed' ? t('EMPTY_CLOSED') : t(data.mode === 'all' ? 'EMPTY_ALL' : 'EMPTY_PAGE')))));
       listContainer.append(empty);
       return;
     }
@@ -1208,6 +1301,20 @@ document.addEventListener('DOMContentLoaded', () => {
         feedbackButton.setAttribute('data-tooltip', `${t('OPEN_FEEDBACK_ENTRIES')} · ${feedbackCount}`);
         feedbackButton.setAttribute('aria-label', `${t('OPEN_FEEDBACK_ENTRIES')} · ${feedbackCount}`);
       }
+      const estimatePendingCount = Number(data.estimatePendingCount || 0);
+      const estimateApprovedCount = Number(data.estimateApprovedCount || 0);
+      if (estimatePendingCountDisplay) estimatePendingCountDisplay.textContent = String(estimatePendingCount);
+      if (estimateApprovedCountDisplay) estimateApprovedCountDisplay.textContent = String(estimateApprovedCount);
+      if (estimatePendingButton) {
+        estimatePendingButton.hidden = !data.canManageEstimate || estimatePendingCount === 0;
+        estimatePendingButton.setAttribute('data-tooltip', `${t('OPEN_ESTIMATE_PENDING')} · ${estimatePendingCount}`);
+        estimatePendingButton.setAttribute('aria-label', `${t('OPEN_ESTIMATE_PENDING')} · ${estimatePendingCount}`);
+      }
+      if (estimateApprovedButton) {
+        estimateApprovedButton.hidden = !data.canManageEstimate || estimateApprovedCount === 0;
+        estimateApprovedButton.setAttribute('data-tooltip', `${t('OPEN_ESTIMATE_APPROVED')} · ${estimateApprovedCount}`);
+        estimateApprovedButton.setAttribute('aria-label', `${t('OPEN_ESTIMATE_APPROVED')} · ${estimateApprovedCount}`);
+      }
       openClosedButton?.setAttribute('data-tooltip', `${t('OPEN_CLOSED_ENTRIES')} · ${closedCount}`);
       openClosedButton?.setAttribute('aria-label', `${t('OPEN_CLOSED_ENTRIES')} · ${closedCount}`);
       if (rainbow) rainbow.hidden = pageOpenCount !== 0;
@@ -1277,6 +1384,8 @@ document.addEventListener('DOMContentLoaded', () => {
   openClosedButton?.addEventListener('click', (event) => openList('closed', event?.currentTarget || openClosedButton));
   openPageListButton?.addEventListener('click', (event) => openList('page-open', event?.currentTarget || openPageListButton));
   feedbackButton?.addEventListener('click', (event) => openList('feedback', event?.currentTarget || feedbackButton));
+  estimatePendingButton?.addEventListener('click', (event) => openList('estimate-pending', event?.currentTarget || estimatePendingButton));
+  estimateApprovedButton?.addEventListener('click', (event) => openList('estimate-approved', event?.currentTarget || estimateApprovedButton));
   openHelpButton?.addEventListener('click', (event) => {
     helpReturnFocus = event?.currentTarget || openHelpButton;
     helpModal.hidden = false;
@@ -1445,6 +1554,17 @@ document.addEventListener('DOMContentLoaded', () => {
         activeEntry.dueDate = result.dueDate || '';
         if (editForm.elements.DueDate) editForm.elements.DueDate.value = activeEntry.dueDate;
       }
+      if (activeEntry && Object.hasOwn(result, 'estimateAmount')) {
+        activeEntry = {
+          ...activeEntry,
+          estimateAmount: result.estimateAmount || '',
+          estimateAmountMax: result.estimateAmountMax || result.estimateAmount || '',
+          estimateDuration: result.estimateDuration || '',
+          estimateCurrency: result.estimateCurrency || 'EUR',
+          estimateNote: result.estimateNote || '',
+          categoryRole: result.categoryRole || activeEntry.categoryRole,
+        };
+      }
       if (activeEntry && Array.isArray(result.relations)) activeEntry.relations = result.relations;
       window.KWMashaFeedlyEntries.renderRelationBadges(editRelations, activeEntry?.relations, document);
       if (activeEntry && result.priorityID) {
@@ -1483,9 +1603,10 @@ document.addEventListener('DOMContentLoaded', () => {
         window.KWMashaFeedlyEntries.celebrateCompletion(document, window, widget.dataset.unicornUrl, widget.dataset.theme);
       }
       if (activeEntry && nextCategory) {
-        activeEntry = { ...activeEntry, categoryID: nextCategoryID, categoryTitle: nextCategory.title, isClosed: Boolean(nextCategory.isClosed) };
+        activeEntry = { ...activeEntry, categoryID: nextCategoryID, categoryTitle: nextCategory.title, categoryRole: nextCategory.systemKey || result.categoryRole || '', isClosed: Boolean(nextCategory.isClosed) };
         editContext.textContent = t('ENTRY_CONTEXT_STATUS', { status: nextCategory.title });
       }
+      renderEstimate(activeEntry);
       await loadEntries('page');
     } catch (error) {
       editStatus.textContent = error.message || t('EDIT_SAVE_ERROR');

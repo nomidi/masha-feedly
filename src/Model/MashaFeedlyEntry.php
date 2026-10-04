@@ -31,6 +31,11 @@ use SilverStripe\i18n\i18n;
  * @property string $EntryDate Datum und Uhrzeit des Eintrags.
  * @property string $DueDate Fälligkeitstermin des Eintrags.
  * @property string $DueDateReminderSentAt Zeitpunkt der letzten Fälligkeitserinnerung.
+ * @property string $EstimatedCostAmount Freigegebene Kostenschätzung als Dezimalbetrag.
+ * @property string $EstimatedCostAmountMax Oberer berechneter Kostenschätzungsbetrag.
+ * @property string $EstimatedCostDuration Geschätzte Dauer.
+ * @property string $EstimatedCostCurrency Währung der Kostenschätzung.
+ * @property string $EstimatedCostNote Erläuterung zur Kostenschätzung.
  * @property int $CategoryID ID des Status.
  * @property int $PriorityID ID der Priorität.
  * @property MashaFeedlyCategory $Category Statuskategorie des Eintrags.
@@ -69,6 +74,11 @@ class MashaFeedlyEntry extends DataObject
         'EntryDate' => 'Datetime',
         'DueDate' => 'Date',
         'DueDateReminderSentAt' => 'Datetime',
+        'EstimatedCostAmount' => 'Decimal(12,2)',
+        'EstimatedCostAmountMax' => 'Decimal(12,2)',
+        'EstimatedCostDuration' => 'Varchar(80)',
+        'EstimatedCostCurrency' => 'Varchar(3)',
+        'EstimatedCostNote' => 'Text',
         'Sort' => 'Int',
         'PageURL' => 'Varchar(2048)',
         'ElementSelector' => 'Varchar(512)',
@@ -79,6 +89,10 @@ class MashaFeedlyEntry extends DataObject
         'Resolution' => 'Varchar(50)',
         'BrowserWindow' => 'Varchar(50)',
         'ColorDepth' => 'Int',
+    ];
+
+    private static $defaults = [
+        'EstimatedCostCurrency' => 'EUR',
     ];
 
     private static $has_many = [
@@ -124,6 +138,12 @@ class MashaFeedlyEntry extends DataObject
 
     private ?string $historyNewReporter = null;
 
+    private ?string $historyOldEstimate = null;
+
+    private ?string $historyNewEstimate = null;
+
+    private bool $notifyCostEstimateRequestedAfterWrite = false;
+
 
     /**
      * Erstellt die im CMS bearbeitbaren Felder des Eintrags.
@@ -133,7 +153,10 @@ class MashaFeedlyEntry extends DataObject
     public function getCMSFields(): FieldList
     {
         $fields = parent::getCMSFields();
-        $fields->removeByName(['Comments', 'ClassName', 'Title', 'Sort', 'ReportedByID']);
+        $fields->removeByName([
+            'Comments', 'ClassName', 'Title', 'Sort', 'ReportedByID',
+            'EstimatedCostAmount', 'EstimatedCostAmountMax', 'EstimatedCostDuration', 'EstimatedCostCurrency', 'EstimatedCostNote',
+        ]);
         $fields->replaceField('Content', TextareaField::create('Content', $this->translate('FIELD_DESCRIPTION', 'Bug-Beschreibung')));
         $dateField = DatetimeField::create('EntryDate', $this->translate('FIELD_DATETIME', 'Datum und Uhrzeit'));
         if (!$this->isInDB() && !$this->EntryDate) {
@@ -157,6 +180,14 @@ class MashaFeedlyEntry extends DataObject
             )->setValue((int)$this->ReportedByID)
                 ->setDescription($this->translate('FIELD_REPORTED_BY_DESCRIPTION', 'Ändert nur die angezeigte Meldeperson. Der technische Ersteller bleibt im Verlauf erhalten.')));
         }
+        if (self::canManageEstimate($member) && (string)$this->Category()->SystemKey === 'estimate_pending') {
+            $fields->addFieldsToTab('Root.Main', [
+                \SilverStripe\Forms\TextField::create('EstimatedCostDuration', $this->translate('ESTIMATE_DURATION', 'Geschätzte Dauer')),
+                LiteralField::create('EstimatedCostCalculatedPrice', '<p>' . htmlspecialchars($this->estimatePriceLabel(), ENT_QUOTES, 'UTF-8') . '</p>'),
+                TextareaField::create('EstimatedCostNote', $this->translate('ESTIMATE_NOTE', 'Erläuterung'))
+                    ->setRows(3),
+            ]);
+        }
         $fields->fieldByName('PageURL')?->setTitle($this->translate('FIELD_PAGE_URL', 'Seitenadresse'))->setReadonly(true);
         $fields->fieldByName('ElementSelector')?->setTitle($this->translate('FIELD_SELECTOR', 'Ausgewählter Bereich'))->setReadonly(true);
         $fields->fieldByName('ElementText')?->setTitle($this->translate('FIELD_ELEMENT_TEXT', 'Text im ausgewählten Bereich'))->setReadonly(true);
@@ -179,7 +210,17 @@ class MashaFeedlyEntry extends DataObject
             $fields->addFieldToTab('Root.Main', LiteralField::create('MashaFeedlyAttachments', $attachmentHTML));
         }
         MashaFeedlyCategory::ensureDefaultCategories();
-        $categories = MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC')->map('ID', 'Title')->toArray();
+        $canManageEstimate = self::canManageEstimate($member);
+        $categories = [];
+        foreach (MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC') as $category) {
+            $estimateRole = in_array((string)$category->SystemKey, ['estimate_pending', 'estimate_approved'], true);
+            if ($estimateRole && !$canManageEstimate && (int)$category->ID !== (int)$this->CategoryID) {
+                continue;
+            }
+            $categories[(string)$category->ID] = $estimateRole && !$canManageEstimate
+                ? $this->translate('ESTIMATE_HIDDEN_CATEGORY', 'In Bearbeitung')
+                : (string)$category->Title;
+        }
         $fields->replaceField(
             'CategoryID',
             DropdownField::create('CategoryID', $this->translate('FIELD_STATUS', 'Status'), $categories)
@@ -300,6 +341,60 @@ class MashaFeedlyEntry extends DataObject
         return in_array(mb_strtolower(trim((string)$member->Email)), $emails, true);
     }
 
+    /** Prüft die separate Betreiberfreigabe für Kostenschätzungen. */
+    public static function canManageEstimate($member = null): bool
+    {
+        $member ??= Security::getCurrentUser();
+        if (!$member instanceof Member) {
+            return false;
+        }
+        return MashaFeedlyConfigExtension::canUse($member)
+            && (self::canManageReporter($member) || (bool)$member->MashaFeedlyCanManageEstimates);
+    }
+
+    /** Formatiert eine Schätzung für den unveränderlichen Verlauf. */
+    private function estimateHistoryLabel(): string
+    {
+        $duration = trim((string)$this->EstimatedCostDuration);
+        if ($duration === '') {
+            return 'Keine Kostenschätzung';
+        }
+        $note = trim((string)$this->EstimatedCostNote);
+        return $duration . ' · ' . $this->estimatePriceLabel() . ($note !== '' ? ' · ' . $note : '');
+    }
+
+    /** Parst Dauern wie „10 Minuten“, „2 Stunden“ oder „2–4 Stunden“ und berechnet den Preis. */
+    public static function calculateEstimate(string $duration, float $hourlyRate): ?array
+    {
+        $duration = trim($duration);
+        $number = '[0-9]+(?:[.,][0-9]+)?';
+        $pattern = '/^\s*(' . $number . ')\s*(?:(?:-|–|bis)\s*(' . $number . ')\s*)?(stunden?|std\\.?|h|minuten?|min)\s*$/iu';
+        if (!preg_match($pattern, $duration, $matches)) {
+            return null;
+        }
+        $first = (float)str_replace(',', '.', $matches[1]);
+        $last = isset($matches[2]) && $matches[2] !== '' ? (float)str_replace(',', '.', $matches[2]) : $first;
+        $unit = mb_strtolower($matches[3]);
+        $factor = in_array($unit, ['minute', 'minuten', 'min'], true) ? 1 / 60 : 1;
+        $minimumHours = $first * $factor;
+        $maximumHours = $last * $factor;
+        if ($first <= 0 || $last < $first || $maximumHours > 10000 || $hourlyRate < 0) {
+            return null;
+        }
+        return [
+            'minimum' => number_format(round($minimumHours * $hourlyRate, 2), 2, '.', ''),
+            'maximum' => number_format(round($maximumHours * $hourlyRate, 2), 2, '.', ''),
+        ];
+    }
+
+    /** Formatiert den berechneten Preis in Euro. */
+    public function estimatePriceLabel(): string
+    {
+        $minimum = number_format((float)$this->EstimatedCostAmount, 2, ',', '.') . ' €';
+        $maximum = number_format((float)$this->EstimatedCostAmountMax, 2, ',', '.') . ' €';
+        return $minimum === $maximum ? $minimum : $minimum . ' – ' . $maximum;
+    }
+
     /** Liefert die ausgewählte Meldeperson oder fällt auf den tatsächlichen Ersteller zurück. */
     public function reportedByMember(): ?Member
     {
@@ -357,8 +452,53 @@ class MashaFeedlyEntry extends DataObject
         $this->historyDueDateChanged = false;
         $this->historyOldReporter = null;
         $this->historyNewReporter = null;
+        $this->historyOldEstimate = null;
+        $this->historyNewEstimate = null;
+        $this->notifyCostEstimateRequestedAfterWrite = false;
         if ($this->isInDB()) {
             $storedEntry = self::get()->byID((int)$this->ID);
+            if ($storedEntry) {
+                $oldRole = (string)$storedEntry->Category()->SystemKey;
+                $newCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
+                $newRole = (string)($newCategory?->SystemKey ?? '');
+                if (!self::canManageEstimate() && (
+                    in_array($oldRole, ['estimate_pending', 'estimate_approved'], true)
+                    || in_array($newRole, ['estimate_pending', 'estimate_approved'], true)
+                )) {
+                    $this->CategoryID = (int)$storedEntry->CategoryID;
+                }
+                $this->notifyCostEstimateRequestedAfterWrite = $oldRole !== 'estimate_pending'
+                    && $newRole === 'estimate_pending'
+                    && self::canManageEstimate();
+                if (self::canManageEstimate() && (string)($newCategory?->SystemKey ?? '') === 'estimate_pending') {
+                    $calculated = self::calculateEstimate((string)$this->EstimatedCostDuration, MashaFeedlyConfigExtension::hourlyRate());
+                    if ($calculated) {
+                        $this->EstimatedCostAmount = $calculated['minimum'];
+                        $this->EstimatedCostAmountMax = $calculated['maximum'];
+                        $this->EstimatedCostCurrency = 'EUR';
+                    }
+                }
+            }
+            if ($storedEntry && (
+                (string)$storedEntry->EstimatedCostDuration !== (string)$this->EstimatedCostDuration
+                ||
+                (string)$storedEntry->EstimatedCostAmount !== (string)$this->EstimatedCostAmount
+                || (string)$storedEntry->EstimatedCostAmountMax !== (string)$this->EstimatedCostAmountMax
+                || (string)$storedEntry->EstimatedCostCurrency !== (string)$this->EstimatedCostCurrency
+                || (string)$storedEntry->EstimatedCostNote !== (string)$this->EstimatedCostNote
+            )) {
+                $targetCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
+                if (!self::canManageEstimate() || (string)($targetCategory?->SystemKey ?? '') !== 'estimate_pending') {
+                    $this->EstimatedCostAmount = $storedEntry->EstimatedCostAmount;
+                    $this->EstimatedCostAmountMax = $storedEntry->EstimatedCostAmountMax;
+                    $this->EstimatedCostDuration = $storedEntry->EstimatedCostDuration;
+                    $this->EstimatedCostCurrency = $storedEntry->EstimatedCostCurrency;
+                    $this->EstimatedCostNote = $storedEntry->EstimatedCostNote;
+                } else {
+                    $this->historyOldEstimate = $storedEntry->estimateHistoryLabel();
+                    $this->historyNewEstimate = $this->estimateHistoryLabel();
+                }
+            }
             if ($storedEntry && (int)$storedEntry->ReportedByID !== (int)$this->ReportedByID) {
                 if (!self::canManageReporter()) {
                     $this->ReportedByID = (int)$storedEntry->ReportedByID;
@@ -382,8 +522,33 @@ class MashaFeedlyEntry extends DataObject
                 $this->historyDueDateChanged = true;
                 $this->DueDateReminderSentAt = null;
             }
-        } elseif ((int)$this->ReportedByID > 0 && !self::canManageReporter()) {
-            $this->ReportedByID = 0;
+        } else {
+            if ((int)$this->ReportedByID > 0 && !self::canManageReporter()) {
+                $this->ReportedByID = 0;
+            }
+            if (!self::canManageEstimate()) {
+                $requestedCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
+                if (in_array((string)($requestedCategory?->SystemKey ?? ''), ['estimate_pending', 'estimate_approved'], true)) {
+                    $this->CategoryID = (int)MashaFeedlyCategory::defaultCategory()->ID;
+                }
+                $this->EstimatedCostAmount = null;
+                $this->EstimatedCostAmountMax = null;
+                $this->EstimatedCostDuration = '';
+                $this->EstimatedCostCurrency = 'EUR';
+                $this->EstimatedCostNote = '';
+            }
+        }
+        $targetCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
+        if (self::canManageEstimate() && (string)($targetCategory?->SystemKey ?? '') === 'estimate_pending') {
+            $calculated = self::calculateEstimate((string)$this->EstimatedCostDuration, MashaFeedlyConfigExtension::hourlyRate());
+            if ($calculated) {
+                $this->EstimatedCostAmount = $calculated['minimum'];
+                $this->EstimatedCostAmountMax = $calculated['maximum'];
+                $this->EstimatedCostCurrency = 'EUR';
+            }
+        }
+        if (trim((string)$this->EstimatedCostCurrency) === '') {
+            $this->EstimatedCostCurrency = 'EUR';
         }
         if (!$this->EntryDate) {
             $this->EntryDate = self::currentEntryDateTime();
@@ -411,6 +576,26 @@ class MashaFeedlyEntry extends DataObject
     public function validate(): ValidationResult
     {
         $result = parent::validate();
+        $newCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
+        $newRole = (string)($newCategory?->SystemKey ?? '');
+        if ($this->isInDB()) {
+            $storedEntry = self::get()->byID((int)$this->ID);
+            $oldRole = (string)($storedEntry?->Category()->SystemKey ?? '');
+            if ($oldRole === 'estimate_pending' && !in_array($newRole, ['estimate_pending', 'estimate_approved'], true)) {
+                $result->addFieldError('CategoryID', $this->translate(
+                    'ESTIMATE_APPROVAL_REQUIRED',
+                    'Dieser Eintrag wartet auf die Freigabe der Kostenschätzung. Er kann nur in „Kostenschätzung freigegeben“ verschoben werden.'
+                ));
+            }
+        }
+        if ($newRole === 'estimate_pending' && MashaFeedlyConfigExtension::hourlyRate() <= 0) {
+            $result->addFieldError('EstimatedCostDuration', $this->translate('ESTIMATE_RATE_REQUIRED', 'Der Stundensatz muss zuerst in den Masha:Feedly-Einstellungen hinterlegt werden.'));
+        } elseif ($newRole === 'estimate_pending' && self::calculateEstimate((string)$this->EstimatedCostDuration, MashaFeedlyConfigExtension::hourlyRate()) === null) {
+            $result->addFieldError('EstimatedCostDuration', $this->translate(
+                'ESTIMATE_AMOUNT_REQUIRED',
+                'Gib zuerst eine gültige geschätzte Dauer ein, bevor du die Freigabe anforderst.'
+            ));
+        }
         $assignedMemberIDs = array_map('intval', $this->AssignedMembers()->column('ID'));
         $unauthorizedIDs = array_diff($assignedMemberIDs, MashaFeedlyConfigExtension::memberIDs());
         if ($unauthorizedIDs) {
@@ -418,6 +603,12 @@ class MashaFeedlyEntry extends DataObject
         }
         if ((int)$this->ReportedByID > 0 && !Member::get()->byID((int)$this->ReportedByID)) {
             $result->addFieldError('ReportedByID', $this->translate('REPORTER_MUST_EXIST', 'Die Meldeperson muss ein vorhandenes Benutzerkonto sein.'));
+        }
+        if (trim((string)$this->EstimatedCostAmount) !== '' && (!is_numeric($this->EstimatedCostAmount) || (float)$this->EstimatedCostAmount < 0)) {
+            $result->addFieldError('EstimatedCostAmount', $this->translate('ESTIMATE_INVALID_AMOUNT', 'Bitte gib einen gültigen positiven Betrag ein.'));
+        }
+        if (!in_array((string)$this->EstimatedCostCurrency, ['EUR', 'CHF', 'GBP', 'USD'], true)) {
+            $result->addFieldError('EstimatedCostCurrency', $this->translate('ESTIMATE_INVALID_CURRENCY', 'Bitte wähle eine unterstützte Währung.'));
         }
         return $result;
     }
@@ -487,11 +678,26 @@ class MashaFeedlyEntry extends DataObject
             $this->historyOldReporter = null;
             $this->historyNewReporter = null;
         }
+        if ($this->historyOldEstimate !== null && $this->historyNewEstimate !== null) {
+            MashaFeedlyEntryHistory::record(
+                $this,
+                'estimate',
+                $this->historyOldEstimate,
+                $this->historyNewEstimate,
+                Security::getCurrentUser()
+            );
+            $this->historyOldEstimate = null;
+            $this->historyNewEstimate = null;
+        }
         if ($this->notifyMembersAfterWrite) {
             MashaFeedlyEntryHistory::record($this, 'created', '', $this->getTitle(), Security::getCurrentUser());
             MashaFeedlyNotificationService::notifyNewEntry($this);
         } elseif ($this->notifyMembersAfterUpdate) {
             MashaFeedlyNotificationService::notifyUpdatedEntry($this);
+        }
+        if ($this->notifyCostEstimateRequestedAfterWrite) {
+            MashaFeedlyNotificationService::notifyCostEstimateRequested($this);
+            $this->notifyCostEstimateRequestedAfterWrite = false;
         }
         $member = Security::getCurrentUser();
         if ($member instanceof Member && MashaFeedlyConfigExtension::canUse($member)) {
