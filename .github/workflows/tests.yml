@@ -16,6 +16,11 @@ jobs:
       - name: Repository auschecken
         uses: actions/checkout@v4
 
+      - name: Isolierten PHP-Testordner vorbereiten
+        run: |
+          mkdir -p "$RUNNER_TEMP/masha-feedly-php-tests"
+          rsync -a --exclude='.git/' --exclude='vendor/' --exclude='public/' --exclude='composer.lock' ./ "$RUNNER_TEMP/masha-feedly-php-tests/"
+
       - name: Node.js einrichten
         uses: actions/setup-node@v4
         with:
@@ -59,9 +64,9 @@ jobs:
           coverage: none
 
       - name: Composer-Abhängigkeiten installieren
-        run: composer install --no-interaction --prefer-dist
+        run: cd "$RUNNER_TEMP/masha-feedly-php-tests" && composer install --no-interaction --prefer-dist
 
       - name: PHP-Unit- und Funktionstests ausführen
-        run: vendor/bin/phpunit -c tests/phpunit.xml.dist
+        run: cd "$RUNNER_TEMP/masha-feedly-php-tests" && vendor/bin/phpunit -c tests/phpunit.xml.dist
         env:
           SS_PHPUNIT_FLUSH: '1'
