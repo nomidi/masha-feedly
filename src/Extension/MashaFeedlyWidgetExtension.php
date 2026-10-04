@@ -56,16 +56,17 @@ class MashaFeedlyWidgetExtension extends Extension
         MashaFeedlyCategory::ensureDefaultCategories();
         MashaFeedlyPriority::ensureDefaultPriorities();
         $canManageEstimate = \KW\MashaFeedly\Model\MashaFeedlyEntry::canManageEstimate(Security::getCurrentUser());
+        $canApproveEstimate = \KW\MashaFeedly\Model\MashaFeedlyEntry::canApproveEstimate(Security::getCurrentUser());
         $categories = [];
         foreach (MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC') as $category) {
             $systemKey = (string)$category->SystemKey;
             $estimateRole = in_array($systemKey, ['estimate_pending', 'estimate_approved'], true);
             $categories[] = [
                 'ID' => (int)$category->ID,
-                'Title' => $estimateRole && !$canManageEstimate
+                'Title' => $estimateRole && !$canApproveEstimate
                     ? i18n::_t('KW\\MashaFeedly\\Translations.ESTIMATE_HIDDEN_CATEGORY', 'In Bearbeitung')
                     : (string)$category->Title,
-                'SystemKey' => $estimateRole && !$canManageEstimate ? 'restricted_estimate' : $systemKey,
+                'SystemKey' => $estimateRole && !$canApproveEstimate ? 'restricted_estimate' : $systemKey,
                 'CanSelectForNewEntry' => $systemKey === 'estimate_pending'
                     ? $canManageEstimate
                     : $systemKey !== 'estimate_approved',
@@ -119,6 +120,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'FontSize' => MashaFeedlyConfigExtension::fontSize(),
             'Theme' => MashaFeedlyConfigExtension::theme(),
             'CanManageEstimate' => $canManageEstimate,
+            'CanApproveEstimate' => $canApproveEstimate,
             'EstimateHourlyRate' => $canManageEstimate ? MashaFeedlyConfigExtension::hourlyRate() : 0,
         ])->forTemplate();
         $translationDefaults = [
@@ -264,6 +266,9 @@ class MashaFeedlyWidgetExtension extends Extension
             'ESTIMATE_PENDING' => 'Kostenschätzung wartet auf Freigabe',
             'ESTIMATE_APPROVED' => 'Kostenschätzung freigegeben',
             'ESTIMATE_NOT_ENTERED' => 'Noch keine Kostenschätzung eingetragen',
+            'ESTIMATE_REVIEW_HELP' => 'Bitte prüfe die geschätzte Dauer, die Erläuterung und den Gesamtpreis. Wähle anschließend im Status „Kostenschätzung freigegeben“.',
+            'ESTIMATE_DETAILS_TOGGLE' => 'Details und Erläuterung',
+            'ESTIMATE_TOTAL_PRICE' => 'Geschätzter Gesamtpreis',
             'ESTIMATE_TRANSITION_LOCKED' => 'Der Eintrag kann erst nach Freigabe der Kostenschätzung weiter verschoben werden.',
             'ESTIMATE_MANAGER_ONLY' => 'Die Kostenschätzung wird von der zuständigen Ansprechperson ergänzt.',
             'ESTIMATE_PRICE_HINT' => 'Dauer eingeben, Preis erscheint hier',

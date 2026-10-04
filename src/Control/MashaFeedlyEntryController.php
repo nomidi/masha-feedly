@@ -257,16 +257,19 @@ class MashaFeedlyEntryController extends Controller
         if (!$category) {
             return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'INVALID_STATUS_SIE' : 'INVALID_STATUS_DU', 'Bitte wähle einen gültigen Status.')], 400);
         }
-        if (in_array((string)$category->SystemKey, ['estimate_pending', 'estimate_approved'], true)
-            && !MashaFeedlyEntry::canManageEstimate($member)
-        ) {
+        $targetRole = (string)$category->SystemKey;
+        $previousCategoryKey = (string)$entry->Category()->SystemKey;
+        $sameProtectedStatus = (int)$category->ID === (int)$entry->CategoryID;
+        if (($targetRole === 'estimate_pending'
+                && !MashaFeedlyEntry::canManageEstimate($member)
+                && !($previousCategoryKey === 'estimate_pending' && $sameProtectedStatus))
+            || ($targetRole === 'estimate_approved'
+                && !MashaFeedlyEntry::canApproveEstimate($member)
+                && !($previousCategoryKey === 'estimate_approved' && $sameProtectedStatus))) {
             return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_FORBIDDEN', 'Du darfst Kostenschätzungen nicht bearbeiten.')], 403);
         }
         $sentToFeedback = false;
-        $previousCategoryKey = (string)$entry->Category()->SystemKey;
-        if (in_array($previousCategoryKey, ['estimate_pending', 'estimate_approved'], true)
-            && !MashaFeedlyEntry::canManageEstimate($member)
-        ) {
+        if ($previousCategoryKey === 'estimate_pending' && !MashaFeedlyEntry::canApproveEstimate($member)) {
             return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_FORBIDDEN', 'Du darfst Kostenschätzungen nicht bearbeiten.')], 403);
         }
         if ($previousCategoryKey === 'estimate_pending'
@@ -277,8 +280,10 @@ class MashaFeedlyEntryController extends Controller
                 'Dieser Eintrag wartet auf die Freigabe der Kostenschätzung. Er kann nur in „Kostenschätzung freigegeben“ verschoben werden.'
             )], 409);
         }
-        if ((string)$category->SystemKey === 'estimate_approved'
-            && ($previousCategoryKey !== 'estimate_pending' || trim((string)$entry->EstimatedCostDuration) === '')
+        if ($targetRole === 'estimate_approved'
+            && (($previousCategoryKey !== 'estimate_pending' && !($previousCategoryKey === 'estimate_approved' && $sameProtectedStatus))
+                || trim((string)$entry->EstimatedCostDuration) === ''
+                || ($previousCategoryKey === 'estimate_pending' && !MashaFeedlyEntry::canApproveEstimate($member)))
         ) {
             return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_APPROVAL_REQUIRED', 'Eine Freigabe kann nur für eine vorhandene Kostenschätzung erfolgen.')], 409);
         }
@@ -435,8 +440,9 @@ class MashaFeedlyEntryController extends Controller
             'categoryID' => (int)$entry->CategoryID,
             'categoryTitle' => $this->visibleCategoryTitle($entry, $member),
             'categoryRole' => $this->visibleCategoryRole($entry, $member),
-            ...(MashaFeedlyEntry::canManageEstimate($member) ? $this->estimatePayload($entry) : []),
+            ...(MashaFeedlyEntry::canManageEstimate($member) ? $this->estimatePayload($entry) : $this->estimateReadonlyPayload($entry, $member)),
             'canManageEstimate' => MashaFeedlyEntry::canManageEstimate($member),
+            'canApproveEstimate' => MashaFeedlyEntry::canApproveEstimate($member),
             'categoryIsClosed' => (bool)$entry->Category()->IsClosed,
             'celebrateCompletion' => (string)$entry->Category()->SystemKey === 'done'
                 && !$wasAlreadyClosed
@@ -538,11 +544,11 @@ class MashaFeedlyEntryController extends Controller
             $estimateRole = in_array((string)$category->SystemKey, ['estimate_pending', 'estimate_approved'], true);
             $categories[] = [
                 'id' => (int)$category->ID,
-                'title' => $estimateRole && !MashaFeedlyEntry::canManageEstimate($member)
+                'title' => $estimateRole && !MashaFeedlyEntry::canApproveEstimate($member)
                     ? $this->translate('ESTIMATE_HIDDEN_CATEGORY', 'In Bearbeitung')
                     : (string)$category->Title,
                 'isClosed' => $isClosed,
-                'systemKey' => $estimateRole && !MashaFeedlyEntry::canManageEstimate($member)
+                'systemKey' => $estimateRole && !MashaFeedlyEntry::canApproveEstimate($member)
                     ? 'restricted_estimate'
                     : (string)$category->SystemKey,
             ];
@@ -558,7 +564,7 @@ class MashaFeedlyEntryController extends Controller
         $unreadEntryIDs = MashaFeedlyEntryRead::unreadEntryIDs($member);
         $requestedMode = (string)$request->getVar('mode');
         $estimateModes = ['estimate-pending', 'estimate-approved'];
-        if (in_array($requestedMode, $estimateModes, true) && !MashaFeedlyEntry::canManageEstimate($member)) {
+        if (in_array($requestedMode, $estimateModes, true) && !MashaFeedlyEntry::canApproveEstimate($member)) {
             return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_FORBIDDEN', 'Du darfst Kostenschätzungen nicht ansehen.')], 403);
         }
         $mode = in_array($requestedMode, ['all', 'open', 'closed', 'page', 'page-open', 'mine', 'feedback', 'unread', ...$estimateModes], true) ? $requestedMode : 'page';
@@ -600,10 +606,10 @@ class MashaFeedlyEntryController extends Controller
             : 0;
         $estimatePendingCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_pending')->first();
         $estimateApprovedCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_approved')->first();
-        $estimatePendingCount = MashaFeedlyEntry::canManageEstimate($member) && $estimatePendingCategory
+        $estimatePendingCount = MashaFeedlyEntry::canApproveEstimate($member) && $estimatePendingCategory
             ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimatePendingCategory->ID)->count()
             : 0;
-        $estimateApprovedCount = MashaFeedlyEntry::canManageEstimate($member) && $estimateApprovedCategory
+        $estimateApprovedCount = MashaFeedlyEntry::canApproveEstimate($member) && $estimateApprovedCategory
             ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimateApprovedCategory->ID)->count()
             : 0;
         $pageEntryIDs = array_fill_keys(array_map('intval', $pageEntries->column('ID')), true);
@@ -633,6 +639,7 @@ class MashaFeedlyEntryController extends Controller
             'pageOpenCount' => $pageOpenCount,
             'categories' => $categories,
             'canManageEstimate' => MashaFeedlyEntry::canManageEstimate($member),
+            'canApproveEstimate' => MashaFeedlyEntry::canApproveEstimate($member),
             'estimateHourlyRate' => MashaFeedlyEntry::canManageEstimate($member) ? MashaFeedlyConfigExtension::hourlyRate() : null,
             'priorities' => array_map(static fn(MashaFeedlyPriority $priority): array => [
                 'id' => (int)$priority->ID,
@@ -790,16 +797,31 @@ class MashaFeedlyEntryController extends Controller
         ];
     }
 
+    /** Zeigt Dauer, Erläuterung und Betrag lesend für Freigabeberechtigte; der Stundensatz bleibt privat. */
+    private function estimateReadonlyPayload(MashaFeedlyEntry $entry, Member $member): array
+    {
+        if (!MashaFeedlyEntry::canApproveEstimate($member) || !$this->isEstimateCategory($entry)) {
+            return [];
+        }
+        return [
+            'estimateAmount' => (string)$entry->EstimatedCostAmount,
+            'estimateAmountMax' => (string)$entry->EstimatedCostAmountMax,
+            'estimateDuration' => (string)$entry->EstimatedCostDuration,
+            'estimateCurrency' => (string)($entry->EstimatedCostCurrency ?: 'EUR'),
+            'estimateNote' => (string)$entry->EstimatedCostNote,
+        ];
+    }
+
     private function visibleCategoryTitle(MashaFeedlyEntry $entry, Member $member): string
     {
-        return $this->isEstimateCategory($entry) && !MashaFeedlyEntry::canManageEstimate($member)
-            ? $this->translate('ESTIMATE_HIDDEN_CATEGORY', 'In Bearbeitung')
-            : (string)$entry->Category()->Title;
+        // Der konkrete Status bleibt am Eintrag sichtbar. Die geschützten Kategorien
+        // bleiben separat aus Kategorieauswahl und Filtern ausgeschlossen.
+        return (string)$entry->Category()->Title;
     }
 
     private function visibleCategoryRole(MashaFeedlyEntry $entry, Member $member): string
     {
-        return $this->isEstimateCategory($entry) && !MashaFeedlyEntry::canManageEstimate($member)
+        return $this->isEstimateCategory($entry) && !MashaFeedlyEntry::canApproveEstimate($member)
             ? 'restricted_estimate'
             : (string)$entry->Category()->SystemKey;
     }
@@ -1009,8 +1031,9 @@ class MashaFeedlyEntryController extends Controller
             'categoryID' => (int)$entry->CategoryID,
             'categoryTitle' => $this->visibleCategoryTitle($entry, $currentMember),
             'categoryRole' => $this->visibleCategoryRole($entry, $currentMember),
-            ...(MashaFeedlyEntry::canManageEstimate($currentMember) ? $this->estimatePayload($entry) : []),
+            ...(MashaFeedlyEntry::canManageEstimate($currentMember) ? $this->estimatePayload($entry) : $this->estimateReadonlyPayload($entry, $currentMember)),
             'canManageEstimate' => MashaFeedlyEntry::canManageEstimate($currentMember),
+            'canApproveEstimate' => MashaFeedlyEntry::canApproveEstimate($currentMember),
             'sort' => (int)$entry->Sort,
             'priorityID' => (int)$entry->PriorityID,
             'priorityTitle' => (string)$entry->Priority()->Title,

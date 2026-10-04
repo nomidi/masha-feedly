@@ -91,6 +91,17 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame([(int)$approvedEntry->ID], array_map('intval', array_column($approvedData['entries'], 'id')));
 
         $ordinaryMember = $this->objFromFixture(Member::class, 'notAllowed');
+        $approver = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($approver);
+        $approver->MashaFeedlyCanManageEstimates = true;
+        $approver->write();
+        $this->logInAs($approver);
+        $approverQueue = json_decode($this->get('/__masha-feedly/listEntries?mode=estimate-pending')->getBody(), true);
+        $this->assertSame('estimate-pending', $approverQueue['mode']);
+        $this->assertSame(1, $approverQueue['estimatePendingCount']);
+        $this->assertFalse($approverQueue['canManageEstimate']);
+        $this->assertTrue($approverQueue['canApproveEstimate']);
+
         $this->allowMember($ordinaryMember);
         $this->logInAs($ordinaryMember);
         $denied = $this->get('/__masha-feedly/listEntries?mode=estimate-pending');
@@ -141,8 +152,9 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNull($data['estimateHourlyRate']);
         $this->assertNotContains('estimate_pending', array_column($data['categories'], 'systemKey'));
         $this->assertNotContains('estimate_approved', array_column($data['categories'], 'systemKey'));
-        $this->assertSame('In Bearbeitung', $listed['categoryTitle']);
+        $this->assertSame((string)$pending->Title, $listed['categoryTitle'], 'Der tatsächliche Status bleibt am Eintrag sichtbar.');
         $this->assertSame('restricted_estimate', $listed['categoryRole']);
+        $this->assertNotContains((string)$pending->Title, array_column($data['categories'], 'title'), 'Die geschützte Kategorie bleibt aus der Auswahl ausgeblendet.');
         foreach (['estimateAmount', 'estimateAmountMax', 'estimateDuration', 'estimateCurrency', 'estimateNote'] as $field) {
             $this->assertArrayNotHasKey($field, $listed);
         }
@@ -170,12 +182,35 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->logInAs($approvedMember);
         $allowedData = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $allowedEntry = array_values(array_filter($allowedData['entries'], static fn(array $item): bool => (int)$item['id'] === (int)$entry->ID))[0];
-        $this->assertTrue($allowedData['canManageEstimate']);
-        $this->assertSame(120.0, (float)$allowedData['estimateHourlyRate']);
+        $this->assertFalse($allowedData['canManageEstimate'], 'Eine Freigabeperson darf die Schätzung nicht bearbeiten.');
+        $this->assertTrue($allowedData['canApproveEstimate']);
+        $this->assertNull($allowedData['estimateHourlyRate'], 'Der interne Stundensatz bleibt für Freigabepersonen verborgen.');
         $this->assertSame('estimate_pending', $allowedEntry['categoryRole']);
         $this->assertSame('240', $allowedEntry['estimateAmount']);
         $this->assertSame('2 Stunden', $allowedEntry['estimateDuration']);
-        $this->assertContains('estimate', array_column($allowedEntry['history'], 'type'));
+        $this->assertSame('Nur für berechtigte Personen', $allowedEntry['estimateNote'], 'Die Erläuterung wird nur lesend angezeigt.');
+        $this->assertNotContains('estimate', array_column($allowedEntry['history'], 'type'), 'Die Freigabeperson sieht die Schätzung, aber nicht die Historie mit Änderungsdetails.');
+
+        $forbiddenEstimateEdit = $this->post('/__masha-feedly/updateEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$entry->ID,
+            'CategoryID' => (int)$pending->ID,
+            'EstimatedCostDuration' => '99 Stunden',
+            'EstimatedCostNote' => 'Manipulierter Eintrag',
+        ]);
+        $this->assertSame(403, $forbiddenEstimateEdit->getStatusCode(), 'Freigabepersonen können Dauer und Text auch per manipuliertem Request nicht ändern.');
+        $approveResponse = $this->post('/__masha-feedly/updateEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$entry->ID,
+            'CategoryID' => (int)MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_approved')->first()->ID,
+        ]);
+        $this->assertSame(200, $approveResponse->getStatusCode());
+        $approvedResponseData = json_decode($approveResponse->getBody(), true);
+        $this->assertSame('estimate_approved', $approvedResponseData['categoryRole']);
+        $this->assertFalse($approvedResponseData['canManageEstimate']);
+        $this->assertSame('2 Stunden', $approvedResponseData['estimateDuration']);
+
+        $this->logInAs($superadmin);
 
         $backlogEntry = MashaFeedlyEntry::create([
             'Content' => 'Kostenschätzung nur im passenden Status',

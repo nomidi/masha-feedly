@@ -341,15 +341,22 @@ class MashaFeedlyEntry extends DataObject
         return in_array(mb_strtolower(trim((string)$member->Email)), $emails, true);
     }
 
-    /** Prüft die separate Betreiberfreigabe für Kostenschätzungen. */
+    /** Nur der konfigurierte Betreiber darf Kostenschätzungen erfassen oder bearbeiten. */
     public static function canManageEstimate($member = null): bool
     {
         $member ??= Security::getCurrentUser();
-        if (!$member instanceof Member) {
-            return false;
-        }
-        return MashaFeedlyConfigExtension::canUse($member)
-            && (self::canManageReporter($member) || (bool)$member->MashaFeedlyCanManageEstimates);
+        return $member instanceof Member
+            && MashaFeedlyConfigExtension::canUse($member)
+            && self::canManageReporter($member);
+    }
+
+    /** Freigegebene Mitglieder dürfen vorhandene Kostenschätzungen ansehen und freigeben. */
+    public static function canApproveEstimate($member = null): bool
+    {
+        $member ??= Security::getCurrentUser();
+        return $member instanceof Member
+            && MashaFeedlyConfigExtension::canUse($member)
+            && (self::canManageEstimate($member) || (bool)$member->MashaFeedlyCanManageEstimates);
     }
 
     /** Formatiert eine Schätzung für den unveränderlichen Verlauf. */
@@ -461,10 +468,18 @@ class MashaFeedlyEntry extends DataObject
                 $oldRole = (string)$storedEntry->Category()->SystemKey;
                 $newCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
                 $newRole = (string)($newCategory?->SystemKey ?? '');
-                if (!self::canManageEstimate() && (
-                    in_array($oldRole, ['estimate_pending', 'estimate_approved'], true)
-                    || in_array($newRole, ['estimate_pending', 'estimate_approved'], true)
-                )) {
+                $invalidEstimateTransition = ($newRole === 'estimate_pending'
+                        && !self::canManageEstimate()
+                        && !($oldRole === 'estimate_pending' && (int)$storedEntry->CategoryID === (int)$this->CategoryID))
+                    || ($newRole === 'estimate_approved'
+                        && !self::canApproveEstimate()
+                        && !($oldRole === 'estimate_approved' && (int)$storedEntry->CategoryID === (int)$this->CategoryID))
+                    || ($oldRole === 'estimate_pending'
+                        && !in_array($newRole, ['estimate_pending', 'estimate_approved'], true))
+                    || ($newRole === 'estimate_approved'
+                        && $oldRole !== 'estimate_pending'
+                        && !($oldRole === 'estimate_approved' && (int)$storedEntry->CategoryID === (int)$this->CategoryID));
+                if ($invalidEstimateTransition) {
                     $this->CategoryID = (int)$storedEntry->CategoryID;
                 }
                 $this->notifyCostEstimateRequestedAfterWrite = $oldRole !== 'estimate_pending'
@@ -578,6 +593,7 @@ class MashaFeedlyEntry extends DataObject
         $result = parent::validate();
         $newCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
         $newRole = (string)($newCategory?->SystemKey ?? '');
+        $oldRole = '';
         if ($this->isInDB()) {
             $storedEntry = self::get()->byID((int)$this->ID);
             $oldRole = (string)($storedEntry?->Category()->SystemKey ?? '');
@@ -587,6 +603,23 @@ class MashaFeedlyEntry extends DataObject
                     'Dieser Eintrag wartet auf die Freigabe der Kostenschätzung. Er kann nur in „Kostenschätzung freigegeben“ verschoben werden.'
                 ));
             }
+            if ($newRole === 'estimate_approved'
+                && $oldRole !== 'estimate_pending'
+                && !($oldRole === 'estimate_approved' && (int)$storedEntry->CategoryID === (int)$this->CategoryID)) {
+                $result->addFieldError('CategoryID', $this->translate(
+                    'ESTIMATE_APPROVAL_REQUIRED',
+                    'Nur eine freigegebene Person kann eine ausstehende Kostenschätzung freigeben.'
+                ));
+            }
+            if ($oldRole === 'estimate_pending' && $newRole === 'estimate_approved' && !self::canApproveEstimate()) {
+                $result->addFieldError('CategoryID', $this->translate(
+                    'ESTIMATE_APPROVAL_REQUIRED',
+                    'Nur eine freigegebene Person kann eine ausstehende Kostenschätzung freigeben.'
+                ));
+            }
+        }
+        if ($this->isInDB() && $newRole === 'estimate_pending' && !self::canManageEstimate() && $oldRole !== 'estimate_pending') {
+            $result->addFieldError('CategoryID', $this->translate('ESTIMATE_FORBIDDEN', 'Nur die zuständige Ansprechperson kann eine Kostenschätzung anfordern.'));
         }
         if ($newRole === 'estimate_pending' && MashaFeedlyConfigExtension::hourlyRate() <= 0) {
             $result->addFieldError('EstimatedCostDuration', $this->translate('ESTIMATE_RATE_REQUIRED', 'Der Stundensatz muss zuerst in den Masha:Feedly-Einstellungen hinterlegt werden.'));

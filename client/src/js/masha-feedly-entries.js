@@ -508,8 +508,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const editEnvironmentDetails = widget.querySelector('[data-masha-feedly-edit-environment-details]');
   const estimateSection = widget.querySelector('[data-masha-feedly-estimate]');
   const estimateFields = widget.querySelector('[data-masha-feedly-estimate-fields]');
-  const estimateSummary = widget.querySelector('[data-masha-feedly-estimate-summary]');
   const estimateReadonly = widget.querySelector('[data-masha-feedly-estimate-readonly]');
+  const estimateReadonlyDuration = widget.querySelector('[data-masha-feedly-estimate-duration]');
+  const estimateReadonlyAmount = widget.querySelector('[data-masha-feedly-estimate-amount]');
+  const estimateReadonlyNote = widget.querySelector('[data-masha-feedly-estimate-note]');
+  const estimateReadonlyNoteRow = widget.querySelector('[data-masha-feedly-estimate-note-row]');
+  const estimateReadonlyHelp = widget.querySelector('[data-masha-feedly-estimate-help]');
   const estimateState = widget.querySelector('[data-masha-feedly-estimate-state]');
   const estimateLock = widget.querySelector('[data-masha-feedly-estimate-lock]');
   const estimatePrice = estimateSection?.querySelector('[data-masha-feedly-estimate-price]');
@@ -726,16 +730,24 @@ document.addEventListener('DOMContentLoaded', () => {
     estimateState.textContent = t(role === 'estimate_approved'
       ? 'ESTIMATE_APPROVED'
       : (role === 'estimate_pending' ? 'ESTIMATE_PENDING' : 'ESTIMATE_TITLE'));
-    estimateFields.hidden = !canEdit;
+    if (estimateFields) estimateFields.hidden = !canEdit;
     ['EstimatedCostDuration', 'EstimatedCostNote'].forEach((fieldName) => {
       if (editForm.elements[fieldName]) editForm.elements[fieldName].disabled = !canEdit;
     });
-    estimateReadonly.hidden = canEdit || role !== 'estimate_pending';
-    estimateSummary.hidden = canEdit || !hasEstimate;
-    estimateSummary.textContent = hasEstimate
-      ? `${entry.estimateDuration} · ${amount}${entry.estimateNote ? ` · ${entry.estimateNote}` : ''}`
-      : '';
-    estimateReadonly.hidden = canEdit || role !== 'estimate_pending';
+    if (estimateReadonly) {
+      estimateReadonly.hidden = canEdit || !hasEstimate;
+      estimateReadonly.open = role === 'estimate_pending';
+    }
+    if (estimateReadonlyDuration) estimateReadonlyDuration.textContent = hasEstimate ? entry.estimateDuration : '';
+    if (estimateReadonlyAmount) estimateReadonlyAmount.textContent = hasEstimate ? amount : '';
+    if (estimateReadonlyNote) {
+      estimateReadonlyNote.textContent = entry.estimateNote || '';
+      if (estimateReadonlyNoteRow) estimateReadonlyNoteRow.hidden = !entry.estimateNote;
+    }
+    if (estimateReadonlyHelp) {
+      estimateReadonlyHelp.textContent = role === 'estimate_pending' ? t('ESTIMATE_REVIEW_HELP') : '';
+      estimateReadonlyHelp.hidden = role !== 'estimate_pending';
+    }
     if (canEdit) {
       editForm.elements.EstimatedCostDuration.value = entry.estimateDuration || '';
       editForm.elements.EstimatedCostNote.value = entry.estimateNote || '';
@@ -1242,6 +1254,18 @@ document.addEventListener('DOMContentLoaded', () => {
       status.dataset.closed = String(Boolean(entry.isClosed));
       status.textContent = entry.categoryTitle || t('ENTRY_WITHOUT_CATEGORY');
       status.title = status.textContent;
+      const estimateStatus = ['estimate_pending', 'estimate_approved'].includes(entry.categoryRole)
+        ? document.createElement('span') : null;
+      if (estimateStatus) {
+        const isApproved = entry.categoryRole === 'estimate_approved';
+        estimateStatus.className = `kw-masha-feedly__entry-estimate-status${isApproved ? ' is-approved' : ' is-pending'}`;
+        estimateStatus.setAttribute('role', 'img');
+        estimateStatus.setAttribute('aria-label', t(isApproved ? 'ESTIMATE_APPROVED' : 'ESTIMATE_PENDING'));
+        estimateStatus.title = estimateStatus.getAttribute('aria-label');
+        estimateStatus.innerHTML = isApproved
+          ? '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 2.5 14.4 9.6 21.5 12l-7.1 2.4L12 21.5l-2.4-7.1L2.5 12l7.1-2.4z"/><path d="m8.2 12.2 2.5 2.5 5.2-5.2" class="check"/></svg>'
+          : '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+      }
       const actions = document.createElement('div');
       actions.className = 'kw-masha-feedly__entry-card-actions';
       const shareButton = document.createElement('button');
@@ -1253,7 +1277,9 @@ document.addEventListener('DOMContentLoaded', () => {
       shareButton.innerHTML = '<svg viewBox="-33 0 512 512" aria-hidden="true" focusable="false"><path d="m361.824219 344.394531c-24.53125 0-46.632813 10.59375-61.972657 27.445313l-137.972656-85.453125c3.683594-9.429688 5.726563-19.671875 5.726563-30.386719 0-10.71875-2.042969-20.960938-5.726563-30.386719l137.972656-85.457031c15.339844 16.851562 37.441407 27.449219 61.972657 27.449219 46.210937 0 83.804687-37.59375 83.804687-83.804688 0-46.210937-37.59375-83.800781-83.804687-83.800781-46.210938 0-83.804688 37.59375-83.804688 83.804688 0 10.714843 2.046875 20.957031 5.726563 30.386718l-137.96875 85.453125c-15.339844-16.851562-37.441406-27.449219-61.972656-27.449219-46.210938 0-83.804688 37.597657-83.804688 83.804688 0 46.210938 37.59375 83.804688 83.804688 83.804688 24.53125 0 46.632812-10.59375 61.972656-27.449219l137.96875 85.453125c-3.679688 9.429687-5.726563 19.671875-5.726563 30.390625 0 46.207031 37.59375 83.800781 83.804688 83.800781 46.210937 0 83.804687-37.59375 83.804687-83.800781 0-46.210938-37.59375-83.804688-83.804687-83.804688zm-53.246094-260.589843c0-29.359376 23.886719-53.246094 53.246094-53.246094s53.246093 23.886718 53.246093 53.246094-23.886718 53.246093-53.246093 53.246093-53.246094-23.886719-53.246094-53.246093zm-224.773437 225.441406c-29.363282 0-53.25-23.886719-53.25-53.246094s23.886718-53.246094 53.25-53.246094c29.359374 0 53.242187 23.886719 53.242187 53.246094s-23.882813 53.246094-53.242187 53.246094zm224.773437 118.949218c0-29.359374 23.886719-53.246093 53.246094-53.246093s53.246093 23.886719 53.246093 53.246093-23.886718 53.246094-53.246093 53.246094-53.246094-23.886718-53.246094-53.246094z"/></svg>';
       if (entry.isUnread) actions.append(activityBadge());
       actions.append(shareButton);
-      metadata.append(status, priorityItem);
+      metadata.append(status);
+      if (estimateStatus) metadata.append(estimateStatus);
+      metadata.append(priorityItem);
       if (entry.dueDate) {
         const dueDate = document.createElement('time');
         dueDate.className = 'kw-masha-feedly__entry-due-date';
@@ -1306,12 +1332,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (estimatePendingCountDisplay) estimatePendingCountDisplay.textContent = String(estimatePendingCount);
       if (estimateApprovedCountDisplay) estimateApprovedCountDisplay.textContent = String(estimateApprovedCount);
       if (estimatePendingButton) {
-        estimatePendingButton.hidden = !data.canManageEstimate || estimatePendingCount === 0;
+        estimatePendingButton.hidden = !data.canApproveEstimate || estimatePendingCount === 0;
         estimatePendingButton.setAttribute('data-tooltip', `${t('OPEN_ESTIMATE_PENDING')} · ${estimatePendingCount}`);
         estimatePendingButton.setAttribute('aria-label', `${t('OPEN_ESTIMATE_PENDING')} · ${estimatePendingCount}`);
       }
       if (estimateApprovedButton) {
-        estimateApprovedButton.hidden = !data.canManageEstimate || estimateApprovedCount === 0;
+        estimateApprovedButton.hidden = !data.canApproveEstimate || estimateApprovedCount === 0;
         estimateApprovedButton.setAttribute('data-tooltip', `${t('OPEN_ESTIMATE_APPROVED')} · ${estimateApprovedCount}`);
         estimateApprovedButton.setAttribute('aria-label', `${t('OPEN_ESTIMATE_APPROVED')} · ${estimateApprovedCount}`);
       }

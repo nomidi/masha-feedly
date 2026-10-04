@@ -19,6 +19,8 @@ const config = {
   memberPassword: process.env.MASHA_FEEDLY_E2E_CREATOR_PASSWORD || localEnv.MASHA_FEEDLY_E2E_CREATOR_PASSWORD,
   managerEmail: process.env.MASHA_FEEDLY_E2E_ESTIMATE_MANAGER_EMAIL || localEnv.MASHA_FEEDLY_E2E_ESTIMATE_MANAGER_EMAIL,
   managerPassword: process.env.MASHA_FEEDLY_E2E_ESTIMATE_MANAGER_PASSWORD || localEnv.MASHA_FEEDLY_E2E_ESTIMATE_MANAGER_PASSWORD,
+  superadminEmail: process.env.MASHA_FEEDLY_E2E_SUPERADMIN_EMAIL || localEnv.MASHA_FEEDLY_E2E_SUPERADMIN_EMAIL,
+  superadminPassword: process.env.MASHA_FEEDLY_E2E_SUPERADMIN_PASSWORD || localEnv.MASHA_FEEDLY_E2E_SUPERADMIN_PASSWORD,
 };
 const missingConfig = Object.entries(config).filter(([, value]) => !value).map(([name]) => name);
 
@@ -47,8 +49,10 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
   const browser = await chromium.launch({ headless: true });
   const memberContext = await browser.newContext({ ignoreHTTPSErrors: true });
   const managerContext = await browser.newContext({ ignoreHTTPSErrors: true });
+  const superadminContext = await browser.newContext({ ignoreHTTPSErrors: true });
   const memberPage = await memberContext.newPage();
   const managerPage = await managerContext.newPage();
+  const superadminPage = await superadminContext.newPage();
   const unique = `E2E Kostenschätzung ${new Date().toISOString()} ${Math.random().toString(36).slice(2, 7)}`;
 
   try {
@@ -74,17 +78,21 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     const entryID = Number(created.entryID);
     assert.ok(entryID > 0, 'Der Eintrag muss eine gültige ID erhalten.');
 
-    const managerWidget = await signIn(managerPage, config.managerEmail, config.managerPassword);
-    assert.equal(await managerWidget.getAttribute('data-can-manage-estimate'), '1', 'Das separate Testkonto muss für Kostenschätzungen freigeschaltet sein.');
-    const hourlyRateValue = (await managerWidget.getAttribute('data-estimate-hourly-rate')) || '';
+    const superadminWidget = await signIn(superadminPage, config.superadminEmail, config.superadminPassword);
+    assert.equal(await superadminWidget.getAttribute('data-can-manage-estimate'), '1', 'Nur der konfigurierte Superadmin darf Kostenschätzungen bearbeiten.');
+    const hourlyRateValue = (await superadminWidget.getAttribute('data-estimate-hourly-rate')) || '';
     const hourlyRate = Number(hourlyRateValue.replace(',', '.'));
-    assert.ok(hourlyRate > 0, `Ein positiver Stundensatz muss hinterlegt und an den berechtigten Nutzer ausgegeben werden (Wert: ${hourlyRateValue || 'leer'}).`);
-    await openEntryList(managerPage, managerWidget);
-    const managerCard = managerWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(managerCard).toBeVisible();
-    await managerCard.click();
+    assert.ok(hourlyRate > 0, `Ein positiver Stundensatz muss hinterlegt und nur an den Superadmin ausgegeben werden (Wert: ${hourlyRateValue || 'leer'}).`);
+    const managerWidget = await signIn(managerPage, config.managerEmail, config.managerPassword);
+    assert.equal(await managerWidget.getAttribute('data-can-manage-estimate'), '0', 'Die Freigabeperson darf die Kostenschätzung nicht bearbeiten.');
+    assert.equal(await managerWidget.getAttribute('data-can-approve-estimate'), '1', 'Das separate Testkonto muss für Freigaben freigeschaltet sein.');
+    assert.equal(await managerWidget.getAttribute('data-estimate-hourly-rate'), '0', 'Der Stundensatz bleibt für die Freigabeperson verborgen.');
+    await openEntryList(superadminPage, superadminWidget);
+    const superadminCard = superadminWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
+    await expect(superadminCard).toBeVisible();
+    await superadminCard.click();
 
-    const editForm = managerWidget.locator('[data-masha-feedly-edit-form]');
+    const editForm = superadminWidget.locator('[data-masha-feedly-edit-form]');
     await expect(editForm).toBeVisible();
     const estimate = editForm.locator('[data-masha-feedly-estimate]');
     await expect(estimate).toBeHidden();
@@ -101,7 +109,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     await expect(preview).toContainText(String(hourlyRate * 2));
     await expect(preview).toContainText(String(hourlyRate * 4));
 
-    const pendingSavePromise = managerPage.waitForResponse((response) =>
+    const pendingSavePromise = superadminPage.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/updateEntry'));
     await editForm.locator('[type="submit"]').click();
     const pendingResponse = await pendingSavePromise;
@@ -123,16 +131,31 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     const pendingTitle = await pendingOption.textContent();
     assert.ok(pendingResult.history.some((item) => item.type === 'status' && item.newValue === pendingTitle), 'Das Anfordern der Kostenschätzung muss als Statuswechsel protokolliert sein.');
 
-    const approvedOption = categorySelect.locator('option[data-system-key="estimate_approved"]');
-    await categorySelect.selectOption(await approvedOption.getAttribute('value'));
+    await openEntryList(managerPage, managerWidget);
+    const reviewerCard = managerWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
+    await expect(reviewerCard).toBeVisible();
+    await expect(reviewerCard.locator('.kw-masha-feedly__entry-estimate-status')).toHaveAttribute('aria-label', /Kostenschätzung wartet auf Freigabe/u);
+    await reviewerCard.click();
+    const reviewerForm = managerWidget.locator('[data-masha-feedly-edit-form]');
+    const reviewerEstimate = reviewerForm.locator('[data-masha-feedly-estimate]');
+    await expect(reviewerEstimate).toBeVisible();
+    await expect(reviewerForm.locator('[name="EstimatedCostDuration"], [name="EstimatedCostNote"]')).toHaveCount(0, 'Freigabeperson sieht keinen Bearbeitungsdialog.');
+    await expect(reviewerEstimate.locator('[data-masha-feedly-estimate-summary]')).toContainText('2–4 Stunden');
+    await expect(reviewerEstimate.locator('[data-masha-feedly-estimate-summary]')).toContainText('Durchgängiger Browser-Test der Preisberechnung');
+    await expect(reviewerEstimate.locator('[data-masha-feedly-estimate-summary]')).toContainText(`${hourlyRate * 2}`);
+    const reviewerCategory = reviewerForm.locator('[name="CategoryID"]');
+    const approvedOption = reviewerCategory.locator('option[data-system-key="estimate_approved"]');
+    await reviewerCategory.selectOption(await approvedOption.getAttribute('value'));
     const approvePromise = managerPage.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/updateEntry'));
-    await editForm.locator('[type="submit"]').click();
+    await reviewerForm.locator('[type="submit"]').click();
     const approvalResponse = await approvePromise;
     const approvalResult = await approvalResponse.json();
     assert.equal(approvalResponse.ok(), true, `Kostenschätzung freigeben: ${approvalResult.message || approvalResponse.status()}`);
     assert.equal(approvalResult.success, true);
     assert.equal(approvalResult.categoryRole, 'estimate_approved');
+    assert.equal(approvalResult.canManageEstimate, false);
+    assert.equal(approvalResult.estimateNote, 'Durchgängiger Browser-Test der Preisberechnung');
     const approvedTitle = await approvedOption.textContent();
     assert.ok(approvalResult.history.some((item) => item.type === 'status' && item.newValue === approvedTitle), 'Die Freigabe muss im Verlauf sichtbar sein.');
 
@@ -149,21 +172,24 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     const protectedEntry = listResult.entries.find((entry) => Number(entry.id) === entryID);
     assert.ok(protectedEntry, 'Das normale Mitglied sieht seinen Eintrag weiterhin.');
     assert.equal(protectedEntry.categoryRole, 'restricted_estimate');
+    assert.equal(protectedEntry.categoryTitle, approvedTitle, 'Das normale Mitglied sieht den tatsächlichen Status am Eintrag.');
     for (const field of ['estimateAmount', 'estimateAmountMax', 'estimateDuration', 'estimateCurrency', 'estimateNote']) {
       assert.equal(Object.hasOwn(protectedEntry, field), false, `Das normale Mitglied darf ${field} nicht aus dem Server-Payload erhalten.`);
     }
     const memberCard = refreshedMemberWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
     await expect(memberCard).toBeVisible();
+    await expect(memberCard).toContainText(approvedTitle);
     await memberCard.click();
     const memberEditForm = refreshedMemberWidget.locator('[data-masha-feedly-edit-form]');
     await expect(memberEditForm.locator('[data-masha-feedly-estimate]')).toHaveCount(0);
     const memberCategorySelect = memberEditForm.locator('[name="CategoryID"]');
     await expect(memberCategorySelect.locator('option[data-system-key="estimate_pending"]')).toHaveCount(0);
     await expect(memberCategorySelect.locator('option[data-system-key="estimate_approved"]')).toHaveCount(0);
+    await expect(memberCategorySelect.locator('option').filter({ hasText: approvedTitle })).toHaveCount(0, 'Der vertrauliche Statusname erscheint nicht als auswählbare Kategorie.');
 
     const doingOption = categorySelect.locator('option[data-system-key="doing"]');
     await categorySelect.selectOption(await doingOption.getAttribute('value'));
-    const statusSavePromise = managerPage.waitForResponse((response) =>
+    const statusSavePromise = superadminPage.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/updateEntry'));
     await editForm.locator('[type="submit"]').click();
     const statusResponse = await statusSavePromise;
@@ -176,6 +202,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
   } finally {
     await memberContext.close();
     await managerContext.close();
+    await superadminContext.close();
     await browser.close();
   }
 });

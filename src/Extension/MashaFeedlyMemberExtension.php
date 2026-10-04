@@ -233,8 +233,8 @@ class MashaFeedlyMemberExtension extends Extension
         if ($isEstimateManager) {
             $fields->addFieldToTab('Root.MashaFeedly', CheckboxField::create(
                 'MashaFeedlyCanManageEstimates',
-                self::translate('PROFILE_CAN_MANAGE_ESTIMATES', 'Darf Kostenschätzungen und Freigaben verwalten')
-            )->setDescription(self::translate('PROFILE_CAN_MANAGE_ESTIMATES_DESCRIPTION', 'Nur der konfigurierte Masha:Feedly-Superadmin kann diese Berechtigung vergeben.')));
+                self::translate('PROFILE_CAN_MANAGE_ESTIMATES', 'Darf Kostenschätzungen freigeben')
+            )->setDescription(self::translate('PROFILE_CAN_MANAGE_ESTIMATES_DESCRIPTION', 'Die Person sieht Dauer, Erläuterung und geschätzten Preis und darf die Schätzung freigeben. Bearbeiten kann sie nur der konfigurierte Masha:Feedly-Superadmin.')));
         }
 
         if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($currentUser)) {

@@ -445,6 +445,7 @@ test('hält Karten kompakt und zeigt Beschreibung sowie Seitenbereich nach dem �
   const env = createWidgetEnvironment();
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
+  await new Promise((resolve) => setImmediate(resolve));
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   assert.ok(card.children.find((child) => child.className === 'kw-masha-feedly__entry-title'));
   assert.equal(card.children.some((child) => child.tagName === 'P' || child.tagName === 'A' || child.className === 'kw-masha-feedly__entry-context'), false);
@@ -1101,8 +1102,8 @@ test('liefert den Feedback-Button mit Wartetext, zugänglichem Label und passend
   assert.match(compiledStyles, /\.kw-masha-feedly__feedback-button\[hidden\]\{display:none !important\}/);
 });
 
-test('zeigt Schätzungswarteschlangen nur für Manager, mit passenden Icons, Zählern und Listenaktionen', () => {
-  assert.match(widgetTemplate, /<% if \$CanManageEstimate %>[\s\S]*?data-masha-feedly-open-estimate-pending[\s\S]*?data-masha-feedly-estimate-pending-count[\s\S]*?data-masha-feedly-open-estimate-approved[\s\S]*?data-masha-feedly-estimate-approved-count[\s\S]*?<% end_if %>/);
+test('zeigt Schätzungswarteschlangen für Freigabeberechtigte, mit passenden Icons, Zählern und Listenaktionen', () => {
+  assert.match(widgetTemplate, /<% if \$CanApproveEstimate %>[\s\S]*?data-masha-feedly-open-estimate-pending[\s\S]*?data-masha-feedly-estimate-pending-count[\s\S]*?data-masha-feedly-open-estimate-approved[\s\S]*?data-masha-feedly-estimate-approved-count[\s\S]*?<% end_if %>/);
   for (const buttonName of ['pending', 'approved']) {
     const button = widgetTemplate.match(new RegExp(`<button\\b(?=[^>]*data-masha-feedly-open-estimate-${buttonName})[\\s\\S]*?<\\/button>`))?.[0] || '';
     assert.match(button, /\shidden>/);
@@ -1111,12 +1112,18 @@ test('zeigt Schätzungswarteschlangen nur für Manager, mit passenden Icons, Zä
   assert.match(widgetTemplate, /data-masha-feedly-open-estimate-approved[\s\S]*?viewBox="0 0 512\.12 512\.12"[\s\S]*?data-masha-feedly-estimate-approved-count/);
   assert.match(widgetTemplate, /<option value="estimate-pending">/);
   assert.match(widgetTemplate, /<option value="estimate-approved">/);
-  assert.match(source, /estimatePendingButton\.hidden = !data\.canManageEstimate \|\| estimatePendingCount === 0/);
-  assert.match(source, /estimateApprovedButton\.hidden = !data\.canManageEstimate \|\| estimateApprovedCount === 0/);
+  assert.match(source, /estimatePendingButton\.hidden = !data\.canApproveEstimate \|\| estimatePendingCount === 0/);
+  assert.match(source, /estimateApprovedButton\.hidden = !data\.canApproveEstimate \|\| estimateApprovedCount === 0/);
   assert.match(source, /estimatePendingButton\?\.addEventListener\('click', \(event\) => openList\('estimate-pending'/);
   assert.match(source, /estimateApprovedButton\?\.addEventListener\('click', \(event\) => openList\('estimate-approved'/);
   assert.match(source, /'estimate-pending': 'ESTIMATE_PENDING_BUTTON', 'estimate-approved': 'ESTIMATE_APPROVED_BUTTON'/);
   assert.match(scss, /\.kw-masha-feedly__estimate-queue-button\[hidden\] \{ display: none !important; \}/);
+  assert.match(widgetTemplate, /<% if \$CanApproveEstimate %><section class="kw-masha-feedly__estimate"/);
+  assert.match(widgetTemplate, /<% if \$CanManageEstimate %><div class="kw-masha-feedly__estimate-fields"/);
+  assert.match(widgetTemplate, /data-masha-feedly-estimate-readonly/);
+  assert.match(scss, /\.kw-masha-feedly__entry-estimate-status\.is-approved/);
+  assert.match(source, /\['estimate_pending', 'estimate_approved'\]\.includes\(entry\.categoryRole\)/);
+  assert.match(source, /metadata\.append\(estimateStatus\)/);
 });
 
 test('hält das Kostenschätzungsfeld bis zur passenden Statusauswahl visuell verborgen', () => {
@@ -1488,6 +1495,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
       colorDepth: 24,
       categoryID: entryStatusOverride?.id ?? (mode === 'feedback' ? 6 : (entryIsClosed ? 4 : 1)),
       categoryTitle: entryStatusOverride?.title ?? (mode === 'feedback' ? 'Feedback' : (entryIsClosed ? 'Done' : 'Backlog')),
+      categoryRole: 'backlog',
       priorityID: 3,
       priorityTitle: priorityIconType === 'info' ? 'Info' : 'Normal',
       priorityColor: priorityIconType === 'info' ? '#4285c7' : '#d7a916',
