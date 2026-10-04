@@ -177,6 +177,7 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     await expect(reloadedCreatorWidget.locator('[data-masha-feedly-comments]')).toContainText(commentText);
     await expect(unreadCount).toHaveText(String(unreadBeforeOpen - 1));
     const comment = reloadedCreatorWidget.locator('[data-masha-feedly-comments] .kw-masha-feedly__comment').filter({ hasText: commentText });
+    let activeReaction = '';
     const react = async (emoji) => {
       const responsePromise = creatorPage.waitForResponse((response) =>
         response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/__masha-feedly-comment'));
@@ -188,6 +189,13 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
       const result = await response.json();
       assert.equal(response.ok(), true, `Reaktion ${emoji} speichern: ${result.message || response.status()}`);
       assert.equal(result.success, true);
+      const reactionEvent = (result.history || []).find((item) => item.type === 'comment_reaction');
+      assert.ok(reactionEvent, `Die Reaktion ${emoji} muss im Verlauf des Eintrags gespeichert werden.`);
+      const previousEmoji = activeReaction;
+      const nextEmoji = activeReaction === emoji ? '' : emoji;
+      assert.equal(reactionEvent.oldValue, previousEmoji);
+      assert.equal(reactionEvent.newValue, nextEmoji);
+      activeReaction = nextEmoji;
       return result.reactions.find((reaction) => reaction.emoji === emoji);
     };
     const heart = await react('❤️');
@@ -199,6 +207,12 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     assert.equal(await comment.locator('.kw-masha-feedly__comment-reaction-summary [data-reaction-emoji="❤️"]').count(), 0, 'Pro Person und Kommentar bleibt nur eine Reaktion aktiv.');
     await react('😂');
     assert.equal(await comment.locator('.kw-masha-feedly__comment-reaction-summary [data-reaction-emoji="😂"]').count(), 0, 'Ein erneuter Klick entfernt die eigene Reaktion.');
+    const historyDetails = reloadedCreatorWidget.locator('.kw-masha-feedly__history');
+    await historyDetails.locator('summary').click();
+    const historyList = historyDetails.locator('[data-masha-feedly-history]');
+    await expect(historyList).toContainText('Reaktion auf Kommentar geändert: Keine Reaktion → ❤️');
+    await expect(historyList).toContainText('Reaktion auf Kommentar geändert: ❤️ → 😂');
+    await expect(historyList).toContainText('Reaktion auf Kommentar geändert: 😂 → Keine Reaktion');
   } finally {
     await creatorContext.close();
     await commenterContext.close();

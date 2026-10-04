@@ -14,8 +14,10 @@ if (fs.existsSync(localEnvPath)) {
 }
 const config = {
   baseURL: process.env.MASHA_FEEDLY_E2E_BASE_URL || localEnv.MASHA_FEEDLY_E2E_BASE_URL,
-  onboardingEmail: process.env.MASHA_FEEDLY_E2E_ONBOARDING_EMAIL || localEnv.MASHA_FEEDLY_E2E_ONBOARDING_EMAIL,
-  onboardingPassword: process.env.MASHA_FEEDLY_E2E_ONBOARDING_PASSWORD || localEnv.MASHA_FEEDLY_E2E_ONBOARDING_PASSWORD,
+  onboardingEmail: process.env.MASHA_FEEDLY_E2E_ONBOARDING_EMAIL || localEnv.MASHA_FEEDLY_E2E_ONBOARDING_EMAIL
+    || process.env.MASHA_FEEDLY_E2E_CREATOR_EMAIL || localEnv.MASHA_FEEDLY_E2E_CREATOR_EMAIL,
+  onboardingPassword: process.env.MASHA_FEEDLY_E2E_ONBOARDING_PASSWORD || localEnv.MASHA_FEEDLY_E2E_ONBOARDING_PASSWORD
+    || process.env.MASHA_FEEDLY_E2E_CREATOR_PASSWORD || localEnv.MASHA_FEEDLY_E2E_CREATOR_PASSWORD,
 };
 const missingConfig = Object.entries(config).filter(([, value]) => !value).map(([name]) => name);
 
