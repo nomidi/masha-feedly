@@ -42,6 +42,8 @@ use SilverStripe\i18n\i18n;
  * @property string $PageURL Seitenadresse des gemeldeten Bereichs.
  * @property string $ElementSelector CSS-Auswahlpfad des gemeldeten Bereichs.
  * @property string $ElementText Lesbarer Text aus dem gemeldeten Bereich.
+ * @property string $ElementPositionX Horizontale Klickposition relativ zum ausgewählten Element.
+ * @property string $ElementPositionY Vertikale Klickposition relativ zum ausgewählten Element.
  * @property string $OperatingSystem Betriebssystem einschließlich erkannter Version.
  * @property string $Browser Browser einschließlich erkannter Version.
  * @property string $UserAgent Vom Browser übermittelte Kennung.
@@ -83,6 +85,8 @@ class MashaFeedlyEntry extends DataObject
         'PageURL' => 'Varchar(2048)',
         'ElementSelector' => 'Varchar(512)',
         'ElementText' => 'Text',
+        'ElementPositionX' => 'Varchar(16)',
+        'ElementPositionY' => 'Varchar(16)',
         'OperatingSystem' => 'Varchar(255)',
         'Browser' => 'Varchar(255)',
         'UserAgent' => 'Varchar(512)',
@@ -191,6 +195,8 @@ class MashaFeedlyEntry extends DataObject
         $fields->fieldByName('PageURL')?->setTitle($this->translate('FIELD_PAGE_URL', 'Seitenadresse'))->setReadonly(true);
         $fields->fieldByName('ElementSelector')?->setTitle($this->translate('FIELD_SELECTOR', 'Ausgewählter Bereich'))->setReadonly(true);
         $fields->fieldByName('ElementText')?->setTitle($this->translate('FIELD_ELEMENT_TEXT', 'Text im ausgewählten Bereich'))->setReadonly(true);
+        $fields->fieldByName('ElementPositionX')?->setTitle($this->translate('FIELD_ELEMENT_POSITION_X', 'Klickstelle X (relativ)'))->setReadonly(true);
+        $fields->fieldByName('ElementPositionY')?->setTitle($this->translate('FIELD_ELEMENT_POSITION_Y', 'Klickstelle Y (relativ)'))->setReadonly(true);
         $fields->fieldByName('OperatingSystem')?->setTitle($this->translate('FIELD_OPERATING_SYSTEM', 'Betriebssystem'))->setReadonly(true);
         $fields->fieldByName('Browser')?->setTitle($this->translate('FIELD_BROWSER', 'Browser'))->setReadonly(true);
         $fields->fieldByName('UserAgent')?->setTitle($this->translate('FIELD_USER_AGENT', 'Browserkennung'))->setReadonly(true);

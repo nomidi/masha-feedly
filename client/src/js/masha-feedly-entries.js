@@ -388,8 +388,14 @@ window.KWMashaFeedlyEntries = (() => {
     marker.innerHTML = '<svg class="kw-masha-feedly__page-marker-icon" viewBox="0 0 612.001 612.001" aria-hidden="true" focusable="false"><path d="M64.601 236.822c0 157.434 128.185 375.178 241.4 375.178 106.581 0 241.399-217.744 241.399-375.178S439.322 0 306 0 64.601 79.388 64.601 236.822zm304.12 116.415c29.475-29.475 70.598-40.195 108.552-32.173 8.021 37.954-2.698 79.077-32.173 108.552-29.475 29.475-70.598 40.195-108.552 32.173 1.978-37.955 12.698-79.078 42.173-108.552zm-233.994-32.174c37.954-8.021 79.077 2.698 108.552 32.173 29.475 29.475 40.195 70.598 32.173 108.552-37.954-8.021-79.077-2.698-108.552-32.173-29.475-29.476-40.194-70.598-32.173-108.552z"/></svg>';
     const reposition = () => {
       const bounds = target.getBoundingClientRect();
-      marker.style.left = `${Math.max(8, Math.min(bounds.left + Math.min(bounds.width / 2, 24), window.innerWidth - 42))}px`;
-      marker.style.top = `${Math.max(8, bounds.top - 10)}px`;
+      const hasPosition = entry.elementPositionX !== '' && entry.elementPositionX !== null && entry.elementPositionX !== undefined
+        && entry.elementPositionY !== '' && entry.elementPositionY !== null && entry.elementPositionY !== undefined
+        && Number.isFinite(Number(entry.elementPositionX)) && Number.isFinite(Number(entry.elementPositionY));
+      const xRatio = hasPosition ? Math.max(0, Math.min(1, Number(entry.elementPositionX))) : 0.5;
+      const yRatio = hasPosition ? Math.max(0, Math.min(1, Number(entry.elementPositionY))) : 0.5;
+      const edge = 24;
+      marker.style.left = `${Math.max(edge, Math.min(bounds.left + bounds.width * xRatio, window.innerWidth - edge))}px`;
+      marker.style.top = `${Math.max(edge, Math.min(bounds.top + bounds.height * yRatio, window.innerHeight - edge))}px`;
     };
     marker.reposition = reposition;
     marker.addEventListener('click', onClick);

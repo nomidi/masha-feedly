@@ -29,7 +29,17 @@ window.KWMashaFeedlyEnvironment = (() => {
       colorDepth: Number(screen.colorDepth) > 0 ? String(screen.colorDepth) : '',
     };
   };
-  return { collect };
+  /** Speichert die Klickstelle relativ zum ausgewählten Element, damit sie bei anderer Fenstergröße wiederfindbar ist. */
+  const elementPosition = (element, clientX, clientY) => {
+    const bounds = element?.getBoundingClientRect?.();
+    if (!bounds || bounds.width <= 0 || bounds.height <= 0) return { x: '0.5', y: '0.5' };
+    const ratio = (value, start, size) => {
+      const coordinate = Number(value);
+      return Number.isFinite(coordinate) ? Math.min(1, Math.max(0, (coordinate - start) / size)).toFixed(5) : '0.5';
+    };
+    return { x: ratio(clientX, bounds.left, bounds.width), y: ratio(clientY, bounds.top, bounds.height) };
+  };
+  return { collect, elementPosition };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -120,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const selector = options.elementSelector || getElementSelector(element);
     const selectedText = options.selectedText ?? (element.innerText || element.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 220);
     context.textContent = selectedText ? t('ENTRY_SELECTED_CONTEXT', { text: selectedText }) : t('ENTRY_CONTEXT_EMPTY');
-    ['PageURL', 'ElementSelector', 'ElementText', 'OperatingSystem', 'Browser', 'UserAgent', 'Resolution', 'BrowserWindow', 'ColorDepth']
+    ['PageURL', 'ElementSelector', 'ElementText', 'ElementPositionX', 'ElementPositionY', 'OperatingSystem', 'Browser', 'UserAgent', 'Resolution', 'BrowserWindow', 'ColorDepth']
       .forEach((name) => form.querySelector(`[name="${name}"]`)?.remove());
     const browserInfo = window.KWMashaFeedlyEnvironment.collect(
       window.navigator?.userAgent || '',
@@ -132,6 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
       ['PageURL', window.location.href],
       ['ElementSelector', selector],
       ['ElementText', selectedText],
+      ['ElementPositionX', options.elementPosition?.x ?? ''],
+      ['ElementPositionY', options.elementPosition?.y ?? ''],
       ['OperatingSystem', browserInfo.operatingSystem],
       ['Browser', browserInfo.browser],
       ['UserAgent', browserInfo.userAgent],
@@ -203,7 +215,11 @@ document.addEventListener('DOMContentLoaded', () => {
     event.stopPropagation();
     const element = event.target.closest('body *');
     stopSelection();
-    if (element && element !== document.body) showEntryDialog(element);
+    if (element && element !== document.body) {
+      showEntryDialog(element, {
+        elementPosition: window.KWMashaFeedlyEnvironment.elementPosition(element, event.clientX, event.clientY),
+      });
+    }
   }, true);
 
   widget.querySelector('[data-masha-feedly-cancel-selection]')?.addEventListener('click', cancelSelection);

@@ -684,14 +684,14 @@ test('erstellt eine sichtbare Blase am Element und lässt sie anklicken', () => 
     addEventListener(name, callback) { if (name === 'click') clickHandler = callback; },
   };
   const fakeDocument = { createElement: (tag) => { marker.tagName = tag; return marker; } };
-  const target = { getBoundingClientRect: () => ({ left: 120, top: 90, width: 180 }) };
+  const target = { getBoundingClientRect: () => ({ left: 120, top: 90, width: 180, height: 80 }) };
   const opened = [];
   const rendered = entriesUI.createMarker(
-    { id: 44, title: 'Kontaktbutton fehlt', categoryTitle: 'To Do', priorityColor: '#d7a916' },
+    { id: 44, title: 'Kontaktbutton fehlt', categoryTitle: 'To Do', priorityColor: '#d7a916', elementPositionX: '0.25', elementPositionY: '0.75' },
     2,
     target,
     fakeDocument,
-    { innerWidth: 800 },
+    { innerWidth: 800, innerHeight: 600 },
     () => opened.push(44)
   );
   assert.equal(rendered.tagName, 'button');
@@ -699,8 +699,8 @@ test('erstellt eine sichtbare Blase am Element und lässt sie anklicken', () => 
   assert.equal(rendered['data-marker-number'], '3');
   assert.match(rendered.innerHTML, /class="kw-masha-feedly__page-marker-icon" viewBox="0 0 612\.001 612\.001"/);
   assert.match(rendered.innerHTML, /M64\.601 236\.822/);
-  assert.equal(rendered.style.left, '144px');
-  assert.equal(rendered.style.top, '80px');
+  assert.equal(rendered.style.left, '165px');
+  assert.equal(rendered.style.top, '150px');
   assert.equal(rendered.style['--masha-feedly-priority-color'], '#d7a916');
   assert.equal(rendered.title, 'To Do · Kontaktbutton fehlt');
   clickHandler({});
@@ -712,7 +712,7 @@ test('verwendet für Seitenmarkierungen nur gültige Prioritätsfarben', () => {
     dataset: {}, style: { setProperty(name, value) { this[name] = value; } },
     setAttribute() {}, addEventListener() {},
   };
-  const target = { getBoundingClientRect: () => ({ left: 120, top: 90, width: 180 }) };
+  const target = { getBoundingClientRect: () => ({ left: 120, top: 90, width: 180, height: 80 }) };
   entriesUI.createMarker(
     { id: 45, title: 'Ungültige Farbe', priorityColor: 'red; background:url(javascript:alert(1))' },
     0,

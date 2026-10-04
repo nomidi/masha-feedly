@@ -239,6 +239,23 @@ test('erkennt Betriebssystem und Browser samt Version, Auflösung, Fenstergröß
   assert.match(info.userAgent, /Chrome\/152/);
 });
 
+test('speichert den Klickpunkt relativ zum ausgewählten Seitenelement', () => {
+  const env = createEnvironment();
+  const target = new TestElement('main', { id: 'content' });
+  target.getBoundingClientRect = () => ({ left: 100, top: 50, width: 200, height: 100 });
+  env.startButton.listeners.click();
+  env.documentListeners.click({
+    target,
+    clientX: 150,
+    clientY: 125,
+    preventDefault() {},
+    stopPropagation() {},
+  });
+
+  assert.equal(env.form.fields['[name="ElementPositionX"]'].value, '0.25000');
+  assert.equal(env.form.fields['[name="ElementPositionY"]'].value, '0.75000');
+});
+
 test('startet die Bereichsauswahl, übernimmt Seitenelement und Browserdaten', () => {
   const env = createEnvironment();
   env.startButton.listeners.click();

@@ -728,6 +728,8 @@ class MashaFeedlyEntryController extends Controller
         $entry->PageURL = $this->safePageURL((string)$request->postVar('PageURL'));
         $entry->ElementSelector = mb_substr(trim((string)$request->postVar('ElementSelector')), 0, 512);
         $entry->ElementText = mb_substr(trim((string)$request->postVar('ElementText')), 0, 5000);
+        $entry->ElementPositionX = $this->relativeElementPosition($request->postVar('ElementPositionX'));
+        $entry->ElementPositionY = $this->relativeElementPosition($request->postVar('ElementPositionY'));
         $entry->OperatingSystem = $this->postedText($request, 'OperatingSystem', 255);
         $entry->Browser = $this->postedText($request, 'Browser', 255);
         $entry->UserAgent = $this->postedText($request, 'UserAgent', 512);
@@ -969,6 +971,15 @@ class MashaFeedlyEntryController extends Controller
         return is_scalar($value) ? mb_substr(trim((string)$value), 0, $maximumLength) : '';
     }
 
+    /** Akzeptiert nur eine normalisierte Koordinate zwischen 0 und 1. */
+    private function relativeElementPosition(mixed $value): string
+    {
+        if (!is_scalar($value) || trim((string)$value) === '' || !is_numeric($value)) {
+            return '';
+        }
+        return number_format(max(0, min(1, (float)$value)), 5, '.', '');
+    }
+
     /** Bereitet einen Eintrag ohne ungeprüftes HTML für die Widget-Ausgabe auf. */
     private function entryData(MashaFeedlyEntry $entry, Member $currentMember): array
     {
@@ -1007,6 +1018,8 @@ class MashaFeedlyEntryController extends Controller
             'pageURL' => (string)$entry->PageURL,
             'selector' => (string)$entry->ElementSelector,
             'elementText' => (string)$entry->ElementText,
+            'elementPositionX' => (string)$entry->ElementPositionX,
+            'elementPositionY' => (string)$entry->ElementPositionY,
             'loggedAt' => (string)$entry->Created,
             'createdBy' => $reportedBy,
             'createdAt' => (string)($creationEvent['created'] ?? ''),

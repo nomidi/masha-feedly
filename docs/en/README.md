@@ -13,7 +13,7 @@ Newly approved users receive a welcome email. On their first visit, an onboardin
 1. Open Masha:Feedly using the icon in the lower-right corner.
 2. Select **+**, then click the affected area of the page.
 3. Enter a title and description. Add a status, priority, assignees, or files if needed.
-4. Save the entry. A numbered marker points to its location on the page.
+4. Save the entry. A numbered marker points to the clicked spot on the selected element and stays relative to that element when the window size changes.
 
 Comments support links. Images appear inline; PDF and ZIP files are shown as protected download links. Only people with Masha:Feedly access can view entries and attachments.
 

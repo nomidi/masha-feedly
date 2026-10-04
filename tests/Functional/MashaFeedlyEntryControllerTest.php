@@ -349,6 +349,8 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             'PageURL' => 'https://example.test/kontakt/?campaign=mailing#formular',
             'ElementSelector' => 'main > button.primary',
             'ElementText' => 'Absenden',
+            'ElementPositionX' => '0.12500',
+            'ElementPositionY' => '0.87500',
             'OperatingSystem' => 'Mac OS 10.15.7',
             'Browser' => 'Chrome 152.0.0.0',
             'UserAgent' => 'Mozilla/5.0 Mac OS X 10_15_7 Chrome/152.0.0.0',
@@ -369,6 +371,8 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame('https://example.test/kontakt', (string)$entry->PageURL);
         $this->assertSame('main > button.primary', (string)$entry->ElementSelector);
         $this->assertSame('Absenden', (string)$entry->ElementText);
+        $this->assertSame('0.12500', (string)$entry->ElementPositionX);
+        $this->assertSame('0.87500', (string)$entry->ElementPositionY);
         $this->assertSame('Mac OS 10.15.7', (string)$entry->OperatingSystem);
         $this->assertSame('Chrome 152.0.0.0', (string)$entry->Browser);
         $this->assertSame('Mozilla/5.0 Mac OS X 10_15_7 Chrome/152.0.0.0', (string)$entry->UserAgent);
@@ -385,6 +389,8 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame('Mac OS 10.15.7', $listedEntry['operatingSystem']);
         $this->assertSame('Chrome 152.0.0.0', $listedEntry['browser']);
         $this->assertSame('main > button.primary', $listedEntry['selector']);
+        $this->assertSame('0.12500', $listedEntry['elementPositionX']);
+        $this->assertSame('0.87500', $listedEntry['elementPositionY']);
         $this->assertSame('2560 × 1440 px', $listedEntry['resolution']);
         $this->assertSame('1943 × 1294 px', $listedEntry['browserWindow']);
         $this->assertSame(24, $listedEntry['colorDepth']);
