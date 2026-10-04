@@ -203,6 +203,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/hearts.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/arcade.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/retro.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/dino.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/check.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/glow.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rings.js');
@@ -255,6 +256,10 @@ class MashaFeedlyAdmin extends ModelAdmin
             . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🪟</span>'
             . '<div><strong>' . self::translate('CONFIG_ANIMATION_RETRO', 'Retro: Windows 80er/90er') . '</strong>'
             . '<button type="button" data-masha-feedly-animation-preview="retro" data-preview-message="' . $playfulMessage
+            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
+            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🦖</span>'
+            . '<div><strong>' . self::translate('CONFIG_ANIMATION_DINO', 'Pixel-Dino frisst den Speichern-Button') . '</strong>'
+            . '<button type="button" data-masha-feedly-animation-preview="dino" data-preview-message="' . $playfulMessage
             . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
             . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">✓</span>'
             . '<div><strong>' . self::translate('CONFIG_ANIMATION_CHECK', 'Gezeichnetes Häkchen') . '</strong>'

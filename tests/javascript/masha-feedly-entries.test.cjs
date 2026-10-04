@@ -7,12 +7,12 @@ const vm = require('node:vm');
 /** Tests für Sortierung, Kategorien und am Seitenbereich verankerte Eintragsblasen. @author Kooperative Web */
 const source = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-entries.js'), 'utf8');
 const compiledSource = fs.readFileSync(path.resolve(__dirname, '../../client/dist/js/masha-feedly-entries.js'), 'utf8');
-const effectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/js/effects/${name}.js`), 'utf8'));
-const compiledEffectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/dist/js/effects/${name}.js`), 'utf8'));
+const effectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'dino', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/js/effects/${name}.js`), 'utf8'));
+const compiledEffectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'dino', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/dist/js/effects/${name}.js`), 'utf8'));
 const scss = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly.scss'), 'utf8');
 const compiledStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly.css'), 'utf8');
 const compiledAdminStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly-admin.css'), 'utf8');
-const effectStyles = ['_confetti.scss', '_unicorn.scss', '_rocket.scss', '_hearts.scss', '_arcade.scss', '_retro.scss', '_check.scss', '_glow.scss', '_rings.scss', '_confirmation.scss'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/scss/effects/${name}`), 'utf8'));
+const effectStyles = ['_confetti.scss', '_unicorn.scss', '_rocket.scss', '_hearts.scss', '_arcade.scss', '_retro.scss', '_dino.scss', '_check.scss', '_glow.scss', '_rings.scss', '_confirmation.scss'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/scss/effects/${name}`), 'utf8'));
 const widgetTemplate = fs.readFileSync(path.resolve(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
 const germanTranslations = fs.readFileSync(path.resolve(__dirname, '../../lang/de.yml'), 'utf8');
 const messages = {
@@ -790,9 +790,9 @@ test('lässt nach einem Abschluss das Einhorn-Asset über die Seite laufen', () 
   assert.equal(layer.removed, true);
 });
 
-test('bricht alle neun Abschlussanimationen beim nächsten Klick vollständig ab', () => {
+test('bricht alle zehn Abschlussanimationen beim nächsten Klick vollständig ab', () => {
   const runnerSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/effects/runner.js'), 'utf8');
-  const animationNames = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'check', 'glow', 'rings', 'confirmation'];
+  const animationNames = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'dino', 'check', 'glow', 'rings', 'confirmation'];
   const removedByEffect = new Map();
   const modules = Object.fromEntries(animationNames.map((name) => [name, {
     play() {
@@ -860,32 +860,32 @@ test('startet beim Raketenstart eine barrierefreie Rakete mit Sternenspur und r�
   assert.equal(layer.removed, true);
 });
 
-test('wählt theme-basiert zwischen Einhorn, Raketenstart, Herzregen, Arcade-Level und Retro-Fenster', () => {
+test('wählt theme-basiert zwischen Einhorn, Raketenstart, Herzregen, Arcade-Level, Retro-Fenster und Dino', () => {
   const layers = [];
   const document = {
     body: { append(layer) { layers.push(layer); } },
     createElement(tagName) {
       return tagName === 'div'
-        ? { children: [], setAttribute(name, value) { this[name] = value; }, append(item) { this.children.push(item); }, remove() {} }
-        : { children: [], style: {}, dataset: {}, setAttribute(name, value) { this[name] = value; }, append(...items) { this.children.push(...items); } };
+        ? { children: [], style: { setProperty(name, value) { this[name] = value; } }, setAttribute(name, value) { this[name] = value; }, append(item) { this.children.push(item); }, remove() {} }
+        : { children: [], style: { setProperty(name, value) { this[name] = value; } }, dataset: {}, setAttribute(name, value) { this[name] = value; }, append(...items) { this.children.push(...items); } };
     },
   };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout() {} };
+  const window = { innerWidth: 1200, innerHeight: 800, matchMedia: () => ({ matches: false }), setTimeout() {} };
   const unicornCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.1);
   assert.ok(unicornCompletion.confetti);
   assert.ok(unicornCompletion.unicorn);
   assert.equal(unicornCompletion.rocket, undefined);
   assert.equal(unicornCompletion.unicorn.children[0].src, '/unicorn.svg');
-  const rocketCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.35);
+  const rocketCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.2);
   assert.deepEqual(Object.keys(rocketCompletion), ['rocket']);
   assert.equal(layers.at(-1).className, 'kw-masha-feedly__rocket-runner');
-  const heartsCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.45);
+  const heartsCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.4);
   assert.deepEqual(Object.keys(heartsCompletion), ['hearts']);
   assert.equal(heartsCompletion.hearts.className, 'kw-masha-feedly__heart-burst');
   assert.equal(heartsCompletion.hearts.children.length, 28);
   assert.equal(heartsCompletion.hearts.children[0].textContent, '♥');
   assert.equal(heartsCompletion.hearts.children[0].style.color, '#ff3b91');
-  const arcadeCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.65);
+  const arcadeCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.55);
   assert.deepEqual(Object.keys(arcadeCompletion), ['arcade']);
   assert.equal(arcadeCompletion.arcade.className, 'kw-masha-feedly__arcade-effect');
   const arcadeScreen = arcadeCompletion.arcade.children[0];
@@ -893,10 +893,17 @@ test('wählt theme-basiert zwischen Einhorn, Raketenstart, Herzregen, Arcade-Lev
   assert.equal(arcadeScreen.children.filter((child) => child.className === 'kw-masha-feedly__arcade-pixel').length, 56);
   assert.equal(arcadeScreen.children.filter((child) => child.className === 'kw-masha-feedly__arcade-invader').length, 4);
   assert.equal(arcadeScreen.children.at(-1).textContent, 'MISSION COMPLETE!');
-  const retroCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.9);
+  const retroCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.72);
   assert.deepEqual(Object.keys(retroCompletion), ['retro']);
   assert.equal(retroCompletion.retro.className, 'kw-masha-feedly__retro-effect');
   assert.equal(retroCompletion.retro.children[0].className, 'kw-masha-feedly__retro-dialog');
+  const dinoCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.9);
+  assert.deepEqual(Object.keys(dinoCompletion), ['dino']);
+  assert.equal(dinoCompletion.dino.className, 'kw-masha-feedly__dino-effect');
+  assert.equal(dinoCompletion.dino.children[0].textContent, 'Speichern');
+  assert.match(dinoCompletion.dino.children[1].innerHTML, /viewBox="0 0 56 60"/);
+  assert.equal(dinoCompletion.dino.children[2].textContent, 'HAPS!');
+  assert.equal(dinoCompletion.dino.children.filter((child) => child.className === 'kw-masha-feedly__dino-pixel').length, 10);
   const rocketPreview = entriesUI.previewCompletionAnimation(document, window, 'rocket', '/unicorn.svg');
   assert.equal(rocketPreview.confetti, undefined);
   assert.equal(rocketPreview.unicorn, undefined);
@@ -907,6 +914,8 @@ test('wählt theme-basiert zwischen Einhorn, Raketenstart, Herzregen, Arcade-Lev
   assert.equal(arcadePreview.arcade.children[0].children.at(-1).textContent, 'MISSION COMPLETE!');
   const retroPreview = entriesUI.previewCompletionAnimation(document, window, 'retro', '/unicorn.svg');
   assert.equal(retroPreview.retro.className, 'kw-masha-feedly__retro-effect');
+  const dinoPreview = entriesUI.previewCompletionAnimation(document, window, 'dino', '/unicorn.svg');
+  assert.equal(dinoPreview.dino.children[0].textContent, 'Speichern');
   const playful = entriesUI.previewCompletionAnimation(document, window, 'playful', '/unicorn.svg');
   assert.ok(playful.confetti);
   assert.ok(playful.unicorn);
@@ -919,6 +928,35 @@ test('wählt theme-basiert zwischen Einhorn, Raketenstart, Herzregen, Arcade-Lev
   const reducedWindow = { matchMedia: () => ({ matches: true }) };
   assert.equal(entriesUI.previewCompletionAnimation(document, reducedWindow, 'rocket'), null);
   assert.equal(entriesUI.celebrateCompletion(document, reducedWindow, '/unicorn.svg', 'playful', () => { throw new Error('Zufall darf bei reduzierter Bewegung nicht ausgewertet werden.'); }), null);
+});
+
+test('lässt den grünen T-Rex zum Speichern-Button laufen und zerbeißt dessen Darstellung', () => {
+  const layer = { children: [], style: { setProperty(name, value) { this[name] = value; } }, setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() {} };
+  const saveButton = { textContent: 'Änderungen speichern →', getClientRects: () => [{}], getBoundingClientRect: () => ({ left: 320, top: 460, width: 180, height: 48 }) };
+  let created = 0;
+  const document = {
+    querySelectorAll(selector) { assert.equal(selector, 'button.kw-masha-feedly__submit[type="submit"]'); return [saveButton]; },
+    createElement() { created += 1; return created === 1 ? layer : { className: '', style: {}, children: [], append(child) { this.children.push(child); } }; },
+    body: { append(item) { this.layer = item; } },
+  };
+  const simulatedWindow = { innerWidth: 1200, innerHeight: 800, matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { assert.equal(delay, 3400); }, KWMashaFeedlyEffectModules: {} };
+  vm.runInNewContext(effectSources[5], { window: simulatedWindow });
+  const result = simulatedWindow.KWMashaFeedlyEffectModules.dino.play(document, simulatedWindow);
+  assert.equal(result.dino, layer);
+  assert.equal(layer.style['--dino-target-left'], '320px');
+  assert.equal(layer.style['--dino-target-top'], '460px');
+  assert.equal(layer.style['--dino-target-width'], '180px');
+  assert.equal(layer.style['--dino-bite-left'], '452px');
+  assert.equal(layer.children[0].textContent, 'Änderungen speichern →');
+  assert.equal(layer.children[1].className, 'kw-masha-feedly__dino-character');
+  assert.match(layer.children[1].innerHTML, /viewBox="0 0 56 60"/);
+  assert.match(layer.children[1].innerHTML, /fill="#60a917"/);
+  assert.match(effectStyles[6], /translateX\(calc\(100vw \+ 17rem\)\)/);
+  assert.match(effectStyles[6], /--dino-bite-left/);
+  assert.doesNotMatch(effectStyles[6], /scaleX\(-1\)/);
+  assert.equal(layer.children[2].textContent, 'HAPS!');
+  assert.equal(layer.children.filter((child) => child.className === 'kw-masha-feedly__dino-pixel').length, 10);
+  assert.equal(saveButton.className, undefined, 'Die gespeicherte Schaltfläche wird nur visuell überlagert, nicht im DOM verändert.');
 });
 
 test('spielt beim 8-Bit-Erfolg eine kurze, freigeschaltete Chiptune-Siegsmelodie', async () => {
@@ -960,14 +998,15 @@ test('Admin-Vorschau nutzt die auswählbaren verspielten Abschlussanimationen', 
   assert.match(adminPHP, /data-masha-feedly-animation-preview="hearts"/);
   assert.match(adminPHP, /data-masha-feedly-animation-preview="arcade"/);
   assert.match(adminPHP, /data-masha-feedly-animation-preview="retro"/);
+  assert.match(adminPHP, /data-masha-feedly-animation-preview="dino"/);
   const widgetPHP = fs.readFileSync(path.resolve(__dirname, '../../src/Extension/MashaFeedlyWidgetExtension.php'), 'utf8');
   for (const name of ['check', 'glow', 'rings', 'confirmation']) {
     assert.match(adminPHP, new RegExp(`data-masha-feedly-animation-preview="${name}"`));
   }
-  const orderedEffects = 'effects/unicorn\\.js[\\s\\S]*effects/rocket\\.js[\\s\\S]*effects/hearts\\.js[\\s\\S]*effects/arcade\\.js[\\s\\S]*effects/retro\\.js[\\s\\S]*effects/check\\.js[\\s\\S]*effects/glow\\.js[\\s\\S]*effects/rings\\.js[\\s\\S]*effects/confirmation\\.js[\\s\\S]*effects/runner\\.js[\\s\\S]*masha-feedly-entries\\.js';
+  const orderedEffects = 'effects/unicorn\\.js[\\s\\S]*effects/rocket\\.js[\\s\\S]*effects/hearts\\.js[\\s\\S]*effects/arcade\\.js[\\s\\S]*effects/retro\\.js[\\s\\S]*effects/dino\\.js[\\s\\S]*effects/check\\.js[\\s\\S]*effects/glow\\.js[\\s\\S]*effects/rings\\.js[\\s\\S]*effects/confirmation\\.js[\\s\\S]*effects/runner\\.js[\\s\\S]*masha-feedly-entries\\.js';
   assert.match(adminPHP, new RegExp(orderedEffects));
   assert.match(widgetPHP, new RegExp(orderedEffects));
-  assert.match(scss, /@use 'effects\/confetti';[\s\S]*@use 'effects\/unicorn';[\s\S]*@use 'effects\/rocket';[\s\S]*@use 'effects\/hearts';[\s\S]*@use 'effects\/arcade';[\s\S]*@use 'effects\/retro';[\s\S]*@use 'effects\/check';[\s\S]*@use 'effects\/glow';[\s\S]*@use 'effects\/rings';[\s\S]*@use 'effects\/confirmation';/);
+  assert.match(scss, /@use 'effects\/confetti';[\s\S]*@use 'effects\/unicorn';[\s\S]*@use 'effects\/rocket';[\s\S]*@use 'effects\/hearts';[\s\S]*@use 'effects\/arcade';[\s\S]*@use 'effects\/retro';[\s\S]*@use 'effects\/dino';[\s\S]*@use 'effects\/check';[\s\S]*@use 'effects\/glow';[\s\S]*@use 'effects\/rings';[\s\S]*@use 'effects\/confirmation';/);
   assert.deepEqual(compiledEffectSources, effectSources);
   assert.match(effectStyles[0], /kw-masha-feedly__confetti-piece/);
   assert.match(effectStyles[1], /kw-masha-feedly__unicorn-runner/);
@@ -987,12 +1026,14 @@ test('Admin-Vorschau nutzt die auswählbaren verspielten Abschlussanimationen', 
   assert.match(effectStyles[4], /kw-masha-feedly__arcade-message/);
   assert.match(effectStyles[5], /kw-masha-feedly__retro-dialog/);
   assert.match(effectStyles[5], /#000080/);
-  assert.match(effectStyles[6], /kw-masha-feedly__serious-check-mark/);
-  assert.match(effectStyles[7], /kw-masha-feedly__serious-glow/);
-  assert.match(effectStyles[7], /::before[\s\S]*?radial-gradient[\s\S]*?opacity: 1[\s\S]*?scale\(1\.7\)/);
-  assert.match(effectStyles[7], /::after[\s\S]*?border: 3px solid[\s\S]*?scale\(3\.4\)/);
-  assert.match(effectStyles[8], /kw-masha-feedly__serious-ring/);
-  assert.match(effectStyles[9], /kw-masha-feedly__serious-confirmation-card/);
+  assert.match(effectStyles[6], /kw-masha-feedly__dino-character/);
+  assert.match(effectStyles[6], /kw-masha-feedly-dino-eaten/);
+  assert.match(effectStyles[7], /kw-masha-feedly__serious-check-mark/);
+  assert.match(effectStyles[8], /kw-masha-feedly__serious-glow/);
+  assert.match(effectStyles[8], /::before[\s\S]*?radial-gradient[\s\S]*?opacity: 1[\s\S]*?scale\(1\.7\)/);
+  assert.match(effectStyles[8], /::after[\s\S]*?border: 3px solid[\s\S]*?scale\(3\.4\)/);
+  assert.match(effectStyles[9], /kw-masha-feedly__serious-ring/);
+  assert.match(effectStyles[10], /kw-masha-feedly__serious-confirmation-card/);
   assert.match(compiledStyles, /kw-masha-feedly__rocket-runner/);
 });
 
@@ -2266,16 +2307,19 @@ test('startet erst nach bestätigtem Feedback-Abschluss zufällig einen passende
   const hearts = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__heart-burst');
   const arcade = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__arcade-effect');
   const retro = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__retro-effect');
-  assert.ok((party && unicorn && !rocket && !hearts && !arcade && !retro)
-    || (!party && !unicorn && rocket && !hearts && !arcade && !retro)
-    || (!party && !unicorn && !rocket && hearts && !arcade && !retro)
-    || (!party && !unicorn && !rocket && !hearts && arcade && !retro)
-    || (!party && !unicorn && !rocket && !hearts && !arcade && retro));
+  const dino = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__dino-effect');
+  assert.ok((party && unicorn && !rocket && !hearts && !arcade && !retro && !dino)
+    || (!party && !unicorn && rocket && !hearts && !arcade && !retro && !dino)
+    || (!party && !unicorn && !rocket && hearts && !arcade && !retro && !dino)
+    || (!party && !unicorn && !rocket && !hearts && arcade && !retro && !dino)
+    || (!party && !unicorn && !rocket && !hearts && !arcade && retro && !dino)
+    || (!party && !unicorn && !rocket && !hearts && !arcade && !retro && dino));
   if (party && unicorn) {
     assert.equal(party.children.length, 128);
     assert.equal(unicorn.children[0].src, env.widget.dataset.unicornUrl);
   }
   if (retro) assert.equal(retro.children[0].className, 'kw-masha-feedly__retro-dialog');
+  if (dino) assert.equal(dino.children[0].className, 'kw-masha-feedly__dino-save-copy');
   assert.equal(env.editContext.textContent, 'Status: Fertig');
 });
 
