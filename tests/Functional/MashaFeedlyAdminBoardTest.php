@@ -437,6 +437,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertStringContainsString('masha-feedly-board__assignees', $body);
+        $this->assertStringContainsString('data-has-assignees="true"', $body);
         $response = $this->get('/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry');
         $body = $response->getBody();
         $this->assertStringContainsString(

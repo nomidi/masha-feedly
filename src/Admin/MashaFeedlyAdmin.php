@@ -615,6 +615,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                     . (int)$entry->ID . '" data-entry-unread="'
                     . ($isUnread ? 'true' : 'false')
                     . '" data-assigned-member-ids="' . $this->escapeBoardValue(implode(',', $assignedEntryMemberIDs))
+                    . '" data-has-assignees="' . ($assignedEntryMemberIDs ? 'true' : 'false')
                     . '"><div class="masha-feedly-board__card-topline"><span class="masha-feedly-board__entry-number">#'
                     . (int)$entry->ID . '</span>';
                 $priority = $entry->Priority();

@@ -328,6 +328,7 @@ test('zeigt Status, Priorität und Zuständige in stabiler Reihenfolge und hält
   assert.deepEqual(actions.children.map((child) => child.className), ['kw-masha-feedly__entry-share']);
   const metadata = card.children.find((child) => child.className === 'kw-masha-feedly__entry-metadata');
   assert.equal(card.children.indexOf(metadata), card.children.indexOf(title) + 1, 'Der Screenreader liest Status, Priorität und Zuständige direkt nach dem Titel.');
+  assert.equal(card.dataset.hasAssignees, 'true');
   assert.ok(card.children.indexOf(actions) > card.children.indexOf(metadata));
   assert.equal(title.children[1].textContent, longTitle, 'CSS darf den Titel nur optisch begrenzen; der vollständige Text bleibt im DOM.');
   assert.equal(actions.children[0].dataset.entryShare, '71');
@@ -340,12 +341,17 @@ test('zeigt Status, Priorität und Zuständige in stabiler Reihenfolge und hält
   assert.match(scss, /entry-title > span:nth-child\(2\) \{[^}]*-webkit-line-clamp: 2;/);
   assert.match(scss, /entry-card-actions \{ grid-column: 2; grid-row: 1; min-width: 40px;/);
   assert.match(scss, /entry-metadata \{ display: flex; grid-column: 1 \/ -1; grid-row: 2;/);
+  assert.match(scss, /entry-card\[data-has-assignees="true"\] \{ position: relative; margin-bottom: 24px; padding-bottom: 30px; \}/);
+  assert.match(scss, /entry-assignees \{ position: absolute; z-index: 2; right: 14px; bottom: 0; gap: 0; margin: 0; transform: translateY\(50%\); \}/);
+  assert.match(compiledAdminStyles, /masha-feedly-board__card\[data-has-assignees=true\][^{]*\{[^}]*padding-bottom:1\.8rem/);
+  assert.match(compiledAdminStyles, /masha-feedly-board__assignees\{position:absolute;z-index:2;right:\.75rem;bottom:0;transform:translateY\(50%\)\}/);
   assert.match(scss, /entry-assignee-empty \{ display: inline-flex;[^}]*border: 1px dashed/);
   assert.match(germanTranslations, /ASSIGNEES_NONE: 'Niemand zugewiesen'/);
   const unassignedEnv = createWidgetEnvironment();
   unassignedEnv.setEntryAssignees([]);
   await unassignedEnv.listeners['kw-masha-feedly:opened']();
   const unassignedCard = unassignedEnv.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
+  assert.equal(unassignedCard.dataset.hasAssignees, 'false');
   const unassignedMetadata = unassignedCard.children.find((child) => child.className === 'kw-masha-feedly__entry-metadata');
   assert.deepEqual(unassignedMetadata.children.map((child) => child.className), ['kw-masha-feedly__entry-status', 'kw-masha-feedly__entry-priority', 'kw-masha-feedly__entry-assignee-empty']);
   assert.equal(unassignedMetadata.children[2].textContent, 'Niemand zugewiesen');

@@ -907,6 +907,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (entry.isUnread) {
         card.dataset.entryUnread = 'true';
       }
+      card.dataset.hasAssignees = entry.assignees?.length ? 'true' : 'false';
       const title = document.createElement('h4');
       title.className = 'kw-masha-feedly__entry-title';
       const number = document.createElement('span');
