@@ -1,0 +1,8 @@
+.kw-masha-feedly__serious-check { position: fixed; z-index: 10036; inset: 0; display: grid; place-items: center; pointer-events: none; animation: kw-masha-feedly-serious-check-fade 1.9s ease both; }
+.kw-masha-feedly__serious-check svg { width: clamp(4.5rem, 10vw, 7rem); height: auto; overflow: visible; filter: drop-shadow(0 .3rem .8rem #183c3330); }
+.kw-masha-feedly__serious-check-ring { fill: #f4faf7f0; stroke: #578b79; stroke-width: 2; stroke-dasharray: 189; stroke-dashoffset: 189; animation: kw-masha-feedly-serious-ring-draw .65s ease-out .1s forwards; }
+.kw-masha-feedly__serious-check-mark { fill: none; stroke: #286b55; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 48; stroke-dashoffset: 48; animation: kw-masha-feedly-serious-mark-draw .42s ease-out .62s forwards; }
+@keyframes kw-masha-feedly-serious-check-fade { 0%, 8% { opacity: 0; transform: scale(.92); } 20%, 76% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.04); } }
+@keyframes kw-masha-feedly-serious-ring-draw { to { stroke-dashoffset: 0; } }
+@keyframes kw-masha-feedly-serious-mark-draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) { .kw-masha-feedly__serious-check, .kw-masha-feedly__serious-check-ring, .kw-masha-feedly__serious-check-mark { animation: none; } }

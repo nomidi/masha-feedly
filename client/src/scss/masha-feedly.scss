@@ -1,3 +1,13 @@
+@use 'effects/confetti';
+@use 'effects/unicorn';
+@use 'effects/rocket';
+@use 'effects/hearts';
+@use 'effects/arcade';
+@use 'effects/check';
+@use 'effects/glow';
+@use 'effects/rings';
+@use 'effects/confirmation';
+
 /** Gestaltung des globalen Masha-Feedly-Aufklappfelds. */
 .kw-masha-feedly {
   --kw-masha-feedly-pink: #e6007e;
@@ -545,9 +555,6 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__entry-description { font-size: calc(24px * var(--masha-font-scale, 1)); }
 .kw-masha-feedly__help-content h3 { font-size: calc(22px * var(--masha-font-scale, 1)); }
 .kw-masha-feedly__help-content p { font-size: calc(18px * var(--masha-font-scale, 1)); }
-.kw-masha-feedly__confetti { position: fixed; z-index: 10030; inset: 0; overflow: hidden; pointer-events: none; }
-.kw-masha-feedly__confetti-piece { position: absolute; top: -24px; width: 12.8px; height: 17.6px; border-radius: 1.92px; box-shadow: 0 0 7.2px #fff8; animation: kw-masha-feedly-confetti-fall 3.8s cubic-bezier(.15,.55,.55,1) both; }
-@keyframes kw-masha-feedly-confetti-fall { 0% { transform: translateY(-32px) rotate(0deg); opacity: 1; } 75% { opacity: 1; } 100% { transform: translateY(110vh) rotate(920deg); opacity: 0; } }
 @media (max-width: 76rem) {
   .kw-masha-feedly__panel { right: 0; width: 34vw; }
   .kw-masha-feedly__entries-modal { right: 34vw; width: 33vw; }
@@ -633,9 +640,6 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   .kw-masha-feedly__entries-modal { right: calc(38vw - 48px); }
   .kw-masha-feedly__edit-modal, .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal { right: calc(69vw - 88px); }
 }
-@media (prefers-reduced-motion: reduce) {
-  .kw-masha-feedly__confetti-piece { animation: none; }
-}
 
 /* Die Seitenbereiche liegen wie Karten im Fächer leicht hintereinander. */
 .kw-masha-feedly__toggle { z-index: 10011; width: 80px; height: 80px; }
@@ -652,15 +656,6 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__edit-dialog > .kw-masha-feedly__dialog-header,
 .kw-masha-feedly__edit-dialog > form { padding-right: 64px; }
 @keyframes kw-masha-feedly-fan-from-under { from { transform: translateX(48px); opacity: .55; } to { transform: translateX(0); opacity: 1; } }
-.kw-masha-feedly__confetti-piece[data-form="band"] { width: 7.2px; height: 28.8px; border-radius: 5.6px; }
-.kw-masha-feedly__confetti-piece[data-origin="oben"] { top: -24px !important; animation-name: kw-masha-feedly-confetti-down; }
-.kw-masha-feedly__confetti-piece[data-origin="rechts"] { right: -24px; left: auto !important; animation-name: kw-masha-feedly-confetti-left; }
-.kw-masha-feedly__confetti-piece[data-origin="unten"] { top: auto !important; bottom: -24px; animation-name: kw-masha-feedly-confetti-up; }
-.kw-masha-feedly__confetti-piece[data-origin="links"] { right: auto; left: -24px !important; animation-name: kw-masha-feedly-confetti-right; }
-@keyframes kw-masha-feedly-confetti-down { to { transform: translate3d(5vw, 112vh, 0) rotate(900deg); opacity: 0; } }
-@keyframes kw-masha-feedly-confetti-up { to { transform: translate3d(-5vw, -112vh, 0) rotate(-900deg); opacity: 0; } }
-@keyframes kw-masha-feedly-confetti-left { to { transform: translate3d(-112vw, 8vh, 0) rotate(900deg); opacity: 0; } }
-@keyframes kw-masha-feedly-confetti-right { to { transform: translate3d(112vw, -8vh, 0) rotate(-900deg); opacity: 0; } }
 @media (max-width: 76rem) {
   .kw-masha-feedly__panel { right: 0; width: 34vw; }
   .kw-masha-feedly__entries-modal { right: calc(34vw - 40px); width: 33vw; }
@@ -814,11 +809,6 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__closed-button > span:first-child { display: grid; width: 28.8px; height: 28.8px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #2f9b63; color: #fff; font-size: calc(17.6px * var(--masha-font-scale, 1)); line-height: 1; }
 .kw-masha-feedly__closed-button strong { color: #195c39; font-size: calc(24px * var(--masha-font-scale, 1)); font-variant-numeric: tabular-nums; line-height: 1; }
 
-/* Schickt das Einhorn nach erledigten Einträgen einmal quer über die Seite. */
-.kw-masha-feedly__unicorn-runner { position: fixed; z-index: 10031; inset: 0; overflow: hidden; pointer-events: none; }
-.kw-masha-feedly__unicorn { position: absolute; bottom: 14vh; left: 0; width: clamp(128px, 18vw, 224px); max-height: 28vh; object-fit: contain; filter: drop-shadow(0 10.4px 10.4px #39244345); animation: kw-masha-feedly-unicorn-run 4.8s cubic-bezier(0.22, 0.68, 0.26, 1) both; }
-@keyframes kw-masha-feedly-unicorn-run { 0% { transform: translate(-120%, 12vh) rotate(-18deg) scale(.78); } 9% { transform: translate(4vw, -10vh) rotate(14deg) scale(1.04); } 21% { transform: translate(18vw, 5vh) rotate(-12deg) scale(.92); } 34% { transform: translate(31vw, -17vh) rotate(19deg) scale(1.12); } 48% { transform: translate(47vw, 2vh) rotate(-20deg) scale(.9); } 61% { transform: translate(60vw, -12vh) rotate(13deg) scale(1.08); } 73% { transform: translate(73vw, 7vh) rotate(-16deg) scale(.94); } 86% { transform: translate(87vw, -13vh) rotate(16deg) scale(1.1); } 100% { transform: translate(calc(100vw + 120%), 4vh) rotate(-12deg) scale(.9); } }
-
 /* Hält das Panel schmal und legt die Erklärung als seitliche Sprechblase darüber. */
 .kw-masha-feedly__rainbow { position: relative; display: grid; width: 72px; min-height: 72px; flex: 0 0 72px; align-self: center; place-items: center; padding: 7.2px; border: 1px solid #efb5d5; border-radius: 0; background: linear-gradient(115deg, #fff3a8 0%, #ffd5e9 24%, #e4d8ff 50%, #c6f3ff 74%, #d6ffd7 100%); color: #633267; box-shadow: 0 8.8px 19.2px #63326738, 0 3.2px 0 #fff9 inset; cursor: pointer; font: inherit; transition: box-shadow 180ms ease, transform 180ms ease; }
 .kw-masha-feedly__rainbow:hover, .kw-masha-feedly__rainbow:focus-visible, .kw-masha-feedly__rainbow[aria-expanded="true"] { box-shadow: 0 11.2px 23.2px #63326748, 0 3.2px 0 #fff9 inset; transform: translateY(-2px); }
@@ -835,7 +825,6 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__help-button { align-self: flex-end; margin-top: 36px; }
 .kw-masha-feedly__entry-environment-details > summary { overflow-wrap: anywhere; }
 .kw-masha-feedly__entry-environment dd { overflow-wrap: anywhere; }
-@media (max-width: 40rem) { .kw-masha-feedly__unicorn { bottom: 12vh; width: 160px; } }
 .kw-masha-feedly__entries-dialog > .kw-masha-feedly__dialog-header,
 .kw-masha-feedly__entries-toolbar,
 .kw-masha-feedly__entries-count,

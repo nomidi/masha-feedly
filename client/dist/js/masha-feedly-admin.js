@@ -1,8 +1,43 @@
 (() => {
+  const applyAnimationTheme = () => {
+    const themeField = document.querySelector('select[name="MashaFeedlyTheme"]');
+    const selectedTheme = themeField?.value === 'serious' ? 'serious' : 'playful';
+    document.querySelectorAll('[data-masha-feedly-animation-preview-card]').forEach((card) => {
+      card.hidden = card.dataset.mashaFeedlyTheme !== selectedTheme;
+    });
+  };
+
+  document.addEventListener('change', (event) => {
+    if (event.target?.matches?.('select[name="MashaFeedlyTheme"]')) applyAnimationTheme();
+  }, true);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyAnimationTheme, { once: true });
+  } else {
+    applyAnimationTheme();
+  }
+
   // Category buttons live in SilverStripe's PJAX-managed ModelAdmin content.
   // Delegate in capture phase so the control keeps working even if the board
   // was replaced after its initialisation (or CMS code stops bubbling clicks).
   document.addEventListener('click', (event) => {
+    const previewButton = event.target?.closest?.('[data-masha-feedly-animation-preview]');
+    if (previewButton) {
+      const preview = previewButton.closest('[data-masha-feedly-animation-previews]');
+      const status = preview?.querySelector('[data-masha-feedly-animation-preview-status]');
+      const animation = previewButton.dataset.mashaFeedlyAnimationPreview;
+      const result = window.KWMashaFeedlyEntries?.previewCompletionAnimation(
+        document,
+        window,
+        animation,
+        preview?.dataset.unicornUrl
+      );
+      if (status) {
+        status.textContent = result
+          ? previewButton.dataset.previewMessage || ''
+          : previewButton.dataset.reducedMotionMessage || '';
+      }
+      return;
+    }
     const button = event.target?.closest?.('[data-open-category-form]');
     if (!button) return;
     const board = button.closest('[data-masha-feedly-board]');

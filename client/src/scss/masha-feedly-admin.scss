@@ -22,6 +22,39 @@
   &__hex { color: #77717e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.68rem; }
 }
 
+.masha-feedly-animation-previews {
+  margin: 0 0 1.25rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid #eadde8;
+  border-radius: 0.8rem;
+  background: linear-gradient(135deg, #fff 0%, #fff7fc 100%);
+
+  h3 { margin: 0 0 0.3rem; color: #30283b; font-size: 1rem; }
+  > p { margin: 0 0 0.8rem; color: #6b6471; font-size: 0.9rem; }
+  &__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.65rem; }
+  &__status { min-height: 1.3em; margin: 0.65rem 0 0 !important; color: #286b42 !important; font-size: 0.9rem !important; }
+}
+
+.masha-feedly-animation-preview {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem;
+  border: 1px solid #eee4eb;
+  border-radius: 0.65rem;
+  background: #fff;
+
+  &__icon { display: grid; width: 2.4rem; height: 2.4rem; flex: 0 0 auto; place-items: center; border-radius: 0.6rem; background: #fff0f7; font-size: 1.35rem; }
+  > div { display: grid; min-width: 0; gap: 0.4rem; }
+  strong { color: #393140; font-size: 0.9rem; }
+  button { justify-self: start; padding: 0.38rem 0.7rem; border: 1px solid #e7bfd3; border-radius: 999px; background: #fff7fb; color: #8c2055; font: inherit; font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+  button:hover { border-color: #d98ab1; background: #ffedf6; }
+  button:focus-visible { outline: 3px solid #e6007e55; outline-offset: 2px; }
+}
+
+.masha-feedly-animation-preview[hidden] { display: none !important; }
+
 .masha-feedly-board {
   padding: 1.5rem;
   color: #272331;

@@ -37,6 +37,15 @@ class MashaFeedlyWidgetExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-emoji.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-create-entry.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-onboarding.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/unicorn.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rocket.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/hearts.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/arcade.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/check.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/glow.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rings.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/confirmation.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/runner.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-entries.js');
         MashaFeedlyCategory::ensureDefaultCategories();
         MashaFeedlyPriority::ensureDefaultPriorities();

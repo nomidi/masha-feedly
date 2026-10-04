@@ -1,0 +1,6 @@
+.kw-masha-feedly__serious-rings { position: fixed; z-index: 10036; inset: 0; display: grid; place-items: center; overflow: hidden; pointer-events: none; }
+.kw-masha-feedly__serious-ring { position: absolute; width: clamp(4rem, 8vw, 6rem); aspect-ratio: 1; border: 1px solid #528875; border-radius: 50%; opacity: 0; animation: kw-masha-feedly-serious-ring-expand 1.8s cubic-bezier(.15,.55,.3,1) both; }
+.kw-masha-feedly__serious-ring:nth-child(2) { animation-delay: .2s; }
+.kw-masha-feedly__serious-ring:nth-child(3) { animation-delay: .4s; }
+@keyframes kw-masha-feedly-serious-ring-expand { 0% { opacity: 0; transform: scale(.55); } 20% { opacity: .45; } 100% { opacity: 0; transform: scale(5.5); } }
+@media (prefers-reduced-motion: reduce) { .kw-masha-feedly__serious-ring { animation: none; } }

@@ -15,6 +15,7 @@ use SilverStripe\Control\Controller;
 use SilverStripe\Control\Director;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse;
+use SilverStripe\Core\Manifest\ModuleResourceLoader;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\Form;
 use SilverStripe\Forms\FormAction;
@@ -155,6 +156,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             ])
                 ->setValue(MashaFeedlyConfigExtension::theme())
                 ->setDescription(self::translate('CONFIG_THEME_DESCRIPTION', 'Legt Farben, Erfolgsmeldungen und Abschlussanimationen im Widget fest.')),
+            LiteralField::create('MashaFeedlyAnimationPreviews', $this->renderCompletionAnimationPreviews()),
             ListboxField::create('AllowedMemberIDs', self::translate('CONFIG_ALLOWED_MEMBERS', 'Benutzer mit Zugriff'), $members)
                 ->setValue(MashaFeedlyConfigExtension::memberIDs())
                 ->setDescription(self::translate('CONFIG_ALLOWED_MEMBERS_DESCRIPTION', 'Wähle alle Benutzer aus, die Einträge und Kommentare verwalten dürfen. Administratoren behalten immer Zugriff.'))
@@ -178,7 +180,18 @@ class MashaFeedlyAdmin extends ModelAdmin
                 ->setTitle(self::translate('CONFIG_AVATAR_COLOR', 'Avatarfarbe: {name}', ['name' => $authorizedMember->getName()])));
         }
         Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly-admin.css');
+        Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly.css');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-colors.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/unicorn.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rocket.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/hearts.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/arcade.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/check.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/glow.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rings.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/confirmation.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/runner.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-entries.js');
         $actions = FieldList::create(
             FormAction::create('saveConfiguration', self::translate('CONFIG_SAVE', 'Konfiguration speichern'))
                 ->addExtraClass('btn-primary')
@@ -190,6 +203,56 @@ class MashaFeedlyAdmin extends ModelAdmin
         $form->setFormAction(Controller::join_links($this->getLinkForModelTab($this->modelTab), 'EditForm'));
         $form->setAttribute('data-pjax-fragment', 'CurrentForm');
         return $form;
+    }
+
+    /** Rendert die sofort abspielbaren Vorschauen für verspielte Abschlussanimationen. */
+    private function renderCompletionAnimationPreviews(): string
+    {
+        $unicornURL = (string)ModuleResourceLoader::resourceURL(
+            'kooperativeweb/masha-feedly:client/dist/icons/masha-feedly-unicorn.svg'
+        );
+        $playfulMessage = $this->escapeBoardValue(self::translate('CONFIG_ANIMATION_PREVIEW_STARTED', 'Vorschau gestartet.'));
+        $reducedMotionMessage = $this->escapeBoardValue(self::translate('CONFIG_ANIMATION_REDUCED_MOTION', 'Animationen sind für reduzierte Bewegung ausgeschaltet.'));
+        $previewLabel = self::translate('CONFIG_ANIMATION_PREVIEW', 'Vorschau ansehen');
+        return '<section class="masha-feedly-animation-previews" data-masha-feedly-animation-previews data-unicorn-url="'
+            . $this->escapeBoardValue($unicornURL) . '">'
+            . '<h3>' . self::translate('CONFIG_ANIMATIONS_TITLE', 'Abschlussanimationen ansehen') . '</h3>'
+            . '<p>' . self::translate('CONFIG_ANIMATIONS_DESCRIPTION', 'Klicke auf eine Vorschau. Beim Abschließen wird je nach Theme zufällig eine passende Animation abgespielt.') . '</p>'
+            . '<div class="masha-feedly-animation-previews__grid">'
+            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">✨🦄</span>'
+            . '<div><strong>' . self::translate('CONFIG_ANIMATION_UNICORN', 'Konfetti & Chaos-Einhorn') . '</strong>'
+            . '<button type="button" data-masha-feedly-animation-preview="playful" data-preview-message="' . $playfulMessage
+            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
+            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🚀</span>'
+            . '<div><strong>' . self::translate('CONFIG_ANIMATION_ROCKET', 'Raketenstart') . '</strong>'
+            . '<button type="button" data-masha-feedly-animation-preview="rocket" data-preview-message="' . $playfulMessage
+            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
+            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">💖</span>'
+            . '<div><strong>' . self::translate('CONFIG_ANIMATION_HEARTS', 'Herzregen') . '</strong>'
+            . '<button type="button" data-masha-feedly-animation-preview="hearts" data-preview-message="' . $playfulMessage
+            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
+            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">👾</span>'
+            . '<div><strong>' . self::translate('CONFIG_ANIMATION_ARCADE', '8-Bit-Level geschafft') . '</strong>'
+            . '<button type="button" data-masha-feedly-animation-preview="arcade" data-preview-message="' . $playfulMessage
+            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
+            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">✓</span>'
+            . '<div><strong>' . self::translate('CONFIG_ANIMATION_CHECK', 'Gezeichnetes Häkchen') . '</strong>'
+            . '<button type="button" data-masha-feedly-animation-preview="check" data-preview-message="' . $playfulMessage
+            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
+            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">◌</span>'
+            . '<div><strong>' . self::translate('CONFIG_ANIMATION_GLOW', 'Sanfter Lichtimpuls') . '</strong>'
+            . '<button type="button" data-masha-feedly-animation-preview="glow" data-preview-message="' . $playfulMessage
+            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
+            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">◎</span>'
+            . '<div><strong>' . self::translate('CONFIG_ANIMATION_RINGS', 'Ruhige Ringwellen') . '</strong>'
+            . '<button type="button" data-masha-feedly-animation-preview="rings" data-preview-message="' . $playfulMessage
+            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
+            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">▱</span>'
+            . '<div><strong>' . self::translate('CONFIG_ANIMATION_CONFIRMATION', 'Leise Statuskarte') . '</strong>'
+            . '<button type="button" data-masha-feedly-animation-preview="confirmation" data-preview-message="' . $playfulMessage
+            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
+            . '</div><p class="masha-feedly-animation-previews__status" data-masha-feedly-animation-preview-status role="status" aria-live="polite"></p>'
+            . '</section>';
     }
 
     /**

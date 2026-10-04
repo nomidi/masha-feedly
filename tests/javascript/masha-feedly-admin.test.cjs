@@ -26,6 +26,47 @@ test('Admin-Menü und Breadcrumb erhalten keine Masha-Feedly-Zähler-Badges', ()
   assert.doesNotMatch(styles, /masha-feedly-menu__badge/);
 });
 
+test('spielt die im Konfigurationsbereich angeklickte Animationsvorschau ab', () => {
+  const previewCalls = [];
+  const entriesAPI = {
+    previewCompletionAnimation(...args) {
+      previewCalls.push(args.slice(2));
+      return { rocket: {} };
+    },
+  };
+  const { documentListeners } = createBoardEnvironment(undefined, true, 'du', () => true, 'complete', true, entriesAPI);
+  const preview = new TestElement('animation-preview', { unicornUrl: '/unicorn.svg' });
+  preview.status = { textContent: '' };
+  preview.querySelector = (selector) => selector === '[data-masha-feedly-animation-preview-status]' ? preview.status : null;
+  const button = new TestElement('animation-preview-button', {
+    mashaFeedlyAnimationPreview: 'rocket',
+    previewMessage: 'Vorschau gestartet.',
+    reducedMotionMessage: 'Animation ausgeschaltet.',
+  });
+  preview.appendChild(button);
+
+  documentListeners.click({ target: button });
+
+  assert.deepEqual(previewCalls, [['rocket', '/unicorn.svg']]);
+  assert.equal(preview.status.textContent, 'Vorschau gestartet.');
+});
+
+test('zeigt im CMS nur die Vorschauen des ausgewählten Themes', () => {
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
+  assert.match(source, /select\[name="MashaFeedlyTheme"\][\s\S]*?data-masha-feedly-animation-preview-card/);
+  assert.match(styles, /\.masha-feedly-animation-preview\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
+  const themeSelect = new TestElement('theme-select');
+  themeSelect.value = 'playful';
+  const cards = ['playful', 'playful', 'serious', 'serious'].map((theme) =>
+    new TestElement('animation-preview-card', { mashaFeedlyTheme: theme }));
+  const { documentListeners } = createBoardEnvironment(undefined, true, 'du', () => true, 'complete', true, null, { themeSelect, cards });
+
+  assert.deepEqual(cards.map((card) => card.hidden), [false, false, true, true]);
+  themeSelect.value = 'serious';
+  documentListeners.change({ target: themeSelect });
+  assert.deepEqual(cards.map((card) => card.hidden), [true, true, false, false]);
+});
+
 test('ordnet Admin-Karten als Kopfzeile, Titel-Auszug und Datum darunter an', () => {
   const renderer = fs.readFileSync(path.resolve(__dirname, '../../src/Admin/MashaFeedlyAdmin.php'), 'utf8');
   const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
@@ -110,6 +151,8 @@ class TestElement {
     if (selector === '.masha-feedly-board__columns' && this.type === 'columns') return this;
     if (selector === '.masha-feedly-board__category-drag-handle' && this.type === 'category-handle') return this;
     if (selector === '[data-delete-category]' && this.type === 'delete-button') return this;
+    if (selector === '[data-masha-feedly-animation-preview]' && this.type === 'animation-preview-button') return this;
+    if (selector === '[data-masha-feedly-animation-previews]' && this.type === 'animation-preview') return this;
     return this.parentElement?.closest(selector) || null;
   }
 
@@ -141,6 +184,10 @@ class TestElement {
 
   getAttribute(name) {
     return this.attributes?.[name] ?? null;
+  }
+
+  matches(selector) {
+    return selector === 'select[name="MashaFeedlyTheme"]' && this.type === 'theme-select';
   }
 
   focus() {
@@ -222,7 +269,7 @@ class TestElement {
 function createBoardEnvironment(fetchImplementation = async () => ({
   ok: true,
   json: async () => ({ success: true }),
-  }), hasBoard = true, formalAddress = 'du', confirmImplementation = () => true, documentReadyState = 'complete', includeGlobalTranslator = true) {
+  }), hasBoard = true, formalAddress = 'du', confirmImplementation = () => true, documentReadyState = 'complete', includeGlobalTranslator = true, entriesAPI = null, animationPreviewState = null) {
   const board = new TestElement('board', {
     moveUrl: '/move-entry',
     moveCategoryUrl: '/move-category',
@@ -301,6 +348,7 @@ function createBoardEnvironment(fetchImplementation = async () => ({
   const simulatedWindow = {
     location: { reload: () => { reloadCount++; } },
     KWMashaFeedlyTranslations: { FORMAL_ADDRESS: formalAddress },
+    KWMashaFeedlyEntries: entriesAPI,
     KWMashaFeedlyTranslate: includeGlobalTranslator
       ? (key, values = {}) => Object.entries(values).reduce((message, [name, value]) => message.replaceAll(`{${name}}`, String(value)), dictionary[key] || key)
       : undefined,
@@ -312,9 +360,10 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     addEventListener: (name, callback) => { documentListeners[name] = callback; },
     querySelector: (selector) => {
       if (selector === '[data-masha-feedly-board]') return boardAvailable ? board : null;
+      if (selector === 'select[name="MashaFeedlyTheme"]') return animationPreviewState?.themeSelect || null;
       return null;
     },
-    querySelectorAll: () => [],
+    querySelectorAll: (selector) => selector === '[data-masha-feedly-animation-preview-card]' ? animationPreviewState?.cards || [] : [],
     createElement: (type) => new TestElement(type),
     createElementNS: (_namespace, type) => new TestElement(type),
   };

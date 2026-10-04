@@ -474,6 +474,32 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('name="MashaFeedlyAddress"', $response->getBody());
         $this->assertStringContainsString('name="MashaFeedlyFontSize"', $response->getBody());
         $this->assertStringContainsString('name="MashaFeedlyTheme"', $response->getBody());
+        $this->assertStringContainsString('data-masha-feedly-animation-previews', $response->getBody());
+        $this->assertStringContainsString('data-masha-feedly-animation-preview="playful"', $response->getBody());
+        $this->assertStringContainsString('data-masha-feedly-animation-preview="rocket"', $response->getBody());
+        $this->assertStringContainsString('data-masha-feedly-animation-preview="hearts"', $response->getBody());
+        $this->assertStringContainsString('data-masha-feedly-animation-preview="arcade"', $response->getBody());
+        $this->assertStringContainsString('data-masha-feedly-animation-preview="check"', $response->getBody());
+        $this->assertStringContainsString('data-masha-feedly-animation-preview="glow"', $response->getBody());
+        $this->assertStringContainsString('data-masha-feedly-animation-preview="rings"', $response->getBody());
+        $this->assertStringContainsString('data-masha-feedly-animation-preview="confirmation"', $response->getBody());
+        $this->assertSame(4, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"'));
+        $this->assertSame(4, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"'));
+        $this->assertStringContainsString('effects/unicorn.js', $response->getBody());
+        $this->assertStringContainsString('effects/rocket.js', $response->getBody());
+        $this->assertStringContainsString('effects/hearts.js', $response->getBody());
+        $this->assertStringContainsString('effects/arcade.js', $response->getBody());
+        $this->assertStringContainsString('effects/check.js', $response->getBody());
+        $this->assertStringContainsString('effects/glow.js', $response->getBody());
+        $this->assertStringContainsString('effects/rings.js', $response->getBody());
+        $this->assertStringContainsString('effects/confirmation.js', $response->getBody());
+        $this->assertStringContainsString('effects/runner.js', $response->getBody());
+        $unicornURL = \SilverStripe\Core\Manifest\ModuleResourceLoader::resourceURL(
+            'kooperativeweb/masha-feedly:client/dist/icons/masha-feedly-unicorn.svg'
+        );
+        $this->assertNotEmpty($unicornURL);
+        $this->assertStringContainsString('data-unicorn-url="' . htmlspecialchars($unicornURL, ENT_QUOTES), $response->getBody());
+        $this->assertStringContainsString('Preview completion animations', $response->getBody());
         $this->assertStringContainsString('value="small"', $response->getBody());
         $this->assertStringContainsString('value="medium"', $response->getBody());
         $this->assertStringContainsString('value="large"', $response->getBody());

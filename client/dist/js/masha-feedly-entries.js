@@ -206,47 +206,14 @@ window.KWMashaFeedlyEntries = (() => {
     });
   };
 
-  /** Löst bei einem neu abgeschlossenen Eintrag eine kurze Konfetti-Animation aus. */
-  const celebrateDone = (document, window) => {
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return null;
-    const layer = document.createElement('div');
-    layer.className = 'kw-masha-feedly__confetti';
-    layer.setAttribute('aria-hidden', 'true');
-    const colors = ['#ff2d95', '#ffd400', '#00d4ff', '#7b2cff', '#39e75f', '#ff7a00', '#ff4fdb', '#00f0b5'];
-    const directions = ['oben', 'rechts', 'unten', 'links'];
-    for (let index = 0; index < 128; index += 1) {
-      const piece = document.createElement('i');
-      piece.className = 'kw-masha-feedly__confetti-piece';
-      piece.dataset.origin = directions[index % directions.length];
-      piece.dataset.form = index % 3 === 0 ? 'band' : 'square';
-      piece.style.left = `${(index * 47) % 100}%`;
-      piece.style.top = `${(index * 31) % 100}%`;
-      piece.style.animationDelay = `${(index % 32) * 18}ms`;
-      piece.style.animationDuration = `${(8.8 + (index % 12) * 0.24).toFixed(2)}s`;
-      piece.style.backgroundColor = colors[index % colors.length];
-      piece.style.transform = `rotate(${(index * 41) % 360}deg)`;
-      layer.append(piece);
-    }
-    document.body.append(layer);
-    window.setTimeout(() => layer.remove(), 13000);
-    return layer;
-  };
-
-  /** Lässt das Einhorn-Asset nach Abschluss eines Eintrags einmal über den Bildschirm laufen. */
-  const celebrateClosedCategory = (document, window, imageURL) => {
-    if (!imageURL || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return null;
-    const layer = document.createElement('div');
-    layer.className = 'kw-masha-feedly__unicorn-runner';
-    layer.setAttribute('aria-hidden', 'true');
-    const unicorn = document.createElement('img');
-    unicorn.className = 'kw-masha-feedly__unicorn';
-    unicorn.src = imageURL;
-    unicorn.alt = '';
-    layer.append(unicorn);
-    document.body.append(layer);
-    window.setTimeout(() => layer.remove(), 13000);
-    return layer;
-  };
+  const effects = window.KWMashaFeedlyEffects || {};
+  const celebrateDone = (document, window) => effects.confetti?.(document, window) || null;
+  const celebrateClosedCategory = (document, window, imageURL) => effects.unicorn?.(document, window, imageURL) || null;
+  const celebrateRocketLaunch = (document, window) => effects.rocket?.(document, window) || null;
+  const celebrateCompletion = (document, window, imageURL, theme = "playful", random = Math.random) =>
+    effects.playOnDone?.(document, window, imageURL, theme, random) || null;
+  const previewCompletionAnimation = (document, window, animation, imageURL) =>
+    effects.preview?.(animation, document, window, imageURL) || null;
 
   /** Erstellt eine anklickbare, am passenden Seitenelement verankerte Markierung. */
   const createMarker = (entry, index, target, document, window, onClick) => {
@@ -311,7 +278,7 @@ window.KWMashaFeedlyEntries = (() => {
     else if (offset < text.length) container.append(documentRef.createTextNode(text.slice(offset)));
   };
 
-  return { sortEntries, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, renderEnvironment, renderAssignees, renderHistory, renderLinks, priorityIconSVG, createMarker, setActiveMarker, celebrateDone, celebrateClosedCategory, trapFocus };
+  return { sortEntries, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, renderEnvironment, renderAssignees, renderHistory, renderLinks, priorityIconSVG, createMarker, setActiveMarker, celebrateDone, celebrateClosedCategory, celebrateRocketLaunch, celebrateCompletion, previewCompletionAnimation, trapFocus };
 })();
 
 /** Lädt Einträge, zeichnet Seitenmarkierungen und zeigt die filterbare Übersicht. */
@@ -1284,9 +1251,8 @@ document.addEventListener('DOMContentLoaded', () => {
           isClosed: Boolean(result.categoryIsClosed),
         } : null);
       if (result.categoryID && nextCategory) editForm.elements.CategoryID.value = String(nextCategoryID);
-      if (widget.dataset.theme !== 'serious' && result.celebrateCompletion === true && nextCategory?.isClosed && !activeEntry?.isClosed) {
-        window.KWMashaFeedlyEntries.celebrateDone(document, window);
-        window.KWMashaFeedlyEntries.celebrateClosedCategory(document, window, widget.dataset.unicornUrl);
+      if (result.celebrateCompletion === true && nextCategory?.isClosed && !activeEntry?.isClosed) {
+        window.KWMashaFeedlyEntries.celebrateCompletion(document, window, widget.dataset.unicornUrl, widget.dataset.theme);
       }
       if (activeEntry && nextCategory) {
         activeEntry = { ...activeEntry, categoryID: nextCategoryID, categoryTitle: nextCategory.title, isClosed: Boolean(nextCategory.isClosed) };
