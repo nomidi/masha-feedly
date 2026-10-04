@@ -253,27 +253,27 @@ class MashaFeedlyMemberExtension extends Extension
         $newEntries = CheckboxField::create(
             'MashaFeedlyNotifyNewEntries',
             self::translate('PROFILE_NOTIFY_NEW_ENTRIES', 'Bei neuen Einträgen benachrichtigen')
-        )->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        )->setDescription(self::translate('PROFILE_NOTIFY_NEW_ENTRIES_DESCRIPTION', 'Erhalte eine E-Mail, wenn eine neue Meldung erstellt wird. Für deine eigenen Meldungen gilt zusätzlich die separate Option für eigene Einträge und Änderungen.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $ownEntryUpdates = CheckboxField::create(
             'MashaFeedlyNotifyOwnEntryChanges',
             self::translate('PROFILE_NOTIFY_OWN_CHANGES', 'Auch bei eigenen Einträgen und Änderungen benachrichtigen')
-        )->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        )->setDescription(self::translate('PROFILE_NOTIFY_OWN_CHANGES_DESCRIPTION', 'Diese Option ist standardmäßig ausgeschaltet. Schalte sie ein, wenn du E-Mails auch für Meldungen erhalten möchtest, die du selbst erstellst oder änderst.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $comments = CheckboxField::create(
             'MashaFeedlyNotifyComments',
             self::translate('PROFILE_NOTIFY_COMMENTS', 'Bei neuen Kommentaren benachrichtigen')
-        )->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        )->setDescription(self::translate('PROFILE_NOTIFY_COMMENTS_DESCRIPTION', 'Erhalte eine E-Mail, wenn jemand bei einem Eintrag kommentiert, für den du zuständig bist oder den du erstellt hast.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $dueDateReminders = CheckboxField::create(
             'MashaFeedlyNotifyDueDateReminders',
             self::translate('PROFILE_NOTIFY_DUE_DATE_REMINDERS', 'An Fälligkeitstermine erinnern')
-        )->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        )->setDescription(self::translate('PROFILE_NOTIFY_DUE_DATE_REMINDERS_DESCRIPTION', 'Erhalte am Fälligkeitstag eine einmalige Erinnerung für Einträge, denen du zugewiesen bist oder die du erstellt hast.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $costEstimates = CheckboxField::create(
             'MashaFeedlyNotifyCostEstimates',
             self::translate('PROFILE_NOTIFY_COST_ESTIMATES', 'Bei angefragten Kostenschätzungen benachrichtigen')
-        )->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        )->setDescription(self::translate('PROFILE_NOTIFY_COST_ESTIMATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn eine Kostenschätzung zur Freigabe bereitsteht.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $entryUpdates = CheckboxField::create(
             'MashaFeedlyNotifyEntryUpdates',
             self::translate('PROFILE_NOTIFY_ENTRY_UPDATES', 'Bei Änderungen an Einträgen benachrichtigen')
-        )->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        )->setDescription(self::translate('PROFILE_NOTIFY_ENTRY_UPDATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn sich Status, Beschreibung, Zuständigkeit oder andere Eintragsdetails ändern. Für eigene Änderungen gilt zusätzlich die separate Option für eigene Einträge.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
 
         $fields->addFieldsToTab('Root.MashaFeedly', [
             LiteralField::create(
@@ -304,7 +304,7 @@ class MashaFeedlyMemberExtension extends Extension
                 CheckboxField::create(
                     'MashaFeedlyEmailNotifications',
                     self::translate('PROFILE_EMAIL_NOTIFICATIONS', 'E-Mail-Benachrichtigungen von Masha:Feedly erhalten')
-                )->setDescription(self::translate('PROFILE_EMAIL_DESCRIPTION', 'Du kannst die Benachrichtigungen jederzeit ausschalten.')),
+                )->setDescription(self::translate('PROFILE_EMAIL_DESCRIPTION', 'Wenn diese Hauptoption eingeschaltet ist, erhältst du die unten ausgewählten E-Mails. Du kannst einzelne Arten oder alle Benachrichtigungen jederzeit ausschalten.')),
                 $newEntries,
                 $entryUpdates,
                 $ownEntryUpdates,

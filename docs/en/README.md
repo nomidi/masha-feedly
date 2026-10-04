@@ -31,7 +31,7 @@ In the expandable **Relationships** section, link entries as duplicates, themati
 
 ## Profile and notifications
 
-In the Masha:Feedly section of your profile, set your avatar and color, manage comment and due-date email reminders, and enable the onboarding tour again. News in the widget shows activity regardless of email notification settings.
+In the Masha:Feedly section of your profile, set your avatar and color, manage each type of email notification, and restart the onboarding tour. You can separately choose emails for new entries, entry updates, comments on entries assigned to you or created by you, due dates, and cost estimate requests. Emails about your own entries and changes are optional and off by default. News in the widget shows activity regardless of email notification settings.
 
 Entries can have an optional due date. In Masha:Feedly settings, choose under **Run due-date reminders** whether checks run via cron or on the first website visit of each day. Visitor mode sends no reminders until someone visits the site. The check sends one email on the due date (or after it, if it did not run on time) to approved assignees and the entry creator. Changing the date resets the reminder.
 

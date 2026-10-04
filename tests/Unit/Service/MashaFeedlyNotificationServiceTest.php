@@ -78,6 +78,44 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         }
     }
 
+    /** Prüft, dass die Freischaltungs-E-Mail die wichtigsten ersten Schritte erklärt. */
+    public function testAccessGrantedEmailExplainsReportingAndProfileNotifications(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $member->MashaFeedlyEmailNotifications = true;
+        $member->write();
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->Title = 'Projekt Wolke';
+        $config->write();
+
+        $mailer = new class implements MailerInterface {
+            /** @var RawMessage[] Gespeicherte Testnachrichten. */
+            public array $messages = [];
+
+            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            {
+                $this->messages[] = $message;
+            }
+        };
+        $injector = Injector::inst();
+        $originalMailer = $injector->get(MailerInterface::class);
+        $injector->registerService($mailer, MailerInterface::class);
+
+        try {
+            MashaFeedlyNotificationService::notifyAccessGranted($member);
+
+            $this->assertCount(1, $mailer->messages);
+            $message = $mailer->messages[0];
+            $this->assertStringContainsString('Projekt Wolke', $message->getSubject());
+            $this->assertStringContainsString('Eine Meldung erstellen', (string)$message->getTextBody());
+            $this->assertStringContainsString('Status und Zuständigkeit', (string)$message->getTextBody());
+            $this->assertStringContainsString('Benachrichtigungen und Profil', (string)$message->getTextBody());
+            $this->assertStringContainsString('freigegeben sind', (string)$message->getTextBody());
+        } finally {
+            $injector->registerService($originalMailer, MailerInterface::class);
+        }
+    }
+
     /** Ohne aktivierte Erinnerungen wird nicht gesendet und der Eintrag bleibt erneut prüfbar. */
     public function testDueDateReminderCanBeDisabledPerMember(): void
     {
@@ -267,8 +305,8 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         }
     }
 
-    /** Prüft, dass eigene Änderungen standardmäßig still bleiben und sich E-Mails dafür einschalten lassen. */
-    public function testOwnEntryUpdateEmailsAreDisabledByDefaultAndConfigurable(): void
+    /** Prüft, dass Mitglieder mit aktivierten Präferenzen E-Mails auch für eigene Einträge erhalten. */
+    public function testOwnEntryAndUpdateEmailsAreConfigurable(): void
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
         $member->write();

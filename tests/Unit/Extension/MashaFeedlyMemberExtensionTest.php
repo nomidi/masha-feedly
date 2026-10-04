@@ -115,6 +115,10 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
             'MashaFeedlyEmailNotifications',
             $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyComments')->DisplayLogicDispatchers()
         );
+        $this->assertStringContainsString('Erhalte eine E-Mail', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyNewEntries')->Description());
+        $this->assertStringContainsString('selbst erstellst oder änderst', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyOwnEntryChanges')->Description());
+        $this->assertStringContainsString('oder den du erstellt hast', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyComments')->Description());
+        $this->assertStringContainsString('Status, Beschreibung, Zuständigkeit', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyEntryUpdates')->Description());
     }
 
     /** Prüft, dass Mitglieder ohne Freigabe keine Masha-Feedly-Einstellungen im Profil sehen. */
@@ -137,10 +141,10 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertNull($fields->dataFieldByName('MashaFeedlyColor'));
     }
 
-    /** Prüft, dass bei neuen Mitgliedern alle Benachrichtigungen standardmäßig eingeschaltet sind. */
-    public function testEmailPreferencesAreEnabledByDefault(): void
+    /** Prüft, dass E-Mails zu eigenen Einträgen standardmäßig ausgeschaltet sind. */
+    public function testOwnEntryEmailPreferenceIsDisabledByDefault(): void
     {
-        $member = $this->objFromFixture(Member::class, 'normalize');
+        $member = Member::create();
 
         $this->assertTrue((bool)$member->MashaFeedlyEmailNotifications);
         $this->assertTrue((bool)$member->MashaFeedlyNotifyNewEntries);

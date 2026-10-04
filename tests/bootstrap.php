@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-// SilverStripe CMS expects applications to define Page and PageController. In a
-// standalone module checkout, expose minimal app fixtures for ClassManifest too.
-if (!class_exists('Page')) {
-    // Use SilverStripe's project root, not the current working directory. The
-    // module can be nested inside a host project; writing fixtures into the
-    // module's own app/src would make ClassManifest discover a second Page.
+// Nur ein eigenständiger Modul-Checkout benötigt die minimalen Seitenklassen.
+// In einem Hostprojekt dürfen keine Fixtures angelegt werden: Dessen Klassen
+// können in beliebigen Unterordnern liegen und sind vor dem Framework-Boot
+// noch nicht zwingend über class_exists() auffindbar.
+if (realpath(BASE_PATH) === realpath(__DIR__ . '/..')) {
     $appSource = BASE_PATH . '/app/src';
     if (!is_file($appSource . '/Page.php') || !is_file($appSource . '/PageController.php')) {
         if (!is_dir($appSource)) {

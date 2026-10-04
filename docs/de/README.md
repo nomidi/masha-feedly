@@ -31,7 +31,7 @@ Im aufklappbaren Bereich **Zusammenhänge** kannst du Einträge als Duplikat, th
 
 ## Profil und Benachrichtigungen
 
-Im Masha:Feedly-Bereich deines Profils kannst du Avatarbild und -farbe festlegen, Kommentar- und Fälligkeitserinnerungen per E-Mail verwalten und die Einführung erneut aktivieren. Neuigkeiten im Widget zeigen Aktivitäten unabhängig von E-Mail-Benachrichtigungen.
+Im Masha:Feedly-Bereich deines Profils kannst du Avatarbild und -farbe festlegen, einzelne Arten von E-Mail-Benachrichtigungen verwalten und die Einführung erneut aktivieren. Neue und geänderte Einträge, Kommentare zu Einträgen, für die du zuständig bist oder die du erstellt hast, Fälligkeitstermine und Kostenschätzungen lassen sich getrennt einstellen. E-Mails zu eigenen Meldungen und Änderungen sind optional und standardmäßig ausgeschaltet. Neuigkeiten im Widget zeigen Aktivitäten unabhängig von E-Mail-Benachrichtigungen.
 
 Einträge können ein optionales Fälligkeitsdatum erhalten. Wähle in den Masha:Feedly-Einstellungen unter **Fälligkeitserinnerungen ausführen**, ob die Prüfung per Cronjob oder beim ersten Websitebesuch des Tages läuft. Beim Besuchsmodus werden keine Erinnerungen versendet, solange niemand die Website aufruft. Die Prüfung sendet am Fälligkeitstag (oder beim nächsten Lauf danach) einmalig eine E-Mail an freigegebene zuständige Personen und die erstellende Person. Änderungen am Termin setzen die Erinnerung zurück.
 
