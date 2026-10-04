@@ -156,6 +156,12 @@ class MashaFeedlyAdmin extends ModelAdmin
             ])
                 ->setValue(MashaFeedlyConfigExtension::theme())
                 ->setDescription(self::translate('CONFIG_THEME_DESCRIPTION', 'Legt Farben, Erfolgsmeldungen und Abschlussanimationen im Widget fest.')),
+            DropdownField::create('MashaFeedlyDueDateReminderMode', self::translate('CONFIG_DUE_DATE_REMINDER_MODE', 'Fälligkeitserinnerungen ausführen'), [
+                'cron' => self::translate('CONFIG_DUE_DATE_REMINDER_CRON', 'Serverseitig per Cronjob'),
+                'visitor' => self::translate('CONFIG_DUE_DATE_REMINDER_VISITOR', 'Bei Websitebesuchen'),
+            ])
+                ->setValue(MashaFeedlyConfigExtension::dueDateReminderMode())
+                ->setDescription(self::translate('CONFIG_DUE_DATE_REMINDER_MODE_DESCRIPTION', 'Cronjob: tägliche Prüfung unabhängig von Websitebesuchen. Bei Websitebesuchen: erster Seitenaufruf pro Tag startet die Prüfung; ohne Besuch werden keine Erinnerungen versendet.')),
             LiteralField::create('MashaFeedlyAnimationPreviews', $this->renderCompletionAnimationPreviews()),
             ListboxField::create('AllowedMemberIDs', self::translate('CONFIG_ALLOWED_MEMBERS', 'Benutzer mit Zugriff'), $members)
                 ->setValue(MashaFeedlyConfigExtension::memberIDs())
@@ -538,8 +544,8 @@ class MashaFeedlyAdmin extends ModelAdmin
                 . ((int)$priority->ID === $defaultPriorityID ? ' selected' : '') . '>'
                 . $this->escapeBoardValue((string)$priority->Title) . '</option>';
         }
-        $html .= '</select></label><label>' . self::translate('BOARD_ENTRY_DATE', 'Datum und Uhrzeit')
-            . '<input type="datetime-local" name="EntryDate"></label></div>';
+        $html .= '</select></label><label>'
+            . self::translate('FIELD_DUE_DATE', 'Fällig am') . '<input type="date" name="DueDate"></label></div>';
         $allowedMemberIDs = MashaFeedlyConfigExtension::memberIDs();
         if ($allowedMemberIDs) {
             $html .= '<fieldset class="masha-feedly-board__entry-assignees kw-masha-feedly__assignees"><legend>'
@@ -671,7 +677,15 @@ class MashaFeedlyAdmin extends ModelAdmin
                 $html .= $frontendEntryURL !== '' ? '</a></div>' : '</span></div>';
                 $html .= '<time class="masha-feedly-board__card-date" datetime="'
                     . $this->escapeBoardValue((string)$entry->EntryDate) . '">'
-                    . $this->escapeBoardValue((string)$entry->dbObject('EntryDate')->Nice()) . '</time></article>';
+                    . $this->escapeBoardValue((string)$entry->dbObject('EntryDate')->Nice()) . '</time>';
+                if ($entry->DueDate) {
+                    $html .= '<time class="masha-feedly-board__due-date" datetime="'
+                        . $this->escapeBoardValue((string)$entry->DueDate) . '">'
+                        . $this->escapeBoardValue(self::translate('BOARD_DUE_DATE', 'Fällig am {date}', [
+                            'date' => (string)$entry->dbObject('DueDate')->Nice(),
+                        ])) . '</time>';
+                }
+                $html .= '</article>';
             }
             $html .= '</div></section>';
         }
@@ -768,6 +782,8 @@ class MashaFeedlyAdmin extends ModelAdmin
         $siteConfig->MashaFeedlyFontSize = in_array($fontSize, ['small', 'medium', 'large'], true) ? $fontSize : 'small';
         $theme = strtolower((string)($data['MashaFeedlyTheme'] ?? 'playful'));
         $siteConfig->MashaFeedlyTheme = in_array($theme, ['playful', 'serious'], true) ? $theme : 'playful';
+        $reminderMode = strtolower((string)($data['MashaFeedlyDueDateReminderMode'] ?? 'cron'));
+        $siteConfig->MashaFeedlyDueDateReminderMode = in_array($reminderMode, ['cron', 'visitor'], true) ? $reminderMode : 'cron';
         $siteConfig->write();
 
         $usedColors = [];

@@ -5,9 +5,11 @@ namespace KW\MashaFeedly\Tests\Unit\Model;
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
+use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Forms\DatetimeField;
+use SilverStripe\Forms\DateField;
 use SilverStripe\Forms\ListboxField;
 use SilverStripe\ORM\FieldType\DBDatetime;
 use SilverStripe\Security\Member;
@@ -87,6 +89,26 @@ class MashaFeedlyEntryTest extends SapphireTest
         } finally {
             DBDatetime::clear_mock_now();
         }
+    }
+
+    /** Fälligkeit lässt sich im CMS setzen, wird protokolliert und setzt die Erinnerung nach Änderungen zurück. */
+    public function testDueDateFieldAndHistoryResetReminder(): void
+    {
+        $entry = MashaFeedlyEntry::create(['Content' => 'Ein Termin mit Verlauf.', 'EntryDate' => '2026-10-01', 'DueDate' => '2026-10-10']);
+        $dueDateField = $entry->getCMSFields()->dataFieldByName('DueDate');
+        $this->assertInstanceOf(DateField::class, $dueDateField);
+        $entry->write();
+
+        $entry->DueDateReminderSentAt = '2026-10-09 07:00:00';
+        $entry->write();
+        $entry->DueDate = '2026-10-12';
+        $entry->write();
+
+        $history = MashaFeedlyEntryHistory::get()->filter(['EntryID' => (int)$entry->ID, 'ChangeType' => 'due_date'])->first();
+        $this->assertNotNull($history);
+        $this->assertSame('2026-10-10', (string)$history->OldValue);
+        $this->assertSame('2026-10-12', (string)$history->NewValue);
+        $this->assertEmpty($entry->DueDateReminderSentAt);
     }
 
     /** Prüft, dass die Sichtbarkeit anhand der Freigabe des aktuellen Benutzers ermittelt wird. */

@@ -23,6 +23,61 @@ use SilverStripe\i18n\i18n;
  */
 class MashaFeedlyNotificationService
 {
+    /** Sendet einmalig eine Erinnerung an freigegebene Verantwortliche und die erstellende Person. */
+    public static function notifyDueDateReminder(MashaFeedlyEntry $entry): int
+    {
+        if (!$entry->DueDate || $entry->DueDateReminderSentAt) {
+            return 0;
+        }
+        $allowedIDs = MashaFeedlyConfigExtension::memberIDs();
+        $assignedIDs = array_map('intval', $entry->AssignedMembers()->column('ID'));
+        $creatorID = $entry->creatorMemberID();
+        $recipientIDs = array_values(array_unique(array_intersect(
+            array_filter(array_merge($assignedIDs, [$creatorID]), static fn(int $id): bool => $id > 0),
+            array_map('intval', $allowedIDs)
+        )));
+        if (!$recipientIDs) {
+            return 0;
+        }
+
+        $entryURL = Director::absoluteURL(MashaFeedlyAdmin::singleton()->getCMSEditLinkForManagedDataObject($entry));
+        $siteTitle = trim((string)SiteConfig::current_site_config()->Title) ?: 'Masha:Feedly';
+        $sent = 0;
+        foreach (Member::get()->filter('ID', $recipientIDs) as $member) {
+            if (
+                !(bool)$member->MashaFeedlyEmailNotifications
+                || !(bool)$member->MashaFeedlyNotifyDueDateReminders
+                || !Email::is_valid_address((string)$member->Email)
+            ) {
+                continue;
+            }
+
+            Email::create()
+                ->setTo((string)$member->Email)
+                ->setSubject(i18n::_t(
+                    'KW\\MashaFeedly\\Translations.EMAIL_DUE_DATE_SUBJECT',
+                    '{siteTitle}: Heute fällig – {title}',
+                    ['siteTitle' => $siteTitle, 'title' => $entry->getTitle()]
+                ))
+                ->setHTMLTemplate('KW/MashaFeedly/Email/DueDateReminderEmail')
+                ->setPlainTemplate('KW/MashaFeedly/Email/DueDateReminderEmailPlain')
+                ->setData([
+                    'SiteTitle' => $siteTitle,
+                    'BugTitle' => $entry->getTitle(),
+                    'DueDate' => (string)$entry->DueDate,
+                    'EntryURL' => $entryURL,
+                ])
+                ->send();
+            $sent++;
+        }
+
+        if ($sent > 0) {
+            $entry->DueDateReminderSentAt = \SilverStripe\ORM\FieldType\DBDatetime::now();
+            $entry->write();
+        }
+        return $sent;
+    }
+
     /** Begrüßt ein neu freigeschaltetes Mitglied per E-Mail. */
     public static function notifyAccessGranted(Member $member): void
     {

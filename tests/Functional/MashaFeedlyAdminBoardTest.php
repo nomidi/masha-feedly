@@ -36,6 +36,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
         $this->allowMember($member);
+        $entryWithDeadline = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
+        $entryWithDeadline->DueDate = '2026-10-10';
+        $entryWithDeadline->write();
         $this->logInAs($member);
 
         $response = $this->get('/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry');
@@ -52,6 +55,11 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('masha-feedly-board__entry-number">#', $body);
         $this->assertStringContainsString('masha-feedly-board__card-topline', $body);
         $this->assertStringContainsString('masha-feedly-board__card-date', $body);
+        $this->assertStringContainsString('masha-feedly-board__due-date', $body);
+        $this->assertStringContainsString('datetime="2026-10-10"', $body);
+        $this->assertStringContainsString('name="DueDate"', $body, 'Das CMS-Overlay muss dasselbe Fälligkeitsfeld wie das Frontend anbieten.');
+        $this->assertStringNotContainsString('name="EntryDate"', $body, 'Der Erstellungszeitpunkt wird im Overlay automatisch gesetzt.');
+        $this->assertStringNotContainsString('type="datetime-local"', $body, 'Das Overlay bietet keine manuelle Eingabe des Erstellungszeitpunkts an.');
         $this->assertStringNotContainsString('masha-feedly-board__entry-status', $body);
         $this->assertDoesNotMatchRegularExpression('/masha-feedly-board__priority-label/', $body);
         $this->assertMatchesRegularExpression(
@@ -475,6 +483,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('name="MashaFeedlyAddress"', $response->getBody());
         $this->assertStringContainsString('name="MashaFeedlyFontSize"', $response->getBody());
         $this->assertStringContainsString('name="MashaFeedlyTheme"', $response->getBody());
+        $this->assertStringContainsString('name="MashaFeedlyDueDateReminderMode"', $response->getBody());
+        $this->assertStringContainsString('value="cron"', $response->getBody());
+        $this->assertStringContainsString('value="visitor"', $response->getBody());
         $this->assertStringContainsString('data-masha-feedly-animation-previews', $response->getBody());
         $this->assertStringContainsString('data-masha-feedly-animation-preview="playful"', $response->getBody());
         $this->assertStringContainsString('data-masha-feedly-animation-preview="rocket"', $response->getBody());
@@ -522,6 +533,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
                 'MashaFeedlyAddress' => 'sie',
                 'MashaFeedlyFontSize' => 'large',
                 'MashaFeedlyTheme' => 'serious',
+                'MashaFeedlyDueDateReminderMode' => 'visitor',
                 'action_saveConfiguration' => 'Konfiguration speichern',
             ]
         );
@@ -530,6 +542,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertSame('sie', MashaFeedlyConfigExtension::address());
         $this->assertSame('large', MashaFeedlyConfigExtension::fontSize());
         $this->assertSame('serious', MashaFeedlyConfigExtension::theme());
+        $this->assertSame('visitor', MashaFeedlyConfigExtension::dueDateReminderMode());
         $this->assertSame('#B5A0E0', (string)Member::get()->byID($member->ID)->MashaFeedlyColor);
         $automaticallyColoredMember = Member::get()->byID((int)$this->objFromFixture(Member::class, 'notAllowed')->ID);
         $this->assertNotSame('', (string)$automaticallyColoredMember->MashaFeedlyColor);

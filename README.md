@@ -43,6 +43,16 @@ sake dev/build flush=1
 - PHP 8.3 oder neuer
 - Silverstripe Framework 6.2 oder neuer
 
+## Fälligkeitserinnerungen
+
+Einträge können ein Fälligkeitsdatum erhalten. Damit Erinnerungen automatisch versendet werden, richte im Silverstripe-Projekt einen täglichen Cron-Aufruf ein:
+
+```sh
+vendor/bin/sake dev/tasks/MashaFeedlyDueDateReminderTask
+```
+
+Die Erinnerung wird einmalig an freigegebene zuständige Personen und die erstellende Person gesendet. In den Masha:Feedly-Einstellungen lässt sich wählen, ob die Prüfung per täglichem Cronjob oder beim ersten Websitebesuch des Tages startet. Im Besuchsmodus bleibt der Versand aus, solange niemand die Website aufruft. Jeder Empfänger kann Fälligkeitserinnerungen in den Masha:Feedly-Profileinstellungen deaktivieren.
+
 ## Lizenz
 
 MIT. Siehe [`composer.json`](composer.json).

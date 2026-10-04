@@ -92,6 +92,7 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
             'MashaFeedlyNotifyEntryUpdates',
             'MashaFeedlyNotifyOwnEntryChanges',
             'MashaFeedlyNotifyComments',
+            'MashaFeedlyNotifyDueDateReminders',
         ] as $fieldName) {
             $this->assertInstanceOf(CheckboxField::class, $fields->dataFieldByName($fieldName));
             $this->assertNull($mainTab->Fields()->dataFieldByName($fieldName));

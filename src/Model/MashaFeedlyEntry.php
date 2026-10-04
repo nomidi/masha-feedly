@@ -28,6 +28,8 @@ use SilverStripe\i18n\i18n;
  * @property-read string $Title Automatisch aus dem Anfang der Bug-Beschreibung gebildeter Titel.
  * @property string $Content Inhalt des Eintrags.
  * @property string $EntryDate Datum und Uhrzeit des Eintrags.
+ * @property string $DueDate Fälligkeitstermin des Eintrags.
+ * @property string $DueDateReminderSentAt Zeitpunkt der letzten Fälligkeitserinnerung.
  * @property int $CategoryID ID des Status.
  * @property int $PriorityID ID der Priorität.
  * @property MashaFeedlyCategory $Category Statuskategorie des Eintrags.
@@ -61,6 +63,8 @@ class MashaFeedlyEntry extends DataObject
     private static $db = [
         'Content' => 'HTMLText',
         'EntryDate' => 'Datetime',
+        'DueDate' => 'Date',
+        'DueDateReminderSentAt' => 'Datetime',
         'Sort' => 'Int',
         'PageURL' => 'Varchar(2048)',
         'ElementSelector' => 'Varchar(512)',
@@ -93,6 +97,7 @@ class MashaFeedlyEntry extends DataObject
         'Title' => 'Bug-Hinweis',
         'Category.Title' => 'Status',
         'EntryDate.Nice' => 'Datum',
+        'DueDate.Nice' => 'Fällig am',
         'Comments.Count' => 'Kommentare',
     ];
 
@@ -105,6 +110,10 @@ class MashaFeedlyEntry extends DataObject
     private ?string $historyOldCategoryTitle = null;
 
     private ?string $historyOldPriorityTitle = null;
+
+    private ?string $historyOldDueDate = null;
+
+    private bool $historyDueDateChanged = false;
 
 
     /**
@@ -122,6 +131,10 @@ class MashaFeedlyEntry extends DataObject
             $dateField->setValue(self::currentEntryDateTime());
         }
         $fields->replaceField('EntryDate', $dateField);
+        $fields->replaceField('DueDate', \SilverStripe\Forms\DateField::create(
+            'DueDate',
+            $this->translate('FIELD_DUE_DATE', 'Fällig am')
+        ));
         $fields->fieldByName('PageURL')?->setTitle($this->translate('FIELD_PAGE_URL', 'Seitenadresse'))->setReadonly(true);
         $fields->fieldByName('ElementSelector')?->setTitle($this->translate('FIELD_SELECTOR', 'Ausgewählter Bereich'))->setReadonly(true);
         $fields->fieldByName('ElementText')?->setTitle($this->translate('FIELD_ELEMENT_TEXT', 'Text im ausgewählten Bereich'))->setReadonly(true);
@@ -203,6 +216,7 @@ class MashaFeedlyEntry extends DataObject
         $fields['Category.Title'] = $this->translate('FIELD_STATUS', 'Status');
         $fields['Priority.Title'] = $this->translate('FIELD_PRIORITY', 'Priorität');
         $fields['EntryDate.Nice'] = $this->translate('FIELD_DATE', 'Datum');
+        $fields['DueDate.Nice'] = $this->translate('FIELD_DUE_DATE', 'Fällig am');
         $fields['Comments.Count'] = $this->translate('FIELD_COMMENTS', 'Kommentare');
         return $fields;
     }
@@ -255,6 +269,8 @@ class MashaFeedlyEntry extends DataObject
     {
         $this->historyOldCategoryTitle = null;
         $this->historyOldPriorityTitle = null;
+        $this->historyOldDueDate = null;
+        $this->historyDueDateChanged = false;
         if ($this->isInDB()) {
             $storedEntry = self::get()->byID((int)$this->ID);
             if ($storedEntry && (int)$storedEntry->CategoryID !== (int)$this->CategoryID) {
@@ -262,6 +278,11 @@ class MashaFeedlyEntry extends DataObject
             }
             if ($storedEntry && (int)$storedEntry->PriorityID > 0 && (int)$storedEntry->PriorityID !== (int)$this->PriorityID) {
                 $this->historyOldPriorityTitle = (string)$storedEntry->Priority()->Title;
+            }
+            if ($storedEntry && (string)$storedEntry->DueDate !== (string)$this->DueDate) {
+                $this->historyOldDueDate = (string)$storedEntry->DueDate;
+                $this->historyDueDateChanged = true;
+                $this->DueDateReminderSentAt = null;
             }
         }
         if (!$this->EntryDate) {
@@ -281,7 +302,7 @@ class MashaFeedlyEntry extends DataObject
         $this->notifyMembersAfterWrite = !$this->isInDB();
         parent::onBeforeWrite();
         $this->notifyMembersAfterUpdate = $this->isInDB() && (bool)$this->getChangedFields(
-            ['Content', 'EntryDate', 'CategoryID', 'PriorityID'],
+            ['Content', 'EntryDate', 'DueDate', 'CategoryID', 'PriorityID'],
             DataObject::CHANGE_VALUE
         );
     }
@@ -337,6 +358,20 @@ class MashaFeedlyEntry extends DataObject
                 );
             }
             $this->historyOldPriorityTitle = null;
+        }
+        if ($this->historyDueDateChanged) {
+            $newDueDate = (string)$this->DueDate;
+            if ($this->historyOldDueDate !== $newDueDate) {
+                MashaFeedlyEntryHistory::record(
+                    $this,
+                    'due_date',
+                    $this->historyOldDueDate,
+                    $newDueDate,
+                    Security::getCurrentUser()
+                );
+            }
+            $this->historyOldDueDate = null;
+            $this->historyDueDateChanged = false;
         }
         if ($this->notifyMembersAfterWrite) {
             MashaFeedlyEntryHistory::record($this, 'created', '', $this->getTitle(), Security::getCurrentUser());

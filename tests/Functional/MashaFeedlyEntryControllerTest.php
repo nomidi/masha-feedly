@@ -56,6 +56,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             'Content' => 'Der Button ist abgeschnitten 😅. https://example.test/ablauf',
             'CategoryID' => (int)$category->ID,
             'EntryDate' => '2026-10-01T10:30',
+            'DueDate' => '2026-10-10',
             'PageURL' => 'https://example.test/kontakt/?campaign=mailing#formular',
             'ElementSelector' => 'main > button.primary',
             'ElementText' => 'Absenden',
@@ -71,6 +72,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(200, $response->getStatusCode());
         $data = json_decode($response->getBody(), true);
         $this->assertTrue($data['success']);
+        $this->assertSame('2026-10-10', $data['dueDate']);
         $this->assertSame([], $data['attachments']);
         $entry = MashaFeedlyEntry::get()->byID((int)$data['entryID']);
         $this->assertNotNull($entry);
@@ -85,6 +87,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame('1943 × 1294 px', (string)$entry->BrowserWindow);
         $this->assertSame(24, (int)$entry->ColorDepth);
         $this->assertSame((int)$category->ID, (int)$entry->CategoryID);
+        $this->assertSame('2026-10-10', (string)$entry->DueDate);
         $this->assertSame([(int)$member->ID], array_map('intval', $entry->AssignedMembers()->column('ID')));
 
         $listResponse = $this->get('/__masha-feedly/listEntries?mode=all&PageURL=' . rawurlencode('https://example.test/kontakt'));
@@ -98,6 +101,37 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(24, $listedEntry['colorDepth']);
         $this->assertNotEmpty($listedEntry['loggedAt']);
         $this->assertSame([], $listedEntry['attachments']);
+        $this->assertSame('2026-10-10', $listedEntry['dueDate']);
+
+        $updated = $this->post('/__masha-feedly/updateEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$entry->ID,
+            'CategoryID' => (int)$category->ID,
+            'DueDate' => '2026-10-12',
+        ]);
+        $this->assertSame(200, $updated->getStatusCode());
+        $history = MashaFeedlyEntryHistory::get()->filter(['EntryID' => (int)$entry->ID, 'ChangeType' => 'due_date'])->first();
+        $this->assertNotNull($history);
+        $this->assertSame('2026-10-10', (string)$history->OldValue);
+        $this->assertSame('2026-10-12', (string)$history->NewValue);
+    }
+
+    /** Ungültige Kalenderdaten dürfen nicht als Fälligkeit gespeichert werden. */
+    public function testInvalidDueDateIsRejected(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($member);
+        MashaFeedlyCategory::ensureDefaultCategories();
+        $this->logInAs($member);
+        $before = MashaFeedlyEntry::get()->count();
+        $response = $this->post('/__masha-feedly/createEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'Content' => 'Ungültiger Fälligkeitstest',
+            'DueDate' => '2026-02-30',
+        ]);
+        $this->assertSame(400, $response->getStatusCode());
+        $this->assertFalse(json_decode($response->getBody(), true)['success']);
+        $this->assertSame($before, MashaFeedlyEntry::get()->count());
     }
 
     /** Prüft, dass der Feedback-Filter nur wartende Einträge liefert und die Anzahl berechnet. */

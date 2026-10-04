@@ -281,6 +281,13 @@ class MashaFeedlyEntryController extends Controller
         if (!$priority || !$priority->exists()) {
             return $this->respond(['success' => false, 'message' => $this->translate('INVALID_PRIORITY', 'Bitte wählen Sie eine gültige Priorität.')], 400);
         }
+        if ($request->postVar('DueDate') !== null) {
+            $dueDate = trim((string)$request->postVar('DueDate'));
+            if ($dueDate !== '' && !$this->isValidDate($dueDate)) {
+                return $this->respond(['success' => false, 'message' => $this->translate('INVALID_DUE_DATE', 'Bitte prüfe den Fälligkeitstermin.')], 400);
+            }
+            $entry->DueDate = $dueDate !== '' ? $dueDate : null;
+        }
         $newAttachments = MashaFeedlyAttachmentService::attachUploads($uploads, $entry);
         $this->recordAttachmentHistory($entry, $newAttachments, $member);
         $oldAssigneeIDs = array_map('intval', $entry->AssignedMembers()->column('ID'));
@@ -380,6 +387,7 @@ class MashaFeedlyEntryController extends Controller
             'priorityTitle' => (string)$entry->Priority()->Title,
             'priorityColor' => (string)$entry->Priority()->Color,
             'priorityIconType' => (string)$entry->Priority()->IconType,
+            'dueDate' => (string)$entry->DueDate,
             'attachments' => array_map(static function ($attachment): array {
                 $file = $attachment->File();
                 return [
@@ -589,6 +597,11 @@ class MashaFeedlyEntryController extends Controller
             return $this->respond(['success' => false, 'message' => $this->translate('INVALID_PRIORITY', 'Bitte wählen Sie eine gültige Priorität.')], 400);
         }
         $entry->PriorityID = (int)$priority->ID;
+        $postedDueDate = trim((string)$request->postVar('DueDate'));
+        if ($postedDueDate !== '' && !$this->isValidDate($postedDueDate)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('INVALID_DUE_DATE', 'Bitte prüfe den Fälligkeitstermin.')], 400);
+        }
+        $entry->DueDate = $postedDueDate !== '' ? $postedDueDate : null;
         $entry->PageURL = $this->safePageURL((string)$request->postVar('PageURL'));
         $entry->ElementSelector = mb_substr(trim((string)$request->postVar('ElementSelector')), 0, 512);
         $entry->ElementText = mb_substr(trim((string)$request->postVar('ElementText')), 0, 5000);
@@ -622,6 +635,7 @@ class MashaFeedlyEntryController extends Controller
             'message' => $this->translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'ENTRY_SAVE_SUCCESS_SIE' : 'ENTRY_SAVE_SUCCESS_DU', 'Dein Eintrag wurde gespeichert.'),
             'title' => $entry->Title,
             'entryID' => (int)$entry->ID,
+            'dueDate' => (string)$entry->DueDate,
             'attachments' => array_map(static function ($attachment): array {
                 $file = $attachment->File();
                 return [
@@ -632,6 +646,16 @@ class MashaFeedlyEntryController extends Controller
             }, $attachments),
             'history' => MashaFeedlyEntryHistory::dataForEntry($entry),
         ]);
+    }
+
+    /** Prüft Datumsfelder streng, damit ungültige Kalenderdaten abgewiesen werden. */
+    private function isValidDate(string $value): bool
+    {
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value, new \DateTimeZone('Europe/Berlin'));
+        $errors = \DateTimeImmutable::getLastErrors();
+        return $date !== false
+            && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))
+            && $date->format('Y-m-d') === $value;
     }
 
     /** Vereinheitlicht Seitenadressen ohne Query und Fragment für zuverlässige Seitenfilter. */
@@ -770,6 +794,7 @@ class MashaFeedlyEntryController extends Controller
             'title' => (string)$entry->Title,
             'content' => trim(html_entity_decode(strip_tags((string)$entry->Content), ENT_QUOTES | ENT_HTML5, 'UTF-8')),
             'entryDate' => (string)$entry->EntryDate,
+            'dueDate' => (string)$entry->DueDate,
             'pageURL' => (string)$entry->PageURL,
             'selector' => (string)$entry->ElementSelector,
             'elementText' => (string)$entry->ElementText,

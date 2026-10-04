@@ -113,6 +113,7 @@ window.KWMashaFeedlyEntries = (() => {
     id: Number(entry.id),
     categoryID: Number(entry.categoryID),
     priorityID: Number(entry.priorityID),
+    dueDate: entry.dueDate || '',
     assignedMemberIDs: (entry.assignedMemberIDs || []).map(Number),
     context: t('ENTRY_CONTEXT_STATUS', { status: entry.categoryTitle || t('ENTRY_WITHOUT_CATEGORY') }),
     description: entry.content || t('ENTRY_NO_DESCRIPTION'),
@@ -180,11 +181,12 @@ window.KWMashaFeedlyEntries = (() => {
     container.replaceChildren();
     (history || []).forEach((item) => {
       const row = document.createElement('li');
-      row.className = `kw-masha-feedly__history-item is-${['status', 'priority', 'relations'].includes(item.type) ? item.type : 'assignees'}`;
+      row.className = `kw-masha-feedly__history-item is-${['status', 'priority', 'relations'].includes(item.type) ? item.type : item.type === 'due_date' ? 'due-date' : 'assignees'}`;
       const change = document.createElement('p');
       const historyText = {
         status: () => t('HISTORY_STATUS_CHANGE', { oldValue: item.oldValue, newValue: item.newValue }),
         priority: () => t('HISTORY_PRIORITY_CHANGE', { oldValue: item.oldValue, newValue: item.newValue }),
+        due_date: () => t('HISTORY_DUE_DATE_CHANGE', { oldValue: item.oldValue || t('NO_DUE_DATE'), newValue: item.newValue || t('NO_DUE_DATE') }),
         created: () => t('HISTORY_CREATED', { title: item.newValue }),
         comment: () => t('HISTORY_COMMENT', { text: item.newValue }),
         attachment: () => t('HISTORY_ATTACHMENT', { text: item.newValue }),
@@ -550,6 +552,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (commentForm?.elements.EntryID) commentForm.elements.EntryID.value = String(editable.id);
     editForm.elements.CategoryID.value = String(editable.categoryID);
     editForm.elements.PriorityID.value = String(editable.priorityID);
+    if (editForm.elements.DueDate) editForm.elements.DueDate.value = editable.dueDate;
     editHeading.textContent = t('ENTRY_NUMBER', { id: editable.id });
     renderEditPriorityIcon(entry);
     window.KWMashaFeedlyEntries.renderRelationBadges(editRelations, entry.relations, document);
@@ -953,16 +956,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (entry.isUnread) actions.append(activityBadge());
       actions.append(shareButton);
       metadata.append(status, priorityItem);
-      card.append(title);
-      const assigned = document.createElement('div');
-      if (entry.assignees?.length) {
-        window.KWMashaFeedlyEntries.renderAssignees(assigned, entry.assignees, document);
-      } else {
-        assigned.className = 'kw-masha-feedly__entry-assignee-empty';
-        assigned.textContent = t('ASSIGNEES_NONE');
-        assigned.setAttribute('aria-label', t('ASSIGNEES_NONE'));
+      if (entry.dueDate) {
+        const dueDate = document.createElement('time');
+        dueDate.className = 'kw-masha-feedly__entry-due-date';
+        dueDate.dateTime = entry.dueDate;
+        const [year, month, day] = entry.dueDate.split('-').map(Number);
+        dueDate.textContent = t('ENTRY_DUE_DATE', { date: new Date(year, month - 1, day, 12).toLocaleDateString('de-DE') });
+        metadata.append(dueDate);
       }
-      metadata.append(assigned);
+      card.append(title);
+      if (entry.assignees?.length) {
+        const assigned = document.createElement('div');
+        window.KWMashaFeedlyEntries.renderAssignees(assigned, entry.assignees, document);
+        metadata.append(assigned);
+      }
       card.append(metadata, actions);
       const relations = document.createElement('div');
       window.KWMashaFeedlyEntries.renderRelationBadges(relations, entry.relations, document);
@@ -1218,6 +1225,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok || !result.success) throw new Error(result.message || t('EDIT_SAVE_ERROR'));
       editStatus.textContent = result.message;
       if (activeEntry) activeEntry.attachments = result.attachments || activeEntry.attachments || [];
+      if (activeEntry && Object.hasOwn(result, 'dueDate')) {
+        activeEntry.dueDate = result.dueDate || '';
+        if (editForm.elements.DueDate) editForm.elements.DueDate.value = activeEntry.dueDate;
+      }
       if (activeEntry && Array.isArray(result.relations)) activeEntry.relations = result.relations;
       window.KWMashaFeedlyEntries.renderRelationBadges(editRelations, activeEntry?.relations, document);
       if (activeEntry && result.priorityID) {

@@ -26,6 +26,7 @@ use SilverStripe\View\Requirements;
  * @property bool $MashaFeedlyNotifyEntryUpdates Benachrichtigung bei Änderungen an Einträgen.
  * @property bool $MashaFeedlyNotifyOwnEntryChanges Benachrichtigung bei eigenen Einträgen und Änderungen.
  * @property bool $MashaFeedlyNotifyComments Benachrichtigung bei neuen Kommentaren.
+ * @property bool $MashaFeedlyNotifyDueDateReminders Benachrichtigung bei Fälligkeitsterminen.
  * @property int $MashaFeedlyIconImageID ID des geschützten Profilbildes für Masha Feedly.
  * @property Image $MashaFeedlyIconImage Geschütztes Masha-Feedly-Profilbild.
  * @property string $MashaFeedlyColor Individuelle Avatarfarbe im Masha-Feedly-Board.
@@ -42,6 +43,7 @@ class MashaFeedlyMemberExtension extends Extension
         'MashaFeedlyNotifyEntryUpdates' => 'Boolean',
         'MashaFeedlyNotifyOwnEntryChanges' => 'Boolean',
         'MashaFeedlyNotifyComments' => 'Boolean',
+        'MashaFeedlyNotifyDueDateReminders' => 'Boolean',
         'MashaFeedlyColor' => 'Varchar(7)',
         'MashaFeedlyOnboardingCompleted' => 'Boolean',
         'MashaFeedlyShowOnboarding' => 'Boolean',
@@ -57,6 +59,7 @@ class MashaFeedlyMemberExtension extends Extension
         'MashaFeedlyNotifyEntryUpdates' => true,
         'MashaFeedlyNotifyOwnEntryChanges' => false,
         'MashaFeedlyNotifyComments' => true,
+        'MashaFeedlyNotifyDueDateReminders' => true,
     ];
 
     /** Liefert die kräftigen, gut unterscheidbaren Farben für Mitglieder-Avatare. */
@@ -200,6 +203,7 @@ class MashaFeedlyMemberExtension extends Extension
             'MashaFeedlyNotifyEntryUpdates',
             'MashaFeedlyNotifyOwnEntryChanges',
             'MashaFeedlyNotifyComments',
+            'MashaFeedlyNotifyDueDateReminders',
             'MashaFeedlyOnboardingCompleted',
             'MashaFeedlyShowOnboarding',
             'MashaFeedlyIconImage',
@@ -230,6 +234,10 @@ class MashaFeedlyMemberExtension extends Extension
         $comments = CheckboxField::create(
             'MashaFeedlyNotifyComments',
             self::translate('PROFILE_NOTIFY_COMMENTS', 'Bei neuen Kommentaren benachrichtigen')
+        )->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        $dueDateReminders = CheckboxField::create(
+            'MashaFeedlyNotifyDueDateReminders',
+            self::translate('PROFILE_NOTIFY_DUE_DATE_REMINDERS', 'An Fälligkeitstermine erinnern')
         )->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $entryUpdates = CheckboxField::create(
             'MashaFeedlyNotifyEntryUpdates',
@@ -269,7 +277,8 @@ class MashaFeedlyMemberExtension extends Extension
                 $newEntries,
                 $entryUpdates,
                 $ownEntryUpdates,
-                $comments
+                $comments,
+                $dueDateReminders
             )->setName('MashaFeedlyEmailSettings')->setTitle(self::translate('PROFILE_EMAIL_SETTINGS', 'E-Mail-Benachrichtigungen'))->addExtraClass('masha-feedly-email-settings'),
             CheckboxField::create(
                 'MashaFeedlyShowOnboarding',

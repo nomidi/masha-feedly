@@ -31,7 +31,15 @@ Im aufklappbaren Bereich **Zusammenhänge** kannst du Einträge als Duplikat, th
 
 ## Profil und Benachrichtigungen
 
-Im Masha:Feedly-Bereich deines Profils kannst du Avatarbild und -farbe festlegen, Kommentar-E-Mail-Benachrichtigungen verwalten und die Einführung erneut aktivieren. Neuigkeiten im Widget zeigen Aktivitäten unabhängig von E-Mail-Benachrichtigungen.
+Im Masha:Feedly-Bereich deines Profils kannst du Avatarbild und -farbe festlegen, Kommentar- und Fälligkeitserinnerungen per E-Mail verwalten und die Einführung erneut aktivieren. Neuigkeiten im Widget zeigen Aktivitäten unabhängig von E-Mail-Benachrichtigungen.
+
+Einträge können ein optionales Fälligkeitsdatum erhalten. Wähle in den Masha:Feedly-Einstellungen unter **Fälligkeitserinnerungen ausführen**, ob die Prüfung per Cronjob oder beim ersten Websitebesuch des Tages läuft. Beim Besuchsmodus werden keine Erinnerungen versendet, solange niemand die Website aufruft. Die Prüfung sendet am Fälligkeitstag (oder beim nächsten Lauf danach) einmalig eine E-Mail an freigegebene zuständige Personen und die erstellende Person. Änderungen am Termin setzen die Erinnerung zurück.
+
+Für den Cronjob-Modus richte im Silverstripe-Projekt einen täglichen Aufruf ein:
+
+```sh
+vendor/bin/sake dev/tasks/MashaFeedlyDueDateReminderTask
+```
 
 ## Im CMS verwalten
 

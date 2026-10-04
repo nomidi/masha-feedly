@@ -29,6 +29,7 @@ const messages = {
   HISTORY_COMMENT_EDITED: 'Kommentar bearbeitet: {oldValue} → {newValue}',
   HISTORY_COMMENT_DELETED: 'Kommentar gelöscht: {text}',
   HISTORY_NOBODY: 'Niemand', HISTORY_META: '{actor} · {when}', HISTORY_PRIORITY_CHANGE: 'Priorität: {oldValue} → {newValue}',
+  HISTORY_DUE_DATE_CHANGE: 'Fälligkeit: {oldValue} → {newValue}', NO_DUE_DATE: 'Kein Termin', ENTRY_DUE_DATE: 'Fällig am {date}',
   ENTRY_NUMBER: 'Eintrag #{id}', CATEGORY_ALL: 'Alle Kategorien', LIST_COUNT_MINE_DU: 'für dich',
   LIST_COUNT_MINE_SIE: 'für Sie', LIST_COUNT_ALL: 'insgesamt', LIST_COUNT_PAGE: 'auf dieser Seite',
   LIST_COUNT_UNREAD: 'mit neuen Aktivitäten', NEWS_BUTTON_DU: 'Neu seit deinem letzten Besuch',
@@ -50,7 +51,6 @@ const messages = {
   RELATION_RELATED_TO: 'Thematisch verwandt mit', RELATION_BLOCKED_BY: 'Blockiert durch',
   RELATION_BLOCKS: 'Blockiert', RELATION_DUPLICATE_OF: 'Duplikat von', RELATION_HAS_DUPLICATE: 'Hat Duplikat',
   ENTRY_PRIORITY_ARIA: 'Priorität: {priority}', PRIORITY_FALLBACK: 'Keine Priorität',
-  ASSIGNEES_NONE: 'Niemand zugewiesen',
   LIST_LOADING: 'Einträge werden geladen …', LIST_LOAD_ERROR: 'Einträge konnten nicht geladen werden.',
   RAINBOW_EMPTY_BOARD_TITLE: 'Bugfrei – oder noch nichts eingetragen!',
   RAINBOW_EMPTY_BOARD_MESSAGE: 'Hier wurde noch nichts erfasst. Wir feiern vorsichtshalber trotzdem.',
@@ -345,16 +345,14 @@ test('zeigt Status, Priorität und Zuständige in stabiler Reihenfolge und hält
   assert.match(scss, /entry-assignees \{ position: absolute; z-index: 2; right: 14px; bottom: 0; gap: 0; margin: 0; transform: translateY\(50%\); \}/);
   assert.match(compiledAdminStyles, /masha-feedly-board__card\[data-has-assignees=true\][^{]*\{[^}]*padding-bottom:1\.8rem/);
   assert.match(compiledAdminStyles, /masha-feedly-board__assignees\{position:absolute;z-index:2;right:\.75rem;bottom:0;transform:translateY\(50%\)\}/);
-  assert.match(scss, /entry-assignee-empty \{ display: inline-flex;[^}]*border: 1px dashed/);
-  assert.match(germanTranslations, /ASSIGNEES_NONE: 'Niemand zugewiesen'/);
+  assert.doesNotMatch(source, /entry-assignee-empty|ASSIGNEES_NONE/, 'Ohne Zuständige wird kein Platzhalter gerendert.');
   const unassignedEnv = createWidgetEnvironment();
   unassignedEnv.setEntryAssignees([]);
   await unassignedEnv.listeners['kw-masha-feedly:opened']();
   const unassignedCard = unassignedEnv.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   assert.equal(unassignedCard.dataset.hasAssignees, 'false');
   const unassignedMetadata = unassignedCard.children.find((child) => child.className === 'kw-masha-feedly__entry-metadata');
-  assert.deepEqual(unassignedMetadata.children.map((child) => child.className), ['kw-masha-feedly__entry-status', 'kw-masha-feedly__entry-priority', 'kw-masha-feedly__entry-assignee-empty']);
-  assert.equal(unassignedMetadata.children[2].textContent, 'Niemand zugewiesen');
+  assert.deepEqual(unassignedMetadata.children.map((child) => child.className), ['kw-masha-feedly__entry-status', 'kw-masha-feedly__entry-priority']);
 });
 
 test('zeigt die Teilen-Funktion auch im geöffneten Bugfenster und teilt genau diesen Bug', async () => {
@@ -401,6 +399,16 @@ test('bereitet die Bugbeschreibung nur zum Lesen sowie Status und Avatar-Zustän
   assert.equal(editable.description, 'Der Originaltext darf nicht im Bearbeitungsformular landen.');
   assert.equal('content' in editable, false);
   assert.equal(editable.assignees[0].initials, 'EM');
+});
+
+test('übernimmt den Fälligkeitstermin in die Bearbeitungsdaten und rendert ihn in der Verlaufshistorie', () => {
+  const editable = entriesUI.editableEntryData({ id: 71, categoryID: 1, priorityID: 3, dueDate: '2026-10-10' });
+  assert.equal(editable.dueDate, '2026-10-10');
+  const container = { children: [], replaceChildren() { this.children = []; }, append(child) { this.children.push(child); } };
+  const doc = { createElement(tagName) { return { tagName, children: [], append(...children) { this.children.push(...children); } }; } };
+  entriesUI.renderHistory(container, [{ type: 'due_date', oldValue: '', newValue: '2026-10-10', actor: 'Ada', created: '2026-10-01T10:00:00Z' }], doc);
+  assert.equal(container.children[0].className, 'kw-masha-feedly__history-item is-due-date');
+  assert.equal(container.children[0].children[0].textContent, 'Fälligkeit: Kein Termin → 2026-10-10');
 });
 
 test('zeigt Browser- und Seitenmetadaten sicher als Eintragsdetails an', () => {
@@ -994,7 +1002,7 @@ test('sendet entfernte Verknüpfungen und zeigt die bestätigte Entfernung im Ve
 });
 
 /** Simuliert die Widget-Oberfläche, um Seitenabfrage und Eintragsblasen im echten Ablauf zu prüfen. */
-function createWidgetEnvironment(locationHref = 'https://feedly:8890/about-us?preview=1', address = 'du', priorityIconType = 'warning') {
+function createWidgetEnvironment(locationHref = 'https://feedly:8890/about-us?preview=1', address = 'du', priorityIconType = 'warning', entryDueDate = '') {
   const listeners = {};
   const requests = [];
   const dispatchedEvents = [];
@@ -1122,7 +1130,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
   commentForm.submitButton = new Element();
   commentForm.querySelector = (selector) => selector === '[type="submit"]' ? commentForm.submitButton : null;
   const editForm = new Element({ updateUrl: '/__masha-feedly/updateEntry', securityId: 'test-token' });
-  editForm.elements = { EntryID: new Element(), CategoryID: new Element(), PriorityID: new Element() };
+  editForm.elements = { EntryID: new Element(), CategoryID: new Element(), PriorityID: new Element(), DueDate: new Element() };
   const editAttachmentInput = new Element();
   editAttachmentInput.name = 'Attachments[]';
   editAttachmentInput.files = [];
@@ -1260,6 +1268,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
       attachments: entryAttachments,
       relations: entryRelations,
       entryDate: '2026-10-01 10:00:00',
+      dueDate: entryDueDate,
       pageURL: entryPageURL,
       selector: '#about-title',
       elementText: 'Über uns',
@@ -1822,7 +1831,7 @@ test('zeigt nach erfolgreichem Speichern die Bestätigung und lädt den aktualis
   env.editForm.elements.PriorityID.value = '5';
   env.editForm.assigneeFields[0].checked = false;
   env.editForm.assigneeFields[1].checked = true;
-  env.postResponses.push({ ok: true, json: async () => ({ success: true, message: 'Status und Zuständigkeiten wurden gespeichert.', priorityID: 5, priorityTitle: 'Info', priorityColor: '#4285c7', priorityIconType: 'info' }) });
+  env.postResponses.push({ ok: true, json: async () => ({ success: true, message: 'Status und Zuständigkeiten wurden gespeichert.', dueDate: '2026-10-12', priorityID: 5, priorityTitle: 'Info', priorityColor: '#4285c7', priorityIconType: 'info' }) });
   await env.editForm.listeners.submit({ preventDefault() {} });
   assert.equal(env.postCalls[0].url.pathname, '/__masha-feedly/updateEntry');
   assert.equal(env.postCalls[0].options.method, 'POST');
@@ -1830,6 +1839,7 @@ test('zeigt nach erfolgreichem Speichern die Bestätigung und lädt den aktualis
   assert.equal(env.postCalls[0].options.body.values.EntryID, '71');
   assert.equal(env.postCalls[0].options.body.values.CategoryID, '3');
   assert.equal(env.postCalls[0].options.body.values.PriorityID, '5');
+  assert.equal(env.editForm.elements.DueDate.value, '2026-10-12');
   assert.equal(env.editPriorityIcon.dataset.iconType, 'info');
   assert.equal(env.editPriorityIcon.attributes['aria-label'], 'Info');
   assert.match(env.editPriorityIcon.innerHTML, /viewBox="0 0 512 512"/);
@@ -1838,6 +1848,19 @@ test('zeigt nach erfolgreichem Speichern die Bestätigung und lädt den aktualis
   assert.match(env.editStatus.textContent, /wurden gespeichert/);
   assert.equal(env.editModal.hidden, false);
   assert.equal(env.requests.length, 3);
+});
+
+test('zeigt eine gesetzte Fälligkeit auf der Karte und übernimmt sie ins Bearbeitungsformular', async () => {
+  const env = createWidgetEnvironment(undefined, undefined, undefined, '2026-10-10');
+  await env.listeners['kw-masha-feedly:opened']();
+  await env.openListButton.listeners.click();
+  const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
+  const metadata = card.children.find((child) => child.className === 'kw-masha-feedly__entry-metadata');
+  const dueDate = metadata.children.find((child) => child.className === 'kw-masha-feedly__entry-due-date');
+  assert.equal(dueDate.dateTime, '2026-10-10');
+  assert.equal(dueDate.textContent, 'Fällig am 10.10.2026');
+  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  assert.equal(env.editForm.elements.DueDate.value, '2026-10-10');
 });
 
 test('zeigt die bestätigte automatische Duplikat-Schließung nach dem Speichern an', async () => {

@@ -29,6 +29,8 @@ class MashaFeedlyConfigExtension extends Extension
         'MashaFeedlyAddress' => "Varchar(3)",
         'MashaFeedlyFontSize' => 'Varchar(10)',
         'MashaFeedlyTheme' => 'Varchar(20)',
+        'MashaFeedlyDueDateReminderMode' => 'Varchar(20)',
+        'MashaFeedlyDueDateReminderLastRunDate' => 'Date',
         'MashaFeedlyClosedCategoriesMigrated' => 'Boolean',
     ];
 
@@ -83,6 +85,14 @@ class MashaFeedlyConfigExtension extends Extension
     {
         $value = strtolower((string)self::currentSiteConfig()->MashaFeedlyTheme);
         return in_array($value, ['playful', 'serious'], true) ? $value : 'playful';
+    }
+
+    /** Liefert den Erinnerungsmodus und nutzt für bestehende Installationen weiterhin Cronjobs. */
+    public static function dueDateReminderMode(): string
+    {
+        return strtolower((string)self::currentSiteConfig()->MashaFeedlyDueDateReminderMode) === 'visitor'
+            ? 'visitor'
+            : 'cron';
     }
 
     /**

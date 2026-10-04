@@ -35,6 +35,80 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         i18n::set_locale('de_DE');
     }
 
+    /** Erinnerungen gehen nur an optierte, freigegebene Zuständige und werden nicht doppelt versandt. */
+    public function testDueDateReminderHonoursPreferenceAndIsSentOnlyOnce(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $member->MashaFeedlyEmailNotifications = true;
+        $member->MashaFeedlyNotifyDueDateReminders = true;
+        $member->write();
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->Title = 'Projekt Wolke';
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
+        $config->write();
+
+        $mailer = new class implements MailerInterface {
+            public array $messages = [];
+            public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
+        };
+        $injector = Injector::inst();
+        $originalMailer = $injector->get(MailerInterface::class);
+        $injector->registerService($mailer, MailerInterface::class);
+        $previousMember = Security::getCurrentUser();
+        try {
+            Security::setCurrentUser($member);
+            $entry = MashaFeedlyEntry::create([
+                'Content' => 'Termin für den Regressionstest.',
+                'EntryDate' => '2026-10-01',
+                'DueDate' => '2026-10-04',
+            ]);
+            $entry->write();
+            $mailer->messages = [];
+
+            $this->assertSame(1, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
+            $this->assertSame('allowed@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
+            $this->assertSame('Projekt Wolke: Heute fällig – Termin für den Regressionstest.', $mailer->messages[0]->getSubject());
+            $this->assertStringContainsString('2026-10-04', (string)$mailer->messages[0]->getTextBody());
+            $this->assertNotEmpty($entry->DueDateReminderSentAt);
+            $this->assertSame(0, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
+            $this->assertCount(1, $mailer->messages);
+        } finally {
+            Security::setCurrentUser($previousMember);
+            $injector->registerService($originalMailer, MailerInterface::class);
+        }
+    }
+
+    /** Ohne aktivierte Erinnerungen wird nicht gesendet und der Eintrag bleibt erneut prüfbar. */
+    public function testDueDateReminderCanBeDisabledPerMember(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $member->MashaFeedlyEmailNotifications = true;
+        $member->MashaFeedlyNotifyDueDateReminders = false;
+        $member->write();
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
+        $config->write();
+        $mailer = new class implements MailerInterface {
+            public array $messages = [];
+            public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
+        };
+        $injector = Injector::inst();
+        $originalMailer = $injector->get(MailerInterface::class);
+        $injector->registerService($mailer, MailerInterface::class);
+        $previousMember = Security::getCurrentUser();
+        try {
+            Security::setCurrentUser($member);
+            $entry = MashaFeedlyEntry::create(['Content' => 'Erinnerung aus.', 'EntryDate' => '2026-10-01', 'DueDate' => '2026-10-04']);
+            $entry->write();
+            $this->assertSame(0, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
+            $this->assertCount(0, $mailer->messages);
+            $this->assertEmpty($entry->DueDateReminderSentAt);
+        } finally {
+            Security::setCurrentUser($previousMember);
+            $injector->registerService($originalMailer, MailerInterface::class);
+        }
+    }
+
     /** Prüft Versand an abonnierende freigegebene Mitglieder und Ausschluss aller anderen. */
     public function testNewEntryEmailsOnlyOptedInMembersWithModuleAccess(): void
     {

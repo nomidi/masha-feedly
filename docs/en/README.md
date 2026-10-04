@@ -31,7 +31,15 @@ In the expandable **Relationships** section, link entries as duplicates, themati
 
 ## Profile and notifications
 
-In the Masha:Feedly section of your profile, set your avatar and color, manage comment email notifications, and enable the onboarding tour again. News in the widget shows activity regardless of email notification settings.
+In the Masha:Feedly section of your profile, set your avatar and color, manage comment and due-date email reminders, and enable the onboarding tour again. News in the widget shows activity regardless of email notification settings.
+
+Entries can have an optional due date. In Masha:Feedly settings, choose under **Run due-date reminders** whether checks run via cron or on the first website visit of each day. Visitor mode sends no reminders until someone visits the site. The check sends one email on the due date (or after it, if it did not run on time) to approved assignees and the entry creator. Changing the date resets the reminder.
+
+For cron mode, schedule this command to run daily in your Silverstripe project:
+
+```sh
+vendor/bin/sake dev/tasks/MashaFeedlyDueDateReminderTask
+```
 
 ## Managing entries in the CMS
 

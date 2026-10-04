@@ -12,8 +12,10 @@ use SilverStripe\Security\SecurityToken;
 use SilverStripe\View\Requirements;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Admin\CMSProfileController;
+use SilverStripe\CMS\Controllers\ContentController;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyPriority;
+use KW\MashaFeedly\Task\MashaFeedlyDueDateReminderTask;
 
 /**
  * Bindet das Masha-Feedly-Widget für berechtigte Benutzer global ein.
@@ -28,6 +30,10 @@ class MashaFeedlyWidgetExtension extends Extension
     /** Bindet Widget, Stylesheet und JavaScript in Frontend und CMS ein. */
     public function onAfterInit(): void
     {
+        if ($this->owner instanceof ContentController) {
+            MashaFeedlyDueDateReminderTask::runForWebsiteVisit();
+        }
+
         if (!MashaFeedlyConfigExtension::canUse(Security::getCurrentUser())) {
             return;
         }
@@ -231,7 +237,6 @@ class MashaFeedlyWidgetExtension extends Extension
             'CLOSE_WIDGET' => 'Masha:Feedly schließen',
             'OPEN_WIDGET' => 'Masha:Feedly öffnen',
             'ASSIGNEES_ARIA' => 'Verantwortliche',
-            'ASSIGNEES_NONE' => 'Niemand zugewiesen',
             'MEMBER_FALLBACK' => 'Mitglied',
             'UNKNOWN_BROWSER' => 'Unbekannter Browser',
             'ENV_LOGGED_AT' => 'Erfasst am',
@@ -279,6 +284,9 @@ class MashaFeedlyWidgetExtension extends Extension
             'HISTORY_COMMENT_EDITED' => 'Kommentar bearbeitet: {oldValue} → {newValue}',
             'HISTORY_COMMENT_DELETED' => 'Kommentar gelöscht: {text}',
             'HISTORY_STATUS_CHANGE' => 'Status: {oldValue} → {newValue}',
+            'HISTORY_DUE_DATE_CHANGE' => 'Fälligkeit: {oldValue} → {newValue}',
+            'NO_DUE_DATE' => 'Kein Termin',
+            'ENTRY_DUE_DATE' => 'Fällig am {date}',
             'HISTORY_ASSIGNEES_CHANGE' => 'Zuständigkeit: {oldValue} → {newValue}',
             'HISTORY_NOBODY' => 'Niemand',
             'HISTORY_META' => '{actor} · {when}',

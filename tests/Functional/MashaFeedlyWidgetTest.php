@@ -213,6 +213,26 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringNotContainsString('data-masha-feedly-start-selection', $restrictedResponse->getBody());
     }
 
+    /** Auch anonyme Websitebesuche starten im Besuchsmodus höchstens eine Prüfung pro Kalendertag. */
+    public function testAnonymousWebsiteVisitStartsConfiguredReminderCheck(): void
+    {
+        $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
+        $page->publishRecursive();
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyDueDateReminderMode = 'visitor';
+        $config->MashaFeedlyDueDateReminderLastRunDate = null;
+        $config->write();
+
+        $response = $this->get('/masha-feedly-widget-test');
+
+        $this->assertSame(200, $response->getStatusCode());
+        $reloadedConfig = \SilverStripe\SiteConfig\SiteConfig::get()->byID((int)$config->ID);
+        $this->assertSame(
+            (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Berlin')))->format('Y-m-d'),
+            (string)$reloadedConfig->MashaFeedlyDueDateReminderLastRunDate
+        );
+    }
+
     /** Admins behalten das Widget, erhalten die geführte Einführung aber erst nach expliziter Freigabe. */
     public function testAdministratorsCanUseWidgetWithoutStartingOnboarding(): void
     {

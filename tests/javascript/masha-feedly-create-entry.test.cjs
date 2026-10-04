@@ -230,7 +230,7 @@ test('startet die Bereichsauswahl, übernimmt Seitenelement und Browserdaten', (
   assert.equal(env.form.querySelector('[name="BrowserWindow"]').value, '1943 × 1294 px');
   assert.equal(env.form.querySelector('[name="ColorDepth"]').value, '24');
   assert.equal(env.content.focused, true);
-  assert.match(env.date.value, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+  assert.equal(env.date.value, '', 'Der automatisch gesetzte Erstellungszeitpunkt wird nicht als editierbares Feld angezeigt.');
 });
 
 test('bricht die Bereichsauswahl mit Escape ab und stellt das Widget wieder her', () => {
@@ -279,6 +279,15 @@ test('sendet das Formular mit CSRF-Token und zeigt die erfolgreiche Anlage', asy
   assert.equal(env.toast.hidden, true);
   assert.equal(env.column.children.at(-1).textContent, 'Button wird abgeschnitten');
   assert.equal(env.submit.disabled, false);
+});
+
+test('stellt im Erfassungsformular ein optionales Fälligkeitsdatum bereit', () => {
+  const template = fs.readFileSync(path.resolve(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
+  assert.match(template, /name="DueDate" type="date"/);
+  assert.doesNotMatch(template, /name="EntryDate"|type="datetime-local"/, 'Der Erstellungszeitpunkt wird automatisch gesetzt und bleibt aus dem Formular heraus.');
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly.scss'), 'utf8');
+  assert.match(styles, /input\[type="date"\]/, 'Das Fälligkeitsdatum erhält dieselbe Eingabefeldgestaltung wie die übrigen Datumsfelder.');
+  assert.match(source, /new FormData\(form\)/, 'Das Datumsfeld wird mit den übrigen Formulardaten an den Eintragsendpunkt gesendet.');
 });
 
 test('zeigt den Serverfehler an und lässt das Formular erneut absenden', async () => {

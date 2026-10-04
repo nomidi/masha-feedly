@@ -116,12 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
       form.append(input);
     });
     modal.hidden = false;
-    const dateField = form.querySelector('[name="EntryDate"]');
-    if (dateField && !dateField.value) {
-      const now = new Date();
-      now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-      dateField.value = now.toISOString().slice(0, 16);
-    }
     form.querySelector('[name="Content"]').focus();
     if (options.dispatchOnboarding !== false) {
       document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-target-selected'));

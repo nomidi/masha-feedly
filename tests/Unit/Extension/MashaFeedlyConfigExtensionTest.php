@@ -27,6 +27,8 @@ class MashaFeedlyConfigExtensionTest extends SapphireTest
 
         $this->assertArrayHasKey('MashaFeedlyTheme', $fields);
         $this->assertArrayHasKey('MashaFeedlyFontSize', $fields);
+        $this->assertArrayHasKey('MashaFeedlyDueDateReminderMode', $fields);
+        $this->assertArrayHasKey('MashaFeedlyDueDateReminderLastRunDate', $fields);
 
         // Eine echte ORM-Abfrage deckt fehlende Spalten auf, die eine reine Config-Prüfung übersieht.
         $siteConfig = SiteConfig::create();
@@ -119,5 +121,20 @@ class MashaFeedlyConfigExtensionTest extends SapphireTest
         $siteConfig->MashaFeedlyTheme = 'unexpected';
         $siteConfig->write();
         $this->assertSame('playful', MashaFeedlyConfigExtension::theme());
+    }
+
+    /** Auswahl der server- oder besuchergetriggerten Fälligkeitserinnerungen mit Cron-Fallback testen. */
+    public function testDueDateReminderModeSupportsCronAndWebsiteVisits(): void
+    {
+        $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
+        foreach (['cron', 'visitor'] as $mode) {
+            $siteConfig->MashaFeedlyDueDateReminderMode = $mode;
+            $siteConfig->write();
+            $this->assertSame($mode, MashaFeedlyConfigExtension::dueDateReminderMode());
+        }
+
+        $siteConfig->MashaFeedlyDueDateReminderMode = 'unexpected';
+        $siteConfig->write();
+        $this->assertSame('cron', MashaFeedlyConfigExtension::dueDateReminderMode());
     }
 }
