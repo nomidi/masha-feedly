@@ -198,6 +198,8 @@ class MashaFeedlyWidgetExtension extends Extension
             'ENTRY_OPEN_ARIA' => 'Eintrag öffnen: {title}',
             'ENTRY_MARKER_ARIA' => 'Eintrag {number}: {title}',
             'ENTRY_NUMBER' => 'Eintrag #{id}',
+            'ENTRY_CREATED_BY' => 'Erstellt von {author}',
+            'ENTRY_CREATED_UNKNOWN' => 'Unbekannt',
             'ENTRY_CONTEXT_STATUS' => 'Status: {status}',
             'ENTRY_CONTEXT_AREA' => 'Bereich: {text}',
             'ENTRY_PAGE_LINK' => 'Zur Seite wechseln',

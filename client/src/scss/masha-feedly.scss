@@ -203,6 +203,12 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__dialog-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 22.4px 25.6px 16px; background: linear-gradient(120deg, #fff6fb, #fff); }
 .kw-masha-feedly__dialog-header h2 { margin: 4px 0 0; font-size: calc(21.6px * var(--masha-font-scale, 1)); letter-spacing: -0.02em; }
 .kw-masha-feedly__edit-header-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-left: auto; }
+.kw-masha-feedly__entry-created { display: flex; width: fit-content; max-width: min(100%, 24rem); align-items: center; gap: 9px; margin-top: 12px; padding: 6px 12px 6px 6px; border: 1px solid #ecdce7; border-radius: 999px; background: linear-gradient(115deg, #fff 0%, #fff6fb 100%); box-shadow: 0 3px 10px #4d23400d; }
+.kw-masha-feedly__entry-created-avatar { display: grid; width: 31px; height: 31px; flex: 0 0 31px; place-items: center; overflow: hidden; border: 2px solid #fff; border-radius: 50%; background: linear-gradient(145deg, #f4d06f, #f6b7a9 52%, #e7a8c8); box-shadow: 0 1px 5px #30283b24; color: #30283b; font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+.kw-masha-feedly__entry-created-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.kw-masha-feedly__entry-created-copy { display: grid; min-width: 0; gap: 1px; }
+.kw-masha-feedly__entry-created-by { overflow: hidden; color: #514451; font-size: clamp(10px, calc(12px * var(--masha-font-scale, 1)), 16px); font-weight: 750; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.kw-masha-feedly__entry-created-at { color: #817584; font-size: clamp(9px, calc(11px * var(--masha-font-scale, 1)), 14px); line-height: 1.25; }
 .kw-masha-feedly__edit-priority { display: inline-flex; width: 28px; height: 28px; flex: 0 0 28px; align-items: center; justify-content: center; margin: 0; color: var(--masha-feedly-priority-color, #64748b); }
 .kw-masha-feedly__edit-priority[hidden] { display: none !important; }
 .kw-masha-feedly__edit-priority svg { display: block; width: 100%; height: 100%; fill: currentColor; }

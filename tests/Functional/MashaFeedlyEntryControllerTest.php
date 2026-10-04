@@ -912,6 +912,20 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertFalse($pageData['entries'][0]['isClosed']);
         $this->assertSame((string)$category->Title, $pageData['entries'][0]['categoryTitle']);
         $this->assertSame((string)$priority->Title, $pageData['entries'][0]['priorityTitle']);
+        $creationEvent = array_values(array_filter(
+            $pageData['entries'][0]['history'],
+            static fn(array $item): bool => $item['type'] === 'created'
+        ))[0];
+        $this->assertSame($creationEvent['actor'], $pageData['entries'][0]['createdBy']);
+        $this->assertSame($creationEvent['created'], $pageData['entries'][0]['createdAt']);
+        $creator = Member::get()->byID($onPageAssigned->creatorMemberID());
+        $this->assertArrayHasKey('createdByInitials', $pageData['entries'][0]);
+        $this->assertArrayHasKey('createdByColor', $pageData['entries'][0]);
+        $this->assertArrayHasKey('createdByImageURL', $pageData['entries'][0]);
+        if ($creator) {
+            $this->assertSame($creator->getMashaFeedlyInitials(), $pageData['entries'][0]['createdByInitials']);
+            $this->assertSame($creator->getMashaFeedlyDisplayColor(), $pageData['entries'][0]['createdByColor']);
+        }
         $this->assertSame($member->getName(), $pageData['entries'][0]['assignees'][0]['name']);
         $this->assertSame('EM', $pageData['entries'][0]['assignees'][0]['initials']);
         $this->assertNotEmpty($pageData['entries'][0]['assignees'][0]['color']);

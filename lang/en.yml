@@ -177,6 +177,8 @@ en:
     ENTRY_CONTEXT_SELECTED: 'Selected area: “{text}”'
     ENTRY_CONTEXT_EMPTY: 'Area selected on the page.'
     ENTRY_NUMBER: 'Entry #{id}'
+    ENTRY_CREATED_BY: 'Created by {author}'
+    ENTRY_CREATED_UNKNOWN: 'Unknown'
     ENTRY_NO_DESCRIPTION: 'No description provided.'
     ENTRY_STATUS_CONTEXT: 'Status: {status}'
     STATUS_UNKNOWN: 'No category'

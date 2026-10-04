@@ -776,6 +776,16 @@ class MashaFeedlyEntryController extends Controller
     /** Bereitet einen Eintrag ohne ungeprüftes HTML für die Widget-Ausgabe auf. */
     private function entryData(MashaFeedlyEntry $entry, Member $currentMember): array
     {
+        $history = MashaFeedlyEntryHistory::dataForEntry($entry);
+        $creationEvent = null;
+        foreach ($history as $historyItem) {
+            if (($historyItem['type'] ?? '') === 'created') {
+                $creationEvent = $historyItem;
+                break;
+            }
+        }
+        $creator = $entry->creatorMemberID() > 0 ? Member::get()->byID($entry->creatorMemberID()) : null;
+        $creatorImage = $creator?->MashaFeedlyIconImage();
         $assignees = [];
         $assigneeIDs = [];
         foreach ($entry->AssignedMembers() as $assignee) {
@@ -799,6 +809,11 @@ class MashaFeedlyEntryController extends Controller
             'selector' => (string)$entry->ElementSelector,
             'elementText' => (string)$entry->ElementText,
             'loggedAt' => (string)$entry->Created,
+            'createdBy' => (string)($creationEvent['actor'] ?? ''),
+            'createdAt' => (string)($creationEvent['created'] ?? ''),
+            'createdByInitials' => $creator ? (string)$creator->getMashaFeedlyInitials() : '',
+            'createdByColor' => $creator ? (string)$creator->getMashaFeedlyDisplayColor() : '',
+            'createdByImageURL' => $creatorImage instanceof Image && $creatorImage->exists() ? (string)$creatorImage->getURL() : '',
             'operatingSystem' => (string)$entry->OperatingSystem,
             'browser' => (string)$entry->Browser,
             'userAgent' => (string)$entry->UserAgent,
@@ -824,7 +839,7 @@ class MashaFeedlyEntryController extends Controller
             'assignees' => $assignees,
             'assignedMemberIDs' => $assigneeIDs,
             'comments' => array_map(fn (MashaFeedlyComment $comment): array => $this->commentData($comment, $currentMember), $entry->Comments()->filter('IsApproved', true)->sort('Created ASC')->toArray()),
-            'history' => MashaFeedlyEntryHistory::dataForEntry($entry),
+            'history' => $history,
             'relations' => $this->relationsData($entry),
         ];
     }

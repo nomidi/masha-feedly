@@ -120,6 +120,45 @@ window.KWMashaFeedlyEntries = (() => {
     assignees: entry.assignees || [],
   });
 
+  /** Formatiert Urheber und Erstellungszeit aus dem unveränderlichen Erstellungspunkt. */
+  const entryCreationMeta = (entry) => {
+    const creation = (entry?.history || []).find((item) => item?.type === 'created');
+    const author = String(creation?.actor || entry?.createdBy || '').trim() || t('ENTRY_CREATED_UNKNOWN');
+    const rawDate = String(creation?.created || entry?.createdAt || entry?.loggedAt || '').trim();
+    const normalizedDate = rawDate.replace(' ', 'T');
+    const dateWithZone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalizedDate) ? normalizedDate : `${normalizedDate}Z`;
+    const date = rawDate ? new Date(dateWithZone) : null;
+    const when = date && !Number.isNaN(date.getTime())
+      ? date.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' })
+      : rawDate;
+    const initials = author.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => Array.from(part)[0]).join('').toLocaleUpperCase('de');
+    return {
+      author,
+      initials: String(entry?.createdByInitials || initials),
+      color: String(entry?.createdByColor || ''),
+      imageURL: String(entry?.createdByImageURL || ''),
+      when,
+      dateTime: date && !Number.isNaN(date.getTime()) ? date.toISOString() : rawDate,
+    };
+  };
+
+  /** Zeichnet das Ersteller-Profilbild wie bei den Zuständigkeiten, mit Initialen als Fallback. */
+  const renderEntryCreatorAvatar = (container, creator, document) => {
+    if (!container) return;
+    container.replaceChildren();
+    container.style.backgroundColor = creator.color || '#d9b6cd';
+    container.title = creator.author || '';
+    if (creator.imageURL) {
+      const image = document.createElement('img');
+      image.src = creator.imageURL;
+      image.alt = '';
+      image.loading = 'lazy';
+      container.append(image);
+    } else {
+      container.textContent = creator.initials || '?';
+    }
+  };
+
   /** Rendert gespeicherte Browser-, Seiten- und Elementdaten als sichere Textwerte. */
   const renderEnvironment = (container, entry, document) => {
     if (!container) return;
@@ -280,7 +319,7 @@ window.KWMashaFeedlyEntries = (() => {
     else if (offset < text.length) container.append(documentRef.createTextNode(text.slice(offset)));
   };
 
-  return { sortEntries, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, renderEnvironment, renderAssignees, renderHistory, renderLinks, priorityIconSVG, createMarker, setActiveMarker, celebrateDone, celebrateClosedCategory, celebrateRocketLaunch, celebrateCompletion, previewCompletionAnimation, trapFocus };
+  return { sortEntries, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, priorityIconSVG, createMarker, setActiveMarker, celebrateDone, celebrateClosedCategory, celebrateRocketLaunch, celebrateCompletion, previewCompletionAnimation, trapFocus };
 })();
 
 /** Lädt Einträge, zeichnet Seitenmarkierungen und zeigt die filterbare Übersicht. */
@@ -328,6 +367,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const editForm = widget.querySelector('[data-masha-feedly-edit-form]');
   const editStatus = widget.querySelector('[data-masha-feedly-edit-status]');
   const editHeading = widget.querySelector('[data-masha-feedly-edit-heading]');
+  const createdMeta = widget.querySelector('[data-masha-feedly-entry-created]');
+  const createdAvatar = widget.querySelector('[data-masha-feedly-entry-created-avatar]');
+  const createdBy = widget.querySelector('[data-masha-feedly-entry-created-by]');
+  const createdAt = widget.querySelector('[data-masha-feedly-entry-created-at]');
   const listHeading = widget.querySelector('[data-masha-feedly-list-heading]');
   const helpHeading = widget.querySelector('[data-masha-feedly-help-heading]');
   const editPriorityIcon = widget.querySelector('[data-masha-feedly-edit-priority]');
@@ -554,6 +597,14 @@ document.addEventListener('DOMContentLoaded', () => {
     editForm.elements.PriorityID.value = String(editable.priorityID);
     if (editForm.elements.DueDate) editForm.elements.DueDate.value = editable.dueDate;
     editHeading.textContent = t('ENTRY_NUMBER', { id: editable.id });
+    if (createdMeta && createdAvatar && createdBy && createdAt) {
+      const creation = window.KWMashaFeedlyEntries.entryCreationMeta(entry);
+      window.KWMashaFeedlyEntries.renderEntryCreatorAvatar(createdAvatar, creation, document);
+      createdBy.textContent = t('ENTRY_CREATED_BY', { author: creation.author });
+      createdAt.textContent = creation.when;
+      createdAt.dateTime = creation.dateTime;
+      createdMeta.setAttribute('aria-label', `${createdBy.textContent} · ${creation.when}`.trim());
+    }
     renderEditPriorityIcon(entry);
     window.KWMashaFeedlyEntries.renderRelationBadges(editRelations, entry.relations, document);
     window.KWMashaFeedlyEntries.renderLinks(editDescription, editable.description, document);

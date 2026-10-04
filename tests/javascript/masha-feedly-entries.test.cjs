@@ -30,7 +30,7 @@ const messages = {
   HISTORY_COMMENT_DELETED: 'Kommentar gelöscht: {text}',
   HISTORY_NOBODY: 'Niemand', HISTORY_META: '{actor} · {when}', HISTORY_PRIORITY_CHANGE: 'Priorität: {oldValue} → {newValue}',
   HISTORY_DUE_DATE_CHANGE: 'Fälligkeit: {oldValue} → {newValue}', NO_DUE_DATE: 'Kein Termin', ENTRY_DUE_DATE: 'Fällig am {date}',
-  ENTRY_NUMBER: 'Eintrag #{id}', CATEGORY_ALL: 'Alle Kategorien', LIST_COUNT_MINE_DU: 'für dich',
+  ENTRY_NUMBER: 'Eintrag #{id}', ENTRY_CREATED_BY: 'Erstellt von {author}', ENTRY_CREATED_UNKNOWN: 'Unbekannt', CATEGORY_ALL: 'Alle Kategorien', LIST_COUNT_MINE_DU: 'für dich',
   LIST_COUNT_MINE_SIE: 'für Sie', LIST_COUNT_ALL: 'insgesamt', LIST_COUNT_PAGE: 'auf dieser Seite',
   LIST_COUNT_UNREAD: 'mit neuen Aktivitäten', NEWS_BUTTON_DU: 'Neu seit deinem letzten Besuch',
   NEWS_BUTTON_SIE: 'Neu seit Ihrem letzten Besuch', NEWS_EMPTY: 'Alles ist auf dem neuesten Stand.',
@@ -100,6 +100,56 @@ test('beschriftet den Zähler als Zahl abgeschlossener Einträge und nennt die Z
   assert.match(germanTranslations, /CLOSED_ENTRIES_BUTTON: 'abgeschlossene Einträge'/);
   assert.match(widgetTemplate, /data-masha-feedly-open-closed[^>]*aria-label="<%t KW\\MashaFeedly\\Translations\.OPEN_CLOSED_ENTRIES/);
   assert.match(widgetTemplate, /data-masha-feedly-closed-count>[^<]*<\/strong><span class="kw-masha-feedly__sr-only"><%t KW\\MashaFeedly\\Translations\.CLOSED_ENTRIES_BUTTON/);
+});
+
+test('zeigt Urheber und lokalen Erstellungszeitpunkt direkt am geöffneten Eintrag', () => {
+  const meta = entriesUI.entryCreationMeta({
+    createdBy: 'Fallback',
+    createdAt: '2026-10-04T12:00:00Z',
+    createdByInitials: 'EM',
+    createdByColor: '#123456',
+    createdByImageURL: '/protected/profile.png',
+    history: [
+      { type: 'created', actor: 'Erika Muster', created: '2026-10-04T12:00:00Z' },
+    ],
+  });
+  assert.equal(meta.author, 'Erika Muster');
+  assert.equal(meta.initials, 'EM');
+  assert.equal(meta.color, '#123456');
+  assert.equal(meta.imageURL, '/protected/profile.png');
+  assert.equal(meta.dateTime, '2026-10-04T12:00:00.000Z');
+  assert.notEqual(meta.when, '');
+  assert.match(widgetTemplate, /data-masha-feedly-entry-created[\s\S]*?data-masha-feedly-entry-created-avatar[\s\S]*?data-masha-feedly-entry-created-by[\s\S]*?data-masha-feedly-entry-created-at/);
+  assert.match(scss, /\.kw-masha-feedly__entry-created \{[^}]*border-radius: 999px;[^}]*background: linear-gradient/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__entry-created\{[^}]*border-radius:999px;[^}]*background:linear-gradient/);
+  assert.match(scss, /\.kw-masha-feedly__entry-created-avatar img \{ width: 100%; height: 100%; object-fit: cover; \}/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__entry-created-avatar img\{width:100%;height:100%;object-fit:cover\}/);
+});
+
+test('zeigt beim Ersteller dasselbe Profilbild wie bei Zuständigkeiten und nutzt Initialen als Fallback', () => {
+  const images = [];
+  const fakeDocument = { createElement: () => { const image = {}; images.push(image); return image; } };
+  const avatar = {
+    style: {},
+    children: [],
+    replaceChildren() { this.children = []; this.textContent = ''; },
+    append(child) { this.children.push(child); },
+  };
+  entriesUI.renderEntryCreatorAvatar(avatar, {
+    author: 'Erika Muster', initials: 'EM', color: '#123456', imageURL: '/geschuetzt/profil.png',
+  }, fakeDocument);
+  assert.equal(images[0].src, '/geschuetzt/profil.png');
+  assert.equal(images[0].alt, '');
+  assert.equal(images[0].loading, 'lazy');
+  assert.equal(avatar.style.backgroundColor, '#123456');
+  assert.equal(avatar.children[0], images[0]);
+
+  entriesUI.renderEntryCreatorAvatar(avatar, {
+    author: 'Erika Muster', initials: 'EM', color: '#654321', imageURL: '',
+  }, fakeDocument);
+  assert.equal(avatar.textContent, 'EM');
+  assert.equal(avatar.children.length, 0);
+  assert.equal(avatar.style.backgroundColor, '#654321');
 });
 
 test('zentriert das Fragezeichen im Hilfe-Button unabhängig von Browser-Button-Padding', () => {
