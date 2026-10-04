@@ -4,8 +4,12 @@ namespace KW\MashaFeedly\Tests\Functional;
 
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
+use KW\MashaFeedly\Model\MashaFeedlyAttachment;
+use KW\MashaFeedly\Model\MashaFeedlyComment;
+use KW\MashaFeedly\Model\MashaFeedlyCommentReaction;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
+use KW\MashaFeedly\Model\MashaFeedlyEntryRelation;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
 use SilverStripe\Dev\FunctionalTest;
 use SilverStripe\Core\Config\Config;
@@ -560,7 +564,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('data-masha-feedly-animation-preview="glow"', $response->getBody());
         $this->assertStringContainsString('data-masha-feedly-animation-preview="rings"', $response->getBody());
         $this->assertStringContainsString('data-masha-feedly-animation-preview="confirmation"', $response->getBody());
-        $this->assertSame(4, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"'));
+        $this->assertSame(6, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"'));
         $this->assertSame(4, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"'));
         $this->assertStringContainsString('effects/unicorn.js', $response->getBody());
         $this->assertStringContainsString('effects/rocket.js', $response->getBody());
@@ -617,6 +621,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     /** Normale CMS-Admins erhalten weder sensible Einstellungen im Formular noch per manipuliertem POST Schreibzugriff. */
     public function testOrdinaryCmsAdminCannotSeeOrChangeSensitiveSettingsAndColors(): void
     {
+        $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
         $allowed = $this->objFromFixture(Member::class, 'allowed');
         $this->allowMember($allowed);
         $this->logInWithPermission('ADMIN');
@@ -637,6 +642,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringNotContainsString('name="MashaFeedlyDueDateReminderMode"', $body);
         $this->assertStringNotContainsString('name="MashaFeedlyHourlyRate"', $body);
         $this->assertStringNotContainsString('data-masha-feedly-animation-previews', $body);
+        $this->assertStringNotContainsString('name="ResetConfirmation"', $body);
+        $this->assertStringNotContainsString('action_resetAllMashaFeedlyData', $body);
         $this->assertStringNotContainsString('MashaFeedlyMemberColor_' . (int)$allowed->ID, $body);
         $this->assertStringNotContainsString('masha-feedly-color-palette__swatch', $body);
         $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $body, $matches));
@@ -657,6 +664,97 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertSame('cron', MashaFeedlyConfigExtension::dueDateReminderMode());
         $this->assertSame(125.0, MashaFeedlyConfigExtension::hourlyRate());
         $this->assertSame('#E95DAB', (string)Member::get()->byID($allowed->ID)->MashaFeedlyColor);
+
+        $resetAttempt = $this->post(
+            html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'ResetConfirmation' => 'RESET',
+                'action_resetAllMashaFeedlyData' => 'Alle Masha:Feedly-Daten löschen',
+            ]
+        );
+        $this->assertNotSame(0, $resetAttempt->getStatusCode());
+        $this->assertNotNull(MashaFeedlyEntry::get()->byID((int)$entry->ID), 'Ein normaler CMS-Admin darf den Reset auch per direktem POST nicht ausführen.');
+    }
+
+    /** Nur der konfigurierte Superadmin kann den vollständigen Inhaltsreset auslösen. */
+    public function testSuperAdminCanResetAllContentAndReseedCategories(): void
+    {
+        $adminMember = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($adminMember);
+        $this->logInWithPermission('ADMIN');
+        $superAdmin = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $superAdmin);
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$superAdmin->Email]);
+
+        $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
+        $otherEntry = MashaFeedlyEntry::create([
+            'Title' => 'Zweiter Eintrag',
+            'Content' => 'Wird ebenfalls gelöscht',
+            'CategoryID' => (int)$entry->CategoryID,
+        ]);
+        $otherEntry->write();
+        $comment = MashaFeedlyComment::create([
+            'EntryID' => (int)$entry->ID,
+            'AuthorName' => 'Erika',
+            'CommentText' => 'Kommentar zum Löschen',
+        ]);
+        $comment->write();
+        MashaFeedlyCommentReaction::create([
+            'CommentID' => (int)$comment->ID,
+            'MemberID' => (int)$adminMember->ID,
+            'Emoji' => '👍',
+        ])->write();
+        MashaFeedlyAttachment::create(['EntryID' => (int)$entry->ID, 'OriginalName' => 'alt.png'])->write();
+        MashaFeedlyEntryRelation::create([
+            'EntryID' => (int)$entry->ID,
+            'RelatedEntryID' => (int)$otherEntry->ID,
+            'LinkType' => 'duplicate_of',
+        ])->write();
+        MashaFeedlyEntryHistory::record($entry, 'comment', '', 'Kommentar', $adminMember);
+        MashaFeedlyEntryRead::markAsSeen($entry, $adminMember);
+        MashaFeedlyCategory::create(['Title' => 'Eigene Kategorie', 'Sort' => 90])->write();
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyHourlyRate = 175;
+        $config->MashaFeedlyEstimateCategoriesSeeded = true;
+        $config->write();
+
+        $url = '/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig';
+        $body = $this->get($url)->getBody();
+        $this->assertStringContainsString('name="ResetConfirmation"', $body);
+        $this->assertStringContainsString('action_resetAllMashaFeedlyData', $body);
+        $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $body, $matches));
+        $actionURL = html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        $wrongConfirmation = $this->post($actionURL, [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'ResetConfirmation' => 'delete',
+            'action_resetAllMashaFeedlyData' => 'Alle Masha:Feedly-Daten löschen',
+        ]);
+        $this->assertSame(2, MashaFeedlyEntry::get()->count());
+        $this->assertSame(1, MashaFeedlyComment::get()->count());
+
+        $response = $this->post($actionURL, [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'ResetConfirmation' => 'RESET',
+            'action_resetAllMashaFeedlyData' => 'Alle Masha:Feedly-Daten löschen',
+        ]);
+
+        $this->assertSame(200, $wrongConfirmation->getStatusCode());
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(0, MashaFeedlyEntry::get()->count());
+        $this->assertSame(0, MashaFeedlyComment::get()->count());
+        $this->assertSame(0, MashaFeedlyCommentReaction::get()->count());
+        $this->assertSame(0, MashaFeedlyAttachment::get()->count());
+        $this->assertSame(0, MashaFeedlyEntryRelation::get()->count());
+        $this->assertSame(0, MashaFeedlyEntryHistory::get()->count());
+        $this->assertSame(0, MashaFeedlyEntryRead::get()->count());
+        foreach (['backlog', 'todo', 'doing', 'done', 'archive', 'feedback', 'estimate_pending', 'estimate_approved'] as $key) {
+            $this->assertSame(1, MashaFeedlyCategory::get()->filter('SystemKey', $key)->count(), 'Systemkategorie ' . $key . ' muss genau einmal neu angelegt werden.');
+        }
+        $this->assertNotContains('Eigene Kategorie', MashaFeedlyCategory::get()->column('Title'));
+        $this->assertSame(175.0, MashaFeedlyConfigExtension::hourlyRate());
+        $this->assertContains((int)$adminMember->ID, MashaFeedlyConfigExtension::memberIDs());
     }
 
     /** Schreibt eine Testfreigabe, ohne produktive Silverstripe-Mitglieder anzulegen. */

@@ -45,6 +45,8 @@ vendor/bin/sake dev/tasks/MashaFeedlyDueDateReminderTask
 
 The Masha:Feedly board groups entries by category. Users with access can edit entries and reorder them with drag and drop. Categories, priorities, and general widget settings are also managed in the CMS.
 
+The specifically configured superadmin account also sees **Delete all Masha:Feedly data** under **Masha:Feedly → Configuration**. It removes entries and their comments, reactions, attachments, relationships, read markers, and history, then recreates the standard categories including optional estimate categories. Users, profiles, access rights, and configuration are kept. Type `RESET` to confirm.
+
 When manually recreating older entries, a designated operator can change the displayed reporter. Add only that operator account's email address to your project's `app/_config.php`:
 
 ```php

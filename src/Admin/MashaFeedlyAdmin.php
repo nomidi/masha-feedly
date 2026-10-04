@@ -10,6 +10,7 @@ use KW\MashaFeedly\Model\MashaFeedlyPriority;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
+use KW\MashaFeedly\Service\MashaFeedlyResetService;
 use SilverStripe\Assets\Image;
 use SilverStripe\Admin\ModelAdmin;
 use SilverStripe\Control\Controller;
@@ -26,6 +27,7 @@ use SilverStripe\Forms\LiteralField;
 use SilverStripe\Forms\HiddenField;
 use SilverStripe\Forms\ListboxField;
 use SilverStripe\Forms\NumericField;
+use SilverStripe\Forms\TextField;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\Security;
@@ -65,6 +67,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         'createCategory',
         'deleteCategory',
         'saveReporter',
+        'resetAllMashaFeedlyData',
     ];
 
     /** Liefert die Anzahl offener Einträge in der Feedback-Kategorie. */
@@ -176,6 +179,20 @@ class MashaFeedlyAdmin extends ModelAdmin
                 ->setValue(MashaFeedlyConfigExtension::hourlyRate())
                 ->setDescription(self::translate('CONFIG_HOURLY_RATE_DESCRIPTION', 'Aus der eingetragenen Dauer wird automatisch der Preis berechnet.')));
             $fields->insertBefore('AllowedMemberIDs', LiteralField::create('MashaFeedlyAnimationPreviews', $this->renderCompletionAnimationPreviews()));
+            $fields->insertBefore('AllowedMemberIDs', LiteralField::create(
+                'MashaFeedlyResetHeading',
+                '<section class="masha-feedly-reset"><h3>'
+                    . self::translate('RESET_TITLE', 'Masha:Feedly-Daten zurücksetzen')
+                    . '</h3><p>'
+                    . self::translate('RESET_DESCRIPTION', 'Löscht alle Einträge samt Kommentaren, Anhängen, Reaktionen, Verknüpfungen und Verlauf. Kategorien werden anschließend neu angelegt. Benutzer, Zugriffsrechte, Profile und Einstellungen bleiben erhalten.')
+                    . '</p><p><strong>'
+                    . self::translate('RESET_CONFIRMATION_INSTRUCTION', 'Diese Aktion kann nicht rückgängig gemacht werden. Tippe zur Bestätigung genau: RESET')
+                    . '</strong></p></section>'
+            ));
+            $fields->insertBefore('AllowedMemberIDs', TextField::create(
+                'ResetConfirmation',
+                self::translate('RESET_CONFIRMATION_LABEL', 'Bestätigung')
+            )->setAttribute('autocomplete', 'off')->setAttribute('spellcheck', 'false'));
         }
         foreach ($canManageSensitiveSettings && $authorizedMemberIDs ? Member::get()->filter('ID', $authorizedMemberIDs)->sort('Surname ASC, FirstName ASC') : [] as $authorizedMember) {
             $colorFieldName = 'MashaFeedlyMemberColor_' . (int)$authorizedMember->ID;
@@ -214,6 +231,12 @@ class MashaFeedlyAdmin extends ModelAdmin
             FormAction::create('saveConfiguration', self::translate('CONFIG_SAVE', 'Konfiguration speichern'))
                 ->addExtraClass('btn-primary')
         );
+        if ($canManageSensitiveSettings) {
+            $actions->push(FormAction::create(
+                'resetAllMashaFeedlyData',
+                self::translate('RESET_BUTTON', 'Alle Masha:Feedly-Daten löschen')
+            )->addExtraClass('btn-danger'));
+        }
         $form = Form::create($this, 'EditForm', $fields, $actions)
             ->setHTMLID('Form_EditForm')
             ->setTemplate($this->getTemplatesWithSuffix('_EditForm'));
@@ -840,6 +863,31 @@ class MashaFeedlyAdmin extends ModelAdmin
             'success' => true,
             'message' => self::translate('REPORTER_SAVED', 'Meldeperson gespeichert.'),
             'reportedByName' => $entry->reportedByName(),
+        ]);
+    }
+
+    /** Setzt alle Masha:Feedly-Inhalte nur für das konfigurierte Superadmin-Konto zurück. */
+    public function resetAllMashaFeedlyData(array $data, Form $form)
+    {
+        $member = Security::getCurrentUser();
+        if (!MashaFeedlyEntry::canManageReporter($member)) {
+            return Security::permissionFailure($this);
+        }
+        if ((string)($data['ResetConfirmation'] ?? '') !== 'RESET') {
+            $form->sessionMessage(self::translate('RESET_CONFIRMATION_ERROR', 'Bitte tippe genau „RESET“, um den Reset zu bestätigen.'), 'bad');
+            return $this->getResponseNegotiator()->respond($this->getRequest(), [
+                'CurrentForm' => fn(): string => $this->getEditForm()->forTemplate(),
+            ]);
+        }
+
+        $counts = MashaFeedlyResetService::resetAllData();
+        $form->sessionMessage(self::translate('RESET_SUCCESS', 'Zurückgesetzt: {entries} Einträge, {comments} Kommentare, {attachments} Anhänge gelöscht; Kategorien neu angelegt.', [
+            'entries' => (string)$counts['entries'],
+            'comments' => (string)$counts['comments'],
+            'attachments' => (string)$counts['attachments'],
+        ]), 'good');
+        return $this->getResponseNegotiator()->respond($this->getRequest(), [
+            'CurrentForm' => fn(): string => $this->getEditForm()->forTemplate(),
         ]);
     }
 
