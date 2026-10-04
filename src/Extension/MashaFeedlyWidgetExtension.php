@@ -47,6 +47,7 @@ class MashaFeedlyWidgetExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rocket.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/hearts.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/arcade.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/retro.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/check.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/glow.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rings.js');
@@ -327,6 +328,9 @@ class MashaFeedlyWidgetExtension extends Extension
             'TOUR_THANKS_TEXT' => 'Du hast deine erste Meldung erstellt und gelernt, wie du Einträge ansiehst und bearbeitest. In deinem Profil kannst du dein Feedly-Icon und deine Avatarfarbe anpassen sowie E-Mail-Benachrichtigungen zu Kommentaren einrichten.',
             'TOUR_PROFILE_LINK' => 'Profileinstellungen öffnen',
             'TOUR_DONE' => 'Fertig',
+            'RETRO_SUCCESS_TITLE' => 'Erfolgreich erledigt!',
+            'RETRO_SUCCESS_MESSAGE' => 'Der Eintrag wurde abgeschlossen.',
+            'RETRO_SUCCESS_BUTTON' => 'OK',
             'TOUR_SELECTION_TARGET' => 'Klicke auf den betroffenen Bereich der Website. Mit „Abbrechen“ kannst du die Auswahl beenden.',
             'HISTORY_EYEBROW' => 'ÄNDERUNGEN',
             'HISTORY_TITLE' => 'Verlauf',

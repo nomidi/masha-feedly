@@ -8,6 +8,7 @@ use SilverStripe\Core\Config\Config;
 use SilverStripe\Dev\FunctionalTest;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Security\Member;
+use SilverStripe\Security\Security;
 
 /**
  * Prüft die globale Widget-Ausgabe im Frontend abhängig vom Benutzerzugriff.
@@ -25,6 +26,26 @@ class MashaFeedlyWidgetTest extends FunctionalTest
     {
         parent::setUp();
         i18n::set_locale('de_DE');
+    }
+
+    /** Prüft Icon-Upload und Avatarfarben auf der echten CMS-Profilseite eines freigegebenen Benutzers. */
+    public function testAllowedMemberCanChooseProfileIconAndColorOnCmsProfilePage(): void
+    {
+        $this->logInWithPermission('CMS_ACCESS');
+        $member = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $member);
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
+        $config->write();
+
+        $response = $this->get('/admin/myprofile');
+
+        $this->assertSame(200, $response->getStatusCode());
+        $body = html_entity_decode($response->getBody(), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $this->assertStringContainsString('Root_MashaFeedly', $body, 'Das Masha:Feedly-Profil erscheint als eigener CMS-Tab.');
+        $this->assertStringContainsString('MashaFeedlyIconImage', $body, 'Freigegebene Mitglieder können ihr Profilbild/Icon hochladen.');
+        $this->assertStringContainsString('MashaFeedlyColor', $body, 'Freigegebene Mitglieder können eine Avatarfarbe wählen.');
+        $this->assertStringContainsString('masha-feedly-color-palette__grid', $body, 'Die Farbauswahl wird auf der Profilseite gerendert.');
     }
 
     /** Prüft, dass nur freigegebene Benutzer das globale Widget erhalten. */

@@ -7,12 +7,12 @@ const vm = require('node:vm');
 /** Tests für Sortierung, Kategorien und am Seitenbereich verankerte Eintragsblasen. @author Kooperative Web */
 const source = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-entries.js'), 'utf8');
 const compiledSource = fs.readFileSync(path.resolve(__dirname, '../../client/dist/js/masha-feedly-entries.js'), 'utf8');
-const effectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/js/effects/${name}.js`), 'utf8'));
-const compiledEffectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/dist/js/effects/${name}.js`), 'utf8'));
+const effectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/js/effects/${name}.js`), 'utf8'));
+const compiledEffectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/dist/js/effects/${name}.js`), 'utf8'));
 const scss = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly.scss'), 'utf8');
 const compiledStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly.css'), 'utf8');
 const compiledAdminStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly-admin.css'), 'utf8');
-const effectStyles = ['_confetti.scss', '_unicorn.scss', '_rocket.scss', '_hearts.scss', '_arcade.scss', '_check.scss', '_glow.scss', '_rings.scss', '_confirmation.scss'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/scss/effects/${name}`), 'utf8'));
+const effectStyles = ['_confetti.scss', '_unicorn.scss', '_rocket.scss', '_hearts.scss', '_arcade.scss', '_retro.scss', '_check.scss', '_glow.scss', '_rings.scss', '_confirmation.scss'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/scss/effects/${name}`), 'utf8'));
 const widgetTemplate = fs.readFileSync(path.resolve(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
 const germanTranslations = fs.readFileSync(path.resolve(__dirname, '../../lang/de.yml'), 'utf8');
 const messages = {
@@ -790,9 +790,9 @@ test('lässt nach einem Abschluss das Einhorn-Asset über die Seite laufen', () 
   assert.equal(layer.removed, true);
 });
 
-test('bricht alle acht Abschlussanimationen beim nächsten Klick vollständig ab', () => {
+test('bricht alle neun Abschlussanimationen beim nächsten Klick vollständig ab', () => {
   const runnerSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/effects/runner.js'), 'utf8');
-  const animationNames = ['unicorn', 'rocket', 'hearts', 'arcade', 'check', 'glow', 'rings', 'confirmation'];
+  const animationNames = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'check', 'glow', 'rings', 'confirmation'];
   const removedByEffect = new Map();
   const modules = Object.fromEntries(animationNames.map((name) => [name, {
     play() {
@@ -860,7 +860,7 @@ test('startet beim Raketenstart eine barrierefreie Rakete mit Sternenspur und r�
   assert.equal(layer.removed, true);
 });
 
-test('wählt theme-basiert zwischen Einhorn, Raketenstart, Herzregen und Arcade-Level', () => {
+test('wählt theme-basiert zwischen Einhorn, Raketenstart, Herzregen, Arcade-Level und Retro-Fenster', () => {
   const layers = [];
   const document = {
     body: { append(layer) { layers.push(layer); } },
@@ -879,20 +879,24 @@ test('wählt theme-basiert zwischen Einhorn, Raketenstart, Herzregen und Arcade-
   const rocketCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.35);
   assert.deepEqual(Object.keys(rocketCompletion), ['rocket']);
   assert.equal(layers.at(-1).className, 'kw-masha-feedly__rocket-runner');
-  const heartsCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.6);
+  const heartsCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.45);
   assert.deepEqual(Object.keys(heartsCompletion), ['hearts']);
   assert.equal(heartsCompletion.hearts.className, 'kw-masha-feedly__heart-burst');
   assert.equal(heartsCompletion.hearts.children.length, 28);
   assert.equal(heartsCompletion.hearts.children[0].textContent, '♥');
   assert.equal(heartsCompletion.hearts.children[0].style.color, '#ff3b91');
-  const arcadeCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.9);
+  const arcadeCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.65);
   assert.deepEqual(Object.keys(arcadeCompletion), ['arcade']);
   assert.equal(arcadeCompletion.arcade.className, 'kw-masha-feedly__arcade-effect');
   const arcadeScreen = arcadeCompletion.arcade.children[0];
   assert.equal(arcadeScreen.className, 'kw-masha-feedly__arcade-screen');
   assert.equal(arcadeScreen.children.filter((child) => child.className === 'kw-masha-feedly__arcade-pixel').length, 56);
   assert.equal(arcadeScreen.children.filter((child) => child.className === 'kw-masha-feedly__arcade-invader').length, 4);
-  assert.equal(arcadeScreen.children.at(-1).textContent, '8-BIT!');
+  assert.equal(arcadeScreen.children.at(-1).textContent, 'MISSION COMPLETE!');
+  const retroCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.9);
+  assert.deepEqual(Object.keys(retroCompletion), ['retro']);
+  assert.equal(retroCompletion.retro.className, 'kw-masha-feedly__retro-effect');
+  assert.equal(retroCompletion.retro.children[0].className, 'kw-masha-feedly__retro-dialog');
   const rocketPreview = entriesUI.previewCompletionAnimation(document, window, 'rocket', '/unicorn.svg');
   assert.equal(rocketPreview.confetti, undefined);
   assert.equal(rocketPreview.unicorn, undefined);
@@ -900,7 +904,9 @@ test('wählt theme-basiert zwischen Einhorn, Raketenstart, Herzregen und Arcade-
   const heartsPreview = entriesUI.previewCompletionAnimation(document, window, 'hearts', '/unicorn.svg');
   assert.equal(heartsPreview.hearts.children.length, 28);
   const arcadePreview = entriesUI.previewCompletionAnimation(document, window, 'arcade', '/unicorn.svg');
-  assert.equal(arcadePreview.arcade.children[0].children.at(-1).textContent, '8-BIT!');
+  assert.equal(arcadePreview.arcade.children[0].children.at(-1).textContent, 'MISSION COMPLETE!');
+  const retroPreview = entriesUI.previewCompletionAnimation(document, window, 'retro', '/unicorn.svg');
+  assert.equal(retroPreview.retro.className, 'kw-masha-feedly__retro-effect');
   const playful = entriesUI.previewCompletionAnimation(document, window, 'playful', '/unicorn.svg');
   assert.ok(playful.confetti);
   assert.ok(playful.unicorn);
@@ -915,6 +921,35 @@ test('wählt theme-basiert zwischen Einhorn, Raketenstart, Herzregen und Arcade-
   assert.equal(entriesUI.celebrateCompletion(document, reducedWindow, '/unicorn.svg', 'playful', () => { throw new Error('Zufall darf bei reduzierter Bewegung nicht ausgewertet werden.'); }), null);
 });
 
+test('spielt beim 8-Bit-Erfolg eine kurze, freigeschaltete Chiptune-Siegsmelodie', async () => {
+  const oscillators = [];
+  const listeners = {};
+  const fakeContext = {
+    state: 'suspended', currentTime: 2, destination: {},
+    resume() { this.state = 'running'; return Promise.resolve(); },
+    createOscillator() {
+      const oscillator = { frequency: { setValueAtTime(value, at) { this.value = value; this.at = at; } }, connect(target) { this.target = target; }, start(at) { this.startedAt = at; }, stop(at) { this.stoppedAt = at; } };
+      oscillators.push(oscillator);
+      return oscillator;
+    },
+    createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; },
+  };
+  const simulatedWindow = {
+    AudioContext: function AudioContext() { return fakeContext; },
+    addEventListener(type, callback, options) { listeners[type] = { callback, options }; },
+  };
+  vm.runInNewContext(effectSources[3], { window: simulatedWindow });
+  assert.equal(listeners.pointerdown.options.once, true);
+  listeners.pointerdown.callback();
+  await Promise.resolve();
+  const played = simulatedWindow.KWMashaFeedlyEffectModules.arcade.playVictorySound(simulatedWindow);
+  assert.equal(played, true);
+  assert.equal(oscillators.length, 6);
+  assert.ok(oscillators.every((oscillator) => oscillator.type === 'square'));
+  assert.deepEqual(oscillators.map((oscillator) => oscillator.frequency.value), [659.25, 783.99, 987.77, 1318.51, 987.77, 1318.51]);
+  assert.ok(oscillators.every((oscillator) => oscillator.stoppedAt > oscillator.startedAt));
+});
+
 test('Admin-Vorschau nutzt die auswählbaren verspielten Abschlussanimationen', () => {
   const adminSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-admin.js'), 'utf8');
   const adminStyleSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
@@ -924,14 +959,15 @@ test('Admin-Vorschau nutzt die auswählbaren verspielten Abschlussanimationen', 
   const adminPHP = fs.readFileSync(path.resolve(__dirname, '../../src/Admin/MashaFeedlyAdmin.php'), 'utf8');
   assert.match(adminPHP, /data-masha-feedly-animation-preview="hearts"/);
   assert.match(adminPHP, /data-masha-feedly-animation-preview="arcade"/);
+  assert.match(adminPHP, /data-masha-feedly-animation-preview="retro"/);
   const widgetPHP = fs.readFileSync(path.resolve(__dirname, '../../src/Extension/MashaFeedlyWidgetExtension.php'), 'utf8');
   for (const name of ['check', 'glow', 'rings', 'confirmation']) {
     assert.match(adminPHP, new RegExp(`data-masha-feedly-animation-preview="${name}"`));
   }
-  const orderedEffects = 'effects/unicorn\\.js[\\s\\S]*effects/rocket\\.js[\\s\\S]*effects/hearts\\.js[\\s\\S]*effects/arcade\\.js[\\s\\S]*effects/check\\.js[\\s\\S]*effects/glow\\.js[\\s\\S]*effects/rings\\.js[\\s\\S]*effects/confirmation\\.js[\\s\\S]*effects/runner\\.js[\\s\\S]*masha-feedly-entries\\.js';
+  const orderedEffects = 'effects/unicorn\\.js[\\s\\S]*effects/rocket\\.js[\\s\\S]*effects/hearts\\.js[\\s\\S]*effects/arcade\\.js[\\s\\S]*effects/retro\\.js[\\s\\S]*effects/check\\.js[\\s\\S]*effects/glow\\.js[\\s\\S]*effects/rings\\.js[\\s\\S]*effects/confirmation\\.js[\\s\\S]*effects/runner\\.js[\\s\\S]*masha-feedly-entries\\.js';
   assert.match(adminPHP, new RegExp(orderedEffects));
   assert.match(widgetPHP, new RegExp(orderedEffects));
-  assert.match(scss, /@use 'effects\/confetti';[\s\S]*@use 'effects\/unicorn';[\s\S]*@use 'effects\/rocket';[\s\S]*@use 'effects\/hearts';[\s\S]*@use 'effects\/arcade';[\s\S]*@use 'effects\/check';[\s\S]*@use 'effects\/glow';[\s\S]*@use 'effects\/rings';[\s\S]*@use 'effects\/confirmation';/);
+  assert.match(scss, /@use 'effects\/confetti';[\s\S]*@use 'effects\/unicorn';[\s\S]*@use 'effects\/rocket';[\s\S]*@use 'effects\/hearts';[\s\S]*@use 'effects\/arcade';[\s\S]*@use 'effects\/retro';[\s\S]*@use 'effects\/check';[\s\S]*@use 'effects\/glow';[\s\S]*@use 'effects\/rings';[\s\S]*@use 'effects\/confirmation';/);
   assert.deepEqual(compiledEffectSources, effectSources);
   assert.match(effectStyles[0], /kw-masha-feedly__confetti-piece/);
   assert.match(effectStyles[1], /kw-masha-feedly__unicorn-runner/);
@@ -949,12 +985,14 @@ test('Admin-Vorschau nutzt die auswählbaren verspielten Abschlussanimationen', 
   assert.match(effectStyles[4], /kw-masha-feedly__arcade-pixel/);
   assert.match(effectStyles[4], /kw-masha-feedly__arcade-invader/);
   assert.match(effectStyles[4], /kw-masha-feedly__arcade-message/);
-  assert.match(effectStyles[5], /kw-masha-feedly__serious-check-mark/);
-  assert.match(effectStyles[6], /kw-masha-feedly__serious-glow/);
-  assert.match(effectStyles[6], /::before[\s\S]*?radial-gradient[\s\S]*?opacity: 1[\s\S]*?scale\(1\.7\)/);
-  assert.match(effectStyles[6], /::after[\s\S]*?border: 3px solid[\s\S]*?scale\(3\.4\)/);
-  assert.match(effectStyles[7], /kw-masha-feedly__serious-ring/);
-  assert.match(effectStyles[8], /kw-masha-feedly__serious-confirmation-card/);
+  assert.match(effectStyles[5], /kw-masha-feedly__retro-dialog/);
+  assert.match(effectStyles[5], /#000080/);
+  assert.match(effectStyles[6], /kw-masha-feedly__serious-check-mark/);
+  assert.match(effectStyles[7], /kw-masha-feedly__serious-glow/);
+  assert.match(effectStyles[7], /::before[\s\S]*?radial-gradient[\s\S]*?opacity: 1[\s\S]*?scale\(1\.7\)/);
+  assert.match(effectStyles[7], /::after[\s\S]*?border: 3px solid[\s\S]*?scale\(3\.4\)/);
+  assert.match(effectStyles[8], /kw-masha-feedly__serious-ring/);
+  assert.match(effectStyles[9], /kw-masha-feedly__serious-confirmation-card/);
   assert.match(compiledStyles, /kw-masha-feedly__rocket-runner/);
 });
 
@@ -2227,14 +2265,17 @@ test('startet erst nach bestätigtem Feedback-Abschluss zufällig einen passende
   const rocket = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__rocket-runner');
   const hearts = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__heart-burst');
   const arcade = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__arcade-effect');
-  assert.ok((party && unicorn && !rocket && !hearts && !arcade)
-    || (!party && !unicorn && rocket && !hearts && !arcade)
-    || (!party && !unicorn && !rocket && hearts && !arcade)
-    || (!party && !unicorn && !rocket && !hearts && arcade));
+  const retro = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__retro-effect');
+  assert.ok((party && unicorn && !rocket && !hearts && !arcade && !retro)
+    || (!party && !unicorn && rocket && !hearts && !arcade && !retro)
+    || (!party && !unicorn && !rocket && hearts && !arcade && !retro)
+    || (!party && !unicorn && !rocket && !hearts && arcade && !retro)
+    || (!party && !unicorn && !rocket && !hearts && !arcade && retro));
   if (party && unicorn) {
     assert.equal(party.children.length, 128);
     assert.equal(unicorn.children[0].src, env.widget.dataset.unicornUrl);
   }
+  if (retro) assert.equal(retro.children[0].className, 'kw-masha-feedly__retro-dialog');
   assert.equal(env.editContext.textContent, 'Status: Fertig');
 });
 

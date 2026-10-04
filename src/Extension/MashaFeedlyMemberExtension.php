@@ -282,7 +282,7 @@ class MashaFeedlyMemberExtension extends Extension
                 . '<div><h2>' . self::translate('PROFILE_TITLE', 'Masha:Feedly') . '</h2><p>' . self::translate('PROFILE_INTRO', 'Verwalte dein Profil und bestimme, worüber dich Masha:Feedly per E-Mail informiert.') . '</p></div></div>'
             ),
             CompositeField::create(
-                UploadField::create('MashaFeedlyIconImage', self::translate('PROFILE_IMAGE', 'Dein Masha-Feedly-Profilbild'))
+                UploadField::create('MashaFeedlyIconImage', self::translate('PROFILE_IMAGE', 'Dein Masha:Feedly-Avatar'))
                     ->setFolderName('masha-feedly/masha-feedly-profile-images')
                     ->setAllowedFileCategories('image/supported')
                     ->setAllowedMaxFileNumber(1)

@@ -2,7 +2,7 @@
 (() => {
   const modules = window.KWMashaFeedlyEffectModules || {};
   const themeEffects = {
-    playful: ['unicorn', 'rocket', 'hearts', 'arcade'],
+    playful: ['unicorn', 'rocket', 'hearts', 'arcade', 'retro'],
     serious: ['check', 'glow', 'rings', 'confirmation'],
   };
   const activeByDocument = new WeakMap();
@@ -75,6 +75,7 @@
     rocket: (document, window) => track(modules.rocket?.play(document, window)?.rocket || null, document, window),
     hearts: (document, window) => track(modules.hearts?.play(document, window)?.hearts || null, document, window),
     arcade: (document, window) => track(modules.arcade?.play(document, window)?.arcade || null, document, window),
+    retro: (document, window) => track(modules.retro?.play(document, window)?.retro || null, document, window),
     check: (document, window) => track(modules.check?.play(document, window)?.check || null, document, window),
     glow: (document, window) => track(modules.glow?.play(document, window)?.glow || null, document, window),
     rings: (document, window) => track(modules.rings?.play(document, window)?.rings || null, document, window),

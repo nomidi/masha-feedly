@@ -63,6 +63,7 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertInstanceOf(\SilverStripe\Forms\CompositeField::class, $profileGroup);
         $imageField = $profileGroup->getChildren()->dataFieldByName('MashaFeedlyIconImage');
         $this->assertInstanceOf(UploadField::class, $imageField);
+        $this->assertSame('Dein Masha:Feedly-Avatar', $imageField->Title());
         $this->assertSame('masha-feedly/masha-feedly-profile-images', $imageField->getFolderName());
         $this->assertFalse($imageField->getAttachEnabled());
         $this->assertContains('png', $imageField->getAllowedExtensions());
