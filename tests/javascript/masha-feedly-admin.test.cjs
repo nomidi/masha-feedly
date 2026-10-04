@@ -82,6 +82,18 @@ test('ordnet Admin-Karten als Kopfzeile, Titel-Auszug und Datum darunter an', ()
   assert.doesNotMatch(renderer, /masha-feedly-board__card-metadata/);
 });
 
+test('lässt zugewiesene Avatar-Gruppen am unteren Rand der Admin-Karte überhängen', () => {
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
+  const compiledStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly-admin.css'), 'utf8');
+  for (const stylesheet of [styles, compiledStyles]) {
+    assert.match(stylesheet, /board__card\[data-has-assignees=(?:"true"|true)\]\s*\{[^}]*overflow:\s*visible;/);
+    assert.match(stylesheet, /data-has-assignees=(?:"true"|true)[^{}]*\{[^}]*position:\s*absolute;[^}]*right:\s*(?:0)?\.75rem;[^}]*bottom:\s*-\s*(?:0)?\.55rem;[^}]*transform:\s*none/);
+    assert.match(stylesheet, /masha-feedly-board__assignees\s*\{[^}]*border-radius:\s*999px;[^}]*background:\s*(?:rgba\(255,\s*255,\s*255,\s*0\.96\)|hsla\(0,\s*0%,\s*100%,\s*\.96\));[^}]*box-shadow:/);
+    assert.match(stylesheet, /masha-feedly-board__assignee:hover\s*\{[^}]*transform:\s*translateY\(-2px\) scale\(1\.06\)/);
+    assert.match(stylesheet, /prefers-reduced-motion:\s*reduce[\s\S]*?masha-feedly-board__assignee\s*\{[^}]*transition:\s*none/);
+  }
+});
+
 test('zentriert das Plus im Admin-Button geometrisch statt über ein Schriftzeichen', () => {
   const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
   const compiledStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly-admin.css'), 'utf8');

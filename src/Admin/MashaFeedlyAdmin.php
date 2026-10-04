@@ -643,25 +643,26 @@ class MashaFeedlyAdmin extends ModelAdmin
                         . '</svg></span>';
                 }
                 $assignedMembers = $entry->AssignedMembers()->sort('Surname ASC, FirstName ASC');
+                $assigneesHTML = '';
                 if ($assignedMembers->exists()) {
-                    $html .= '<div class="masha-feedly-board__assignees" aria-label="' . $this->escapeBoardValue(self::translate('BOARD_ASSIGNED_MEMBERS', 'Zugeordnete Mitglieder')) . '">';
+                    $assigneesHTML .= '<div class="masha-feedly-board__assignees" aria-label="' . $this->escapeBoardValue(self::translate('BOARD_ASSIGNED_MEMBERS', 'Zugeordnete Mitglieder')) . '">';
                     foreach ($assignedMembers as $assignedMember) {
                         $name = (string)$assignedMember->getName();
                         $imageURL = $this->memberProfileImageURL($assignedMember);
                         $color = $assignedMember->getMashaFeedlyDisplayColor();
-                        $html .= '<span class="masha-feedly-board__assignee" style="--masha-feedly-member-color:'
+                        $assigneesHTML .= '<span class="masha-feedly-board__assignee" style="--masha-feedly-member-color:'
                             . $this->escapeBoardValue($color) . '" aria-label="'
                             . $this->escapeBoardValue($name) . '">';
                         if ($imageURL !== '') {
-                            $html .= '<img class="masha-feedly-board__assignee-image" src="'
+                            $assigneesHTML .= '<img class="masha-feedly-board__assignee-image" src="'
                                 . $this->escapeBoardValue($imageURL) . '" alt="" loading="lazy">';
                         } else {
-                            $html .= '<span class="masha-feedly-board__assignee-icon" aria-hidden="true">'
+                            $assigneesHTML .= '<span class="masha-feedly-board__assignee-icon" aria-hidden="true">'
                                 . $this->escapeBoardValue($assignedMember->getMashaFeedlyInitials()) . '</span>';
                         }
-                        $html .= '</span>';
+                        $assigneesHTML .= '</span>';
                     }
-                    $html .= '</div>';
+                    $assigneesHTML .= '</div>';
                 }
                 $html .= '<span class="masha-feedly-board__drag-handle" draggable="true"'
                     . ' title="' . $this->escapeBoardValue(self::translate('BOARD_DRAG_TITLE', 'Zum Sortieren ziehen')) . '" aria-label="' . $this->escapeBoardValue(self::translate('BOARD_DRAG_ARIA', 'Eintrag sortieren')) . '">⠿</span>'
@@ -685,6 +686,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                             'date' => (string)$entry->dbObject('DueDate')->Nice(),
                         ])) . '</time>';
                 }
+                $html .= $assigneesHTML;
                 $html .= '</article>';
             }
             $html .= '</div></section>';

@@ -446,6 +446,11 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertSame(200, $response->getStatusCode());
         $this->assertStringContainsString('masha-feedly-board__assignees', $body);
         $this->assertStringContainsString('data-has-assignees="true"', $body);
+        $this->assertMatchesRegularExpression(
+            '/<div class="masha-feedly-board__card-topline"[\s\S]*?<\/div><div class="masha-feedly-board__card-heading"[\s\S]*?<\/time><div class="masha-feedly-board__assignees"/',
+            $body,
+            'Avatar-Gruppe muss außerhalb der Kopfzeile als direktes Kind der Karte nach den Inhalten gerendert werden.'
+        );
         $response = $this->get('/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry');
         $body = $response->getBody();
         $this->assertStringContainsString(
