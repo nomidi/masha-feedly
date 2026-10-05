@@ -1,0 +1,79 @@
+/* Flower Power der Siebziger */
+.kw-masha-feedly__flower-power {
+  position: fixed;
+  z-index: 10039;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 50%, #f6d87822 0%, #f6d87800 62%);
+}
+
+.kw-masha-feedly__flower-power-sun {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(64vw, 42rem);
+  aspect-ratio: 1;
+  border: clamp(.8rem, 3vw, 2rem) solid #f4c453;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, #e9673a 0deg 12deg, #f3bd49 12deg 24deg, #cf5b4c 24deg 36deg);
+  box-shadow: 0 0 0 .8rem #713a35, 0 0 0 1.4rem #f4c453, 0 0 4rem #ed7b49a6;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(.25) rotate(-35deg);
+  animation: kw-masha-feedly-flower-sun 4.8s cubic-bezier(.18, .75, .3, 1) both;
+}
+
+.kw-masha-feedly__flower-power-title {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding: .2em .38em .28em;
+  border: .16em solid #713a35;
+  border-radius: .2em .35em .22em .4em;
+  background: #f4c453;
+  box-shadow: .12em .14em 0 #713a35;
+  color: #713a35;
+  font: 1000 clamp(2rem, 8vw, 6rem)/.95 system-ui, sans-serif;
+  letter-spacing: -.075em;
+  opacity: 0;
+  transform: translate(-50%, -50%) rotate(-8deg) scale(.3);
+  animation: kw-masha-feedly-groovy-title 4.8s cubic-bezier(.2, .8, .3, 1) .28s both;
+}
+
+.kw-masha-feedly__flower-power-flower {
+  position: absolute;
+  top: var(--flower-y);
+  left: var(--flower-x);
+  display: block;
+  width: var(--flower-size);
+  opacity: 0;
+  filter: drop-shadow(0 .25rem .2rem #542d2940);
+  animation: kw-masha-feedly-daisy-dance 4.6s ease-in-out var(--flower-delay) both;
+}
+
+.kw-masha-feedly__flower-power-flower svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+@keyframes kw-masha-feedly-flower-sun {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.25) rotate(-35deg); }
+  18%, 75% { opacity: .82; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.08) rotate(35deg); }
+}
+
+@keyframes kw-masha-feedly-groovy-title {
+  0%, 100% { opacity: 0; transform: translate(-50%, -50%) rotate(-8deg) scale(.3); }
+  17%, 25% { opacity: 1; transform: translate(-50%, -50%) rotate(5deg) scale(1.08); }
+  32%, 72% { opacity: 1; transform: translate(-50%, -50%) rotate(-3deg) scale(1); }
+  83% { opacity: .8; transform: translate(-50%, -50%) rotate(8deg) scale(1.1); }
+}
+
+@keyframes kw-masha-feedly-daisy-dance {
+  0% { opacity: 0; transform: rotate(-25deg) scale(.25); }
+  20%, 78% { opacity: 1; }
+  42% { transform: rotate(18deg) scale(1.12); }
+  62% { transform: rotate(-12deg) scale(.95); }
+  100% { opacity: 0; transform: rotate(25deg) scale(.5); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-masha-feedly__flower-power-sun, .kw-masha-feedly__flower-power-title, .kw-masha-feedly__flower-power-flower { animation: none; opacity: 0; }
+}

@@ -353,6 +353,7 @@ de:
     CONFIG_ANIMATION_GHOST_SWARM: 'Geisterschwarm'
     CONFIG_ANIMATION_POTION: 'Zaubertrank-Blubbern'
     CONFIG_ANIMATION_CAT_PAWS: 'Katzenpfoten-Spur'
+    CONFIG_ANIMATION_FLOWER_POWER: 'Flower Power'
     CONFIG_ANIMATION_CHECK: 'Gezeichnetes Häkchen'
     CONFIG_ANIMATION_GLOW: 'Sanfter Lichtimpuls'
     CONFIG_ANIMATION_RINGS: 'Ruhige Ringwellen'
