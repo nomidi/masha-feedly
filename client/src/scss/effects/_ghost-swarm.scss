@@ -1,0 +1,61 @@
+/* Geisterschwarm */
+.kw-masha-feedly__ghost-swarm {
+  position: fixed;
+  z-index: 10039;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  animation: kw-masha-feedly-ghost-flicker 7.8s steps(1, end) both;
+}
+
+.kw-masha-feedly__swarm-ghost {
+  position: absolute;
+  top: 110vh;
+  left: var(--ghost-x);
+  display: block;
+  width: var(--ghost-size);
+  opacity: 0;
+  filter: drop-shadow(0 0 .65rem #b5ddffb8);
+  animation: kw-masha-feedly-ghost-float 7.4s ease-in-out var(--ghost-delay) both;
+}
+
+.kw-masha-feedly__swarm-ghost svg { display: block; width: 100%; height: auto; overflow: visible; }
+.kw-masha-feedly__ghost-shape { fill: #e8f5ff; stroke: #a8d5f6; stroke-width: 3; opacity: .88; }
+.kw-masha-feedly__ghost-eye, .kw-masha-feedly__ghost-mouth { fill: #34415b; }
+
+.kw-masha-feedly__ghost-mist {
+  position: absolute;
+  bottom: -3rem;
+  left: var(--mist-x);
+  width: 28vw;
+  height: 9rem;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #d9e8f433 0%, #d9e8f400 72%);
+  opacity: 0;
+  animation: kw-masha-feedly-ghost-mist 5s ease-out var(--mist-delay) both;
+}
+
+@keyframes kw-masha-feedly-ghost-float {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(.7) rotate(-8deg); }
+  12% { opacity: .92; }
+  35% { transform: translate3d(var(--ghost-drift), -38vh, 0) scale(1) rotate(7deg); }
+  62% { opacity: .78; transform: translate3d(calc(var(--ghost-drift) * -.7), -72vh, 0) scale(.9) rotate(-5deg); }
+  82% { opacity: .94; transform: translate3d(var(--ghost-drift), -112vh, 0) scale(1.08) rotate(6deg); }
+  100% { opacity: 0; transform: translate3d(0, -125vh, 0) scale(.8) rotate(0); }
+}
+
+@keyframes kw-masha-feedly-ghost-mist {
+  0% { opacity: 0; transform: translateY(0) scale(.7); }
+  25% { opacity: .8; }
+  100% { opacity: 0; transform: translateY(-35vh) scale(1.8); }
+}
+
+@keyframes kw-masha-feedly-ghost-flicker {
+  0%, 39%, 44%, 100% { opacity: 1; }
+  40%, 42% { opacity: .55; }
+  41%, 43% { opacity: .9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-masha-feedly__ghost-swarm, .kw-masha-feedly__swarm-ghost, .kw-masha-feedly__ghost-mist { animation: none; opacity: 0; }
+}
