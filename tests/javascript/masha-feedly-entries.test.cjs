@@ -1081,7 +1081,10 @@ test('lässt Katzenpfoten in einer geschwungenen Spur verblassen', () => {
   assert.equal(layer.children.length, 18);
   assert.equal(layer.children[0].style['--paw-x'], '-3vw');
   assert.equal(layer.children[1].style['--paw-delay'], '0.22s');
+  assert.equal(layer.children[0].style['--paw-color'], '#ff1744');
   assert.match(layer.children[0].innerHTML, /viewBox="0 0 64 64"/);
+  assert.match(layer.children[0].innerHTML, /m40\.1 33\.51a11\.78 11\.78/);
+  assert.match(layer.children[0].innerHTML, /kw-masha-feedly__cat-paw-toe-4/);
   cleanup();
   assert.equal(layer.removed, true);
   assert.equal(modules.catPaws.play(document, { matchMedia: () => ({ matches: true }) }), null);
