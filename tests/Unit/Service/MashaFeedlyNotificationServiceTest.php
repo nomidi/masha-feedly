@@ -35,6 +35,33 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         i18n::set_locale('de_DE');
     }
 
+    /** Der allgemeine Testversand adressiert das Konto und enthält eine einfache Zustellbestätigung. */
+    public function testTestEmailUsesMemberAddressAndIdentifiesTheSite(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->Title = 'Projekt Wolke';
+        $config->write();
+        $mailer = new class implements MailerInterface {
+            /** @var RawMessage[] */
+            public array $messages = [];
+            public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
+        };
+        $injector = Injector::inst();
+        $originalMailer = $injector->get(MailerInterface::class);
+        $injector->registerService($mailer, MailerInterface::class);
+        try {
+            MashaFeedlyNotificationService::sendTestEmail($member);
+
+            $this->assertCount(1, $mailer->messages);
+            $this->assertSame('allowed@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
+            $this->assertSame('Masha:Feedly – Test-E-Mail', $mailer->messages[0]->getSubject());
+            $this->assertStringContainsString('Projekt Wolke', (string)$mailer->messages[0]->getTextBody());
+        } finally {
+            $injector->registerService($originalMailer, MailerInterface::class);
+        }
+    }
+
     /** Erinnerungen gehen nur an optierte, freigegebene Zuständige und werden nicht doppelt versandt. */
     public function testDueDateReminderHonoursPreferenceAndIsSentOnlyOnce(): void
     {

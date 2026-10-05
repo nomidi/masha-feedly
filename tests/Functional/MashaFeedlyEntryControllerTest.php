@@ -1810,6 +1810,44 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(1, MashaFeedlyComment::get()->count());
     }
 
+    /** Ein Mailserverfehler darf den Erstellungsrequest nicht abbrechen oder den Eintrag verhindern. */
+    public function testEntryIsSavedWhenNewEntryNotificationFails(): void
+    {
+        $author = $this->objFromFixture(Member::class, 'allowed');
+        $recipient = $this->objFromFixture(Member::class, 'normalize');
+        $recipient->MashaFeedlyEmailNotifications = true;
+        $recipient->MashaFeedlyNotifyNewEntries = true;
+        $recipient->write();
+        $this->allowMember($author);
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$author->ID, (int)$recipient->ID]);
+        $config->write();
+        $this->logInAs($author);
+
+        $mailer = new class implements MailerInterface {
+            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            {
+                throw new \RuntimeException('Simulierter SMTP-Ausfall.');
+            }
+        };
+        $injector = Injector::inst();
+        $originalMailer = $injector->get(MailerInterface::class);
+        $injector->registerService($mailer, MailerInterface::class);
+        try {
+            $response = $this->post('/__masha-feedly/createEntry', [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'Content' => 'Eintrag trotz Mailserverfehler speichern.',
+            ]);
+
+            $this->assertSame(200, $response->getStatusCode());
+            $data = json_decode($response->getBody(), true);
+            $this->assertTrue($data['success']);
+            $this->assertNotNull(MashaFeedlyEntry::get()->byID((int)$data['entryID']));
+        } finally {
+            $injector->registerService($originalMailer, MailerInterface::class);
+        }
+    }
+
     /** Prüft den echten Kommentar-Endpunkt einschließlich E-Mail an eine zugewiesene Person. */
     public function testPostingCommentEmailsAssignedMember(): void
     {

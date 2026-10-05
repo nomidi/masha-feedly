@@ -16,6 +16,10 @@ use SilverStripe\Core\Config\Config;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\SecurityToken;
+use SilverStripe\Core\Injector\Injector;
+use Symfony\Component\Mailer\Envelope;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\RawMessage;
 use SilverStripe\Security\Security;
 
 /**
@@ -182,6 +186,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->logInWithPermission('ADMIN');
         $member = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $member);
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
+        $config->write();
 
         $unreadIDs = MashaFeedlyEntryRead::unreadEntryIDs($member);
         $unreadCounts = MashaFeedlyEntryRead::unreadCounts($member);
@@ -623,6 +630,56 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $automaticallyColoredMember = Member::get()->byID((int)$this->objFromFixture(Member::class, 'notAllowed')->ID);
         $this->assertNotSame('', (string)$automaticallyColoredMember->MashaFeedlyColor);
         $this->assertNotSame('#B5A0E0', (string)$automaticallyColoredMember->MashaFeedlyColor);
+    }
+
+    /** CMS-Administratoren können die konfigurierte Mailstrecke aus der Modulkonfiguration testen. */
+    public function testConfigurationCanSendTestEmailToCurrentAdmin(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $admin = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $admin);
+        $response = $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig');
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringContainsString('action_sendTestEmail', $response->getBody());
+        $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $response->getBody(), $matches));
+
+        $mailer = new class implements MailerInterface {
+            /** @var RawMessage[] */
+            public array $messages = [];
+            public ?\Throwable $failure = null;
+            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            {
+                if ($this->failure) {
+                    throw $this->failure;
+                }
+                $this->messages[] = $message;
+            }
+        };
+        $injector = Injector::inst();
+        $originalMailer = $injector->get(MailerInterface::class);
+        $injector->registerService($mailer, MailerInterface::class);
+        try {
+            $sent = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'action_sendTestEmail' => 'Test-E-Mail senden',
+            ]);
+
+            $this->assertSame(200, $sent->getStatusCode());
+            $this->assertCount(1, $mailer->messages);
+            $this->assertSame((string)$admin->Email, $mailer->messages[0]->getTo()[0]->getAddress());
+            $this->assertSame('Masha:Feedly – Test-E-Mail', $mailer->messages[0]->getSubject());
+
+            $mailer->failure = new \RuntimeException('Simulierter SMTP-Ausfall.');
+            $failed = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'action_sendTestEmail' => 'Test-E-Mail senden',
+            ]);
+            $this->assertSame(200, $failed->getStatusCode());
+            $this->assertStringContainsString('Test-E-Mail konnte nicht gesendet werden', $failed->getBody());
+            $this->assertCount(1, $mailer->messages);
+        } finally {
+            $injector->registerService($originalMailer, MailerInterface::class);
+        }
     }
 
     /** Normale CMS-Admins erhalten weder sensible Einstellungen im Formular noch per manipuliertem POST Schreibzugriff. */
