@@ -17,11 +17,11 @@
       layer.append(ghost);
     }
 
-    for (let index = 0; index < 6; index += 1) {
+    for (let index = 0; index < 12; index += 1) {
       const mist = document.createElement('i');
       mist.className = 'kw-masha-feedly__ghost-mist';
-      mist.style.setProperty('--mist-x', `${index * 19 - 8}vw`);
-      mist.style.setProperty('--mist-delay', `${index * 0.18}s`);
+      mist.style.setProperty('--mist-x', `${index * 10 - 14}vw`);
+      mist.style.setProperty('--mist-delay', `${index * 0.12}s`);
       layer.append(mist);
     }
 

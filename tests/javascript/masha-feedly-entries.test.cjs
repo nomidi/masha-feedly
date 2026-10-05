@@ -1026,7 +1026,7 @@ test('lässt einen geisterschwarm durch nebel schweben und kurz flackern', () =>
   assert.equal(layer.className, 'kw-masha-feedly__ghost-swarm');
   assert.equal(layer['aria-hidden'], 'true');
   assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__swarm-ghost').length, 9);
-  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__ghost-mist').length, 6);
+  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__ghost-mist').length, 12);
   assert.match(layer.children[0].innerHTML, /kw-masha-feedly__ghost-shape/);
   cleanup();
   assert.equal(layer.removed, true);
@@ -1086,7 +1086,7 @@ test('wählt theme-basiert zwischen Einhorn, Rakete, Herzen, Arcade, Retro, Dino
   const iconShowerCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.85);
   assert.equal(iconShowerCompletion.iconShower.children.length, 50);
   const ghostSwarmCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.95);
-  assert.equal(ghostSwarmCompletion.ghostSwarm.children.length, 15);
+  assert.equal(ghostSwarmCompletion.ghostSwarm.children.length, 21);
   const rocketPreview = entriesUI.previewCompletionAnimation(document, window, 'rocket', '/unicorn.svg');
   assert.equal(rocketPreview.confetti, undefined);
   assert.equal(rocketPreview.unicorn, undefined);
@@ -1106,7 +1106,7 @@ test('wählt theme-basiert zwischen Einhorn, Rakete, Herzen, Arcade, Retro, Dino
   const iconShowerPreview = entriesUI.previewCompletionAnimation(document, window, 'iconShower', '/unicorn.svg');
   assert.equal(iconShowerPreview.iconShower.children.length, 50);
   const ghostSwarmPreview = entriesUI.previewCompletionAnimation(document, window, 'ghostSwarm', '/unicorn.svg');
-  assert.equal(ghostSwarmPreview.ghostSwarm.children.length, 15);
+  assert.equal(ghostSwarmPreview.ghostSwarm.children.length, 21);
   const playful = entriesUI.previewCompletionAnimation(document, window, 'playful', '/unicorn.svg');
   assert.ok(playful.confetti);
   assert.ok(playful.unicorn);
