@@ -943,7 +943,11 @@ test('lässt sieben Gummienten mit Abstand watschelnd durchs Bild ziehen', () =>
   assert.equal(layer.children[0].className, 'kw-masha-feedly__parade-duck');
   assert.equal(layer.children[0].style.animationDelay, '0s');
   assert.equal(layer.children[6].style.animationDelay, '2.88s');
+  assert.equal(layer.children[0].style['--duck-body-color'], '#fec80e');
+  assert.equal(layer.children[3].style['--duck-body-color'], '#242424');
+  assert.match(layer.children[0].innerHTML, /viewBox="0 0 512 512"/);
   assert.match(layer.children[0].innerHTML, /kw-masha-feedly__duck-beak/);
+  assert.match(layer.children[0].innerHTML, /m252\.59 211\.91/);
   cleanup();
   assert.equal(layer.removed, true);
   assert.equal(modules.ducks.play(document, { matchMedia: () => ({ matches: true }) }), null);

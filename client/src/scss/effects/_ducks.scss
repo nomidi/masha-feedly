@@ -20,11 +20,10 @@
 }
 
 .kw-masha-feedly__parade-duck svg { display: block; width: 100%; height: auto; overflow: visible; }
-.kw-masha-feedly__duck-body { fill: var(--duck-color); stroke: #d99d1b; stroke-width: 3; stroke-linejoin: round; }
-.kw-masha-feedly__duck-beak { fill: #ff8e24; stroke: #d7661a; stroke-width: 2; stroke-linejoin: round; }
-.kw-masha-feedly__duck-wing { fill: #fff3a8; opacity: .82; }
-.kw-masha-feedly__duck-eye { fill: #332b25; }
-.kw-masha-feedly__duck-shine { fill: none; stroke: #fff7c5; stroke-width: 4; stroke-linecap: round; opacity: .78; }
+.kw-masha-feedly__duck-body { fill: var(--duck-body-color); }
+.kw-masha-feedly__duck-beak { fill: #ff3f34; }
+.kw-masha-feedly__duck-wing { fill: var(--duck-wing-color); }
+.kw-masha-feedly__duck-eye { fill: #044244; }
 
 @keyframes kw-masha-feedly-duck-waddle {
   0% { opacity: 0; transform: translateX(-8rem) translateY(.25rem) rotate(-5deg) scale(.85); }
