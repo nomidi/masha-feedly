@@ -349,6 +349,7 @@ en:
     CONFIG_ANIMATION_DINO: 'Pixel dino eats the save button'
     CONFIG_ANIMATION_DUCKS: 'Rubber duck parade'
     CONFIG_ANIMATION_FROGS: 'Frog parade'
+    CONFIG_ANIMATION_ICON_SHOWER: 'Colorful icon shower'
     CONFIG_ANIMATION_CHECK: 'Drawn checkmark'
     CONFIG_ANIMATION_GLOW: 'Soft light pulse'
     CONFIG_ANIMATION_RINGS: 'Calm ripple rings'
