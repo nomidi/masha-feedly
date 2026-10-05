@@ -55,6 +55,7 @@ class MashaFeedlyWidgetExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/icon-shower.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/ghost-swarm.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/potion.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/cat-paws.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/check.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/glow.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rings.js');

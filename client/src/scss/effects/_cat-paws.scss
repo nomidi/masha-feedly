@@ -1,0 +1,33 @@
+/* Tapsende Katzenpfoten */
+.kw-masha-feedly__cat-paw-trail {
+  position: fixed;
+  z-index: 10039;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.kw-masha-feedly__cat-paw {
+  position: absolute;
+  top: var(--paw-y);
+  left: var(--paw-x);
+  display: block;
+  width: clamp(2rem, 4vw, 3.1rem);
+  color: #52415f;
+  opacity: 0;
+  filter: drop-shadow(0 .15rem .16rem #34283f40);
+  animation: kw-masha-feedly-cat-paw-step 1.7s ease-out var(--paw-delay) both;
+}
+
+.kw-masha-feedly__cat-paw svg { display: block; width: 100%; height: auto; overflow: visible; fill: currentColor; }
+
+@keyframes kw-masha-feedly-cat-paw-step {
+  0% { opacity: 0; transform: translateY(-.7rem) rotate(var(--paw-tilt)) scale(.35); }
+  18% { opacity: .86; transform: translateY(0) rotate(var(--paw-tilt)) scale(1.08); }
+  38% { opacity: .72; transform: translateY(.1rem) rotate(var(--paw-tilt)) scale(1); }
+  100% { opacity: 0; transform: translateY(-.4rem) rotate(var(--paw-tilt)) scale(.92); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-masha-feedly__cat-paw { animation: none; opacity: 0; }
+}
