@@ -2,7 +2,7 @@
 (() => {
   const modules = window.KWMashaFeedlyEffectModules || {};
   const themeEffects = {
-    playful: ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'dino', 'ducks', 'frogs', 'iconShower', 'ghostSwarm'],
+    playful: ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'dino', 'ducks', 'frogs', 'iconShower', 'ghostSwarm', 'potion'],
     serious: ['check', 'glow', 'rings', 'confirmation'],
   };
   const activeByDocument = new WeakMap();
@@ -81,6 +81,7 @@
     frogs: (document, window) => track(modules.frogs?.play(document, window)?.frogs || null, document, window),
     iconShower: (document, window) => track(modules.iconShower?.play(document, window)?.iconShower || null, document, window),
     ghostSwarm: (document, window) => track(modules.ghostSwarm?.play(document, window)?.ghostSwarm || null, document, window),
+    potion: (document, window) => track(modules.potion?.play(document, window)?.potion || null, document, window),
     check: (document, window) => track(modules.check?.play(document, window)?.check || null, document, window),
     glow: (document, window) => track(modules.glow?.play(document, window)?.glow || null, document, window),
     rings: (document, window) => track(modules.rings?.play(document, window)?.rings || null, document, window),

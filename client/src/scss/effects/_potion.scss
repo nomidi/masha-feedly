@@ -1,0 +1,77 @@
+/* Zaubertrank-Kessel */
+.kw-masha-feedly__potion-effect {
+  position: fixed;
+  z-index: 10039;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.kw-masha-feedly__potion-glow {
+  position: absolute;
+  bottom: 12vh;
+  left: 50%;
+  width: min(27rem, 78vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #9c55ff45 0%, #38f5e52b 38%, #38f5e500 72%);
+  opacity: 0;
+  transform: translate(-50%, 50%) scale(.55);
+  animation: kw-masha-feedly-potion-glow 5.8s ease-in-out both;
+}
+
+.kw-masha-feedly__potion-cauldron {
+  position: absolute;
+  bottom: 8vh;
+  left: 50%;
+  display: block;
+  width: clamp(9rem, 24vw, 15rem);
+  filter: drop-shadow(0 .6rem .55rem #150d2d70);
+  opacity: 0;
+  transform: translate(-50%, 2rem) scale(.72);
+  animation: kw-masha-feedly-potion-arrive .85s cubic-bezier(.2, .85, .35, 1.2) both;
+}
+
+.kw-masha-feedly__potion-cauldron svg { display: block; width: 100%; height: auto; overflow: visible; }
+.kw-masha-feedly__cauldron-handle { fill: none; stroke: #35304e; stroke-width: 13; }
+.kw-masha-feedly__cauldron-body { fill: #48415f; stroke: #29243d; stroke-width: 5; }
+.kw-masha-feedly__cauldron-rim { fill: #77708d; stroke: #29243d; stroke-width: 5; stroke-linejoin: round; }
+.kw-masha-feedly__cauldron-brew { fill: #b54fff; }
+.kw-masha-feedly__cauldron-highlight { fill: none; stroke: #a9a2bd; stroke-width: 4; stroke-linecap: round; opacity: .7; }
+.kw-masha-feedly__cauldron-star { fill: #d9ff79; filter: drop-shadow(0 0 4px #d9ff79); }
+
+.kw-masha-feedly__potion-bubble {
+  position: absolute;
+  bottom: calc(15vh + 3rem);
+  left: var(--bubble-x);
+  width: var(--bubble-size);
+  height: var(--bubble-size);
+  border: 2px solid color-mix(in srgb, var(--bubble-color), white 35%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, #ffffffdd 0 9%, color-mix(in srgb, var(--bubble-color), transparent 42%) 48%, color-mix(in srgb, var(--bubble-color), transparent 12%) 100%);
+  box-shadow: 0 0 .8rem color-mix(in srgb, var(--bubble-color), transparent 30%);
+  opacity: 0;
+  animation: kw-masha-feedly-potion-bubble var(--bubble-duration) ease-out var(--bubble-delay) infinite;
+}
+
+@keyframes kw-masha-feedly-potion-arrive {
+  0% { opacity: 0; transform: translate(-50%, 2rem) scale(.72); }
+  72% { opacity: 1; transform: translate(-50%, -.4rem) scale(1.04); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@keyframes kw-masha-feedly-potion-glow {
+  0%, 100% { opacity: .15; transform: translate(-50%, 50%) scale(.65); }
+  35%, 72% { opacity: .95; transform: translate(-50%, 50%) scale(1.12); }
+}
+
+@keyframes kw-masha-feedly-potion-bubble {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(.35); }
+  14% { opacity: .95; }
+  72% { opacity: .8; }
+  100% { opacity: 0; transform: translate3d(10vw, -72vh, 0) scale(1.3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-masha-feedly__potion-glow, .kw-masha-feedly__potion-cauldron, .kw-masha-feedly__potion-bubble { animation: none; opacity: 0; }
+}

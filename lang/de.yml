@@ -351,6 +351,7 @@ de:
     CONFIG_ANIMATION_FROGS: 'Froschparade'
     CONFIG_ANIMATION_ICON_SHOWER: 'Bunter Icon-Schauer'
     CONFIG_ANIMATION_GHOST_SWARM: 'Geisterschwarm'
+    CONFIG_ANIMATION_POTION: 'Zaubertrank-Blubbern'
     CONFIG_ANIMATION_CHECK: 'Gezeichnetes Häkchen'
     CONFIG_ANIMATION_GLOW: 'Sanfter Lichtimpuls'
     CONFIG_ANIMATION_RINGS: 'Ruhige Ringwellen'

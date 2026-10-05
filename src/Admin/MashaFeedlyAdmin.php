@@ -249,6 +249,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/frogs.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/icon-shower.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/ghost-swarm.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/potion.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/check.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/glow.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rings.js');
@@ -469,6 +470,10 @@ class MashaFeedlyAdmin extends ModelAdmin
             . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">👻</span>'
             . '<div><strong>' . self::translate('CONFIG_ANIMATION_GHOST_SWARM', 'Geisterschwarm') . '</strong>'
             . '<button type="button" data-masha-feedly-animation-preview="ghostSwarm" data-preview-message="' . $playfulMessage
+            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
+            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🧪</span>'
+            . '<div><strong>' . self::translate('CONFIG_ANIMATION_POTION', 'Zaubertrank-Blubbern') . '</strong>'
+            . '<button type="button" data-masha-feedly-animation-preview="potion" data-preview-message="' . $playfulMessage
             . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
             . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">✓</span>'
             . '<div><strong>' . self::translate('CONFIG_ANIMATION_CHECK', 'Gezeichnetes Häkchen') . '</strong>'
