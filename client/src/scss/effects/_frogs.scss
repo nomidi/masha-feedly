@@ -1,0 +1,50 @@
+/* Froschparade */
+.kw-masha-feedly__frog-parade {
+  position: fixed;
+  z-index: 10039;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.kw-masha-feedly__parade-frog {
+  position: absolute;
+  bottom: calc(10vh + var(--frog-lane));
+  left: 0;
+  display: block;
+  width: clamp(4.8rem, 8vw, 6.8rem);
+  opacity: 0;
+  filter: drop-shadow(0 .35rem .3rem #263b2b40);
+  animation: kw-masha-feedly-frog-hop 6.8s cubic-bezier(.45, 0, .55, 1) both;
+}
+
+.kw-masha-feedly__parade-frog svg { display: block; width: 100%; height: auto; overflow: visible; }
+.kw-masha-feedly__frog-body { fill: var(--frog-color); stroke: #287844; stroke-width: 3; }
+.kw-masha-feedly__frog-belly { fill: #f8e9a8; }
+.kw-masha-feedly__frog-leg { fill: none; stroke: var(--frog-color); stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; }
+.kw-masha-feedly__frog-eye { fill: #fff; stroke: #287844; stroke-width: 3; }
+.kw-masha-feedly__frog-pupil { fill: #202b25; }
+.kw-masha-feedly__frog-smile { fill: none; stroke: #263b2b; stroke-width: 3; stroke-linecap: round; }
+.kw-masha-feedly__frog-cheek { fill: #ff8aa4; opacity: .8; }
+.kw-masha-feedly__frog-shadow { fill: #263b2b; opacity: .18; }
+
+@keyframes kw-masha-feedly-frog-hop {
+  0% { opacity: 0; transform: translateX(-8rem) translateY(0) rotate(-5deg) scale(.85); }
+  8% { opacity: 1; }
+  20% { transform: translateX(12vw) translateY(-1.8rem) rotate(5deg); }
+  32% { transform: translateX(25vw) translateY(0) rotate(-4deg); }
+  44% { transform: translateX(40vw) translateY(-2.2rem) rotate(5deg); }
+  56% { transform: translateX(54vw) translateY(0) rotate(-4deg); }
+  68% { transform: translateX(69vw) translateY(-1.8rem) rotate(5deg); }
+  80% { transform: translateX(84vw) translateY(0) rotate(-4deg); }
+  92% { transform: translateX(98vw) translateY(-1.2rem) rotate(4deg); }
+  100% { opacity: 0; transform: translateX(calc(100vw + 8rem)) translateY(0) rotate(0); }
+}
+
+@media (max-width: 40rem) {
+  .kw-masha-feedly__parade-frog { width: 4.6rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-masha-feedly__parade-frog { animation: none; opacity: 0; }
+}
