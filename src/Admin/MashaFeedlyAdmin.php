@@ -10,6 +10,8 @@ use KW\MashaFeedly\Model\MashaFeedlyPriority;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
+use KW\MashaFeedly\Service\MashaFeedlyMiteClient;
+use KW\MashaFeedly\Service\MashaFeedlyMiteService;
 use KW\MashaFeedly\Service\MashaFeedlyResetService;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
 use SilverStripe\Assets\Image;
@@ -19,11 +21,13 @@ use SilverStripe\Control\Director;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Core\Manifest\ModuleResourceLoader;
+use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\Form;
 use SilverStripe\Forms\FormAction;
 use SilverStripe\Forms\CompositeField;
 use SilverStripe\Forms\DropdownField;
+use SilverStripe\Forms\CheckboxField;
 use SilverStripe\Forms\LiteralField;
 use SilverStripe\Forms\HiddenField;
 use SilverStripe\Forms\ListboxField;
@@ -56,6 +60,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         MashaFeedlyPriority::class => ['title' => 'Prioritäten'],
         MashaFeedlyComment::class => ['title' => 'Kommentare'],
         SiteConfig::class => ['title' => 'Konfiguration'],
+        'mite' => ['dataClass' => SiteConfig::class, 'title' => 'Mite'],
     ];
 
     /** canView() verwendet die modulspezifische Benutzerfreigabe. */
@@ -70,6 +75,10 @@ class MashaFeedlyAdmin extends ModelAdmin
         'deleteCategory',
         'saveReporter',
         'resetAllMashaFeedlyData',
+        'saveMiteConfiguration',
+        'miteOptions',
+        'startMiteTimer',
+        'stopMiteTimer',
     ];
 
     /** Liefert die Anzahl offener Einträge in der Feedback-Kategorie. */
@@ -79,7 +88,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         return $category && !$category->IsClosed ? $category->Entries()->count() : 0;
     }
 
-    /** Leitet Nicht-Administratoren bei direkten Aufrufen der Konfiguration um. */
+    /** Schützt direkte Konfigurationsaufrufe und den ausschließlich für Betreiber sichtbaren Mite-Reiter. */
     /** @return void */
     protected function init(): void
     {
@@ -91,6 +100,13 @@ class MashaFeedlyAdmin extends ModelAdmin
             && (!$member || !Permission::checkMember($member, 'ADMIN'))
         ) {
             $this->redirect($this->Link());
+        }
+        if (
+            $requestedModel
+            && $requestedModel === 'mite'
+            && !MashaFeedlyEntry::canManageReporter($member)
+        ) {
+            $this->httpError(403);
         }
         parent::init();
         MashaFeedlyCategory::ensureDefaultCategories();
@@ -120,6 +136,9 @@ class MashaFeedlyAdmin extends ModelAdmin
      */
     public function getEditForm($id = null, $fields = null)
     {
+        if ($this->modelTab === 'mite') {
+            return $this->getMiteConfigurationForm();
+        }
         if ($this->modelClass !== SiteConfig::class) {
             $form = parent::getEditForm($id, $fields);
             if (
@@ -255,6 +274,144 @@ class MashaFeedlyAdmin extends ModelAdmin
         return $form;
     }
 
+    /** Liefert Aktivierung, Projekt und Mehrfachauswahl der Startkategorien ohne Ausgabe des API-Schlüssels. */
+    private function getMiteConfigurationForm(): Form
+    {
+        if (!MashaFeedlyEntry::canManageReporter()) {
+            $this->httpError(403);
+        }
+        $projects = [];
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $enabled = MashaFeedlyConfigExtension::miteEnabled();
+        $message = self::translate('MITE_CONFIG_DESCRIPTION', 'Aktiviere Mite und wähle das Projekt sowie die Startkategorien für den Timerdialog. Die Leistung wählst du beim Start.');
+        try {
+            $miteClient = Injector::inst()->get(MashaFeedlyMiteClient::class);
+            $projects = $miteClient->projects();
+        } catch (\RuntimeException $exception) {
+            $message = $exception->getMessage();
+        }
+        if ((int)$config->MashaFeedlyMiteProjectID > 0 && !isset($projects[(int)$config->MashaFeedlyMiteProjectID])) {
+            $projects[(int)$config->MashaFeedlyMiteProjectID] = self::translate('MITE_SAVED_PROJECT', 'Gespeichertes Projekt #{id}', ['id' => (int)$config->MashaFeedlyMiteProjectID]);
+        }
+        $settings = CompositeField::create(
+            DropdownField::create('MashaFeedlyMiteProjectID', self::translate('MITE_PROJECT', 'Mite-Projekt'), $projects)
+                ->setEmptyString(self::translate('MITE_CHOOSE_PROJECT', 'Projekt auswählen'))
+                ->setValue((int)$config->MashaFeedlyMiteProjectID),
+            ListboxField::create('MashaFeedlyMiteCategoryIDs', self::translate('MITE_CATEGORIES', 'Timerdialog bei diesen Kategorien'),
+                MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC')->map('ID', 'Title')->toArray())
+                ->setValue(MashaFeedlyConfigExtension::miteCategoryIDs())
+                ->setDescription(self::translate('MITE_CATEGORIES_DESCRIPTION', 'Wähle eine oder mehrere Kategorien. Nur beim Wechsel in eine ausgewählte Kategorie erscheint der Dialog.'))
+        )->setName('MiteSettings');
+        $fields = FieldList::create(
+            LiteralField::create('MiteHeading', '<h2>Mite</h2><p>' . $this->escapeBoardValue($message) . '</p>'),
+            CheckboxField::create('MashaFeedlyMiteEnabled', self::translate('MITE_ENABLED', 'Mite aktivieren'))->setValue($enabled),
+            LiteralField::create('MiteSettingsStart', '<div data-mite-settings' . ($enabled ? '' : ' hidden') . '>'),
+            $settings,
+            LiteralField::create('MiteSettingsEnd', '</div>')
+        );
+        $form = Form::create($this, 'EditForm', $fields, FieldList::create(
+            FormAction::create('saveMiteConfiguration', self::translate('CONFIG_SAVE', 'Konfiguration speichern'))->addExtraClass('btn-primary')
+        ))->setHTMLID('Form_EditForm')->setTemplate($this->getTemplatesWithSuffix('_EditForm'));
+        $form->addExtraClass('cms-edit-form cms-panel-padded center flexbox-area-grow');
+        $form->setFormAction(Controller::join_links($this->getLinkForModelTab('mite'), 'EditForm'));
+        $form->setAttribute('data-pjax-fragment', 'CurrentForm');
+        return $form;
+    }
+
+    /**
+     * Speichert Aktivierung und Kategorien nach serverseitiger Berechtigungs- und Projektprüfung.
+     * @param array<string, mixed> $data Formularwerte.
+     * @param Form $form CMS-Konfigurationsformular.
+     * @return HTTPResponse Aktualisiertes Formular mit Rückmeldung.
+     */
+    public function saveMiteConfiguration(array $data, Form $form): HTTPResponse
+    {
+        $request = $this->getRequest();
+        if (!MashaFeedlyEntry::canManageReporter()) {
+            $this->httpError(403);
+        }
+        if (!$request->isPOST() || !SecurityToken::inst()->checkRequest($request)) {
+            $this->httpError(400);
+        }
+        try {
+            Injector::inst()->get(MashaFeedlyMiteService::class)->saveConfiguration(
+                (bool)($data['MashaFeedlyMiteEnabled'] ?? false),
+                (int)($data['MashaFeedlyMiteProjectID'] ?? 0),
+                (array)($data['MashaFeedlyMiteCategoryIDs'] ?? [])
+            );
+            $form->sessionMessage(self::translate('CONFIG_SAVED', 'Die Masha-Feedly-Konfiguration wurde gespeichert.'), 'good');
+        } catch (\RuntimeException $exception) {
+            $form->sessionMessage($exception->getMessage(), 'bad');
+        }
+        return $this->getResponseNegotiator()->respond($request, [
+            'CurrentForm' => fn(): string => $this->getMiteConfigurationForm()->forTemplate(),
+        ]);
+    }
+
+    /** @return HTTPResponse Geschützte Projekt- und Leistungsauswahl sowie laufender Timer. */
+    public function miteOptions(HTTPRequest $request): HTTPResponse
+    {
+        if (!MashaFeedlyEntry::canManageReporter()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung für Mite.'], 403);
+        }
+        if (!$request->isGET()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'GET erforderlich.'], 405);
+        }
+        try {
+            return $this->jsonResponse(['success' => true] + Injector::inst()->get(MashaFeedlyMiteService::class)->options());
+        } catch (\RuntimeException $exception) {
+            return $this->jsonResponse(['success' => false, 'message' => $exception->getMessage()], $exception->getCode() === 409 ? 409 : 502);
+        }
+    }
+
+    /** @return HTTPResponse Ergebnis des ausdrücklich bestätigten Timerstarts. */
+    public function startMiteTimer(HTTPRequest $request): HTTPResponse
+    {
+        if (!MashaFeedlyEntry::canManageReporter()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung für Mite.'], 403);
+        }
+        if (!$request->isPOST()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'POST erforderlich.'], 405);
+        }
+        if (!SecurityToken::inst()->checkRequest($request)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Ungültiges Sicherheitstoken.'], 400);
+        }
+        $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
+        if (!$entry) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Eintrag nicht gefunden.'], 404);
+        }
+        try {
+            $id = Injector::inst()->get(MashaFeedlyMiteService::class)->start(
+                $entry,
+                (int)$request->postVar('ProjectID'),
+                (int)$request->postVar('ServiceID'),
+                (int)$request->postVar('ConfirmedTimerID')
+            );
+            return $this->jsonResponse(['success' => true, 'message' => self::translate('MITE_STARTED', 'Mite-Timer läuft.'), 'timeEntryID' => $id]);
+        } catch (\RuntimeException $exception) {
+            $status = in_array($exception->getCode(), [400, 403, 409], true) ? $exception->getCode() : 502;
+            return $this->jsonResponse(['success' => false, 'message' => $exception->getMessage()], $status);
+        }
+    }
+
+    /** Stoppt den zuvor im geschützten Dialog bestätigten Mite-Timer. */
+    public function stopMiteTimer(HTTPRequest $request): HTTPResponse
+    {
+        if (!MashaFeedlyEntry::canManageReporter()) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung für Mite.'], 403);
+        }
+        if (!$request->isPOST() || !SecurityToken::inst()->checkRequest($request)) {
+            return $this->jsonResponse(['success' => false, 'message' => 'Ungültige Anfrage oder Sitzung abgelaufen.'], 400);
+        }
+        try {
+            Injector::inst()->get(MashaFeedlyMiteService::class)->stop((int)$request->postVar('ConfirmedTimerID'));
+            return $this->jsonResponse(['success' => true, 'activeTimerID' => 0, 'message' => self::translate('MITE_STOPPED', 'Mite-Timer wurde gestoppt.')]);
+        } catch (\RuntimeException $exception) {
+            $status = in_array($exception->getCode(), [400, 403, 409], true) ? $exception->getCode() : 502;
+            return $this->jsonResponse(['success' => false, 'message' => $exception->getMessage()], $status);
+        }
+    }
+
     /** Rendert die sofort abspielbaren Vorschauen für verspielte Abschlussanimationen. */
     private function renderCompletionAnimationPreviews(): string
     {
@@ -348,6 +505,8 @@ class MashaFeedlyAdmin extends ModelAdmin
             ], 409);
         }
 
+        $movedToMiteCategory = (int)$entry->CategoryID !== (int)$category->ID
+            && MashaFeedlyConfigExtension::miteTriggersCategory((int)$category->ID);
         $entry->CategoryID = (int)$category->ID;
         $entry->write();
         $entryIDs = array_values(array_unique(array_filter(array_map(
@@ -373,6 +532,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             'success' => true,
             'unreadCount' => $unreadCount,
             'feedbackCount' => self::feedbackCount(),
+            'mitePrompt' => $movedToMiteCategory && MashaFeedlyEntry::canManageReporter($member),
         ]);
     }
 
@@ -520,6 +680,17 @@ class MashaFeedlyAdmin extends ModelAdmin
             'BOARD_ENTRY_SAVE_ERROR' => 'Eintrag konnte nicht gespeichert werden.',
             'BOARD_ENTRY_SAVE_SUCCESS' => 'Eintrag wurde gespeichert.',
             'BOARD_ENTRY_UPLOAD_HINT' => 'Bilder, PDFs oder ZIP-Dateien auswählen',
+            'MITE_LOADING' => 'Mite-Projekte und laufender Timer werden geladen …',
+            'MITE_STARTING' => 'Mite-Timer wird gestartet …',
+            'MITE_STARTED' => 'Mite-Timer läuft.',
+            'MITE_STOPPING' => 'Mite-Timer wird gestoppt …',
+            'MITE_STOPPED' => 'Mite-Timer wurde gestoppt.',
+            'MITE_STOP_ERROR' => 'Mite-Timer konnte nicht gestoppt werden.',
+            'MITE_LOAD_ERROR' => 'Mite konnte nicht geladen werden.',
+            'MITE_START_ERROR' => 'Mite-Timer konnte nicht gestartet werden.',
+            'MITE_CHOOSE_PROJECT' => 'Projekt auswählen',
+            'MITE_NO_TIMER' => 'Derzeit läuft kein Mite-Timer.',
+            'MITE_SWITCH_TIMER' => 'Aktuell läuft Timer #{id}: {note}. Beim Start wird dieser Timer gestoppt.',
         ] as $key => $default) {
             $adminTranslations[$key] = self::translate($key, $default);
         }
@@ -556,12 +727,15 @@ class MashaFeedlyAdmin extends ModelAdmin
         $html .= '</div></header>';
         $canManageReporter = MashaFeedlyEntry::canManageReporter($member);
         if ($canManageReporter) {
+            if (MashaFeedlyConfigExtension::miteEnabled()) {
+                $html .= $this->renderMiteDialog();
+            }
             $html .= '<nav class="masha-feedly-board__views" role="tablist" aria-label="'
                 . $this->escapeBoardValue(self::translate('REPORTER_TABS_LABEL', 'Masha:Feedly-Ansichten')) . '">'
                 . '<button type="button" class="masha-feedly-board__view-tab is-active" role="tab" aria-selected="true" aria-controls="masha-feedly-entry-board-panel" data-admin-view-tab="entries">'
                 . self::translate('ADMIN_ENTRIES', 'Einträge') . '</button>'
                 . '<button type="button" class="masha-feedly-board__view-tab" role="tab" aria-selected="false" aria-controls="masha-feedly-reporter-panel" data-admin-view-tab="reporters">'
-                . self::translate('REPORTER_TAB', 'Meldepersonen') . '</button></nav>';
+                . self::translate('REPORTER_TAB', 'Meldepersonen ändern') . '</button></nav>';
         }
         $html .= '<div id="masha-feedly-entry-board-panel" data-admin-view-panel="entries" role="tabpanel">';
         if ($canManageCategories) {
@@ -771,6 +945,32 @@ class MashaFeedlyAdmin extends ModelAdmin
         }
         $html .= '<p class="masha-feedly-board__status" aria-live="polite"></p></section>';
         return $html;
+    }
+
+    /** Rendert den Betreiber-Dialog ohne Zugangsdaten und ohne vorab Mite anzufragen. */
+    private function renderMiteDialog(): string
+    {
+        $baseURL = $this->getLinkForModelClass(MashaFeedlyEntry::class);
+        return '<div class="kw-masha-feedly__modal" data-mite-modal hidden'
+            . ' data-options-url="' . $this->escapeBoardValue(Controller::join_links($baseURL, 'miteOptions')) . '"'
+            . ' data-start-url="' . $this->escapeBoardValue(Controller::join_links($baseURL, 'startMiteTimer')) . '"'
+            . ' data-stop-url="' . $this->escapeBoardValue(Controller::join_links($baseURL, 'stopMiteTimer')) . '">'
+            . '<section class="kw-masha-feedly__dialog kw-masha-feedly__mite-dialog" role="dialog" aria-modal="true" aria-labelledby="masha-feedly-mite-title">'
+            . '<header class="kw-masha-feedly__dialog-header"><div><span class="kw-masha-feedly__eyebrow">MITE</span><h2 id="masha-feedly-mite-title" tabindex="-1">'
+            . self::translate('MITE_DIALOG_TITLE', 'Mite-Timer starten?') . '</h2>'
+            . '</div><button type="button" class="kw-masha-feedly__close" data-mite-close aria-label="'
+            . $this->escapeBoardValue(self::translate('CLOSE_MODAL', 'Dialog schließen')) . '">×</button></header>'
+            . '<form class="kw-masha-feedly__mite-form" data-mite-controls>'
+            . '<p class="kw-masha-feedly__selected-context">' . self::translate('MITE_DIALOG_DESCRIPTION', 'Bei Bedarf startet hier die Zeiterfassung in Mite. Beschreibung und Seitenlink des Eintrags werden übernommen.') . '</p>'
+            . '<label>' . self::translate('MITE_PROJECT', 'Mite-Projekt') . '<select data-mite-project disabled></select></label>'
+            . '<label>' . self::translate('MITE_SERVICE', 'Mite-Leistung') . '<select data-mite-service disabled></select></label>'
+            . '<p class="kw-masha-feedly__mite-active" data-mite-active-timer></p><p class="kw-masha-feedly__form-status" data-mite-status role="status" aria-live="polite"></p>'
+            . '<footer class="kw-masha-feedly__dialog-actions">'
+            . '<button type="button" class="kw-masha-feedly__secondary" data-mite-refresh>' . self::translate('MITE_REFRESH', 'Neu laden') . '</button>'
+            . '<button type="button" class="kw-masha-feedly__secondary" data-mite-close>' . self::translate('MITE_SKIP', 'Ohne Timer weiter') . '</button>'
+            . '<button type="button" class="kw-masha-feedly__secondary" data-mite-stop hidden>' . self::translate('MITE_STOP', 'Timer stoppen') . '</button>'
+            . '<button type="button" class="kw-masha-feedly__submit" data-mite-start disabled>' . self::translate('MITE_START', 'Timer starten') . '</button>'
+            . '</footer></form></section></div>';
     }
 
     /** Rendert die geschützte Übersicht zum Ändern der angezeigten Meldeperson. */
@@ -1062,7 +1262,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     }
 
     /**
-     * Blendet die Konfiguration für freigegebene Nicht-Administratoren aus.
+     * Blendet die allgemeine Konfiguration für Nicht-Admins und Mite für nicht freigegebene Betreiber aus.
      *
      * @return array<string, array<string, string>> Sichtbare ModelAdmin-Tabs.
      */
@@ -1074,6 +1274,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             MashaFeedlyCategory::class => ['ADMIN_CATEGORIES', 'Kategorien'],
             MashaFeedlyComment::class => ['ADMIN_COMMENTS', 'Kommentare'],
             SiteConfig::class => ['ADMIN_CONFIGURATION', 'Konfiguration'],
+            'mite' => ['MITE_TAB', 'Mite'],
         ];
         foreach ($titles as $class => [$key, $fallback]) {
             if (isset($models[$class])) {
@@ -1083,6 +1284,9 @@ class MashaFeedlyAdmin extends ModelAdmin
         $member = Security::getCurrentUser();
         if (!$member || !Permission::checkMember($member, 'ADMIN')) {
             unset($models[SiteConfig::class]);
+        }
+        if (!MashaFeedlyEntry::canManageReporter($member)) {
+            unset($models['mite']);
         }
         return $models;
     }

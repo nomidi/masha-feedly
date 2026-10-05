@@ -512,6 +512,13 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__add { display: grid; width: 60px; height: 60px; place-items: center; padding: 0; border: 0; border-radius: 18.4px; background: linear-gradient(145deg, #ff70b7, #df0877); color: #fff; box-shadow: 0 5.6px 16px #d20b7640; font-size: calc(40px * var(--masha-font-scale, 1)); font-weight: 400; line-height: 1; }
 .kw-masha-feedly__add:hover { transform: translateY(-2px); box-shadow: 0 8.8px 19.2px #d20b7655; }
 .kw-masha-feedly__help-button { display: grid; width: 60px; min-width: 60px; height: 60px; min-height: 60px; flex: 0 0 60px; aspect-ratio: 1; place-items: center; padding: 0; border: 1px solid #efd3e2; border-radius: 18.4px; background: #fff; color: #a91c62; box-shadow: 0 4px 12.8px #27233112; font-family: inherit; font-size: calc(26.4px * var(--masha-font-scale, 1)); font-weight: 800; line-height: 1; cursor: pointer; }
+.kw-masha-feedly__mite-button { position: relative; display: grid; width: 60px; min-width: 60px; height: 60px; min-height: 60px; flex: 0 0 60px; aspect-ratio: 1; place-items: center; padding: 0; border: 1px solid #f0d2bf; border-radius: 18.4px; background: #fff; box-shadow: 0 4px 12.8px #27233112; cursor: pointer; transition: transform 180ms cubic-bezier(.2, .8, .2, 1), box-shadow 180ms ease, border-color 180ms ease; }
+.kw-masha-feedly__mite-button::before { width: 16px; height: 16px; border-radius: 50%; background: #f28c28; content: ''; transition: transform 180ms cubic-bezier(.2, .8, .2, 1); }
+.kw-masha-feedly__mite-button:hover::before { transform: scale(1.12); }
+.kw-masha-feedly__mite-button:hover,
+.kw-masha-feedly__mite-button:focus-visible { z-index: 7; transform: translateY(-3px); border-color: #f28c28; box-shadow: 0 8.8px 19.2px #e8872633, inset 0 1px 0 #fff; }
+.kw-masha-feedly__mite-button:focus-visible { outline: 3px solid #db791c; outline-offset: 3px; }
+.kw-masha-feedly__mite-button[hidden] { display: none !important; }
 .kw-masha-feedly__close { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; padding: 0 0 1.92px; border: 1px solid #f1d2e1; border-radius: 13.6px; background: linear-gradient(145deg, #fff, #fff2f8); color: #a91c62; box-shadow: 0 3.2px 9.6px #27233112; font-family: inherit; font-size: calc(29.6px * var(--masha-font-scale, 1)); font-weight: 500; line-height: 1; cursor: pointer; }
 .kw-masha-feedly__dialog-header .kw-masha-feedly__close { width: 44px; height: 44px; flex-basis: 44px; padding: 0 0 1.92px; font-size: calc(29.6px * var(--masha-font-scale, 1)); }
 .kw-masha-feedly__close:hover { transform: rotate(90deg); border-color: #e6007e; background: #e6007e; color: #fff; transition: transform 160ms ease, background 160ms ease, color 160ms ease; }
@@ -581,7 +588,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__news-button[data-has-news="true"] strong { background: linear-gradient(145deg, #b92d71, #8d1e59); color: #fff; box-shadow: 0 3px 9px #98245c35; }
 @media (prefers-reduced-motion: reduce) { .kw-masha-feedly__news-button { transition: none; } .kw-masha-feedly__news-button:hover { transform: none; } }
 .kw-masha-feedly__actions { gap: 11.2px; }
-.kw-masha-feedly__add, .kw-masha-feedly__help-button { width: 64px; height: 64px; border-radius: 17.6px; }
+.kw-masha-feedly__add, .kw-masha-feedly__help-button, .kw-masha-feedly__mite-button { width: 64px; height: 64px; border-radius: 17.6px; }
 .kw-masha-feedly__add { font-size: calc(44px * var(--masha-font-scale, 1)); }
 .kw-masha-feedly__help-button { font-size: calc(28px * var(--masha-font-scale, 1)); }
 .kw-masha-feedly__rainbow { position: relative; width: 100%; overflow: hidden; padding: 20px; border: 1px solid #f2c4dd; border-radius: 17.6px; background: linear-gradient(120deg, #fff2a8 0%, #ffd7e9 28%, #e5d7ff 55%, #c9f5ff 78%, #d7ffd9 100%); color: #633267; text-align: center; box-shadow: 0 8px 19.2px #7d38821a; }
@@ -1317,7 +1324,54 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__actions > .kw-masha-feedly__news-button strong,
 .kw-masha-feedly__actions > .kw-masha-feedly__feedback-button strong,
 .kw-masha-feedly__actions > .kw-masha-feedly__closed-button strong { position: absolute; top: -5px; right: -5px; min-width: 20px; width: auto; height: 20px; padding: 0 4px; font-size: 11px; }
+.kw-masha-feedly__mite-button { width: 48px; min-width: 48px; height: 48px; min-height: 48px; flex-basis: 48px; }
 .kw-masha-feedly__help-button { width: 48px; min-width: 48px; height: 48px; min-height: 48px; flex-basis: 48px; margin-top: 12px; }
+
+/* Die Neuigkeiten- und Mite-Kacheln stehen gleich groß nebeneinander. */
+.kw-masha-feedly__news-mite-row { display: contents; }
+.kw-masha-feedly__actions > .kw-masha-feedly__news-mite-row > .kw-masha-feedly__news-button,
+.kw-masha-feedly__actions > .kw-masha-feedly__news-mite-row > .kw-masha-feedly__mite-button { width: 56px; min-width: 56px; height: 56px; min-height: 56px; flex: 0 0 56px; padding: 6px; border-radius: 14px; }
+.kw-masha-feedly__actions > .kw-masha-feedly__news-mite-row > .kw-masha-feedly__news-button { grid-template-columns: 1fr; justify-items: center; border-color: #c5e2bc; background: linear-gradient(150deg, #fff, #f0faec); color: #39882d; }
+.kw-masha-feedly__actions > .kw-masha-feedly__news-mite-row > .kw-masha-feedly__news-button:hover,
+.kw-masha-feedly__actions > .kw-masha-feedly__news-mite-row > .kw-masha-feedly__news-button:focus-visible { z-index: 7; transform: translateY(-3px); border-color: #62a84b; box-shadow: 0 8.8px 19.2px #39882d30, inset 0 1px 0 #fff; }
+.kw-masha-feedly__news-mite-row .kw-masha-feedly__news-icon { width: 38px; height: 38px; justify-self: center; }
+.kw-masha-feedly__news-mite-row .kw-masha-feedly__news-icon svg { width: 36px; height: 36px; }
+.kw-masha-feedly__news-mite-row .kw-masha-feedly__news-button strong { position: absolute; top: -5px; right: -5px; min-width: 20px; width: auto; height: 20px; padding: 0 4px; font-size: 11px; }
+.kw-masha-feedly__news-mite-row .kw-masha-feedly__mite-button { border-radius: 14px; }
+
+/* Kompakter Zeiterfassungsdialog mit ruhiger Formularhierarchie. */
+.kw-masha-feedly__mite-dialog { width: min(480px, 100%); max-height: min(86vh, 620px); border-color: #f0e4ec; border-radius: 22px; box-shadow: 0 28px 90px #17101f55, 0 4px 18px #e6007e12; }
+.kw-masha-feedly__mite-dialog > .kw-masha-feedly__dialog-header { align-items: center; padding: 22px 24px 18px; border-bottom: 1px solid #f3eaf0; background: linear-gradient(135deg, #fff7fb 0%, #fff 78%); }
+.kw-masha-feedly__mite-dialog > .kw-masha-feedly__dialog-header h2 { margin-top: 3px; font-size: calc(23px * var(--masha-font-scale, 1)); }
+.kw-masha-feedly__mite-dialog > .kw-masha-feedly__dialog-header .kw-masha-feedly__eyebrow { color: #b56b26; font-size: 11px; letter-spacing: .14em; }
+.kw-masha-feedly__mite-form { gap: 13px !important; padding: 18px 24px 22px !important; }
+.kw-masha-feedly__mite-form > .kw-masha-feedly__selected-context { margin: 0 0 2px; padding: 11px 13px; border: 1px solid #f3e2d5; border-left: 3px solid #f28c28; border-radius: 11px; background: linear-gradient(120deg, #fff9f3, #fff); color: #6c5d53; font-size: calc(13px * var(--masha-font-scale, 1)); line-height: 1.5; }
+.kw-masha-feedly__mite-form > label { gap: 6px !important; color: #5d5260 !important; font-size: calc(13px * var(--masha-font-scale, 1)) !important; font-weight: 700 !important; letter-spacing: .01em; }
+.kw-masha-feedly__mite-form > label > select { box-sizing: border-box; min-height: 40px; height: 40px; padding: 7px 38px 7px 12px; border-color: #e7dfe8; border-radius: 10px; background-color: #fff; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23756b78' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-position: right 12px center; background-repeat: no-repeat; background-size: 15px; color: #342b38; font-size: calc(14px * var(--masha-font-scale, 1)); }
+.kw-masha-feedly__mite-form > label > select:focus { border-color: #e8a35f; outline: 3px solid #f28c2826; }
+.kw-masha-feedly__mite-active { min-height: 0; margin: 0; padding: 10px 12px; border: 1px solid #ece7ef; border-radius: 10px; background: #faf9fb; color: #665d6b; font-size: calc(12px * var(--masha-font-scale, 1)); line-height: 1.45; }
+.kw-masha-feedly__mite-active:empty { display: none; }
+.kw-masha-feedly__mite-form > .kw-masha-feedly__form-status { min-height: 1.25em; margin: 0; font-size: calc(12px * var(--masha-font-scale, 1)); }
+.kw-masha-feedly__mite-form > .kw-masha-feedly__dialog-actions { flex-wrap: wrap; gap: 8px; padding-top: 14px; border-top: 1px solid #f1ebf1; }
+.kw-masha-feedly__mite-form > .kw-masha-feedly__dialog-actions > button { padding: 9px 13px; border-radius: 9px; font-size: calc(13px * var(--masha-font-scale, 1)); transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease; }
+.kw-masha-feedly__mite-form > .kw-masha-feedly__dialog-actions > .kw-masha-feedly__secondary:hover { transform: translateY(-1px); background: #eee9f0; }
+.kw-masha-feedly__mite-form > .kw-masha-feedly__dialog-actions > .kw-masha-feedly__submit { background: linear-gradient(135deg, #f28c28, #df7416); box-shadow: 0 4px 11px #d9771830; }
+.kw-masha-feedly__mite-form > .kw-masha-feedly__dialog-actions > .kw-masha-feedly__submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 14px #d9771840; }
+.kw-masha-feedly__mite-form > .kw-masha-feedly__dialog-actions > .kw-masha-feedly__submit:disabled { background: #e6dfe7; color: #958b98; box-shadow: none; cursor: not-allowed; }
+
+@media (max-width: 40rem) {
+  .kw-masha-feedly__mite-dialog > .kw-masha-feedly__dialog-header { padding: 18px 18px 14px; }
+  .kw-masha-feedly__mite-form { padding: 14px 18px 18px !important; }
+  .kw-masha-feedly__mite-form > .kw-masha-feedly__dialog-actions { justify-content: stretch; }
+  .kw-masha-feedly__mite-form > .kw-masha-feedly__dialog-actions > button { flex: 1 1 auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kw-masha-feedly__mite-button { transition: none; }
+  .kw-masha-feedly__mite-button:hover,
+  .kw-masha-feedly__mite-button:focus-visible { transform: none; }
+  .kw-masha-feedly__mite-button:hover::before { transform: none; }
+}
 
 .kw-masha-feedly__hover-tooltip {
   position: fixed;

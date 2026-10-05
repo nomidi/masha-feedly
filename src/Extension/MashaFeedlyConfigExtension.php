@@ -7,6 +7,7 @@ use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\SiteConfig\SiteConfig;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
+use KW\MashaFeedly\Model\MashaFeedlyMiteTrigger;
 
 /**
  * Ergänzt die SiteConfig um die für Masha Feedly freigegebenen Benutzer.
@@ -14,6 +15,9 @@ use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
  * @property string $MashaFeedlyAddress Konfigurierte Anrede im Modul (du oder sie).
  * @property string $MashaFeedlyAllowedMemberIDs JSON-Liste freigegebener Mitglieds-IDs.
  * @property bool $MashaFeedlyClosedCategoriesMigrated Kennzeichnet die einmalige Übernahme abgeschlossener Kategorien.
+ * @property int $MashaFeedlyMiteProjectID Standardprojekt für den persönlichen Mite-Timer.
+ * @property bool $MashaFeedlyMiteEnabled Aktiviert die Mite-Timerfunktion für diese Website.
+ * @method \SilverStripe\ORM\HasManyList<MashaFeedlyMiteTrigger> MashaFeedlyMiteTriggers() Auslösende Statuskategorien.
  * @package MashaFeedly
  * @author Kooperative Web
  * @license MIT
@@ -31,15 +35,46 @@ class MashaFeedlyConfigExtension extends Extension
         'MashaFeedlyTheme' => 'Varchar(20)',
         'MashaFeedlyDueDateReminderMode' => 'Varchar(20)',
         'MashaFeedlyHourlyRate' => 'Decimal(10,2)',
+        'MashaFeedlyMiteProjectID' => 'Int',
+        'MashaFeedlyMiteEnabled' => 'Boolean',
         'MashaFeedlyEstimateCategoriesSeeded' => 'Boolean',
         'MashaFeedlyDueDateReminderLastRunDate' => 'Date',
         'MashaFeedlyClosedCategoriesMigrated' => 'Boolean',
     ];
 
     private static $defaults = [
+        'MashaFeedlyMiteEnabled' => false,
         'MashaFeedlyHourlyRate' => 0,
         'MashaFeedlyEstimateCategoriesSeeded' => false,
     ];
+
+    private static $has_many = [
+        'MashaFeedlyMiteTriggers' => MashaFeedlyMiteTrigger::class . '.SiteConfig',
+    ];
+
+    /** Die Mite-Zuordnung wird ausschließlich im geschützten Modulreiter gepflegt. */
+    public function updateCMSFields(\SilverStripe\Forms\FieldList $fields): void
+    {
+        $fields->removeByName(['MashaFeedlyMiteProjectID', 'MashaFeedlyMiteEnabled', 'MashaFeedlyMiteTriggers']);
+    }
+
+    /** Prüft den zentralen Aktiv-Schalter; neue Installationen sind zunächst deaktiviert. */
+    public static function miteEnabled(): bool
+    {
+        return (bool)self::currentSiteConfig()->MashaFeedlyMiteEnabled;
+    }
+
+    /** @return int[] IDs der für den Timerdialog konfigurierten Statuskategorien. */
+    public static function miteCategoryIDs(): array
+    {
+        return array_map('intval', self::currentSiteConfig()->MashaFeedlyMiteTriggers()->column('CategoryID'));
+    }
+
+    /** Prüft Aktivierung und Kategorie serverseitig, auch für direkte Timerstart-Anfragen. */
+    public static function miteTriggersCategory(int $categoryID): bool
+    {
+        return self::miteEnabled() && in_array($categoryID, self::miteCategoryIDs(), true);
+    }
 
     /** Ermittelt neue Freigaben, bevor SiteConfig die bisherige Liste überschreibt. */
     protected function onBeforeWrite(): void

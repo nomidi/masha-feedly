@@ -653,7 +653,7 @@ class MashaFeedlyEntry extends DataObject
     }
 
     /** Liefert den aktuellen Zeitpunkt in der für Einträge konfigurierten Zeitzone. */
-    private static function currentEntryDateTime(): string
+    public static function currentEntryDateTime(): string
     {
         $timezone = (string)(static::config()->get('entry_timezone') ?: 'Europe/Berlin');
         $timestamp = DBDatetime::now()->getTimestamp();
@@ -756,7 +756,10 @@ class MashaFeedlyEntry extends DataObject
     public function canView($member = null): bool
     {
         $member ??= Security::getCurrentUser();
-        return $member instanceof Member && MashaFeedlyConfigExtension::canUse($member);
+        return $member instanceof Member && (
+            MashaFeedlyConfigExtension::canUse($member)
+            || self::canManageReporter($member)
+        );
     }
 
     /**

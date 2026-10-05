@@ -499,6 +499,99 @@ document.addEventListener('DOMContentLoaded', () => {
   const widget = document.querySelector('[data-kw-masha-feedly]');
   if (!widget) return;
 
+  // Der Betreiber kann Mite unabhängig von einem Eintragswechsel starten oder stoppen.
+  const miteModal = widget.querySelector('[data-widget-mite-modal]');
+  if (miteModal) {
+    let miteEntryID = '';
+    let miteTimerID = 0;
+    let miteBusy = false;
+    const miteProject = miteModal.querySelector('[data-widget-mite-project]');
+    const miteService = miteModal.querySelector('[data-widget-mite-service]');
+    const miteStart = miteModal.querySelector('[data-widget-mite-start]');
+    const miteStop = miteModal.querySelector('[data-widget-mite-stop]');
+    const miteStatus = miteModal.querySelector('[data-widget-mite-status]');
+    const miteButton = widget.querySelector('[data-masha-feedly-open-mite]');
+    const loadMiteOptions = async () => {
+      miteStatus.textContent = t('MITE_LOADING');
+      miteProject.disabled = miteService.disabled = miteStart.disabled = true;
+      miteStop.hidden = true;
+      try {
+        const response = await fetch(miteModal.dataset.optionsUrl, { credentials: 'same-origin' });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || t('MITE_LOAD_ERROR'));
+        miteProject.replaceChildren(new Option(t('MITE_CHOOSE_PROJECT'), ''));
+        Object.entries(result.projects || {}).forEach(([id, label]) => miteProject.add(new Option(label, id)));
+        miteService.replaceChildren(new Option(t('MITE_CHOOSE_SERVICE'), ''));
+        Object.entries(result.services || {}).forEach(([id, label]) => miteService.add(new Option(label, id)));
+        miteProject.value = String(result.projectID || '');
+        miteProject.disabled = miteService.disabled = false;
+        miteTimerID = Number(result.activeTimerID || 0);
+        miteStop.hidden = miteTimerID === 0;
+        miteModal.querySelector('[data-widget-mite-active]').textContent = miteTimerID
+          ? t('MITE_SWITCH_TIMER', { id: miteTimerID, note: result.activeTimerNote || '—' })
+          : t('MITE_NO_TIMER');
+        miteStart.hidden = false;
+        miteStart.disabled = !miteProject.value || !miteService.value;
+        miteStatus.textContent = '';
+      } catch (error) {
+        miteStatus.textContent = error.message || t('MITE_LOAD_ERROR');
+      }
+    };
+    const openMite = (entryID = '') => {
+      miteEntryID = String(entryID || '');
+      miteStart.hidden = false;
+      miteStart.disabled = true;
+      miteModal.hidden = false;
+      miteModal.querySelector('h2').focus();
+      loadMiteOptions();
+    };
+    const closeMite = () => { if (!miteBusy) miteModal.hidden = true; };
+    miteButton?.addEventListener('click', () => openMite());
+    document.addEventListener('kw-masha-feedly:mite-prompt', (event) => {
+      if (event.detail?.entryID) openMite(event.detail.entryID);
+    });
+    miteModal.addEventListener('change', () => {
+      miteStart.disabled = miteBusy || !miteProject.value || !miteService.value;
+    });
+    miteModal.addEventListener('click', async (event) => {
+      if (event.target.closest('[data-widget-mite-close]')) { closeMite(); return; }
+      if (event.target.closest('[data-widget-mite-refresh]')) { loadMiteOptions(); return; }
+      const stopping = Boolean(event.target.closest('[data-widget-mite-stop]'));
+      if (!stopping && !event.target.closest('[data-widget-mite-start]')) return;
+      if (miteBusy || (stopping ? !miteTimerID : (!miteProject.value || !miteService.value))) return;
+      miteBusy = true;
+      miteModal.querySelectorAll('button,select').forEach((control) => { control.disabled = true; });
+      miteStatus.textContent = stopping ? t('MITE_STOPPING') : t('MITE_STARTING');
+      const data = new FormData();
+      data.set('SecurityID', widget.dataset.securityId || '');
+      data.set('ConfirmedTimerID', String(miteTimerID));
+      if (!stopping && miteEntryID) {
+        data.set('EntryID', miteEntryID);
+      }
+      if (!stopping) {
+        data.set('ProjectID', miteProject.value);
+        data.set('ServiceID', miteService.value);
+      }
+      try {
+        const response = await fetch(stopping ? miteModal.dataset.stopUrl : miteModal.dataset.startUrl, {
+          method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: data,
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || (stopping ? t('MITE_STOP_ERROR') : t('MITE_START_ERROR')));
+        const successMessage = result.message || (stopping ? t('MITE_STOPPED') : t('MITE_STARTED'));
+        await loadMiteOptions();
+        miteStatus.textContent = successMessage;
+      } catch (error) {
+        miteStatus.textContent = error.message || t(stopping ? 'MITE_STOP_ERROR' : 'MITE_START_ERROR');
+      } finally {
+        miteBusy = false;
+        miteProject.disabled = miteService.disabled = false;
+        miteStop.disabled = false;
+        miteStart.disabled = !miteProject.value || !miteService.value;
+      }
+    });
+  }
+
   const form = widget.querySelector('[data-masha-feedly-entry-form]');
   const pageCount = widget.querySelector('[data-masha-feedly-page-count]');
   const totalCount = widget.querySelector('[data-masha-feedly-total-count]');
@@ -1681,6 +1774,11 @@ document.addEventListener('DOMContentLoaded', () => {
           isClosed: Boolean(result.categoryIsClosed),
         } : null);
       if (result.categoryID && nextCategory) editForm.elements.CategoryID.value = String(nextCategoryID);
+      if (result.mitePrompt === true) {
+        document.dispatchEvent(new CustomEvent('kw-masha-feedly:mite-prompt', {
+          detail: { entryID: String(activeEntry?.id || editForm.elements.EntryID.value) },
+        }));
+      }
       if (result.celebrateCompletion === true && nextCategory?.isClosed && !activeEntry?.isClosed) {
         window.KWMashaFeedlyEntries.celebrateCompletion(document, window, widget.dataset.unicornUrl, widget.dataset.theme);
       }

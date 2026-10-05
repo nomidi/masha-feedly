@@ -16,6 +16,7 @@ use SilverStripe\CMS\Controllers\ContentController;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyPriority;
 use KW\MashaFeedly\Task\MashaFeedlyDueDateReminderTask;
+use KW\MashaFeedly\Model\MashaFeedlyEntry;
 
 /**
  * Bindet das Masha-Feedly-Widget für berechtigte Benutzer global ein.
@@ -108,6 +109,9 @@ class MashaFeedlyWidgetExtension extends Extension
             'SavedViewsURL' => Controller::join_links(Director::baseURL(), '__masha-feedly'),
             'SaveViewURL' => Controller::join_links(Director::baseURL(), '__masha-feedly'),
             'DeleteViewURL' => Controller::join_links(Director::baseURL(), '__masha-feedly'),
+            'MiteOptionsURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'miteOptions'),
+            'MiteStartURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'startMiteTimer'),
+            'MiteStopURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'stopMiteTimer'),
             'ProfileURL' => CMSProfileController::singleton()->Link() . '#Root_MashaFeedly',
             'TokenValue' => SecurityToken::inst()->getValue(),
             // Admins may use the widget for configuration, but the guided tour is
@@ -123,9 +127,27 @@ class MashaFeedlyWidgetExtension extends Extension
             'Theme' => MashaFeedlyConfigExtension::theme(),
             'CanManageEstimate' => $canManageEstimate,
             'CanApproveEstimate' => $canApproveEstimate,
+            'CanManageReporter' => MashaFeedlyEntry::canManageReporter(Security::getCurrentUser()),
+            'MiteEnabled' => MashaFeedlyConfigExtension::miteEnabled(),
+            'CanManageMite' => MashaFeedlyEntry::canManageReporter(Security::getCurrentUser())
+                && MashaFeedlyConfigExtension::miteEnabled(),
             'EstimateHourlyRate' => $canManageEstimate ? MashaFeedlyConfigExtension::hourlyRate() : 0,
         ])->forTemplate();
         $translationDefaults = [
+            'MITE_LOADING' => 'Mite-Projekte und laufender Timer werden geladen …',
+            'MITE_LOAD_ERROR' => 'Mite konnte nicht geladen werden.',
+            'MITE_CHOOSE_PROJECT' => 'Projekt auswählen',
+            'MITE_CHOOSE_SERVICE' => 'Leistung auswählen',
+            'MITE_SWITCH_TIMER' => 'Aktuell läuft Timer #{id}: {note}.',
+            'MITE_NO_TIMER' => 'Derzeit läuft kein Mite-Timer.',
+            'MITE_STARTING' => 'Mite-Timer wird gestartet …',
+            'MITE_STARTED' => 'Mite-Timer läuft.',
+            'MITE_START_ERROR' => 'Mite-Timer konnte nicht gestartet werden.',
+            'MITE_STOPPING' => 'Mite-Timer wird gestoppt …',
+            'MITE_STOPPED' => 'Mite-Timer wurde gestoppt.',
+            'MITE_STOP_ERROR' => 'Mite-Timer konnte nicht gestoppt werden.',
+            'MITE_GENERAL_CONTEXT' => 'Starte eine allgemeine Zeiterfassung ohne Feedly-Eintrag oder stoppe den laufenden Timer.',
+            'MITE_ENTRY_CONTEXT' => 'Der Eintrag und Seitenlink werden als Beschreibung an Mite übergeben.',
             'EMOJI_PICKER_OPEN' => 'Emoji auswählen',
             'EMOJI_PICKER_TITLE' => 'Emoji auswählen',
             'EMOJI_PICKER_SEARCH' => 'Emoji oder Begriff suchen …',

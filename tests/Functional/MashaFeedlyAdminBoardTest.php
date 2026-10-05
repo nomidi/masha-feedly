@@ -131,6 +131,10 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('data-admin-view-panel="reporters"', $body);
         $this->assertStringContainsString('data-reporter-form', $body);
         $this->assertStringContainsString('name="ReportedByID"', $body);
+        $this->assertStringNotContainsString('data-admin-view-tab="mite"', $body);
+        $this->assertStringNotContainsString('data-mite-entry-edit="', $body);
+
+        $this->assertStringNotContainsString('data-mite-modal', $body);
 
         $saved = $this->post($url . '/saveReporter', [
             'SecurityID' => SecurityToken::getSecurityID(),
@@ -160,6 +164,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $response = $this->get($url);
         $this->assertSame(200, $response->getStatusCode());
         $this->assertStringNotContainsString('data-admin-view-tab="reporters"', $response->getBody());
+        $this->assertStringNotContainsString('data-mite-modal', $response->getBody());
+        $miteResponse = $this->get('/admin/masha-feedly/mite');
+        $this->assertSame(403, $miteResponse->getStatusCode());
         $saved = $this->post($url . '/saveReporter', [
             'SecurityID' => SecurityToken::getSecurityID(),
             'EntryID' => (int)$entry->ID,

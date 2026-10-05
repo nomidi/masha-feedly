@@ -73,6 +73,7 @@ final class MashaFeedlyResetService
             // Keep the existing SiteConfig, but reseed optional estimate categories on this reset.
             $config = MashaFeedlyConfigExtension::currentSiteConfig();
             $config->MashaFeedlyEstimateCategoriesSeeded = false;
+            $config->MashaFeedlyMiteEnabled = false;
             $config->write();
             MashaFeedlyCategory::ensureDefaultCategories();
 

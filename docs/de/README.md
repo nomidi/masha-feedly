@@ -62,6 +62,19 @@ Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [
 
 Das Konto muss zusätzlich SilverStripe-CMS-Administrator sein. Kundenadmins ohne diese konfigurierte E-Mail erhalten keinen Zugriff auf die Auswahl. Der tatsächliche Ersteller bleibt unverändert und jede Änderung der Meldeperson erscheint im Verlauf.
 
+Für die persönliche Mite-Zeiterfassung hinterlegst du die Verbindung ausschließlich in der `.env`:
+
+```dotenv
+MASHA_FEEDLY_MITE_API_KEY="dein-persoenlicher-api-schluessel"
+MASHA_FEEDLY_MITE_ACCOUNT="kooperative-web"
+```
+
+Der API-Schlüssel gehört zu deinem Mite-Benutzer und wird weder im CMS noch im Browser ausgegeben. Nach `dev/build?flush=1` aktivierst du unter **Masha:Feedly → Mite** die Integration und wählst das Standardprojekt sowie eine oder mehrere **Startkategorien** aus. Die **Leistung** wählst du beim Start jedes Timers aus. Mite ist standardmäßig deaktiviert. Der Hauptreiter, der allgemeine Mite-Timerknopf im Widget und die Timerfunktionen sind nur für das CMS-Admin-Konto mit der unter `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` konfigurierten E-Mail verfügbar. Andere Personen können das Board weiterhin benutzen, sehen den Mite-Knopf aber nicht und erhalten keinen Mite-Dialog.
+
+Verschiebst du selbst einen Fehler im CMS-Board oder änderst im Eintragsdialog den Status in eine ausgewählte **Startkategorie**, erscheint der Dialog **Mite-Timer starten?**. Er lädt verfügbare Projekte und Leistungen und zeigt einen bereits laufenden Timer an. **Timer starten** legt einen Mite-Zeiteintrag mit der vollständigen Fehlerbeschreibung als Bemerkung, dem gewählten Mite-Projekt und der gewählten Leistung an und startet dessen Stoppuhr. Das Standardprojekt ist vorausgewählt; Projekt und Leistung lassen sich für jeden Start auswählen. Über **Mite-Timer** im ersten Bereich des Seitenwidgets kannst du unabhängig davon eine allgemeine Zeiterfassung ohne Feedly-Eintrag starten oder einen laufenden Timer stoppen. Allgemeine Zeiteinträge erhalten in Mite den Hinweis „Masha:Feedly – allgemeine Zeiterfassung“.
+
+Mite erlaubt nur einen laufenden Timer pro Benutzer. Ändert sich der laufende Timer nach Öffnen des Dialogs, musst du ihn über **Neu laden** erneut prüfen. Bei einem API-Fehler bleibt der Fehler in der gewählten Kategorie; der Dialog zeigt die Ursache. Feedly speichert keine Mite-Zeiteinträge oder Zuordnungen dazu. Zeitdaten bleiben in Mite. Im Widget-Dialog kannst du einen laufenden Timer mit **Timer stoppen** beenden. Bloßes Umsortieren innerhalb derselben Kategorie öffnet keinen Dialog. Bei deaktiviertem Mite erscheinen keine Timerdialoge und bereits geöffnete Dialoge können keinen Timer mehr starten oder stoppen. Beim Zurücksetzen von Feedly werden die Startkategorien entfernt und Mite deaktiviert.
+
 Im CMS findest du die Übersicht unter **Masha:Feedly → Einträge → Meldepersonen ändern**. Dort kannst du Einträge nach ID oder Titel suchen und die angezeigte Person direkt in der Zeile speichern.
 
 ## Installation und Tests

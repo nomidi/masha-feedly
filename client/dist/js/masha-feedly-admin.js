@@ -1,4 +1,21 @@
 (() => {
+  /** Zeigt die Startkategorien und das Projekt nur bei ausgewählter Mite-Aktivierung. */
+  const applyMiteConfiguration = () => {
+    const enabled = document.querySelector('input[name="MashaFeedlyMiteEnabled"][type="checkbox"]');
+    document.querySelectorAll('[data-mite-settings]').forEach((settings) => {
+      settings.hidden = !enabled?.checked;
+    });
+  };
+  /**
+   * @typedef {Object} MiteOptionsResponse
+   * @property {boolean} success Ob die Projektauswahl geladen werden konnte.
+   * @property {Object<string, string>} projects Zugängliche Mite-Projekte nach ID.
+   * @property {Object<string, string>} services Verfügbare Mite-Leistungen nach ID.
+   * @property {number} projectID Standardprojekt dieser Website.
+   * @property {number} activeTimerID Laufender Timer, oder 0.
+   * @property {string} activeTimerNote Beschreibung des derzeit laufenden Zeiteintrags.
+   * @property {string} [message] Fehlermeldung der Serverprüfung.
+   */
   const applyAnimationTheme = () => {
     const themeField = document.querySelector('select[name="MashaFeedlyTheme"]');
     const selectedTheme = themeField?.value === 'serious' ? 'serious' : 'playful';
@@ -9,6 +26,7 @@
 
   document.addEventListener('change', (event) => {
     if (event.target?.matches?.('select[name="MashaFeedlyTheme"]')) applyAnimationTheme();
+    if (event.target?.matches?.('input[name="MashaFeedlyMiteEnabled"][type="checkbox"]')) applyMiteConfiguration();
   }, true);
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', applyAnimationTheme, { once: true });
@@ -98,6 +116,13 @@
   }, true);
 
   const initialiseMashaFeedlyAdmin = () => {
+  applyMiteConfiguration();
+  // CMS-Reiter ersetzen das Board per PJAX auch nach der ersten Initialisierung.
+  if (typeof MutationObserver !== 'undefined' && document.body && !window.KWMashaFeedlyBoardObserver) {
+    const observer = new MutationObserver(initialiseMashaFeedlyAdmin);
+    window.KWMashaFeedlyBoardObserver = observer;
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
   const board = document.querySelector('[data-masha-feedly-board]');
   let boardTranslations = {};
   try {
@@ -117,26 +142,161 @@
     });
     return message;
   };
-  if (!board) {
-    // SilverStripe can replace ModelAdmin content through PJAX after this file
-    // has executed. Keep watching until the board arrives, then bind its actions.
-    if (typeof MutationObserver !== 'undefined' && document.body && !window.KWMashaFeedlyBoardObserver) {
-      const observer = new MutationObserver(() => {
-        if (document.querySelector('[data-masha-feedly-board]')) {
-          observer.disconnect();
-          window.KWMashaFeedlyBoardObserver = null;
-          initialiseMashaFeedlyAdmin();
-        }
-      });
-      window.KWMashaFeedlyBoardObserver = observer;
-      observer.observe(document.body, { childList: true, subtree: true });
-    }
-    return;
-  }
+  if (!board) return;
   if (board.dataset.mashaFeedlyAdminInitialized === 'true') return;
   board.dataset.mashaFeedlyAdminInitialized = 'true';
 
   const status = board.querySelector('.masha-feedly-board__status');
+  const miteModal = board.querySelector('[data-mite-modal]');
+  let miteEntryID = '';
+  let miteConfirmedTimerID = 0;
+  let miteBusy = false;
+  let miteReturnFocus = null;
+  let miteLoadVersion = 0;
+
+  /** Schließt den Dialog und gibt den Fokus an die verschobene Karte zurück. */
+  const closeMiteDialog = () => {
+    if (!miteModal || miteBusy) return;
+    miteLoadVersion += 1;
+    miteModal.hidden = true;
+    miteReturnFocus?.focus();
+  };
+
+  /** Lädt Projekte und den Timerzustand neu; ein Timerwechsel muss erneut bestätigt werden. */
+  const loadMiteOptions = async () => {
+    if (!miteModal || miteBusy) return;
+    const loadVersion = ++miteLoadVersion;
+    const project = miteModal.querySelector('[data-mite-project]');
+    const service = miteModal.querySelector('[data-mite-service]');
+    const start = miteModal.querySelector('[data-mite-start]');
+    const stop = miteModal.querySelector('[data-mite-stop]');
+    const message = miteModal.querySelector('[data-mite-status]');
+    const activeTimer = miteModal.querySelector('[data-mite-active-timer]');
+    project.disabled = true;
+    service.disabled = true;
+    start.disabled = true;
+    if (stop) stop.hidden = true;
+    activeTimer.textContent = '';
+    message.textContent = t('MITE_LOADING');
+    try {
+      const response = await fetch(miteModal.dataset.optionsUrl, {
+        credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      /** @type {MiteOptionsResponse} */
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || t('MITE_LOAD_ERROR'));
+      if (loadVersion !== miteLoadVersion || miteModal.hidden) return;
+      project.replaceChildren(new Option(t('MITE_CHOOSE_PROJECT'), ''));
+      Object.entries(result.projects || {}).forEach(([id, label]) => project.add(new Option(label, id)));
+      service.replaceChildren(new Option(t('MITE_CHOOSE_SERVICE'), ''));
+      Object.entries(result.services || {}).forEach(([id, label]) => service.add(new Option(label, id)));
+      project.value = String(result.projectID || '');
+      project.disabled = false;
+      service.disabled = false;
+      start.disabled = !project.value || !service.value;
+      miteConfirmedTimerID = Number(result.activeTimerID || 0);
+      if (stop) stop.hidden = miteConfirmedTimerID === 0;
+      activeTimer.textContent = miteConfirmedTimerID
+        ? t('MITE_SWITCH_TIMER', { id: miteConfirmedTimerID, note: result.activeTimerNote || '—' })
+        : t('MITE_NO_TIMER');
+      message.textContent = '';
+    } catch (error) {
+      if (loadVersion === miteLoadVersion && !miteModal.hidden) message.textContent = error.message || t('MITE_LOAD_ERROR');
+    }
+  };
+
+  /**
+   * Öffnet die freiwillige Zeiterfassung nach dem Wechsel in eine konfigurierte Startkategorie.
+   * @param {string} entryID ID des verschobenen Fehlers.
+   * @param {HTMLElement|null} returnFocus Ziel für die Fokusrückgabe.
+   */
+  const openMiteDialog = (entryID, returnFocus) => {
+    if (!miteModal) return;
+    miteEntryID = entryID;
+    miteReturnFocus = returnFocus;
+    miteModal.hidden = false;
+    miteModal.querySelector('h2').focus();
+    loadMiteOptions();
+  };
+
+  document.addEventListener('kw-masha-feedly:mite-prompt', (event) => {
+    const entryID = event.detail?.entryID;
+    if (entryID && miteModal) openMiteDialog(String(entryID), document.activeElement);
+  });
+
+  miteModal?.addEventListener('change', (event) => {
+    if (event.target.matches('[data-mite-project], [data-mite-service]')) {
+      const project = miteModal.querySelector('[data-mite-project]');
+      const service = miteModal.querySelector('[data-mite-service]');
+      miteModal.querySelector('[data-mite-start]').disabled = miteBusy || !project.value || !service.value;
+    }
+  });
+  miteModal?.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMiteDialog();
+    }
+    if (event.key !== 'Tab') return;
+    const controls = [...miteModal.querySelectorAll('button:not([disabled]), select:not([disabled])')];
+    if (!controls.length) { event.preventDefault(); return; }
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === miteModal.querySelector('h2'))) {
+      event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault(); first.focus();
+    }
+  });
+  miteModal?.addEventListener('click', async (event) => {
+    if (event.target.closest('[data-mite-close]')) { closeMiteDialog(); return; }
+    if (event.target.closest('[data-mite-refresh]')) { loadMiteOptions(); return; }
+    const stopping = Boolean(event.target.closest('[data-mite-stop]'));
+    if (!stopping && !event.target.closest('[data-mite-start]')) return;
+    if (miteBusy || (stopping && !miteConfirmedTimerID)) return;
+    const project = miteModal.querySelector('[data-mite-project]');
+    const service = miteModal.querySelector('[data-mite-service]');
+    const message = miteModal.querySelector('[data-mite-status]');
+    if (!stopping && (!project.value || project.disabled || !service.value || service.disabled)) return;
+    miteBusy = true;
+    miteModal.querySelectorAll('button, select').forEach((control) => { control.disabled = true; });
+    message.textContent = t(stopping ? 'MITE_STOPPING' : 'MITE_STARTING');
+    const data = new FormData();
+    data.set('SecurityID', board.dataset.securityId);
+    data.set('ConfirmedTimerID', String(miteConfirmedTimerID));
+    if (!stopping) {
+      data.set('EntryID', miteEntryID);
+      data.set('ProjectID', project.value);
+      data.set('ServiceID', service.value);
+    }
+    try {
+      const response = await fetch(stopping ? miteModal.dataset.stopUrl : miteModal.dataset.startUrl, {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: data,
+      });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || t('MITE_START_ERROR'));
+      miteBusy = false;
+      if (stopping) {
+        const successMessage = result.message || t('MITE_STOPPED');
+        await loadMiteOptions();
+        message.textContent = successMessage;
+      } else {
+        status.textContent = result.message || t('MITE_STARTED');
+        closeMiteDialog();
+      }
+    } catch (error) {
+      message.textContent = error.message || t(stopping ? 'MITE_STOP_ERROR' : 'MITE_START_ERROR');
+    } finally {
+      miteBusy = false;
+      miteModal.querySelectorAll('button, select').forEach((control) => { control.disabled = false; });
+      // Nach Fehlern muss der aktuelle Timer erneut geladen werden, bevor ein weiterer Start möglich ist.
+      if (!miteModal.hidden) {
+        project.disabled = true;
+        miteModal.querySelector('[data-mite-start]').disabled = true;
+      }
+    }
+  });
   const assigneeFilter = board.querySelector('[data-masha-feedly-assignee-filter]');
   const columnsContainer = board.querySelector('.masha-feedly-board__columns');
   const categoryModal = board.querySelector('[data-category-modal]');
@@ -454,6 +614,7 @@
           columnList.querySelectorAll('.masha-feedly-board__card:not([hidden])').length;
       });
       status.textContent = t('BOARD_SAVE_SUCCESS');
+      if (result.mitePrompt) openMiteDialog(card.dataset.entryId, card.querySelector('a'));
     } catch (error) {
       if (previousList) previousList.insertBefore(card, previousNextCard && previousNextCard.parentElement === previousList ? previousNextCard : null);
       status.textContent = error.message || t('BOARD_SAVE_FAILURE');

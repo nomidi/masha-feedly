@@ -62,6 +62,19 @@ Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [
 
 The account must also be a Silverstripe CMS administrator. Customer CMS administrators without the configured email do not receive access to the selector. The actual creator remains unchanged, and reporter changes are recorded in history.
 
+Configure your personal Mite connection exclusively in `.env`:
+
+```dotenv
+MASHA_FEEDLY_MITE_API_KEY="your-personal-api-key"
+MASHA_FEEDLY_MITE_ACCOUNT="kooperative-web"
+```
+
+The API key belongs to your Mite user and is never exposed in the CMS or browser. After `dev/build?flush=1`, enable the integration under **Masha:Feedly → Mite**, choose this website's default project and one or more **trigger categories**, then save the configuration. Choose the **service** each time you start a timer. Mite is disabled by default. Only the CMS administrator whose email is configured through `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` can access the tab, the general Mite timer button in the widget's first section, and timer functions. Other people can still use the board but do not see the Mite button or receive a Mite dialog.
+
+When you move an issue to a selected **trigger category** in the CMS board or change its status in the entry dialog, **Start Mite timer?** opens. It loads available projects and services and shows any currently running timer. **Start timer** creates a Mite time entry with the full issue description as its note, the selected project and service, and starts its tracker. The default project is preselected; choose a project and service for each start. Use **Mite timer** in the first section of the page widget to start general time tracking without a Feedly entry or stop a running timer. General entries use the note “Masha:Feedly – general time tracking” in Mite.
+
+If the running timer changes while the dialog is open, use **Reload** to review its updated state. API errors keep the issue in the selected category and show a message in the dialog. Feedly does not store Mite time entries or associations; time data remains in Mite. Use **Stop timer** in the widget dialog to stop a running timer. Reordering within the same category does not open a dialog. Disabling Mite hides timer dialogs and blocks starts and stops from dialogs that are already open. Resetting Feedly removes trigger categories and disables Mite.
+
 In the CMS, open **Masha:Feedly → Entries → Change reporter**. Search by entry ID or title and save the displayed reporter directly in the row.
 
 ## Installation and tests

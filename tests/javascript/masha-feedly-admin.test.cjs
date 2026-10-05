@@ -8,6 +8,149 @@ const vm = require('node:vm');
 const sourcePath = path.resolve(__dirname, '../../client/src/js/masha-feedly-admin.js');
 const source = fs.readFileSync(sourcePath, 'utf8');
 
+/** Erzeugt die interaktiven Teile des Mite-Dialogs für Verhaltenstests. */
+function createMiteModal() {
+  const modal = new TestElement('mite-modal', { optionsUrl: '/mite-options', startUrl: '/mite-start', stopUrl: '/mite-stop' });
+  modal.hidden = true;
+  modal.heading = new TestElement('heading');
+  modal.project = new TestElement('select');
+  modal.project.replaceChildren = (...options) => { modal.project.options = options; };
+  modal.project.add = (option) => { modal.project.options.push(option); };
+  modal.service = new TestElement('select');
+  modal.service.value = '789';
+  modal.service.replaceChildren = (...options) => { modal.service.options = options; };
+  modal.service.add = (option) => { modal.service.options.push(option); };
+  modal.activeTimer = new TestElement('p');
+  modal.message = new TestElement('p');
+  modal.start = new TestElement('button');
+  modal.close = new TestElement('button');
+  modal.refresh = new TestElement('button');
+  modal.stop = new TestElement('button');
+  for (const [control, selector] of [[modal.start, '[data-mite-start]'], [modal.stop, '[data-mite-stop]'], [modal.close, '[data-mite-close]'], [modal.refresh, '[data-mite-refresh]']]) {
+    control.closest = (candidate) => candidate === selector ? control : null;
+  }
+  modal.querySelector = (selector) => ({
+    h2: modal.heading,
+    '[data-mite-project]': modal.project,
+    '[data-mite-service]': modal.service,
+    '[data-mite-start]': modal.start,
+    '[data-mite-stop]': modal.stop,
+    '[data-mite-active-timer]': modal.activeTimer,
+    '[data-mite-status]': modal.message,
+  })[selector] || null;
+  modal.querySelectorAll = () => [modal.start, modal.stop, modal.close, modal.refresh, modal.project, modal.service];
+  return modal;
+}
+
+/** Verschiebt eine Testkarte und wartet auf die asynchron geladene Mite-Auswahl. */
+async function moveCardWithMite(board) {
+  const sourceList = new TestElement('list', { categoryId: '1' });
+  const targetList = new TestElement('list', { categoryId: '2' });
+  const card = new TestElement('card', { entryId: '42' });
+  sourceList.appendChild(card);
+  startDragging(board, card);
+  await board.listeners.drop({ target: targetList, preventDefault() {} });
+  await new Promise(setImmediate);
+  return { card, targetList };
+}
+
+test('Doing öffnet nur die Auswahl und sendet den Timer erst nach ausdrücklichem Klick mit CSRF-Token', async () => {
+  const modal = createMiteModal();
+  const requests = [];
+  const { board } = createBoardEnvironment(async (url, options) => {
+    requests.push({ url, options });
+    return { ok: true, json: async () => url === '/move-entry'
+      ? { success: true, mitePrompt: true }
+      : url === '/mite-options'
+        ? { success: true, projects: { 123: 'Website' }, services: { 789: 'Entwicklung' }, projectID: 123, activeTimerID: 77, activeTimerNote: 'Andere Arbeit' }
+        : { success: true, message: 'Mite-Timer läuft.' } };
+  }, true, 'du', () => true, 'complete', true, null, null, modal);
+  await moveCardWithMite(board);
+  assert.equal(modal.hidden, false);
+  assert.equal(modal.project.value, '123');
+  assert.equal(modal.start.disabled, false);
+  assert.deepEqual(requests.map(({ url }) => url), ['/move-entry', '/mite-options']);
+  await modal.listeners.click({ target: modal.start });
+  assert.equal(requests[2].url, '/mite-start');
+  assert.equal(requests[2].options.method, 'POST');
+  assert.deepEqual(requests[2].options.body.values, [
+    ['SecurityID', 'csrf-test-token'], ['ConfirmedTimerID', '77'], ['EntryID', '42'], ['ProjectID', '123'], ['ServiceID', '789'],
+  ]);
+  assert.equal(modal.hidden, true);
+  assert.equal(board.status.textContent, 'Mite-Timer läuft.');
+});
+
+test('Ohne Timer weiter behält Doing und erzeugt keinen Mite-Schreibaufruf', async () => {
+  const modal = createMiteModal();
+  const requests = [];
+  const { board } = createBoardEnvironment(async (url) => {
+    requests.push(url);
+    return { ok: true, json: async () => url === '/move-entry' ? { success: true, mitePrompt: true }
+      : { success: true, projects: { 123: 'Website' }, projectID: 123, activeTimerID: 0 } };
+  }, true, 'du', () => true, 'complete', true, null, null, modal);
+  const { card, targetList } = await moveCardWithMite(board);
+  await modal.listeners.click({ target: modal.close });
+  assert.equal(modal.hidden, true);
+  assert.equal(card.parentElement, targetList);
+  assert.deepEqual(requests, ['/move-entry', '/mite-options']);
+});
+
+test('zeigt bei laufendem Timer eine Stoppaktion und sendet keine Feedly-Eintragsdaten', async () => {
+  const modal = createMiteModal();
+  const requests = [];
+  const { board } = createBoardEnvironment(async (url, options) => {
+    requests.push({ url, options });
+    return { ok: true, json: async () => url === '/move-entry' ? { success: true, mitePrompt: true }
+      : url === '/mite-options'
+        ? { success: true, projects: {}, services: {}, activeTimerID: requests.filter((request) => request.url === '/mite-options').length === 1 ? 77 : 0, activeTimerNote: 'Arbeit' }
+      : { success: true, message: 'Mite-Timer wurde gestoppt.' } };
+  }, true, 'du', () => true, 'complete', true, null, null, modal);
+  await moveCardWithMite(board);
+  assert.equal(modal.stop.hidden, false);
+  await modal.listeners.click({ target: modal.stop });
+  assert.equal(requests[2].url, '/mite-stop');
+  assert.deepEqual(requests[2].options.body.values, [['SecurityID', 'csrf-test-token'], ['ConfirmedTimerID', '77']]);
+  assert.equal(requests[3].url, '/mite-options');
+});
+
+test('Mite-Fehler lassen die Karte auf Doing und verlangen vor erneutem Start eine aktualisierte Auswahl', async () => {
+  const modal = createMiteModal();
+  const { board } = createBoardEnvironment(async (url) => ({
+    ok: url !== '/mite-start', json: async () => url === '/move-entry' ? { success: true, mitePrompt: true }
+      : url === '/mite-options' ? { success: true, projects: { 123: 'Website' }, projectID: 123 }
+        : { success: false, message: 'Mite ist nicht erreichbar.' },
+  }), true, 'du', () => true, 'complete', true, null, null, modal);
+  const { card, targetList } = await moveCardWithMite(board);
+  await modal.listeners.click({ target: modal.start });
+  assert.equal(modal.hidden, false);
+  assert.equal(modal.message.textContent, 'Mite ist nicht erreichbar.');
+  assert.equal(modal.start.disabled, true);
+  assert.equal(card.parentElement, targetList);
+  await modal.listeners.click({ target: modal.refresh });
+  await new Promise(setImmediate);
+  assert.equal(modal.start.disabled, false);
+});
+
+test('initialisiert den Mite-Dialog erneut, wenn CMS-PJAX das bereits benutzte Board ersetzt', async () => {
+  const modal = createMiteModal();
+  const environment = createBoardEnvironment(async (url) => ({
+    ok: true, json: async () => url === '/move-entry' ? { success: true, mitePrompt: true }
+      : { success: true, projects: { 123: 'Website' }, projectID: 123 },
+  }), true, 'du', () => true, 'complete', true, null, null, modal);
+  environment.setBoardAvailable(false);
+  environment.triggerMutation();
+  // Eine neu geladene Board-Kopie hat weder Initialisierungsmarkierung noch gebundene Aktionen.
+  delete environment.board.dataset.mashaFeedlyAdminInitialized;
+  environment.board.listeners = {};
+  const replacementModal = createMiteModal();
+  environment.board.miteModal = replacementModal;
+  environment.setBoardAvailable(true);
+  environment.triggerMutation();
+  await moveCardWithMite(environment.board);
+  assert.equal(replacementModal.hidden, false);
+  assert.equal(replacementModal.project.value, '123');
+});
+
 test('zeigt im CMS-Board das grüne Neu-Icon statt eines Aktivität-Sterns', () => {
   const renderer = fs.readFileSync(path.resolve(__dirname, '../../src/Admin/MashaFeedlyAdmin.php'), 'utf8');
   const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
@@ -218,6 +361,7 @@ class TestElement {
   }
 
   querySelector(selector) {
+    if (selector === '[data-mite-modal]') return this.miteModal || null;
     if (selector === '.masha-feedly-board__status') return this.status;
     if (selector === '[data-masha-feedly-assignee-filter]') return this.assigneeFilter || null;
     if (selector === '.masha-feedly-board__list') return this.list || null;
@@ -248,7 +392,8 @@ class TestElement {
   }
 
   matches(selector) {
-    return selector === 'select[name="MashaFeedlyTheme"]' && this.type === 'theme-select';
+    return (selector === 'select[name="MashaFeedlyTheme"]' && this.type === 'theme-select')
+      || (selector === 'input[name="MashaFeedlyMiteEnabled"][type="checkbox"]' && this.type === 'mite-enabled');
   }
 
   focus() {
@@ -330,7 +475,7 @@ class TestElement {
 function createBoardEnvironment(fetchImplementation = async () => ({
   ok: true,
   json: async () => ({ success: true }),
-  }), hasBoard = true, formalAddress = 'du', confirmImplementation = () => true, documentReadyState = 'complete', includeGlobalTranslator = true, entriesAPI = null, animationPreviewState = null) {
+  }), hasBoard = true, formalAddress = 'du', confirmImplementation = () => true, documentReadyState = 'complete', includeGlobalTranslator = true, entriesAPI = null, animationPreviewState = null, miteModal = null) {
   const board = new TestElement('board', {
     moveUrl: '/move-entry',
     moveCategoryUrl: '/move-category',
@@ -344,6 +489,7 @@ function createBoardEnvironment(fetchImplementation = async () => ({
       BOARD_CATEGORY_DELETE: 'Leere Kategorie löschen',
     }),
   });
+  board.miteModal = miteModal;
   board.assigneeFilter = new TestElement('select');
   board.assigneeFilter.value = '';
   board.columnsContainer = new TestElement('columns');
@@ -422,9 +568,10 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     querySelector: (selector) => {
       if (selector === '[data-masha-feedly-board]') return boardAvailable ? board : null;
       if (selector === 'select[name="MashaFeedlyTheme"]') return animationPreviewState?.themeSelect || null;
+      if (selector === 'input[name="MashaFeedlyMiteEnabled"][type="checkbox"]') return animationPreviewState?.miteEnabled || null;
       return null;
     },
-    querySelectorAll: (selector) => selector === '[data-masha-feedly-animation-preview-card]' ? animationPreviewState?.cards || [] : [],
+    querySelectorAll: (selector) => selector === '[data-masha-feedly-animation-preview-card]' ? animationPreviewState?.cards || [] : selector === '[data-mite-settings]' ? animationPreviewState?.miteSettings || [] : [],
     createElement: (type) => new TestElement(type),
     createElementNS: (_namespace, type) => new TestElement(type),
   };
@@ -469,6 +616,7 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     FormData: TestFormData,
     fetch: fetchImplementation,
     MutationObserver: TestMutationObserver,
+    Option: class { constructor(label, value) { this.label = label; this.value = value; } },
   });
 
   return {
@@ -481,6 +629,19 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     reloadCount: () => reloadCount,
   };
 }
+
+test('öffnet den Mite-Dialog auch nach einem Statuswechsel aus dem Eintragsdropdown', async () => {
+  const modal = createMiteModal();
+  const requests = [];
+  const { documentListeners } = createBoardEnvironment(async (url) => {
+    requests.push(url);
+    return { ok: true, json: async () => ({ success: true, projects: { 123: 'Website' }, projectID: 123, activeTimerID: 0 }) };
+  }, true, 'du', () => true, 'complete', true, null, null, modal);
+  documentListeners['kw-masha-feedly:mite-prompt']({ detail: { entryID: 42 } });
+  await new Promise(setImmediate);
+  assert.equal(modal.hidden, false);
+  assert.deepEqual(requests, ['/mite-options']);
+});
 
 test('filtert das Board nach nicht zugeordneten und ausgewählten persönlichen Einträgen', () => {
   const { board } = createBoardEnvironment();
@@ -890,4 +1051,19 @@ test('lässt das CMS-Overlay bei einem fehlgeschlagenen Eintrag offen und bewahr
   assert.equal(board.entryForm.status.textContent, 'Eintrag konnte nicht gespeichert werden.');
   assert.equal(reloadCount(), 0);
   assert.equal(board.entryForm.submitButton.disabled, false);
+});
+
+
+test('Mite configuration shows project and categories only when enabled', () => {
+  const miteEnabled = new TestElement('mite-enabled');
+  miteEnabled.checked = false;
+  const settings = new TestElement('mite-settings');
+  const { documentListeners } = createBoardEnvironment(undefined, false, 'du', () => true, 'complete', true, null, { miteEnabled, miteSettings: [settings] });
+  assert.equal(settings.hidden, true);
+  miteEnabled.checked = true;
+  documentListeners.change({ target: miteEnabled });
+  assert.equal(settings.hidden, false);
+  miteEnabled.checked = false;
+  documentListeners.change({ target: miteEnabled });
+  assert.equal(settings.hidden, true);
 });

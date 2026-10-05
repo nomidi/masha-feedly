@@ -4,6 +4,7 @@
   "type": "silverstripe-vendormodule",
   "license": "MIT",
   "require": {
+    "guzzlehttp/guzzle": "^7.9",
     "php": ">=8.3",
     "silverstripe/asset-admin": "^3.2",
     "silverstripe/cms": "^6.2",

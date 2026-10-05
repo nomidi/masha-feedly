@@ -15,6 +15,8 @@ use KW\MashaFeedly\Model\MashaFeedlyPriority;
 use KW\MashaFeedly\Model\MashaFeedlySavedView;
 use KW\MashaFeedly\Service\MashaFeedlyAttachmentService;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
+use KW\MashaFeedly\Service\MashaFeedlyMiteService;
+use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Control\Controller;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse;
@@ -34,7 +36,66 @@ use SilverStripe\i18n\i18n;
  */
 class MashaFeedlyEntryController extends Controller
 {
-    private static $allowed_actions = ['index', 'createEntry', 'listEntries', 'updateEntry', 'findSimilarEntries', 'completeOnboarding', 'restartOnboarding', 'savedViews', 'saveView', 'deleteView', 'markEntryRead'];
+    private static $allowed_actions = ['index', 'createEntry', 'listEntries', 'updateEntry', 'findSimilarEntries', 'completeOnboarding', 'restartOnboarding', 'savedViews', 'saveView', 'deleteView', 'markEntryRead', 'miteOptions', 'startMiteTimer', 'stopMiteTimer'];
+
+    /** Liefert Mite-Projekte, Leistungen und den Timer nur für die freigegebene Manager-Adresse. */
+    public function miteOptions(HTTPRequest $request): HTTPResponse
+    {
+        if (!MashaFeedlyEntry::canManageReporter()) {
+            return $this->respond(['success' => false, 'message' => 'Keine Berechtigung für Mite.'], 403);
+        }
+        try {
+            return $this->respond(['success' => true] + Injector::inst()->get(MashaFeedlyMiteService::class)->options());
+        } catch (\RuntimeException $exception) {
+            return $this->respond(['success' => false, 'message' => $exception->getMessage()], $exception->getCode() === 409 ? 409 : 502);
+        }
+    }
+
+    /** Startet Mite für einen Eintrag nach Auswahl von Projekt und Leistung. */
+    public function startMiteTimer(HTTPRequest $request): HTTPResponse
+    {
+        if (!MashaFeedlyEntry::canManageReporter()) {
+            return $this->respond(['success' => false, 'message' => 'Keine Berechtigung für Mite.'], 403);
+        }
+        if (!$request->isPOST() || !SecurityToken::inst()->checkRequest($request)) {
+            return $this->respond(['success' => false, 'message' => 'Ungültige Anfrage oder Sitzung abgelaufen.'], 400);
+        }
+        try {
+            $miteService = Injector::inst()->get(MashaFeedlyMiteService::class);
+            $entryID = (int)$request->postVar('EntryID');
+            if ($entryID > 0) {
+                $entry = MashaFeedlyEntry::get()->byID($entryID);
+                if (!$entry) {
+                    return $this->respond(['success' => false, 'message' => 'Eintrag nicht gefunden.'], 404);
+                }
+                $id = $miteService->start($entry, (int)$request->postVar('ProjectID'), (int)$request->postVar('ServiceID'), (int)$request->postVar('ConfirmedTimerID'));
+            } else {
+                $id = $miteService->startGeneral((int)$request->postVar('ProjectID'), (int)$request->postVar('ServiceID'), (int)$request->postVar('ConfirmedTimerID'));
+            }
+            return $this->respond(['success' => true, 'timeEntryID' => $id, 'message' => 'Mite-Timer läuft.']);
+        } catch (\RuntimeException $exception) {
+            $status = in_array($exception->getCode(), [400, 403, 409], true) ? $exception->getCode() : 502;
+            return $this->respond(['success' => false, 'message' => $exception->getMessage()], $status);
+        }
+    }
+
+    /** Stoppt den laufenden Mite-Timer nur nach Bestätigung seiner zuvor geladenen ID. */
+    public function stopMiteTimer(HTTPRequest $request): HTTPResponse
+    {
+        if (!MashaFeedlyEntry::canManageReporter()) {
+            return $this->respond(['success' => false, 'message' => 'Keine Berechtigung für Mite.'], 403);
+        }
+        if (!$request->isPOST() || !SecurityToken::inst()->checkRequest($request)) {
+            return $this->respond(['success' => false, 'message' => 'Ungültige Anfrage oder Sitzung abgelaufen.'], 400);
+        }
+        try {
+            Injector::inst()->get(MashaFeedlyMiteService::class)->stop((int)$request->postVar('ConfirmedTimerID'));
+            return $this->respond(['success' => true, 'activeTimerID' => 0, 'message' => 'Mite-Timer wurde gestoppt.']);
+        } catch (\RuntimeException $exception) {
+            $status = in_array($exception->getCode(), [400, 403, 409], true) ? $exception->getCode() : 502;
+            return $this->respond(['success' => false, 'message' => $exception->getMessage()], $status);
+        }
+    }
 
     /** Markiert einen Eintrag für das angemeldete, berechtigte Mitglied als gelesen. */
     public function markEntryRead(HTTPRequest $request): HTTPResponse
@@ -259,6 +320,7 @@ class MashaFeedlyEntryController extends Controller
         }
         $targetRole = (string)$category->SystemKey;
         $previousCategoryKey = (string)$entry->Category()->SystemKey;
+        $previousCategoryID = (int)$entry->CategoryID;
         $sameProtectedStatus = (int)$category->ID === (int)$entry->CategoryID;
         if (($targetRole === 'estimate_pending'
                 && !MashaFeedlyEntry::canManageEstimate($member)
@@ -438,6 +500,9 @@ class MashaFeedlyEntryController extends Controller
             'message' => $message,
             'closedDuplicateCount' => $closedDuplicateCount,
             'categoryID' => (int)$entry->CategoryID,
+            'mitePrompt' => $previousCategoryID !== (int)$entry->CategoryID
+                && MashaFeedlyConfigExtension::miteTriggersCategory((int)$entry->CategoryID)
+                && MashaFeedlyEntry::canManageReporter($member),
             'categoryTitle' => $this->visibleCategoryTitle($entry, $member),
             'categoryRole' => $this->visibleCategoryRole($entry, $member),
             ...(MashaFeedlyEntry::canManageEstimate($member) ? $this->estimatePayload($entry) : $this->estimateReadonlyPayload($entry, $member)),

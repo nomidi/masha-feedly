@@ -55,6 +55,15 @@ class MashaFeedlyCategory extends DataObject
         'IsClosed' => false,
     ];
 
+    /** Entfernt verwaiste Startregeln beim Löschen einer Kategorie. */
+    protected function onBeforeDelete(): void
+    {
+        parent::onBeforeDelete();
+        foreach (MashaFeedlyMiteTrigger::get()->filter('CategoryID', (int)$this->ID) as $trigger) {
+            $trigger->delete();
+        }
+    }
+
     /** Liefert die Startkategorie und legt alle Standardkategorien bei Bedarf an. */
     public static function defaultCategory(): self
     {
