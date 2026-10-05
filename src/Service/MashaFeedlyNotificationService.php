@@ -12,6 +12,7 @@ use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
 use SilverStripe\SiteConfig\SiteConfig;
 use SilverStripe\i18n\i18n;
+use Throwable;
 
 /**
  * Versendet E-Mail-Benachrichtigungen zu Masha-Feedly-Einträgen.
@@ -23,6 +24,32 @@ use SilverStripe\i18n\i18n;
  */
 class MashaFeedlyNotificationService
 {
+    /** Versendet eine Benachrichtigung, ohne einen fachlichen Schreibvorgang durch Mailfehler abzubrechen. */
+    private static function sendSafely(Email $email): bool
+    {
+        try {
+            $email->send();
+            return true;
+        } catch (Throwable $exception) {
+            error_log('[Masha:Feedly] E-Mail-Versand fehlgeschlagen (' . get_class($exception) . '): ' . $exception->getMessage());
+            return false;
+        }
+    }
+
+    /** Sendet eine allgemeine Testnachricht an ein Mitglied und lässt Versandfehler für die CMS-Rückmeldung hochlaufen. */
+    public static function sendTestEmail(Member $member): void
+    {
+        if (!Email::is_valid_address((string)$member->Email)) {
+            throw new \RuntimeException('Für dein Benutzerkonto ist keine gültige E-Mail-Adresse hinterlegt.');
+        }
+        $siteTitle = trim((string)SiteConfig::current_site_config()->Title) ?: 'Masha:Feedly';
+        Email::create()
+            ->setTo((string)$member->Email)
+            ->setSubject('Masha:Feedly – Test-E-Mail')
+            ->setBody('Der E-Mail-Versand von ' . $siteTitle . ' funktioniert.')
+            ->send();
+    }
+
     /** Sendet einmalig eine Erinnerung an freigegebene Verantwortliche und die erstellende Person. */
     public static function notifyDueDateReminder(MashaFeedlyEntry $entry): int
     {
@@ -52,7 +79,7 @@ class MashaFeedlyNotificationService
                 continue;
             }
 
-            Email::create()
+            if (self::sendSafely(Email::create()
                 ->setTo((string)$member->Email)
                 ->setSubject(i18n::_t(
                     'KW\\MashaFeedly\\Translations.EMAIL_DUE_DATE_SUBJECT',
@@ -67,8 +94,9 @@ class MashaFeedlyNotificationService
                     'DueDate' => (string)$entry->DueDate,
                     'EntryURL' => $entryURL,
                 ])
-                ->send();
-            $sent++;
+            )) {
+                $sent++;
+            }
         }
 
         if ($sent > 0) {
@@ -86,7 +114,7 @@ class MashaFeedlyNotificationService
         }
         $siteTitle = trim((string)SiteConfig::current_site_config()->Title) ?: 'Masha:Feedly';
         $widgetURL = Director::absoluteURL(Director::baseURL());
-        Email::create()
+        self::sendSafely(Email::create()
             ->setTo((string)$member->Email)
             ->setSubject(i18n::_t(
                 'KW\\MashaFeedly\\Translations.EMAIL_ACCESS_SUBJECT',
@@ -96,7 +124,7 @@ class MashaFeedlyNotificationService
             ->setHTMLTemplate('KW/MashaFeedly/Email/AccessGrantedEmail')
             ->setPlainTemplate('KW/MashaFeedly/Email/AccessGrantedEmailPlain')
             ->setData(['SiteTitle' => $siteTitle, 'WidgetURL' => $widgetURL])
-            ->send();
+        );
     }
 
     /** Sendet den neuen Bug-Eintrag an ausdrücklich freigegebene Abonnenten. */
@@ -127,7 +155,7 @@ class MashaFeedlyNotificationService
                 continue;
             }
 
-            Email::create()
+            self::sendSafely(Email::create()
                 ->setTo((string)$member->Email)
                 ->setSubject(i18n::_t(
                     'KW\\MashaFeedly\\Translations.EMAIL_NEW_SUBJECT',
@@ -142,7 +170,7 @@ class MashaFeedlyNotificationService
                     'BugDescription' => $bugDescription,
                     'EntryURL' => $entryURL,
                 ])
-                ->send();
+            );
         }
     }
 
@@ -173,7 +201,7 @@ class MashaFeedlyNotificationService
                 continue;
             }
 
-            Email::create()
+            self::sendSafely(Email::create()
                 ->setTo((string)$member->Email)
                 ->setSubject(i18n::_t(
                     'KW\\MashaFeedly\\Translations.EMAIL_UPDATED_SUBJECT',
@@ -188,7 +216,7 @@ class MashaFeedlyNotificationService
                     'EntryURL' => $entryURL,
                     'CategoryTitle' => (string)$entry->Category()->Title,
                 ])
-                ->send();
+            );
         }
     }
 
@@ -222,7 +250,7 @@ class MashaFeedlyNotificationService
                 continue;
             }
 
-            Email::create()
+            self::sendSafely(Email::create()
                 ->setTo((string)$member->Email)
                 ->setSubject(i18n::_t(
                     'KW\\MashaFeedly\\Translations.EMAIL_COMMENT_SUBJECT',
@@ -238,7 +266,7 @@ class MashaFeedlyNotificationService
                     'CommentText' => (string)$comment->CommentText,
                     'EntryURL' => $entryURL,
                 ])
-                ->send();
+            );
         }
     }
 
@@ -266,7 +294,7 @@ class MashaFeedlyNotificationService
                 continue;
             }
 
-            Email::create()
+            if (self::sendSafely(Email::create()
                 ->setTo((string)$member->Email)
                 ->setSubject(i18n::_t(
                     'KW\\MashaFeedly\\Translations.EMAIL_ESTIMATE_REQUEST_SUBJECT',
@@ -280,8 +308,9 @@ class MashaFeedlyNotificationService
                     'EntryTitle' => $entry->getTitle(),
                     'EntryURL' => $entryURL,
                 ])
-                ->send();
-            $sent++;
+            )) {
+                $sent++;
+            }
         }
         return $sent;
     }

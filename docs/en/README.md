@@ -33,6 +33,8 @@ In the expandable **Relationships** section, link entries as duplicates, themati
 
 In the Masha:Feedly section of your profile, set your avatar and color, manage each type of email notification, and restart the onboarding tour. You can separately choose emails for new entries, entry updates, comments on entries assigned to you or created by you, due dates, and cost estimate requests. Emails about your own entries and changes are optional and off by default. News in the widget shows activity regardless of email notification settings.
 
+CMS administrators can use **Send test email** under **Masha:Feedly → Configuration** to check delivery to the email address on their account. If a notification fails, the entry is still saved and the error is written to the PHP error log.
+
 Entries can have an optional due date. In Masha:Feedly settings, choose under **Run due-date reminders** whether checks run via cron or on the first website visit of each day. Visitor mode sends no reminders until someone visits the site. The check sends one email on the due date (or after it, if it did not run on time) to approved assignees and the entry creator. Changing the date resets the reminder.
 
 For cron mode, schedule this command to run daily in your Silverstripe project:

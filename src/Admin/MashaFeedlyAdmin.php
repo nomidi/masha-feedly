@@ -11,6 +11,7 @@ use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
 use KW\MashaFeedly\Service\MashaFeedlyResetService;
+use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
 use SilverStripe\Assets\Image;
 use SilverStripe\Admin\ModelAdmin;
 use SilverStripe\Control\Controller;
@@ -62,6 +63,7 @@ class MashaFeedlyAdmin extends ModelAdmin
 
     private static $allowed_actions = [
         'saveConfiguration',
+        'sendTestEmail',
         'moveEntry',
         'moveCategory',
         'createCategory',
@@ -234,6 +236,10 @@ class MashaFeedlyAdmin extends ModelAdmin
             FormAction::create('saveConfiguration', self::translate('CONFIG_SAVE', 'Konfiguration speichern'))
                 ->addExtraClass('btn-primary')
         );
+        $actions->push(FormAction::create(
+            'sendTestEmail',
+            self::translate('CONFIG_TEST_EMAIL', 'Test-E-Mail senden')
+        ));
         if ($canManageSensitiveSettings) {
             $actions->push(FormAction::create(
                 'resetAllMashaFeedlyData',
@@ -1028,6 +1034,29 @@ class MashaFeedlyAdmin extends ModelAdmin
 
         $form->sessionMessage(self::translate('CONFIG_SAVED', 'Die Masha-Feedly-Konfiguration wurde gespeichert.'), 'good');
         return $this->getResponseNegotiator()->respond($this->getRequest(), [
+            'CurrentForm' => fn(): string => $this->getEditForm()->forTemplate(),
+        ]);
+    }
+
+    /** Sendet eine Testnachricht an die E-Mail-Adresse des angemeldeten CMS-Administrators. */
+    public function sendTestEmail(array $data, Form $form): HTTPResponse
+    {
+        $request = $this->getRequest();
+        $member = Security::getCurrentUser();
+        if (!$member || !Permission::checkMember($member, 'ADMIN')) {
+            $this->httpError(403);
+        }
+        if (!$request->isPOST() || !SecurityToken::inst()->checkRequest($request)) {
+            $this->httpError(400);
+        }
+        try {
+            MashaFeedlyNotificationService::sendTestEmail($member);
+            $form->sessionMessage(self::translate('CONFIG_TEST_EMAIL_SENT', 'Test-E-Mail wurde an {email} gesendet.', ['email' => (string)$member->Email]), 'good');
+        } catch (\Throwable $exception) {
+            error_log('[Masha:Feedly] Test-E-Mail fehlgeschlagen (' . get_class($exception) . '): ' . $exception->getMessage());
+            $form->sessionMessage(self::translate('CONFIG_TEST_EMAIL_FAILED', 'Test-E-Mail konnte nicht gesendet werden. Prüfe die Mailserver-Konfiguration und das PHP-Fehlerprotokoll.'), 'bad');
+        }
+        return $this->getResponseNegotiator()->respond($request, [
             'CurrentForm' => fn(): string => $this->getEditForm()->forTemplate(),
         ]);
     }
