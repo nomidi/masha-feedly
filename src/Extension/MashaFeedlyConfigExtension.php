@@ -120,8 +120,7 @@ class MashaFeedlyConfigExtension extends Extension
             return false;
         }
 
-        return Permission::checkMember($member, 'ADMIN')
-            || in_array((int)$member->ID, self::memberIDs(), true);
+        return in_array((int)$member->ID, self::memberIDs(), true);
     }
 
     /** Prüft, ob ein Mitglied ausdrücklich in der Masha-Feedly-Freigabeliste steht. */

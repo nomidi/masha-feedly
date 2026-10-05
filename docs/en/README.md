@@ -4,7 +4,7 @@ Masha:Feedly is a shared issue and feedback tracker built into your website. Peo
 
 ## Access and setup
 
-Administrators open **Masha:Feedly → Configuration** in the CMS and select who may use the module. Administrators always retain access. The same screen controls the form of address, font size, appearance, categories, and priorities. The categories for the initial status, completion, and approval are required; their labels can be changed.
+Administrators open **Masha:Feedly → Configuration** in the CMS and select who may use the module. Administrators only see the widget when explicitly selected as well. The same screen controls the form of address, font size, appearance, categories, and priorities. The categories for the initial status, completion, and approval are required; their labels can be changed.
 
 Newly approved users receive a welcome email. On their first visit, an onboarding tour walks them through the key steps. They can stop the tour at any time and restart it from their profile or the help panel.
 

@@ -324,7 +324,7 @@ en:
     CONFIG_ANIMATION_PREVIEW_STARTED: 'Preview started.'
     CONFIG_ANIMATION_REDUCED_MOTION: 'Animations are disabled when reduced motion is preferred.'
     CONFIG_ALLOWED_MEMBERS: 'Users with access'
-    CONFIG_ALLOWED_MEMBERS_DESCRIPTION: 'Select users who may manage entries and comments. Administrators always retain access.'
+    CONFIG_ALLOWED_MEMBERS_DESCRIPTION: 'Select users who may use the widget and entries. Administrators also need to be selected.'
     CONFIG_SAVE: 'Save configuration'
     CONFIG_SAVED: 'Masha:Feedly configuration saved.'
     RESET_TITLE: 'Reset Masha:Feedly data'

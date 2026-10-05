@@ -103,7 +103,10 @@ class MashaFeedlyAdmin extends ModelAdmin
     public function canView($member = null)
     {
         $member ??= Security::getCurrentUser();
-        return $member instanceof Member && MashaFeedlyConfigExtension::canUse($member);
+        return $member instanceof Member && (
+            Permission::checkMember($member, 'ADMIN')
+            || MashaFeedlyConfigExtension::canUse($member)
+        );
     }
 
     /**
@@ -165,7 +168,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                 ->setDescription(self::translate('CONFIG_THEME_DESCRIPTION', 'Legt Farben, Erfolgsmeldungen und Abschlussanimationen im Widget fest.')),
             ListboxField::create('AllowedMemberIDs', self::translate('CONFIG_ALLOWED_MEMBERS', 'Benutzer mit Zugriff'), $members)
                 ->setValue(MashaFeedlyConfigExtension::memberIDs())
-                ->setDescription(self::translate('CONFIG_ALLOWED_MEMBERS_DESCRIPTION', 'Wähle alle Benutzer aus, die Einträge und Kommentare verwalten dürfen. Administratoren behalten immer Zugriff.'))
+                ->setDescription(self::translate('CONFIG_ALLOWED_MEMBERS_DESCRIPTION', 'Wähle alle Benutzer aus, die das Widget und die Einträge verwenden dürfen. Auch Administratoren benötigen eine Freigabe.'))
         );
         if ($canManageSensitiveSettings) {
             $fields->insertBefore('AllowedMemberIDs', DropdownField::create('MashaFeedlyDueDateReminderMode', self::translate('CONFIG_DUE_DATE_REMINDER_MODE', 'Fälligkeitserinnerungen ausführen'), [

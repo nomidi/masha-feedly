@@ -324,7 +324,7 @@ de:
     CONFIG_ANIMATION_PREVIEW_STARTED: 'Vorschau gestartet.'
     CONFIG_ANIMATION_REDUCED_MOTION: 'Animationen sind für reduzierte Bewegung ausgeschaltet.'
     CONFIG_ALLOWED_MEMBERS: 'Benutzer mit Zugriff'
-    CONFIG_ALLOWED_MEMBERS_DESCRIPTION: 'Wähle alle Benutzer aus, die Einträge und Kommentare verwalten dürfen. Administratoren behalten immer Zugriff.'
+    CONFIG_ALLOWED_MEMBERS_DESCRIPTION: 'Wähle alle Benutzer aus, die das Widget und die Einträge verwenden dürfen. Auch Administratoren benötigen eine Freigabe.'
     CONFIG_SAVE: 'Konfiguration speichern'
     CONFIG_SAVED: 'Die Masha-Feedly-Konfiguration wurde gespeichert.'
     RESET_TITLE: 'Masha:Feedly-Daten zurücksetzen'

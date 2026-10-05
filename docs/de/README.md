@@ -4,7 +4,7 @@ Masha:Feedly ist ein gemeinsamer Fehler- und Feedback-Tracker direkt auf der Web
 
 ## Zugang und Einrichtung
 
-Administratoren öffnen im CMS **Masha:Feedly → Konfiguration** und wählen die Personen aus, die das Modul verwenden dürfen. Administratoren behalten immer Zugriff. Im selben Bereich lassen sich Ansprache, Schriftgröße, Erscheinungsbild, Kategorien und Prioritäten einstellen. Die Kategorien für Startstatus, Erledigt und Freigabe sind erforderlich; ihre Namen können angepasst werden.
+Administratoren öffnen im CMS **Masha:Feedly → Konfiguration** und wählen die Personen aus, die das Modul verwenden dürfen. Auch Administratoren sehen das Widget nur, wenn sie ausdrücklich ausgewählt wurden. Im selben Bereich lassen sich Ansprache, Schriftgröße, Erscheinungsbild, Kategorien und Prioritäten einstellen. Die Kategorien für Startstatus, Erledigt und Freigabe sind erforderlich; ihre Namen können angepasst werden.
 
 Neue berechtigte Personen erhalten eine Willkommens-E-Mail. Beim ersten Besuch führt sie das Onboarding durch die wichtigsten Schritte. Die Einführung lässt sich jederzeit abbrechen und im Profil oder im Hilfefenster erneut starten.
 

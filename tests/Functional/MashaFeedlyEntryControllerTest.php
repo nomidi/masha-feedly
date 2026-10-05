@@ -51,13 +51,15 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->logInWithPermission('ADMIN');
         $manager = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $manager);
+        $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
+        $siteConfig->MashaFeedlyAllowedMemberIDs = json_encode([(int)$manager->ID]);
+        $siteConfig->write();
         Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$manager->Email]);
         MashaFeedlyCategory::ensureDefaultCategories();
         $pending = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_pending')->first();
         $approved = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_approved')->first();
         $this->assertNotNull($pending);
         $this->assertNotNull($approved);
-        $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
         $siteConfig->MashaFeedlyHourlyRate = 100;
         $siteConfig->write();
 
@@ -121,7 +123,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
 
         $approvedMember = $this->objFromFixture(Member::class, 'allowed');
         $unapprovedMember = $this->objFromFixture(Member::class, 'notAllowed');
-        $this->allowMember($approvedMember, $unapprovedMember);
+        $this->allowMember($approvedMember, $unapprovedMember, $superadmin);
         $this->assertNotNull($approvedMember->getCMSFields()->dataFieldByName('MashaFeedlyCanManageEstimates'));
         $approvedMember->MashaFeedlyCanManageEstimates = true;
         $approvedMember->write();
@@ -280,6 +282,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->logInWithPermission('ADMIN');
         $manager = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $manager);
+        $this->allowMember($manager);
         Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$manager->Email]);
         $reporter = $this->objFromFixture(Member::class, 'notAllowed');
         MashaFeedlyCategory::ensureDefaultCategories();

@@ -2,6 +2,7 @@
 
 namespace KW\MashaFeedly\Tests\Functional;
 
+use KW\MashaFeedly\Admin\MashaFeedlyAdmin;
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use SilverStripe\Core\Config\Config;
@@ -273,6 +274,9 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertInstanceOf(Member::class, $superAdmin);
         $superAdmin->Email = 'super-admin@example.test';
         $superAdmin->write();
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$superAdmin->ID]);
+        $config->write();
 
         Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$superAdmin->Email]);
         $superAdminResponse = $this->get('/masha-feedly-widget-test');
@@ -292,8 +296,8 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringNotContainsString('name="EstimatedCostNote"', $ordinaryAdminMarkup);
     }
 
-    /** Admins behalten das Widget, erhalten die geführte Einführung aber erst nach expliziter Freigabe. */
-    public function testAdministratorsCanUseWidgetWithoutStartingOnboarding(): void
+    /** Admins benötigen eine ausdrückliche Freigabe, um das Widget zu sehen. */
+    public function testAdministratorsOnlySeeWidgetWhenExplicitlyAllowed(): void
     {
         $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
         $page->publishRecursive();
@@ -306,8 +310,22 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $response = $this->get('/masha-feedly-widget-test');
 
         $this->assertSame(200, $response->getStatusCode());
-        $markup = $this->widgetMarkup($response->getBody());
-        $this->assertNotSame('', $markup, 'Admins behalten das Widget für die Konfiguration.');
+        $this->assertSame('', $this->widgetMarkup($response->getBody()));
+        $this->assertStringNotContainsString('data-kw-masha-feedly', $response->getBody());
+        $this->assertSame(403, $this->get('/__masha-feedly/listEntries')->getStatusCode());
+
+        $admin = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $admin);
+        $this->assertTrue(MashaFeedlyAdmin::singleton()->canView($admin), 'Admins behalten die CMS-Konfiguration zur Vergabe von Freigaben.');
+        $admin->MashaFeedlyOnboardingCompleted = true;
+        $admin->write();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$allowedMember->ID, (int)$admin->ID]);
+        $config->write();
+
+        $allowedResponse = $this->get('/masha-feedly-widget-test');
+        $this->assertSame(200, $allowedResponse->getStatusCode());
+        $markup = $this->widgetMarkup($allowedResponse->getBody());
+        $this->assertNotSame('', $markup);
         $this->assertStringNotContainsString('data-onboarding-enabled="1"', $markup);
     }
 
