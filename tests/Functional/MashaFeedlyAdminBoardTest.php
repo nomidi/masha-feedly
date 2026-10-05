@@ -578,7 +578,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('data-masha-feedly-animation-preview="glow"', $response->getBody());
         $this->assertStringContainsString('data-masha-feedly-animation-preview="rings"', $response->getBody());
         $this->assertStringContainsString('data-masha-feedly-animation-preview="confirmation"', $response->getBody());
-        $this->assertSame(6, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"'));
+        $this->assertSame(7, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"'));
         $this->assertSame(4, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"'));
         $this->assertStringContainsString('effects/unicorn.js', $response->getBody());
         $this->assertStringContainsString('effects/rocket.js', $response->getBody());

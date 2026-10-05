@@ -347,6 +347,7 @@ en:
     CONFIG_ANIMATION_ARCADE: '8-bit level complete'
     CONFIG_ANIMATION_RETRO: 'Retro: Windows 80s/90s'
     CONFIG_ANIMATION_DINO: 'Pixel dino eats the save button'
+    CONFIG_ANIMATION_DUCKS: 'Rubber duck parade'
     CONFIG_ANIMATION_CHECK: 'Drawn checkmark'
     CONFIG_ANIMATION_GLOW: 'Soft light pulse'
     CONFIG_ANIMATION_RINGS: 'Calm ripple rings'

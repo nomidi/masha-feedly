@@ -50,6 +50,7 @@ class MashaFeedlyWidgetExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/arcade.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/retro.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/dino.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/ducks.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/check.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/glow.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rings.js');

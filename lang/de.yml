@@ -347,6 +347,7 @@ de:
     CONFIG_ANIMATION_ARCADE: '8-Bit-Level geschafft'
     CONFIG_ANIMATION_RETRO: 'Retro: Windows 80er/90er'
     CONFIG_ANIMATION_DINO: 'Pixel-Dino frisst den Speichern-Button'
+    CONFIG_ANIMATION_DUCKS: 'Gummienten-Parade'
     CONFIG_ANIMATION_CHECK: 'Gezeichnetes Häkchen'
     CONFIG_ANIMATION_GLOW: 'Sanfter Lichtimpuls'
     CONFIG_ANIMATION_RINGS: 'Ruhige Ringwellen'
