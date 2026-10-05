@@ -354,6 +354,7 @@ en:
     CONFIG_ANIMATION_POTION: 'Bubbling magic potion'
     CONFIG_ANIMATION_CAT_PAWS: 'Cat paw trail'
     CONFIG_ANIMATION_FLOWER_POWER: 'Flower Power'
+    CONFIG_ANIMATION_PINBALL_TILT: 'Pinball: Tilt!'
     CONFIG_ANIMATION_CHECK: 'Drawn checkmark'
     CONFIG_ANIMATION_GLOW: 'Soft light pulse'
     CONFIG_ANIMATION_RINGS: 'Calm ripple rings'
