@@ -255,11 +255,11 @@ class MashaFeedlyAdmin extends ModelAdmin
             FormAction::create('saveConfiguration', self::translate('CONFIG_SAVE', 'Konfiguration speichern'))
                 ->addExtraClass('btn-primary')
         );
-        $actions->push(FormAction::create(
-            'sendTestEmail',
-            self::translate('CONFIG_TEST_EMAIL', 'Test-E-Mail senden')
-        ));
         if ($canManageSensitiveSettings) {
+            $actions->push(FormAction::create(
+                'sendTestEmail',
+                self::translate('CONFIG_TEST_EMAIL', 'Test-E-Mail senden')
+            ));
             $actions->push(FormAction::create(
                 'resetAllMashaFeedlyData',
                 self::translate('RESET_BUTTON', 'Alle Masha:Feedly-Daten löschen')
@@ -1243,7 +1243,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     {
         $request = $this->getRequest();
         $member = Security::getCurrentUser();
-        if (!$member || !Permission::checkMember($member, 'ADMIN')) {
+        if (!MashaFeedlyEntry::canManageReporter($member)) {
             $this->httpError(403);
         }
         if (!$request->isPOST() || !SecurityToken::inst()->checkRequest($request)) {
