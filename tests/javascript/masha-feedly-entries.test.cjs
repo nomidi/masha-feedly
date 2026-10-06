@@ -67,6 +67,7 @@ const messages = {
   SUCCESS_PAGE_MESSAGE: 'Auf dieser Seite gibt es derzeit keine offenen Einträge.',
   SUCCESS_EMPTY_PAGE_MESSAGE: 'Für diese Seite wurden noch keine Einträge erfasst.',
   EDIT_SAVING: 'Änderungen werden gespeichert …', EDIT_SAVE_ERROR: 'Änderungen konnten nicht gespeichert werden.',
+  SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Eintragsliste neu.',
   COMMENT_SAVING: 'Kommentar wird gesendet …',
   COMMENT_SAVED: 'Kommentar gesendet.',
   COMMENT_SAVE_ERROR: 'Kommentar konnte nicht gesendet werden.',
@@ -2660,6 +2661,29 @@ test('startet erst nach bestätigtem Feedback-Abschluss zufällig einen passende
   if (retro) assert.equal(retro.children[0].className, 'kw-masha-feedly__retro-dialog');
   if (dino) assert.equal(dino.children[0].className, 'kw-masha-feedly__dino-save-copy');
   assert.equal(env.editContext.textContent, 'Status: Fertig');
+});
+
+test('meldet bestätigtes Speichern auch dann als Erfolg, wenn die Abschlussanimation einen Fehler auslöst', async () => {
+  const env = createWidgetEnvironment();
+  env.setEntryStatus({ id: 6, title: 'Feedback', isClosed: false });
+  await env.listeners['kw-masha-feedly:opened']();
+  await env.openListButton.listeners.click();
+  const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
+  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  env.editForm.elements.CategoryID.value = '4';
+  env.postResponses.push({ ok: true, json: async () => ({
+    success: true, message: 'Erledigt.', categoryID: 4, categoryTitle: 'Fertig', categoryIsClosed: true, celebrateCompletion: true,
+  }) });
+  env.window.KWMashaFeedlyEntries.celebrateCompletion = () => { throw new Error('Animation fehlgeschlagen.'); };
+  const originalCelebrate = entriesUI.celebrateCompletion;
+  try {
+    await env.editForm.listeners.submit({ preventDefault() {} });
+  } finally {
+    env.window.KWMashaFeedlyEntries.celebrateCompletion = originalCelebrate;
+  }
+  assert.equal(env.editStatus.textContent, messages.SAVE_CONFIRMED_DISPLAY_ERROR);
+  assert.equal(env.editForm.submitButton.disabled, false);
+  assert.equal(env.postCalls.length, 1, 'Der fehlgeschlagene Anzeigeeffekt löst keinen zweiten Speicherversuch aus.');
 });
 
 test('zeigt im seriösen Theme sachliche Erfolgstexte', async () => {

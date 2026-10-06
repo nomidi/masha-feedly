@@ -1719,10 +1719,12 @@ document.addEventListener('DOMContentLoaded', () => {
     editStatus.textContent = t('EDIT_SAVING');
     const data = new FormData(editForm);
     data.set('SecurityID', editForm.dataset.securityId);
+    let saveConfirmed = false;
     try {
       const response = await fetch(editForm.dataset.updateUrl, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: data });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || t('EDIT_SAVE_ERROR'));
+      saveConfirmed = true;
       editStatus.textContent = result.message;
       if (activeEntry) activeEntry.attachments = result.attachments || activeEntry.attachments || [];
       if (activeEntry && Object.hasOwn(result, 'dueDate')) {
@@ -1789,7 +1791,9 @@ document.addEventListener('DOMContentLoaded', () => {
       renderEstimate(activeEntry);
       await loadEntries('page');
     } catch (error) {
-      editStatus.textContent = error.message || t('EDIT_SAVE_ERROR');
+      editStatus.textContent = saveConfirmed
+        ? t('SAVE_CONFIRMED_DISPLAY_ERROR')
+        : (error.message || t('EDIT_SAVE_ERROR'));
     } finally {
       submit.disabled = false;
     }

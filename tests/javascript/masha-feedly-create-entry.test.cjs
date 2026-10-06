@@ -163,6 +163,7 @@ function createEnvironment(fetchImplementation = async () => ({
     ENTRY_CONTEXT_EMPTY: 'Bereich auf der Seite ausgewählt.',
     CREATE_SAVING: 'Eintrag wird gespeichert …',
     CREATE_SAVE_ERROR: 'Der Eintrag konnte nicht gespeichert werden.',
+    SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Eintragsliste neu.',
     CREATE_ENTRY_FALLBACK: 'Neuer Eintrag',
     SIMILAR_ENTRY_NO_TITLE: 'Eintrag ohne Titel', SIMILAR_SCORE: '{score}% ähnlich', SIMILAR_OPEN_ENTRY: 'Eintrag ansehen',
     CLOSE_WIDGET: 'Masha:Feedly schließen',
@@ -373,6 +374,19 @@ test('sendet das Formular mit CSRF-Token und zeigt die erfolgreiche Anlage', asy
   assert.equal(env.toast.hidden, true);
   assert.equal(env.column.children.at(-1).textContent, 'Button wird abgeschnitten');
   assert.equal(env.submit.disabled, false);
+});
+
+test('meldet bestätigtes Erstellen auch bei einem Fehler in der Erfolgsanzeige als gespeichert', async () => {
+  const env = createEnvironment();
+  env.startButton.listeners.click();
+  env.documentListeners.click({ target: new TestElement('main', { id: 'main' }), preventDefault() {}, stopPropagation() {} });
+  env.column.append = () => { throw new Error('Bestätigung konnte nicht dargestellt werden.'); };
+
+  await env.form.listeners.submit({ preventDefault() {} });
+
+  assert.equal(env.status.textContent, 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Eintragsliste neu.');
+  assert.equal(env.submit.disabled, false);
+  assert.equal(env.calls.fetch[0], '/__masha-feedly/createEntry');
 });
 
 test('stellt im Erfassungsformular ein optionales Fälligkeitsdatum bereit', () => {

@@ -257,6 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
     status.textContent = t('CREATE_SAVING');
     const data = new FormData(form);
     data.set('SecurityID', form.dataset.securityId);
+    let saveConfirmed = false;
     try {
       const response = await fetch(form.dataset.createUrl, {
         method: 'POST',
@@ -266,6 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || t('CREATE_SAVE_ERROR'));
+      saveConfirmed = true;
       status.textContent = result.message;
       toastMessage.textContent = result.message;
       toast.hidden = false;
@@ -285,7 +287,9 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(() => { modal.hidden = true; toggleButton?.focus?.(); }, 500);
       setTimeout(() => { toast.hidden = true; }, 6000);
     } catch (error) {
-      status.textContent = error.message || t('CREATE_SAVE_ERROR');
+      status.textContent = saveConfirmed
+        ? t('SAVE_CONFIRMED_DISPLAY_ERROR')
+        : (error.message || t('CREATE_SAVE_ERROR'));
     } finally {
       submit.disabled = false;
     }
