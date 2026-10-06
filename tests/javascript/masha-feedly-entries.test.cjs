@@ -430,6 +430,9 @@ test('zeigt Reaktionen kompakt und öffnet die sechs Optionen erst auf Klick', a
   assert.equal(picker.children[0].attributes['aria-pressed'], 'true');
   picker.children[2].listeners.click();
   assert.equal(reactedTo, '😂', 'Eine Auswahl wird zum Speichervorgang übergeben und ersetzt die bisherige eigene Reaktion.');
+  assert.match(scss, /\.kw-masha-feedly__comment-reactions\s*\{\s*position: relative;/);
+  assert.match(scss, /\.kw-masha-feedly__comment-reaction-picker\s*\{\s*position: absolute; z-index: 8; bottom: calc\(100% \+ 6px\); left: 0;/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__comment-reaction-picker\{position:absolute;z-index:8;bottom:calc\(100% \+ 6px\);left:0;/);
   assert.match(scss, /comment-reaction-picker-toggle\s*\{[^}]*place-items:\s*center/);
   assert.match(scss, /comment-reaction-picker-face\s*\{[^}]*line-height:\s*1[^}]*transform:\s*translateY\(-1px\)/);
 });
@@ -811,9 +814,14 @@ test('lässt nur den aktuell ausgewählten Eintrag pulsiert markieren und setzt 
 test('färbt das Website-Symbol in Prioritätsfarbe und zeigt es immer als Fehler-Marker', () => {
   assert.match(scss, /\.kw-masha-feedly__page-marker-icon\s*\{[^}]*fill: currentColor/);
   assert.match(scss, /\.kw-masha-feedly__page-marker\s*\{[^}]*color: var\(--masha-feedly-priority-color/);
-  assert.match(scss, /\.kw-masha-feedly__page-marker\.is-active \.kw-masha-feedly__page-marker-icon\s*\{[^}]*animation: kw-masha-feedly-marker-selected/);
+  assert.match(scss, /\.kw-masha-feedly__page-marker\.is-active \.kw-masha-feedly__page-marker-icon,[\s\S]*?\.kw-masha-feedly__page-marker:hover \.kw-masha-feedly__page-marker-icon\s*\{[^}]*animation: kw-masha-feedly-marker-selected/);
   assert.match(scss, /\.kw-masha-feedly__page-marker::after\s*\{[^}]*opacity: 0/);
-  assert.match(scss, /\.kw-masha-feedly__page-marker\.is-active::after\s*\{[^}]*animation: kw-masha-feedly-marker-pulse/);
+  assert.match(scss, /\.kw-masha-feedly__page-marker\.is-active::after,[\s\S]*?\.kw-masha-feedly__page-marker:hover::after\s*\{[^}]*animation: kw-masha-feedly-marker-pulse/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__page-marker\.is-active \.kw-masha-feedly__page-marker-icon,\.kw-masha-feedly__page-marker:hover \.kw-masha-feedly__page-marker-icon\{animation:kw-masha-feedly-marker-selected/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__page-marker\.is-active::after,\.kw-masha-feedly__page-marker:hover::after\{animation:kw-masha-feedly-marker-pulse/);
+  assert.match(scss, /\.kw-masha-feedly__page-marker:hover \{ z-index: 10002; transform: translate\(-50%, -55%\) scale\(1\.2\); filter: drop-shadow/);
+  assert.match(scss, /\.kw-masha-feedly__page-marker-icon \{[^}]*cursor: pointer/);
+  assert.match(scss, /@keyframes kw-masha-feedly-marker-in \{ from \{ opacity: 0; \} to \{ opacity: 1; \} \}/);
   assert.match(scss, /\.kw-masha-feedly__page-marker:focus-visible\s*\{[^}]*outline-color: var\(--masha-feedly-priority-color/);
   assert.match(scss, /\.kw-masha-feedly__page-marker:focus-visible\s*\{[^}]*box-shadow: 0 0 0 6px color-mix\(in srgb, var\(--masha-feedly-priority-color/);
   assert.match(scss, /:focus-visible:not\(\.kw-masha-feedly__page-marker\)\s*\{[^}]*outline-color: #334155/);
@@ -1381,6 +1389,14 @@ test('ausgeliefertes JavaScript entspricht der getesteten Quelldatei', () => {
 
 test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widget-Stilen aus', () => {
   assert.match(widgetTemplate, /saved-view-select[\s\S]*?<details class="kw-masha-feedly__saved-views-details">[\s\S]*?SAVED_VIEW_DETAILS[\s\S]*?data-masha-feedly-saved-views/);
+  assert.match(scss, /\.kw-masha-feedly__comment-form textarea \{ font-size: 18px; line-height: 1\.5; \}/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__comment-form textarea\{font-size:18px;line-height:1\.5\}/);
+  assert.match(scss, /\.kw-masha-feedly__toggle\s*\{\s*right: 0;\s*bottom: 28px;[\s\S]*?width: var\(--kw-feedly-panel-width, 64px\);\s*max-width: 100vw;\s*height: 64px;[\s\S]*?border-radius: 16px 0 0 16px;/);
+  assert.match(scss, /\.kw-masha-feedly__toggle:hover,[\s\S]*?\.kw-masha-feedly__toggle:focus-visible\s*\{\s*animation: kw-masha-feedly-toggle-sway 460ms ease-in-out; transform-origin: right center;/);
+  assert.match(scss, /@keyframes kw-masha-feedly-toggle-sway \{ 0%, 100% \{ transform: rotate\(0\); \} 25% \{ transform: rotate\(-3deg\); \} 55% \{ transform: rotate\(2deg\); \} 78% \{ transform: rotate\(-1deg\); \} \}/);
+  assert.match(scss, /\.kw-masha-feedly\[data-panel-open="true"\] \.kw-masha-feedly__toggle \.kw-masha-feedly__logo\s*\{\s*transform: rotate\(-12deg\) scale\(\.94\);/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__toggle\{right:0;bottom:28px;[\s\S]*?width:var\(--kw-feedly-panel-width, 64px\);max-width:100vw;height:64px;[\s\S]*?border-radius:16px 0 0 16px/);
+  assert.match(compiledStyles, /@keyframes kw-masha-feedly-toggle-sway/);
   assert.match(scss, /\.kw-masha-feedly__saved-views-details > summary \{[^}]*cursor: pointer;/);
   assert.match(scss, /\.kw-masha-feedly__entries-count \{ padding-top: 4px; padding-bottom: 6\.4px; \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__saved-views-details>summary\{[^}]*cursor:pointer/);
@@ -1393,11 +1409,25 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /kw-masha-feedly-fan-from-under/);
   assert.match(effectStyles[1], /kw-masha-feedly-unicorn-run/);
   assert.match(effectStyles[1], /kw-masha-feedly-unicorn-run 4\.8s/);
-  assert.match(scss, /\.kw-masha-feedly__rainbow \{ position: relative; display: grid; width: 72px; min-height: 72px;/);
+  assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button \{ box-sizing: border-box; width: 56px; min-width: 56px; height: 56px; min-height: 56px; flex: 0 0 56px; align-self: flex-start; margin: 0; padding: 6px; border-radius: 14px;/);
+  for (const button of ['news-button', 'mite-button', 'rainbow', 'help-button', 'feedback-button', 'closed-button', 'estimate-queue-button']) {
+    assert.match(widgetTemplate, new RegExp(`kw-masha-feedly__${button}[^\"]*kw-masha-feedly__action-icon-button`));
+  }
+  assert.match(scss, /\.kw-masha-feedly__rainbow \{ position: relative; display: grid; place-items: center;/);
   assert.match(scss, /kw-masha-feedly__rainbow-copy\[hidden\]/);
+  assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button \{[^}]*border-radius: 14px;/);
+  assert.match(scss, /\.kw-masha-feedly__rainbow \{[^}]*background: linear-gradient\(145deg, #fff 18%, #fff8fc 68%, #f5fbff\)/);
+  assert.match(scss, /\.kw-masha-feedly__rainbow-icon \{ display: block; width: 38px; height: 38px;/);
+  assert.match(scss, /\.kw-masha-feedly__help-button \{ font-size: 36px; \}/);
+  assert.match(scss, /\.kw-masha-feedly__column \{ gap: 8px; \}/);
+  assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button:hover,[\s\S]*?\.kw-masha-feedly__action-icon-button:focus-visible,[\s\S]*?\.kw-masha-feedly__action-icon-button\[aria-expanded="true"\] \{ z-index: 7; transform: translateY\(-3px\);/);
+  assert.match(scss, /\.kw-masha-feedly__assignee-choice:hover \.kw-masha-feedly__assignee-avatar \{ outline: 3px solid #e8a4c5; outline-offset: 2px; transform: translateY\(-3px\) scale\(1\.16\); box-shadow:/);
+  assert.match(scss, /\.kw-masha-feedly__assignee-choice:hover input:checked \+ \.kw-masha-feedly__assignee-avatar \{ outline-color: #e6007e; box-shadow: 0 0 0 3px #e6007e/);
+  assert.match(scss, /prefers-reduced-motion: reduce\) \{ \.kw-masha-feedly__assignee-avatar \{ transition: none;/);
+  assert.match(scss, /\.kw-masha-feedly__help-button:hover,[\s\S]*?\.kw-masha-feedly__help-button:focus-visible \{ z-index: 7; transform: translateY\(-3px\);/);
   assert.match(scss, /\.kw-masha-feedly__rainbow-copy \{ position: absolute; z-index: 3;/);
   assert.match(scss, /\.kw-masha-feedly__rainbow \{ overflow: visible; \}/);
-  assert.match(scss, /\.kw-masha-feedly__help-button \{ align-self: flex-end; margin-top: 36px; \}/);
+  assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button \{[^}]*align-self: flex-start; margin: 0;/);
   assert.match(scss, /\.kw-masha-feedly__entry-environment \{ display: grid; grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(scss, /\.kw-masha-feedly__entry-environment dd \{ min-width: 0; margin: 0 0 6\.4px;[\s\S]*?overflow-wrap: anywhere;/);
   assert.match(scss, /\.kw-masha-feedly__priority \{ display: inline-flex; align-items: center; justify-content: center;/);
@@ -1425,7 +1455,7 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /@media \(max-width: 40rem\) \{[\s\S]*?padding-right: 20px; \}/);
   assert.match(scss, /data-success-visible="true"\]\[data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ width: min\(688px, calc\(100vw - 688px\)\); \}/);
   assert.match(scss, /\.kw-masha-feedly\[data-edit-open="true"\] \.kw-masha-feedly__entries-modal \{ visibility: hidden; \}/);
-  assert.match(scss, /\.kw-masha-feedly__add > span:first-child\s*\{ display: block; margin: 0; font-size: calc\(88px \* var\(--masha-font-scale, 1\)\); font-weight: 400; line-height: 1; transform: translateY\(-0\.06em\);/);
+  assert.match(scss, /\.kw-masha-feedly__add > span:first-child\s*\{ display: block; margin: 0; font-size: calc\(88px \* var\(--masha-font-scale, 1\)\); font-weight: 400; line-height: 1; transform: translateY\(-4px\);/);
   assert.match(scss, /\.kw-masha-feedly__help-button\s*\{ display: grid; width: 52px; min-width: 52px; height: 52px; min-height: 52px; flex: 0 0 52px; aspect-ratio: 1; margin-top: 32px; padding: 0; place-items: center;/);
   assert.match(scss, /\.kw-masha-feedly__entries-modal\s*\{ right: 256px;/);
   assert.match(scss, /data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ right: 560px;/);
@@ -1508,7 +1538,7 @@ test('zeigt den gestalteten Upload in Erstellung und Bearbeitung mit dem Upload-
 test('liefert den Feedback-Button mit Wartetext, zugänglichem Label und passendem Symbol aus', () => {
   assert.match(widgetTemplate, /data-masha-feedly-open-feedback/);
   assert.match(widgetTemplate, /data-masha-feedly-open-page-list aria-label="[^"]*"><svg class="kw-masha-feedly__page-icon" aria-hidden="true" viewBox="0 0 512 512" focusable="false"><path d="m446\.605 124\.392-/);
-  assert.match(widgetTemplate, /class="kw-masha-feedly__feedback-button"[^\n]*hidden/);
+  assert.match(widgetTemplate, /class="kw-masha-feedly__feedback-button kw-masha-feedly__action-icon-button"[^\n]*hidden/);
   assert.match(widgetTemplate, /data-masha-feedly-feedback-count/);
   assert.match(widgetTemplate, /viewBox="0 0 512 512" aria-hidden="true" focusable="false"><path d="M117\.333 149\.333H352/);
   assert.match(widgetTemplate, /value="feedback"/);
@@ -1554,6 +1584,18 @@ test('zeigt das Prioritätssymbol im Kopf des geöffneten Eintrags an', () => {
   assert.match(widgetTemplate, /data-masha-feedly-edit-priority role="img" aria-label="Priorität" hidden/);
   assert.match(widgetTemplate, /class="kw-masha-feedly__edit-header-actions"><span class="kw-masha-feedly__edit-priority" data-masha-feedly-edit-priority role="img" aria-label="Priorität" hidden><\/span><button type="button" class="kw-masha-feedly__entry-share"/);
   assert.match(scss, /\.kw-masha-feedly__edit-header-actions \{ display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-left: auto; \}/);
+  assert.match(scss, /\.kw-masha-feedly__dialog-header \{[^}]*align-items: center;/);
+  assert.match(scss, /\.kw-masha-feedly__dialog-header \{ padding: 23\.2px 30\.4px; \}/);
+  assert.match(scss, /\.kw-masha-feedly__close:hover \{ border-color: #e6007e; background: #e6007e; color: #fff; box-shadow:/);
+  assert.doesNotMatch(scss, /\.kw-masha-feedly__close:hover \{ transform: rotate\(90deg\)/);
+  assert.match(scss, /\.kw-masha-feedly__close \{[^}]*place-items: center; padding: 0;/);
+  assert.match(scss, /\.kw-masha-feedly__dialog-header \.kw-masha-feedly__close \{[^}]*padding: 0;/);
+  assert.match(scss, /\.kw-masha-feedly__dialog-header \.kw-masha-feedly__close \{ padding-bottom: 6px; \}/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__dialog-header\{[^}]*align-items:center/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__dialog-header\{padding:23\.2px 30\.4px\}/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__close:hover\{border-color:#e6007e;background:#e6007e;color:#fff;box-shadow:/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__close\{[^}]*place-items:center;padding:0;/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__dialog-header \.kw-masha-feedly__close\{padding-bottom:6px\}/);
 });
 
 test('hält die Eintragsanlage schlank und bietet typisierte Verknüpfungen beim Bearbeiten an', () => {
