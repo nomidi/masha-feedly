@@ -164,6 +164,8 @@ en:
     COMMENT_SAVE_ERROR: 'Could not send comment.'
     COMMENT_UPDATE_ERROR: 'Could not save comment.'
     COMMENT_DELETE_ERROR: 'Could not delete comment.'
+    COMMENT_UNCLEAR_RESULT_ERROR: 'The connection was interrupted or the server returned an unexpected response. It is unclear whether the change was saved. Reopen the entry before trying again.'
+    COMMENT_SAVED_DISPLAY_ERROR: 'The change was saved, but the display could not be updated. Reopen the entry before trying again.'
     COMMENT_REACTIONS: 'Reactions to this comment'
     COMMENT_REACTION_LIKE: 'Like'
     COMMENT_REACTION_LOVE: 'Heart'

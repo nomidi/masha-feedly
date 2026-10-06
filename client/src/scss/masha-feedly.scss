@@ -584,6 +584,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__feedback-button strong { font-size: calc(21.6px * var(--masha-font-scale, 1)); }
 .kw-masha-feedly__feedback-button[hidden] { display: none !important; }
 .kw-masha-feedly__news-button { position: relative; display: grid; width: 100%; min-height: 85.6px; grid-template-columns: 46.4px minmax(0, 1fr) auto; align-items: center; gap: 13.6px; overflow: hidden; padding: 12.8px 14.4px; border: 1px solid #efc2d8; border-radius: 16px; background: linear-gradient(125deg, #fff 4%, #fff8fc 58%, #fceaf3 100%); color: #342633; box-shadow: 0 7.2px 17.6px #79234a14, inset 0 1px 0 #fff; font: inherit; text-align: left; cursor: pointer; transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease; }
+.kw-masha-feedly__news-button[data-has-news="false"] { display: none !important; }
 .kw-masha-feedly__news-button::after { position: absolute; top: 0; right: 0; width: 54.4px; height: 100%; background: linear-gradient(90deg, transparent, #efb3d01c); content: ''; pointer-events: none; }
 .kw-masha-feedly__news-button:hover { transform: translateY(-2px); border-color: #dc78a7; box-shadow: 0 11.2px 22.4px #79234a20, inset 0 1px 0 #fff; }
 .kw-masha-feedly__news-button:focus-visible { outline: 3px solid #c32c73; outline-offset: 3px; }
@@ -876,6 +877,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__entry-share:focus-visible { outline: 2px solid #a91c62; outline-offset: 2px; }
 .kw-masha-feedly__entry-number { flex: 0 0 auto; padding: 2.4px 7.2px; border: 1px solid #f0c5da; border-radius: 5.6px; background: #fff1f8; color: #a91c62; font-size: 0.85em; font-weight: 850; font-variant-numeric: tabular-nums; }
 .kw-masha-feedly__closed-button { display: flex; width: 100%; min-height: 72px; flex: 0 0 72px; align-items: center; justify-content: center; gap: 10.4px; padding: 10.4px 14.4px; border: 1px solid #bfe7d4; border-radius: 11.2px; background: linear-gradient(135deg, #f3fff8, #dff8eb); color: #24734b; box-shadow: 0 4.8px 14.4px #24734b24, inset 0 1px 0 #fff; font: inherit; font-size: calc(16px * var(--masha-font-scale, 1)); font-weight: 750; cursor: pointer; transition: transform 160ms ease, box-shadow 160ms ease; }
+.kw-masha-feedly__closed-button[data-has-closed="false"] { display: none !important; }
 .kw-masha-feedly__closed-button:hover { transform: translateY(-2px); box-shadow: 0 8.8px 17.6px #24734b38, inset 0 1px 0 #fff; }
 .kw-masha-feedly__closed-button > span:first-child { display: grid; width: 28.8px; height: 28.8px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #2f9b63; color: #fff; font-size: calc(17.6px * var(--masha-font-scale, 1)); line-height: 1; }
 .kw-masha-feedly__closed-button strong { color: #195c39; font-size: calc(24px * var(--masha-font-scale, 1)); font-variant-numeric: tabular-nums; line-height: 1; }
@@ -946,10 +948,10 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-dialog > form { padding-right: 20px; }
 }
 
-/* Die Fenster fächern sich mit höchstens 15 px Überdeckung auf; der Bugtext nutzt die freie Breite. */
+/* Die Eintragsliste schließt bündig ans Startpanel an; das Bearbeitungsfach kann leicht überdecken. */
 .kw-masha-feedly { --masha-font-scale: 0.78; --kw-feedly-panel-width: 288px; --kw-feedly-list-width: 592px; }
 .kw-masha-feedly[data-success-visible="true"] { --kw-feedly-panel-width: 400px; }
-.kw-masha-feedly__entries-modal { right: calc(var(--kw-feedly-panel-width) - 15px); width: min(var(--kw-feedly-list-width), calc(100vw - var(--kw-feedly-panel-width) + 15px)); }
+.kw-masha-feedly__entries-modal { right: var(--kw-feedly-panel-width); width: min(var(--kw-feedly-list-width), calc(100vw - var(--kw-feedly-panel-width))); }
 .kw-masha-feedly__edit-modal { right: calc(var(--kw-feedly-panel-width) - 15px); width: min(688px, calc(100vw - var(--kw-feedly-panel-width) + 15px)); }
 .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal { right: calc(var(--kw-feedly-panel-width) + var(--kw-feedly-list-width) - 30px); width: min(688px, calc(100vw - var(--kw-feedly-panel-width) - var(--kw-feedly-list-width) + 30px)); }
 .kw-masha-feedly__edit-dialog > .kw-masha-feedly__dialog-header,
@@ -1251,7 +1253,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 }
 .kw-masha-feedly__panel,
 .kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__panel { width: var(--kw-feedly-panel-width); }
-.kw-masha-feedly__entries-modal { right: calc(var(--kw-feedly-panel-width) - 15px); width: min(var(--kw-feedly-list-width), calc(100vw - var(--kw-feedly-panel-width) + 15px)); }
+.kw-masha-feedly__entries-modal { right: var(--kw-feedly-panel-width); width: min(var(--kw-feedly-list-width), calc(100vw - var(--kw-feedly-panel-width))); }
 .kw-masha-feedly__edit-modal,
 .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal { right: calc(var(--kw-feedly-panel-width) - 15px); width: min(var(--kw-feedly-edit-width), calc(100vw - var(--kw-feedly-panel-width) + 15px)); }
 .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal { right: calc(var(--kw-feedly-panel-width) + var(--kw-feedly-list-width) - 30px); width: min(var(--kw-feedly-edit-width), calc(100vw - var(--kw-feedly-panel-width) - var(--kw-feedly-list-width) + 30px)); }
@@ -1419,7 +1421,11 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 @media (prefers-reduced-motion: reduce) {
   .kw-masha-feedly__hover-tooltip { transition-duration: 0.01ms !important; }
 }
+
+/* Der Erfolgszustand nutzt dieselbe bündige Panelkante wie die normale Liste. */
+.kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__entries-modal { right: var(--kw-feedly-panel-width); }
 @media (max-width: 40rem) {
   .kw-masha-feedly { --kw-feedly-panel-width: clamp(64px, 18vw, 76px); }
   .kw-masha-feedly[data-success-visible="true"] { --kw-feedly-panel-width: clamp(64px, 18vw, 76px); }
+  .kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__entries-modal { right: 0; }
 }

@@ -606,6 +606,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const newsSummary = widget.querySelector('[data-masha-feedly-news-summary]');
   const openListButton = widget.querySelector('[data-masha-feedly-open-list]');
   const openClosedButton = widget.querySelector('[data-masha-feedly-open-closed]');
+  if (openClosedButton) {
+    openClosedButton.hidden = true;
+    openClosedButton.setAttribute('data-has-closed', 'false');
+  }
   const openPageListButton = widget.querySelector('[data-masha-feedly-open-page-list]');
   const openNewsButton = widget.querySelector('[data-masha-feedly-open-news]');
   const rainbow = widget.querySelector('[data-masha-feedly-rainbow]');
@@ -750,9 +754,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const updateUnreadCount = (count, commentCount = 0) => {
     if (unreadCountDisplay && Number.isFinite(Number(count))) {
       const unread = Math.max(0, Number(count));
-      unreadCountDisplay.textContent = String(unread);
-      openNewsButton?.setAttribute('data-has-news', String(unread > 0));
       const comments = Math.max(0, Number(commentCount) || 0);
+      const totalUnread = unread + comments;
+      unreadCountDisplay.textContent = String(totalUnread);
+      if (openNewsButton) {
+        openNewsButton.hidden = totalUnread === 0;
+        openNewsButton.setAttribute('data-has-news', String(totalUnread > 0));
+      }
       if (newsSummary) newsSummary.textContent = t('NEWS_SUMMARY', { entries: unread, comments });
       const description = `${t('NEWS_TITLE')} · ${t('NEWS_SUMMARY', { entries: unread, comments })}`;
       openNewsButton?.setAttribute('aria-label', description);
@@ -1063,6 +1071,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const reactions = document.createElement('div');
       window.KWMashaFeedlyEntries.renderCommentReactions(reactions, comment.reactions, document, async (emoji, button) => {
         button.disabled = true;
+        let saveConfirmed = false;
         try {
           const data = new FormData(commentForm);
           data.set('SecurityID', commentForm.dataset.securityId);
@@ -1071,6 +1080,7 @@ document.addEventListener('DOMContentLoaded', () => {
           data.set('CommentAction', 'react');
           data.set('ReactionEmoji', emoji);
           const result = await postCommentData(data);
+          saveConfirmed = true;
           comment.reactions = result.reactions;
           if (Array.isArray(result.history)) {
             activeEntry.history = result.history;
@@ -1079,7 +1089,9 @@ document.addEventListener('DOMContentLoaded', () => {
           renderComments(activeEntry.comments || []);
           commentStatus.textContent = t('COMMENT_REACTION_SAVED');
         } catch (error) {
-          commentStatus.textContent = error.message || t('COMMENT_REACTION_ERROR');
+          commentStatus.textContent = saveConfirmed
+            ? t('COMMENT_SAVED_DISPLAY_ERROR')
+            : commentFailureMessage(error, 'COMMENT_REACTION_ERROR');
           button.disabled = false;
         }
       });
@@ -1126,11 +1138,13 @@ document.addEventListener('DOMContentLoaded', () => {
           editor.addEventListener('submit', async (event) => {
             event.preventDefault();
             save.disabled = true;
+            let saveConfirmed = false;
             try {
               const data = new FormData(editor);
               data.set('SecurityID', commentForm.dataset.securityId);
               data.set('CommentAction', 'edit');
               const result = await postCommentData(data);
+              saveConfirmed = true;
               activeEntry.comments = activeEntry.comments.map((item) => item.id === result.comment.id ? result.comment : item);
               renderComments(activeEntry.comments);
               if (Array.isArray(result.history)) {
@@ -1138,7 +1152,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 window.KWMashaFeedlyEntries.renderHistory(editHistory, activeEntry.history, document);
               }
             } catch (error) {
-              commentStatus.textContent = error.message || t('COMMENT_UPDATE_ERROR');
+              commentStatus.textContent = saveConfirmed
+                ? t('COMMENT_SAVED_DISPLAY_ERROR')
+                : commentFailureMessage(error, 'COMMENT_UPDATE_ERROR');
               save.disabled = false;
             }
           });
@@ -1148,12 +1164,14 @@ document.addEventListener('DOMContentLoaded', () => {
         remove.addEventListener('click', async () => {
           if (typeof window.confirm === 'function' && !window.confirm('Diesen Kommentar wirklich löschen?')) return;
           remove.disabled = true;
+          let saveConfirmed = false;
           try {
             const data = new FormData(commentForm);
             data.set('SecurityID', commentForm.dataset.securityId);
             data.set('CommentAction', 'delete');
             data.set('CommentID', String(comment.id));
             const result = await postCommentData(data);
+            saveConfirmed = true;
             activeEntry.comments = activeEntry.comments.filter((item) => item.id !== result.commentID);
             renderComments(activeEntry.comments);
             if (Array.isArray(result.history)) {
@@ -1161,7 +1179,9 @@ document.addEventListener('DOMContentLoaded', () => {
               window.KWMashaFeedlyEntries.renderHistory(editHistory, activeEntry.history, document);
             }
           } catch (error) {
-            commentStatus.textContent = error.message || t('COMMENT_DELETE_ERROR');
+            commentStatus.textContent = saveConfirmed
+              ? t('COMMENT_SAVED_DISPLAY_ERROR')
+              : commentFailureMessage(error, 'COMMENT_DELETE_ERROR');
             remove.disabled = false;
           }
         });
@@ -1174,15 +1194,31 @@ document.addEventListener('DOMContentLoaded', () => {
     commentList.scrollTop = commentList.scrollHeight;
   };
 
+  const commentFailureMessage = (error, fallbackKey) => error?.userMessage
+    ? error.message
+    : t(fallbackKey);
+
+  const userFacingCommentError = (message) => {
+    const error = new Error(message);
+    error.userMessage = true;
+    return error;
+  };
+
   const postCommentData = async (data) => {
-    const response = await fetch(commentForm.dataset.commentUrl, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, body: data });
+    let response;
+    try {
+      response = await fetch(commentForm.dataset.commentUrl, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' }, body: data });
+    } catch (_) {
+      throw userFacingCommentError(t('COMMENT_UNCLEAR_RESULT_ERROR'));
+    }
     let result;
     try {
       result = await response.json();
     } catch (_) {
-      throw new Error('Der Kommentar-Endpunkt hat keine gültige JSON-Antwort geliefert.');
+      throw userFacingCommentError(t('COMMENT_UNCLEAR_RESULT_ERROR'));
     }
-    if (!response.ok || !result.success) throw new Error(result.message || t('COMMENT_SAVE_ERROR'));
+    if (!result || typeof result !== 'object' || Array.isArray(result)) throw userFacingCommentError(t('COMMENT_UNCLEAR_RESULT_ERROR'));
+    if (!response.ok || !result.success) throw userFacingCommentError(result.message || t('COMMENT_SAVE_ERROR'));
     return result;
   };
 
@@ -1468,6 +1504,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const openCount = Number(data.openCount ?? data.totalCount ?? 0);
       const feedbackCount = Number(data.feedbackCount || 0);
       const closedCount = Math.max(0, Number(data.totalCount || 0) - openCount);
+      if (openClosedButton) {
+        openClosedButton.hidden = closedCount === 0;
+        openClosedButton.setAttribute('data-has-closed', String(closedCount > 0));
+      }
       pageCount.textContent = String(pageOpenCount);
       totalCount.textContent = String(openCount);
       if (closedCountDisplay) closedCountDisplay.textContent = String(closedCount);
@@ -1805,8 +1845,10 @@ document.addEventListener('DOMContentLoaded', () => {
     commentStatus.textContent = '';
     const data = new FormData(commentForm);
     data.set('SecurityID', commentForm.dataset.securityId);
+    let saveConfirmed = false;
     try {
       const result = await postCommentData(data);
+      saveConfirmed = true;
       activeEntry.comments = [...(activeEntry.comments || []), result.comment];
       renderComments(activeEntry.comments);
       if (Array.isArray(result.history)) {
@@ -1817,7 +1859,9 @@ document.addEventListener('DOMContentLoaded', () => {
       commentStatus.textContent = t('COMMENT_SAVED');
       document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-comment-saved'));
     } catch (error) {
-      commentStatus.textContent = error.message || t('COMMENT_SAVE_ERROR');
+      commentStatus.textContent = saveConfirmed
+        ? t('COMMENT_SAVED_DISPLAY_ERROR')
+        : commentFailureMessage(error, 'COMMENT_SAVE_ERROR');
     } finally {
       submit.disabled = false;
     }

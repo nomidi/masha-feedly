@@ -164,6 +164,8 @@ de:
     COMMENT_SAVE_ERROR: 'Kommentar konnte nicht gesendet werden.'
     COMMENT_UPDATE_ERROR: 'Kommentar konnte nicht gespeichert werden.'
     COMMENT_DELETE_ERROR: 'Kommentar konnte nicht gelöscht werden.'
+    COMMENT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderung gespeichert wurde, ist unklar. Bitte öffne den Eintrag neu, bevor du es erneut versuchst.'
+    COMMENT_SAVED_DISPLAY_ERROR: 'Die Änderung wurde gespeichert, aber die Anzeige konnte nicht aktualisiert werden. Bitte öffne den Eintrag neu, bevor du es erneut versuchst.'
     COMMENT_REACTIONS: 'Reaktionen auf diesen Kommentar'
     COMMENT_REACTION_LIKE: 'Gefällt mir'
     COMMENT_REACTION_LOVE: 'Herz'

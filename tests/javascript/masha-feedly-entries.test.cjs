@@ -73,6 +73,8 @@ const messages = {
   COMMENT_SAVE_ERROR: 'Kommentar konnte nicht gesendet werden.',
   COMMENT_UPDATE_ERROR: 'Kommentar konnte nicht gespeichert werden.',
   COMMENT_DELETE_ERROR: 'Kommentar konnte nicht gelöscht werden.',
+  COMMENT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderung gespeichert wurde, ist unklar. Bitte öffne den Eintrag neu, bevor du es erneut versuchst.',
+  COMMENT_SAVED_DISPLAY_ERROR: 'Die Änderung wurde gespeichert, aber die Anzeige konnte nicht aktualisiert werden. Bitte öffne den Eintrag neu, bevor du es erneut versuchst.',
   UNREAD_ACTIVITY: 'Neue Aktivität',
   NEWS_TITLE: 'Neuigkeiten',
   NEWS_SUMMARY: 'Einträge: {entries} · Kommentare: {comments}',
@@ -1439,7 +1441,8 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(widgetTemplate, /data-font-size="\$FontSize"/);
   const remFontSizes = [...scss.matchAll(/font-size:\s*(?:calc\()?([0-9]*\.?[0-9]+)rem/g)].map((match) => Number(match[1]));
   assert.ok(Math.min(...remFontSizes) >= 0.625, 'keine Schriftgröße darf unter 10 px bei 16 px Root-Schrift liegen');
-  assert.match(scss, /right:\s*calc\(var\(--kw-feedly-panel-width\) - 15px\); width:\s*min\(var\(--kw-feedly-list-width\)/);
+  assert.match(scss, /\.kw-masha-feedly__entries-modal \{ right: var\(--kw-feedly-panel-width\); width: min\(var\(--kw-feedly-list-width\)/);
+  assert.match(scss, /data-success-visible="true"\] \.kw-masha-feedly__entries-modal \{ right: var\(--kw-feedly-panel-width\); \}/);
   assert.match(scss, /right:\s*calc\(var\(--kw-feedly-panel-width\) \+ var\(--kw-feedly-list-width\) - 30px\)/);
   assert.match(scss, /\.kw-masha-feedly__edit-dialog > form[\s\S]*?padding-right:\s*20px;/);
   assert.match(scss, /--kw-feedly-list-width:\s*592px/);
@@ -1698,9 +1701,9 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
   const unreadCountDisplay = new Element();
   const newsSummary = new Element();
   const openListButton = new Element();
-  const openClosedButton = new Element();
+  const openClosedButton = new Element(); openClosedButton.hidden = true;
   const openPageListButton = new Element();
-  const openNewsButton = new Element();
+  const openNewsButton = new Element(); openNewsButton.hidden = true;
   const newsIconSVG = new Element(); newsIconSVG.tagName = 'svg';
   const rainbow = new Element(); rainbow.hidden = true;
   const rainbowCopy = new Element(); rainbowCopy.hidden = true;
@@ -1876,6 +1879,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
   let feedbackEntryCount = 1;
   let entryIsClosed = false;
   let entryIsUnread = false;
+  let unreadCommentCountOverride = null;
   let entryStatusOverride = null;
   const responseFor = (mode) => ({
     success: true,
@@ -1886,7 +1890,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
     totalCount: totalEntriesCount,
     feedbackCount: feedbackEntryCount,
     unreadCount: entryIsUnread ? 1 : 0,
-    unreadCommentCount: entryIsUnread ? 2 : 0,
+    unreadCommentCount: unreadCommentCountOverride ?? (entryIsUnread ? 2 : 0),
     mineCount: 1,
     categories: [{ id: 1, title: 'Backlog', isClosed: false }, { id: 4, title: 'Done', isClosed: true }, { id: 5, title: 'Archiv', isClosed: true }, { id: 6, title: 'Feedback', isClosed: false }, { id: 8, title: 'In Bearbeitung', systemKey: 'restricted_estimate', isClosed: false }],
     priorities: [{ id: 1, title: 'Sofort bearbeiten', iconType: 'warning' }, { id: 2, title: 'Zeitnah bearbeiten', iconType: 'warning' }, { id: 3, title: 'Normal', iconType: 'warning' }, { id: 4, title: 'Bei Gelegenheit', iconType: 'warning' }, { id: 5, title: 'Info', iconType: 'info' }],
@@ -1933,7 +1937,9 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
       const parsedURL = new URL(url, window.location.href);
       if (options.method === 'POST') {
         postCalls.push({ url: parsedURL, options });
-        return postResponses.shift() || { ok: true, json: async () => ({ success: true, message: 'Änderungen wurden gespeichert.' }) };
+        const response = postResponses.shift();
+        if (response instanceof Error) throw response;
+        return response || { ok: true, json: async () => ({ success: true, message: 'Änderungen wurden gespeichert.' }) };
       }
       if (parsedURL.pathname === '/__masha-feedly') {
         return { ok: true, json: async () => ({ success: true, views: savedViewsData }) };
@@ -1969,7 +1975,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
   };
   vm.runInNewContext(source, context);
   listeners.DOMContentLoaded();
-  return { listeners, requests, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
+  return { listeners, requests, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
 }
 
 test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedback-Warteschlange', async () => {
@@ -2003,7 +2009,8 @@ test('zeigt Neuigkeiten im ersten Panel und öffnet die Liste ungelesener Eintr�
   const env = createWidgetEnvironment();
   env.setEntryUnread(true);
   await env.listeners['kw-masha-feedly:opened']();
-  assert.equal(env.unreadCountDisplay.textContent, '1');
+  assert.equal(env.unreadCountDisplay.textContent, '3');
+  assert.equal(env.openNewsButton.hidden, false);
   assert.equal(env.openNewsButton.attributes['data-has-news'], 'true');
   assert.equal(env.newsSummary.textContent, 'Einträge: 1 · Kommentare: 2');
   assert.equal(env.openNewsButton.attributes['aria-label'], 'Neuigkeiten · Einträge: 1 · Kommentare: 2');
@@ -2021,6 +2028,7 @@ test('zeigt Neuigkeiten im ersten Panel und öffnet die Liste ungelesener Eintr�
 
   const scss = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../client/src/scss/masha-feedly.scss'), 'utf8');
   assert.match(scss, /\.kw-masha-feedly__news-button\s*\{/);
+  assert.match(scss, /\.kw-masha-feedly__news-button\[data-has-news="false"\] \{ display: none !important; \}/);
   assert.match(scss, /\.kw-masha-feedly__news-copy\s*\{/);
   assert.match(scss, /\.kw-masha-feedly__news-title\s*\{[^}]*font-size:\s*calc\(16\.8px \* var\(--masha-font-scale, 1\)\)/);
   assert.match(scss, /\.kw-masha-feedly__news-copy small\s*\{[^}]*font-size:\s*calc\(12\.8px \* var\(--masha-font-scale, 1\)\)/);
@@ -2045,6 +2053,22 @@ test('zeigt Neuigkeiten im ersten Panel und öffnet die Liste ungelesener Eintr�
   assert.match(scss, /\.kw-masha-feedly__sr-only \{ position: absolute !important;/);
   const compiledStyles = require('node:fs').readFileSync(require('node:path').join(__dirname, '../../client/dist/css/masha-feedly.css'), 'utf8');
   assert.match(compiledStyles, /\.kw-masha-feedly__news-button:focus-visible\{outline:3px solid/);
+});
+
+test('zeigt den Neuigkeiten-Button nur bei ungelesenen Einträgen oder Kommentaren', async () => {
+  const env = createWidgetEnvironment();
+  await env.listeners['kw-masha-feedly:opened']();
+  assert.equal(env.openNewsButton.hidden, true);
+  assert.equal(env.openNewsButton.attributes['data-has-news'], 'false');
+
+  env.setUnreadCommentCount(2);
+  await env.listeners['kw-masha-feedly:refresh']();
+  assert.equal(env.openNewsButton.hidden, false, 'Ungelesene Kommentare zeigen den Button auch ohne ungelesene Einträge.');
+  assert.equal(env.unreadCountDisplay.textContent, '2');
+
+  env.setUnreadCommentCount(0);
+  await env.listeners['kw-masha-feedly:refresh']();
+  assert.equal(env.openNewsButton.hidden, true, 'Nach dem Lesen aller Aktivitäten verschwindet der Button wieder.');
 });
 
 test('hält Filter eingeklappt, zeigt aktive Filter als Chips und erlaubt Entfernen sowie Zurücksetzen', async () => {
@@ -2261,7 +2285,84 @@ test('erklärt eine HTML-Fehlerantwort des Kommentar-Endpunkts lesbar', async ()
   env.commentForm.elements.CommentText.value = 'Test';
   env.postResponses.push({ ok: false, json: async () => { throw new SyntaxError(`Unexpected token 'A', "Action 'commentEntry' isn't allowed" is not valid JSON`); } });
   await env.commentForm.listeners.submit({ preventDefault() {} });
-  assert.match(env.commentStatus.textContent, /keine gültige JSON-Antwort/);
+  assert.equal(env.commentStatus.textContent, messages.COMMENT_UNCLEAR_RESULT_ERROR);
+  assert.equal(env.commentForm.submitButton.disabled, false);
+});
+
+test('meldet nach bestätigtem Senden einen Anzeige-Fehler als gespeichert', async () => {
+  const env = createWidgetEnvironment();
+  await env.listeners['kw-masha-feedly:opened']();
+  await env.openListButton.listeners.click();
+  const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
+  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  env.commentForm.elements.CommentText.value = 'Neuer Kommentar';
+  env.postResponses.push({ ok: true, json: async () => ({ success: true, comment: { id: 3, author: 'Erika', text: 'Neuer Kommentar' } }) });
+  const originalRenderLinks = env.window.KWMashaFeedlyEntries.renderLinks;
+  env.window.KWMashaFeedlyEntries.renderLinks = () => { throw new Error('DOM-Fehler'); };
+  try {
+    await env.commentForm.listeners.submit({ preventDefault() {} });
+  } finally {
+    env.window.KWMashaFeedlyEntries.renderLinks = originalRenderLinks;
+  }
+  assert.equal(env.commentStatus.textContent, messages.COMMENT_SAVED_DISPLAY_ERROR);
+  assert.equal(env.commentForm.submitButton.disabled, false);
+  assert.equal(env.postCalls.length, 1);
+});
+
+test('meldet nach bestätigtem Bearbeiten einen Anzeige-Fehler als gespeichert', async () => {
+  const env = createWidgetEnvironment();
+  await env.listeners['kw-masha-feedly:opened']();
+  await env.openListButton.listeners.click();
+  const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
+  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  const actions = env.commentList.children[0].children.find((child) => child.className === 'kw-masha-feedly__comment-actions');
+  actions.children[0].listeners.click();
+  const editor = env.commentList.children[0].children[1];
+  const saveButton = editor.children[3].children[1];
+  env.postResponses.push({ ok: true, json: async () => ({ success: true, comment: { id: 1, author: 'Erika', text: 'Geändert', edited: true } }) });
+  const originalRenderLinks = env.window.KWMashaFeedlyEntries.renderLinks;
+  env.window.KWMashaFeedlyEntries.renderLinks = () => { throw new Error('DOM-Fehler'); };
+  try {
+    await editor.listeners.submit({ preventDefault() {} });
+  } finally {
+    env.window.KWMashaFeedlyEntries.renderLinks = originalRenderLinks;
+  }
+  assert.equal(env.commentStatus.textContent, messages.COMMENT_SAVED_DISPLAY_ERROR);
+  assert.equal(saveButton.disabled, false);
+  assert.equal(env.postCalls.length, 1);
+});
+
+test('meldet nach bestätigter Emoji-Reaktion einen Anzeige-Fehler als gespeichert', async () => {
+  const env = createWidgetEnvironment();
+  await env.listeners['kw-masha-feedly:opened']();
+  await env.openListButton.listeners.click();
+  const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
+  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  const reactionContainer = env.commentList.children[0].children[3];
+  reactionContainer.children[0].children.at(-1).listeners.click();
+  const reactionButton = reactionContainer.children[1].children[0];
+  env.postResponses.push({ ok: true, json: async () => ({ success: true, reactions: [], history: [] }) });
+  const originalRenderHistory = env.window.KWMashaFeedlyEntries.renderHistory;
+  env.window.KWMashaFeedlyEntries.renderHistory = () => { throw new Error('DOM-Fehler'); };
+  try {
+    await reactionButton.listeners.click();
+  } finally {
+    env.window.KWMashaFeedlyEntries.renderHistory = originalRenderHistory;
+  }
+  assert.equal(env.commentStatus.textContent, messages.COMMENT_SAVED_DISPLAY_ERROR);
+  assert.equal(reactionButton.disabled, false);
+  assert.equal(env.postCalls.length, 1);
+});
+
+test('erklärt einen Kommentar-Netzwerkfehler mit unklarem Speicherstatus', async () => {
+  const env = createWidgetEnvironment();
+  await env.listeners['kw-masha-feedly:opened']();
+  await env.openListButton.listeners.click();
+  const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
+  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  env.postResponses.push(new Error('Failed to fetch'));
+  await env.commentForm.listeners.submit({ preventDefault() {} });
+  assert.equal(env.commentStatus.textContent, messages.COMMENT_UNCLEAR_RESULT_ERROR);
   assert.equal(env.commentForm.submitButton.disabled, false);
 });
 
@@ -2371,6 +2472,7 @@ test('zeigt abgeschlossene Kategorie-Einträge in der Liste, aber nicht als Fehl
 test('zeigt offene und abgeschlossene Einträge in der Übersicht getrennt an', async () => {
   const openEnv = createWidgetEnvironment();
   await openEnv.listeners['kw-masha-feedly:opened']();
+  assert.equal(openEnv.openClosedButton.hidden, true, 'Ohne abgeschlossene Einträge bleibt der Button verborgen.');
   await openEnv.openListButton.listeners.click();
   assert.equal(openEnv.requests[1].searchParams.get('mode'), 'open');
   assert.equal(openEnv.listCount.textContent, '1 Eintrag offen');
@@ -2381,6 +2483,8 @@ test('zeigt offene und abgeschlossene Einträge in der Übersicht getrennt an', 
   closedEnv.setTotalEntriesCount(5);
   closedEnv.setPageOpenEntryCount(0);
   await closedEnv.listeners['kw-masha-feedly:opened']();
+  assert.equal(closedEnv.openClosedButton.hidden, false, 'Mit abgeschlossenen Einträgen wird der Button eingeblendet.');
+  assert.equal(closedEnv.openClosedButton.attributes['data-has-closed'], 'true');
   assert.equal(closedEnv.pageCount.textContent, '0');
   assert.equal(closedEnv.totalCount.textContent, '2');
   assert.equal(closedEnv.closedCountDisplay.textContent, '3');
@@ -2391,6 +2495,10 @@ test('zeigt offene und abgeschlossene Einträge in der Übersicht getrennt an', 
   assert.equal(closedEnv.requests[2].searchParams.get('mode'), 'closed');
   assert.equal(closedEnv.listCount.textContent, '1 Eintrag abgeschlossen');
   assert.ok(closedEnv.listContainer.children.some((child) => child.className === 'kw-masha-feedly__entry-card'));
+
+  closedEnv.setTotalEntriesCount(2);
+  await closedEnv.listeners['kw-masha-feedly:refresh']();
+  assert.equal(closedEnv.openClosedButton.hidden, true, 'Nach dem letzten Abschluss wird der Button wieder verborgen.');
 });
 
 test('lädt persönliche Zuweisungen im eigenen Listenfilter nach', async () => {
