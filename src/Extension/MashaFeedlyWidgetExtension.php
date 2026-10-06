@@ -132,7 +132,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'Members' => $members,
             'Address' => MashaFeedlyConfigExtension::address(),
             'FontSize' => MashaFeedlyConfigExtension::fontSize(),
-            'Theme' => MashaFeedlyConfigExtension::theme(),
+            'Theme' => MashaFeedlyMemberExtension::themeFor(Security::getCurrentUser()),
             'CanManageEstimate' => $canManageEstimate,
             'CanApproveEstimate' => $canApproveEstimate,
             'CanManageReporter' => MashaFeedlyEntry::canManageReporter(Security::getCurrentUser()),

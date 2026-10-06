@@ -8,6 +8,7 @@ use SilverStripe\Assets\Image;
 use SilverStripe\Core\Extension;
 use SilverStripe\Forms\CheckboxField;
 use SilverStripe\Forms\CompositeField;
+use SilverStripe\Forms\DropdownField;
 use SilverStripe\Forms\FieldList;
 use SilverStripe\Forms\LiteralField;
 use SilverStripe\Forms\HiddenField;
@@ -33,6 +34,7 @@ use SilverStripe\View\Requirements;
  * @property int $MashaFeedlyIconImageID ID des geschützten Profilbildes für Masha Feedly.
  * @property Image $MashaFeedlyIconImage Geschütztes Masha-Feedly-Profilbild.
  * @property string $MashaFeedlyColor Individuelle Avatarfarbe im Masha-Feedly-Board.
+ * @property string $MashaFeedlyTheme Persönliches Masha-Feedly-Theme oder leere Website-Vorgabe.
  * @package MashaFeedly
  * @author Kooperative Web
  * @license MIT
@@ -50,6 +52,7 @@ class MashaFeedlyMemberExtension extends Extension
         'MashaFeedlyNotifyCostEstimates' => 'Boolean',
         'MashaFeedlyCanManageEstimates' => 'Boolean',
         'MashaFeedlyColor' => 'Varchar(7)',
+        'MashaFeedlyTheme' => 'Varchar(20)',
         'MashaFeedlyOnboardingCompleted' => 'Boolean',
         'MashaFeedlyShowOnboarding' => 'Boolean',
     ];
@@ -129,6 +132,15 @@ class MashaFeedlyMemberExtension extends Extension
     {
         $color = strtoupper(trim((string)$color));
         return array_key_exists($color, self::colorOptions()) ? $color : null;
+    }
+
+    /** Liefert das persönliche Theme oder bei leerer Auswahl die konfigurierte Website-Vorgabe. */
+    public static function themeFor(?Member $member): string
+    {
+        $theme = strtolower(trim((string)($member?->MashaFeedlyTheme ?? '')));
+        return in_array($theme, ['playful', 'serious'], true)
+            ? $theme
+            : MashaFeedlyConfigExtension::theme();
     }
 
     /** Wählt aus der Palette die bisher am seltensten vergebene Farbe. */
@@ -222,6 +234,7 @@ class MashaFeedlyMemberExtension extends Extension
             'MashaFeedlyShowOnboarding',
             'MashaFeedlyIconImage',
             'MashaFeedlyColor',
+            'MashaFeedlyTheme',
         ]);
 
         $currentUser = Security::getCurrentUser();
@@ -300,6 +313,12 @@ class MashaFeedlyMemberExtension extends Extension
                     )
                 )->setName('MashaFeedlyAvatarColor')->setTitle(self::translate('PROFILE_COLOR', 'Avatarfarbe'))
             )->setName('MashaFeedlyProfileSettings')->setTitle(self::translate('PROFILE_AVATAR', 'Profil und Avatar'))->addExtraClass('masha-feedly-profile-settings'),
+            DropdownField::create('MashaFeedlyTheme', self::translate('PROFILE_THEME', 'Erscheinungsbild'), [
+                'playful' => self::translate('CONFIG_THEME_PLAYFUL', 'Verspielt'),
+                'serious' => self::translate('CONFIG_THEME_SERIOUS', 'Seriös'),
+            ])->setValue((string)$this->owner->MashaFeedlyTheme)
+                ->setEmptyString(self::translate('PROFILE_THEME_DEFAULT', 'Website-Vorgabe'))
+                ->setDescription(self::translate('PROFILE_THEME_DESCRIPTION', 'Wähle dein persönliches Erscheinungsbild. Bei Website-Vorgabe gilt das Theme aus Masha:Feedly → Konfiguration; neue Installationen verwenden Verspielt.')),
             CompositeField::create(
                 CheckboxField::create(
                     'MashaFeedlyEmailNotifications',

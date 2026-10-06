@@ -112,6 +112,9 @@ class MashaFeedlyConfigExtensionTest extends SapphireTest
     public function testConfiguredThemeSupportsPlayfulAndSeriousWithPlayfulFallback(): void
     {
         $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
+        $siteConfig->MashaFeedlyTheme = '';
+        $siteConfig->write();
+        $this->assertSame('playful', MashaFeedlyConfigExtension::theme(), 'Eine nicht konfigurierte Website-Vorgabe startet immer verspielt.');
         foreach (['playful', 'serious'] as $theme) {
             $siteConfig->MashaFeedlyTheme = $theme;
             $siteConfig->write();

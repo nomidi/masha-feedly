@@ -17,6 +17,7 @@ use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Forms\CheckboxField;
+use SilverStripe\Forms\DropdownField;
 use SilverStripe\Forms\HiddenField;
 use SilverStripe\AssetAdmin\Forms\UploadField;
 use SilverStripe\Security\Member;
@@ -58,6 +59,11 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $completedField = $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyOnboardingCompleted');
         $this->assertInstanceOf(CheckboxField::class, $completedField);
         $this->assertSame('Einführung abgeschlossen', $completedField->Title());
+        $themeField = $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyTheme');
+        $this->assertInstanceOf(DropdownField::class, $themeField);
+        $this->assertSame('Website-Vorgabe', $themeField->getEmptyString());
+        $this->assertSame('Verspielt – mit Konfetti und Einhorn', $themeField->getSource()['playful']);
+        $this->assertSame('Seriös – sachliche Farben und ruhige Effekte', $themeField->getSource()['serious']);
         $this->assertNull($mainTab->Fields()->dataFieldByName('MashaFeedlyOnboardingCompleted'));
         $profileGroup = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyProfileSettings');
         $this->assertInstanceOf(\SilverStripe\Forms\CompositeField::class, $profileGroup);
@@ -151,6 +157,31 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertTrue((bool)$member->MashaFeedlyNotifyEntryUpdates);
         $this->assertFalse((bool)$member->MashaFeedlyNotifyOwnEntryChanges);
         $this->assertTrue((bool)$member->MashaFeedlyNotifyComments);
+    }
+
+    /** Das persönliche Theme überschreibt die Website-Vorgabe; ungültige Werte fallen sicher zurück. */
+    public function testPersonalThemeUsesWebsiteDefaultAndAllowsIndependentChoices(): void
+    {
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyTheme = 'playful';
+        $config->write();
+        $firstMember = $this->objFromFixture(Member::class, 'allowed');
+        $secondMember = $this->objFromFixture(Member::class, 'notAllowed');
+
+        $this->assertSame('playful', MashaFeedlyMemberExtension::themeFor($firstMember));
+        $this->assertSame('playful', MashaFeedlyMemberExtension::themeFor(null));
+
+        $firstMember->MashaFeedlyTheme = 'serious';
+        $firstMember->write();
+        $secondMember->MashaFeedlyTheme = 'playful';
+        $secondMember->write();
+
+        $this->assertSame('serious', MashaFeedlyMemberExtension::themeFor(Member::get()->byID($firstMember->ID)));
+        $this->assertSame('playful', MashaFeedlyMemberExtension::themeFor(Member::get()->byID($secondMember->ID)));
+
+        $firstMember->MashaFeedlyTheme = 'unexpected';
+        $firstMember->write();
+        $this->assertSame('playful', MashaFeedlyMemberExtension::themeFor(Member::get()->byID($firstMember->ID)));
     }
 
     /** Erneutes Anzeigen setzt den gespeicherten Abschlussstatus zurück. */

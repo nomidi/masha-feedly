@@ -13,6 +13,7 @@ use KW\MashaFeedly\Model\MashaFeedlyMiteTrigger;
  * Ergänzt die SiteConfig um die für Masha Feedly freigegebenen Benutzer.
  *
  * @property string $MashaFeedlyAddress Konfigurierte Anrede im Modul (du oder sie).
+ * @property string $MashaFeedlyTheme Website-Vorgabe für das persönliche Masha-Feedly-Erscheinungsbild.
  * @property string $MashaFeedlyAllowedMemberIDs JSON-Liste freigegebener Mitglieds-IDs.
  * @property bool $MashaFeedlyClosedCategoriesMigrated Kennzeichnet die einmalige Übernahme abgeschlossener Kategorien.
  * @property int $MashaFeedlyMiteProjectID Standardprojekt für den persönlichen Mite-Timer.
@@ -43,6 +44,7 @@ class MashaFeedlyConfigExtension extends Extension
     ];
 
     private static $defaults = [
+        'MashaFeedlyTheme' => 'playful',
         'MashaFeedlyMiteEnabled' => false,
         'MashaFeedlyHourlyRate' => 0,
         'MashaFeedlyEstimateCategoriesSeeded' => false,

@@ -4,7 +4,7 @@ Masha:Feedly is a shared issue and feedback tracker built into your website. Peo
 
 ## Access and setup
 
-Administrators open **Masha:Feedly → Configuration** in the CMS and select who may use the module. Administrators only see the widget when explicitly selected as well. The same screen controls the form of address, font size, appearance, categories, and priorities. The categories for the initial status, completion, and approval are required; their labels can be changed.
+Administrators open **Masha:Feedly → Configuration** in the CMS and select who may use the module. Administrators only see the widget when explicitly selected as well. The same screen controls the form of address, font size, website default appearance, categories, and priorities. The default is **Playful** on new installations. Each approved user can choose a different theme in their own profile. The categories for the initial status, completion, and approval are required; their labels can be changed.
 
 Newly approved users receive a welcome email. On their first visit, an onboarding tour walks them through the key steps. They can stop the tour at any time and restart it from their profile or the help panel.
 
@@ -31,7 +31,7 @@ In the expandable **Relationships** section, link entries as duplicates, themati
 
 ## Profile and notifications
 
-In the Masha:Feedly section of your profile, set your avatar and color, manage each type of email notification, and restart the onboarding tour. You can separately choose emails for new entries, entry updates, comments on entries assigned to you or created by you, due dates, and cost estimate requests. Emails about your own entries and changes are optional and off by default. News in the widget shows activity regardless of email notification settings.
+In the Masha:Feedly section of your profile, set your avatar and color, choose your personal appearance, manage each type of email notification, and restart the onboarding tour. Choose **Website default**, **Playful**, or **Serious**. Administrators set the website default under **Masha:Feedly → Configuration**; new installations use **Playful** by default. You can separately choose emails for new entries, entry updates, comments on entries assigned to you or created by you, due dates, and cost estimate requests. Emails about your own entries and changes are optional and off by default. News in the widget shows activity regardless of email notification settings.
 
 The CMS administrator configured through `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` can use **Send test email** under **Masha:Feedly → Configuration** to check delivery to the email address on their account. If a notification fails, the entry is still saved and the error is written to the PHP error log.
 

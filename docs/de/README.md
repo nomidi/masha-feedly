@@ -4,7 +4,7 @@ Masha:Feedly ist ein gemeinsamer Fehler- und Feedback-Tracker direkt auf der Web
 
 ## Zugang und Einrichtung
 
-Administratoren öffnen im CMS **Masha:Feedly → Konfiguration** und wählen die Personen aus, die das Modul verwenden dürfen. Auch Administratoren sehen das Widget nur, wenn sie ausdrücklich ausgewählt wurden. Im selben Bereich lassen sich Ansprache, Schriftgröße, Erscheinungsbild, Kategorien und Prioritäten einstellen. Die Kategorien für Startstatus, Erledigt und Freigabe sind erforderlich; ihre Namen können angepasst werden.
+Administratoren öffnen im CMS **Masha:Feedly → Konfiguration** und wählen die Personen aus, die das Modul verwenden dürfen. Auch Administratoren sehen das Widget nur, wenn sie ausdrücklich ausgewählt wurden. Im selben Bereich lassen sich Ansprache, Schriftgröße, Website-Vorgabe für das Erscheinungsbild, Kategorien und Prioritäten einstellen. Die Vorgabe ist bei neuen Installationen **Verspielt**. Jede berechtigte Person kann im eigenen Profil ein anderes Theme wählen. Die Kategorien für Startstatus, Erledigt und Freigabe sind erforderlich; ihre Namen können angepasst werden.
 
 Neue berechtigte Personen erhalten eine Willkommens-E-Mail. Beim ersten Besuch führt sie das Onboarding durch die wichtigsten Schritte. Die Einführung lässt sich jederzeit abbrechen und im Profil oder im Hilfefenster erneut starten.
 
@@ -31,7 +31,7 @@ Im aufklappbaren Bereich **Zusammenhänge** kannst du Einträge als Duplikat, th
 
 ## Profil und Benachrichtigungen
 
-Im Masha:Feedly-Bereich deines Profils kannst du Avatarbild und -farbe festlegen, einzelne Arten von E-Mail-Benachrichtigungen verwalten und die Einführung erneut aktivieren. Neue und geänderte Einträge, Kommentare zu Einträgen, für die du zuständig bist oder die du erstellt hast, Fälligkeitstermine und Kostenschätzungen lassen sich getrennt einstellen. E-Mails zu eigenen Meldungen und Änderungen sind optional und standardmäßig ausgeschaltet. Neuigkeiten im Widget zeigen Aktivitäten unabhängig von E-Mail-Benachrichtigungen.
+Im Masha:Feedly-Bereich deines Profils kannst du Avatarbild und -farbe festlegen, dein persönliches Erscheinungsbild wählen, einzelne Arten von E-Mail-Benachrichtigungen verwalten und die Einführung erneut aktivieren. Wähle **Website-Vorgabe**, **Verspielt** oder **Seriös**. Die Website-Vorgabe wird unter **Masha:Feedly → Konfiguration** festgelegt; neue Installationen verwenden standardmäßig **Verspielt**. Neue und geänderte Einträge, Kommentare zu Einträgen, für die du zuständig bist oder die du erstellt hast, Fälligkeitstermine und Kostenschätzungen lassen sich getrennt einstellen. E-Mails zu eigenen Meldungen und Änderungen sind optional und standardmäßig ausgeschaltet. Neuigkeiten im Widget zeigen Aktivitäten unabhängig von E-Mail-Benachrichtigungen.
 
 Der über `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` konfigurierte CMS-Administrator kann unter **Masha:Feedly → Konfiguration** mit **Test-E-Mail senden** den Mailversand an die E-Mail-Adresse seines Kontos prüfen. Schlägt eine Benachrichtigung fehl, wird der Eintrag trotzdem gespeichert; der Fehler steht im PHP-Fehlerprotokoll.
 

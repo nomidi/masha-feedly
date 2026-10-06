@@ -46,6 +46,8 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('Root_MashaFeedly', $body, 'Das Masha:Feedly-Profil erscheint als eigener CMS-Tab.');
         $this->assertStringContainsString('MashaFeedlyIconImage', $body, 'Freigegebene Mitglieder können ihr Profilbild/Icon hochladen.');
         $this->assertStringContainsString('MashaFeedlyColor', $body, 'Freigegebene Mitglieder können eine Avatarfarbe wählen.');
+        $this->assertStringContainsString('name="MashaFeedlyTheme"', $body, 'Freigegebene Mitglieder können ihr persönliches Theme einstellen.');
+        $this->assertStringContainsString('Website-Vorgabe', $body);
         $this->assertStringContainsString('masha-feedly-color-palette__grid', $body, 'Die Farbauswahl wird auf der Profilseite gerendert.');
     }
 
@@ -127,7 +129,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('Offene Fehler auf dieser Seite ansehen', $allowedResponse->getBody());
         $this->assertStringContainsString('Der Globus zeigt offene Fehler auf der gesamten Website', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-open-closed', $allowedResponse->getBody());
-        $this->assertStringContainsString('data-masha-feedly-open-closed aria-label=', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertStringContainsString('data-masha-feedly-open-closed data-has-closed="false" hidden aria-label=', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertLessThan(strpos($this->widgetMarkup($allowedResponse->getBody()), 'data-masha-feedly-open-closed'), strpos($this->widgetMarkup($allowedResponse->getBody()), 'data-masha-feedly-open-feedback'));
         $this->assertStringContainsString('aria-label="Abgeschlossene Einträge ansehen"', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('<span class="kw-masha-feedly__sr-only">abgeschlossene Einträge</span>', $this->widgetMarkup($allowedResponse->getBody()));
@@ -135,7 +137,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('viewBox="0 0 177800 177800"', $this->widgetMarkup($allowedResponse->getBody()));
         $widgetMarkup = $this->widgetMarkup($allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-open-feedback data-tooltip=', $widgetMarkup);
-        $this->assertStringContainsString('data-masha-feedly-open-closed aria-label="Abgeschlossene Einträge ansehen" data-tooltip=', $widgetMarkup);
+        $this->assertStringContainsString('data-masha-feedly-open-closed data-has-closed="false" hidden aria-label="Abgeschlossene Einträge ansehen" data-tooltip=', $widgetMarkup);
         $this->assertDoesNotMatchRegularExpression('/data-masha-feedly-open-(?:news|feedback|closed)[^>]*\stitle=/', $widgetMarkup);
         $this->assertStringContainsString('data-masha-feedly-closed-count', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-list-mode', $allowedResponse->getBody());
@@ -179,6 +181,9 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         }
         $this->assertStringContainsString('data-onboarding-enabled="1"', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-onboarding-welcome', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertStringContainsString('Das Erscheinungsbild kannst du später in deinen Masha:Feedly-Profileinstellungen ändern.', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertMatchesRegularExpression('/Theme einstellen[^<]*<\/a>/', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertMatchesRegularExpression('/data-masha-feedly-onboarding-welcome[\s\S]*?data-masha-feedly-profile-link href="[^"]*myprofile[^"]*#Root_MashaFeedly/i', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-onboarding-thanks', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertMatchesRegularExpression('/data-masha-feedly-profile-link href="[^"]*myprofile[^\"]*#Root_MashaFeedly/i', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('E-Mail-Benachrichtigungen zu Kommentaren einrichten', $allowedResponse->getBody());
@@ -242,6 +247,33 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertSame(200, $restrictedResponse->getStatusCode());
         $this->assertStringNotContainsString('window.KWMashaFeedlyWidgetMarkup', $restrictedResponse->getBody());
         $this->assertStringNotContainsString('data-masha-feedly-start-selection', $restrictedResponse->getBody());
+    }
+
+    /** Jedes freigegebene Mitglied erhält sein persönliches Theme; ohne Auswahl gilt verspielt. */
+    public function testWidgetUsesIndependentPersonalThemesAndPlayfulDefault(): void
+    {
+        $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
+        $page->publishRecursive();
+        $firstMember = $this->objFromFixture(Member::class, 'allowed');
+        $secondMember = $this->objFromFixture(Member::class, 'notAllowed');
+        $firstMember->MashaFeedlyTheme = 'serious';
+        $firstMember->write();
+        $secondMember->MashaFeedlyTheme = '';
+        $secondMember->write();
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$firstMember->ID, (int)$secondMember->ID]);
+        $config->MashaFeedlyTheme = 'playful';
+        $config->write();
+
+        $this->logInAs($firstMember);
+        $firstResponse = $this->get('/masha-feedly-widget-test');
+        $this->assertSame(200, $firstResponse->getStatusCode());
+        $this->assertStringContainsString('data-theme="serious"', $this->widgetMarkup($firstResponse->getBody()));
+
+        $this->logInAs($secondMember);
+        $secondResponse = $this->get('/masha-feedly-widget-test');
+        $this->assertSame(200, $secondResponse->getStatusCode());
+        $this->assertStringContainsString('data-theme="playful"', $this->widgetMarkup($secondResponse->getBody()));
     }
 
     /** Auch anonyme Websitebesuche starten im Besuchsmodus höchstens eine Prüfung pro Kalendertag. */
