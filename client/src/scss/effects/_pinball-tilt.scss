@@ -1,4 +1,9 @@
-/* Flipper-Tilt im 80er-Arcade-Stil */
+/* Bildschirmrütteln beim Pinball-Tilt */
+html.kw-masha-feedly__pinball-viewport-shake {
+  animation: kw-masha-feedly-pinball-viewport-shake 1.8s cubic-bezier(.36, .07, .19, .97) both;
+  transform-origin: center;
+}
+
 .kw-masha-feedly__pinball-tilt {
   position: fixed;
   z-index: 10039;
@@ -7,173 +12,82 @@
   place-items: center;
   overflow: hidden;
   pointer-events: none;
-  animation: kw-masha-feedly-pinball-screen-shake 5.4s ease-out both;
 }
 
-.kw-masha-feedly__pinball-machine {
-  position: relative;
-  display: block;
-  width: min(27rem, 84vw);
-  height: min(76vh, 44rem);
-  overflow: hidden;
-  border: .8rem solid #ffbd38;
-  border-radius: 2rem 2rem 2.8rem 2.8rem;
-  background: radial-gradient(ellipse at 50% 35%, #ff459d44 0 4%, transparent 44%), linear-gradient(165deg, #1c347b, #29115a 55%, #101942);
-  box-shadow: 0 0 0 .35rem #f44b81, 0 0 2.8rem #34eaffd1, inset 0 0 2rem #65eaff66, 0 1rem 0 #65246a;
-  transform: perspective(45rem) rotateX(5deg);
-  animation: kw-masha-feedly-pinball-machine-tilt 5.2s cubic-bezier(.36, .07, .19, .97) both;
-}
-
-.kw-masha-feedly__pinball-machine::before {
+.kw-masha-feedly__pinball-tilt::before {
   position: absolute;
-  inset: 17% 7% 12%;
-  border: 3px solid #71efffbd;
-  border-radius: 46% 46% 1.1rem 1.1rem;
-  background: repeating-linear-gradient(165deg, transparent 0 2.3rem, #62e9ff30 2.35rem 2.5rem);
-  box-shadow: inset 0 0 1.6rem #3be6ff3d;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, #ff36711a 0 2px, transparent 2px 6px);
   content: '';
+  opacity: 0;
+  animation: kw-masha-feedly-pinball-flash 1.8s steps(1, end) both;
 }
-
-.kw-masha-feedly__pinball-title {
-  position: absolute;
-  z-index: 2;
-  top: 4%;
-  left: 0;
-  width: 100%;
-  color: #ffe76d;
-  font: 1000 1.45rem/1 system-ui, sans-serif;
-  letter-spacing: .12em;
-  text-align: center;
-  text-shadow: 2px 3px #f53a91, 0 0 1rem #ffae36;
-}
-
-.kw-masha-feedly__pinball-bumper {
-  position: absolute;
-  z-index: 2;
-  display: grid;
-  width: 4rem;
-  aspect-ratio: 1;
-  place-items: center;
-  border: .35rem solid #ffdc4d;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff 0 8%, #ff70b5 13% 28%, #852be8 62%, #291759 100%);
-  box-shadow: 0 0 .55rem .2rem #ff47b8, inset 0 0 .5rem #fff;
-  color: #fff578;
-  font-size: 1.35rem;
-  animation: kw-masha-feedly-bumper-flash .75s steps(2, end) infinite alternate;
-}
-
-.kw-masha-feedly__pinball-bumper--one { top: 23%; left: 12%; }
-.kw-masha-feedly__pinball-bumper--two { top: 32%; right: 11%; animation-delay: .18s; }
-.kw-masha-feedly__pinball-bumper--three { top: 48%; left: 38%; animation-delay: .34s; }
-
-.kw-masha-feedly__pinball-ball {
-  position: absolute;
-  z-index: 3;
-  top: 21%;
-  left: 45%;
-  width: 1.45rem;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: radial-gradient(circle at 30% 25%, #fff 0 8%, #dffbff 18%, #76e9ff 48%, #2990d7 100%);
-  box-shadow: 0 0 .7rem .2rem #71edff;
-  animation: kw-masha-feedly-pinball-roll 2.45s cubic-bezier(.45, 0, .55, 1) .3s infinite;
-}
-
-.kw-masha-feedly__pinball-flipper {
-  position: absolute;
-  z-index: 3;
-  bottom: 13%;
-  width: 5rem;
-  height: 1rem;
-  border: 2px solid #fff37c;
-  border-radius: 1rem;
-  background: linear-gradient(90deg, #ff4c9a, #ffb42e);
-  box-shadow: 0 0 .7rem #ff5cab;
-  transform-origin: 100% 50%;
-  animation: kw-masha-feedly-flipper-left-hit .7s ease-in-out 2.55s infinite;
-}
-
-.kw-masha-feedly__pinball-flipper--left { left: 19%; }
-.kw-masha-feedly__pinball-flipper--right { right: 19%; transform-origin: 0 50%; animation-name: kw-masha-feedly-flipper-right-hit; animation-delay: 2.68s; }
 
 .kw-masha-feedly__pinball-tilt-word {
-  position: absolute;
-  z-index: 4;
-  top: 53%;
-  left: 50%;
-  padding: .2em .32em;
-  border: .18rem solid #fff;
-  background: #f52e72;
-  box-shadow: 0 0 1.4rem #ff3d9d, 0 .3rem 0 #8e174f;
+  position: relative;
+  z-index: 2;
+  padding: .16em .35em .22em;
+  border: .2rem solid #fff;
+  background: #ed176c;
+  box-shadow: .16rem .2rem 0 #641343, 0 0 1.6rem #ff3d9d;
   color: #fff;
-  font: 1000 clamp(2rem, 8vw, 3.4rem)/1 system-ui, sans-serif;
-  letter-spacing: .04em;
+  font: 1000 clamp(4rem, 18vw, 13rem)/.9 system-ui, sans-serif;
+  letter-spacing: .045em;
   opacity: 0;
-  transform: translate(-50%, -50%) rotate(-8deg) scale(.25);
-  animation: kw-masha-feedly-tilt-warning 2.1s steps(2, end) 3.2s both;
+  text-shadow: .08em .07em 0 #542274;
+  transform: rotate(-9deg) scale(.3);
+  animation: kw-masha-feedly-pinball-warning 1.8s cubic-bezier(.16, .8, .25, 1) both;
 }
 
 .kw-masha-feedly__pinball-light {
   position: absolute;
-  z-index: 5;
+  z-index: 1;
   top: var(--light-y);
-  left: 4%;
-  width: .55rem;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  background: #ffe75b;
-  box-shadow: 0 0 .65rem .2rem #ffcb45;
-  animation: kw-masha-feedly-pinball-light .4s steps(2, end) var(--light-delay) infinite alternate;
+  left: var(--light-x);
+  width: clamp(1rem, 3vw, 2.4rem);
+  height: .22rem;
+  border-radius: 1rem;
+  background: #ffe94e;
+  box-shadow: 0 0 .8rem .25rem #ffb82f;
+  opacity: 0;
+  transform: rotate(-24deg) scaleX(.2);
+  animation: kw-masha-feedly-pinball-spark .65s ease-out var(--light-delay) both;
 }
 
-.kw-masha-feedly__pinball-light:nth-of-type(even) { right: 4%; left: auto; background: #59f0ff; box-shadow: 0 0 .65rem .2rem #36dfff; }
-
-@keyframes kw-masha-feedly-pinball-screen-shake {
-  0%, 54%, 100% { transform: translate(0, 0); }
-  56%, 60%, 64%, 68%, 72%, 76%, 80%, 84% { transform: translate(-.18rem, .12rem); }
-  58%, 62%, 66%, 70%, 74%, 78%, 82%, 86% { transform: translate(.2rem, -.14rem); }
+.kw-masha-feedly__pinball-light:nth-of-type(even) {
+  background: #58f4ff;
+  box-shadow: 0 0 .8rem .25rem #27d9ff;
+  transform: rotate(24deg) scaleX(.2);
 }
 
-@keyframes kw-masha-feedly-pinball-machine-tilt {
-  0%, 8%, 18%, 28%, 38%, 50%, 100% { transform: perspective(45rem) rotateX(5deg) translate(0, 0) rotate(0); }
-  10%, 32%, 42% { transform: perspective(45rem) rotateX(5deg) translate(-.65rem, .28rem) rotate(-2deg); }
-  14%, 35%, 46% { transform: perspective(45rem) rotateX(5deg) translate(.7rem, -.24rem) rotate(2.2deg); }
-  22%, 44% { transform: perspective(45rem) rotateX(5deg) translate(.35rem, .36rem) rotate(1deg); }
+@keyframes kw-masha-feedly-pinball-viewport-shake {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0); }
+  4%, 20%, 36%, 52%, 68%, 84% { transform: translate3d(-9px, 4px, 0) rotate(-.35deg); }
+  8%, 24%, 40%, 56%, 72%, 88% { transform: translate3d(10px, -5px, 0) rotate(.4deg); }
+  12%, 28%, 44%, 60%, 76%, 92% { transform: translate3d(-6px, -3px, 0) rotate(-.25deg); }
+  16%, 32%, 48%, 64%, 80%, 96% { transform: translate3d(7px, 3px, 0) rotate(.3deg); }
 }
 
-@keyframes kw-masha-feedly-pinball-roll {
-  0% { transform: translate(0, 0); }
-  18% { transform: translate(4rem, 5rem); }
-  34% { transform: translate(-4rem, 8rem); }
-  49% { transform: translate(3.2rem, 12rem); }
-  64% { transform: translate(-3.8rem, 16rem); }
-  78% { transform: translate(2rem, 20rem); }
-  100% { transform: translate(0, 0); }
+@keyframes kw-masha-feedly-pinball-flash {
+  0%, 100% { opacity: 0; }
+  8%, 17%, 28%, 38%, 49%, 59% { opacity: .72; }
+  12%, 23%, 33%, 44%, 54%, 64% { opacity: .12; }
 }
 
-@keyframes kw-masha-feedly-bumper-flash {
-  from { filter: brightness(.85); }
-  to { filter: brightness(1.7); }
+@keyframes kw-masha-feedly-pinball-warning {
+  0%, 100% { opacity: 0; transform: rotate(-9deg) scale(.3); }
+  12% { opacity: 1; transform: rotate(6deg) scale(1.12); }
+  20%, 57% { opacity: 1; transform: rotate(-4deg) scale(1); }
+  67% { opacity: .8; transform: rotate(4deg) scale(1.05); }
 }
 
-@keyframes kw-masha-feedly-flipper-left-hit {
-  0%, 72%, 100% { transform: rotate(0); }
-  24%, 45% { transform: rotate(-35deg); }
-}
-
-@keyframes kw-masha-feedly-flipper-right-hit {
-  0%, 72%, 100% { transform: rotate(0); }
-  24%, 45% { transform: rotate(35deg); }
-}
-
-@keyframes kw-masha-feedly-tilt-warning {
-  0% { opacity: 0; transform: translate(-50%, -50%) rotate(-8deg) scale(.25); }
-  18%, 64% { opacity: 1; transform: translate(-50%, -50%) rotate(5deg) scale(1.08); }
-  34%, 82% { opacity: .25; }
-  100% { opacity: 0; transform: translate(-50%, -50%) rotate(-3deg) scale(.92); }
+@keyframes kw-masha-feedly-pinball-spark {
+  0% { opacity: 0; transform: rotate(-24deg) scaleX(.2); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(-24deg) scaleX(2.8); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .kw-masha-feedly__pinball-tilt, .kw-masha-feedly__pinball-machine, .kw-masha-feedly__pinball-bumper, .kw-masha-feedly__pinball-ball, .kw-masha-feedly__pinball-flipper, .kw-masha-feedly__pinball-tilt-word, .kw-masha-feedly__pinball-light { animation: none; opacity: 0; }
+  html.kw-masha-feedly__pinball-viewport-shake { animation: none; }
+  .kw-masha-feedly__pinball-tilt::before, .kw-masha-feedly__pinball-tilt-word, .kw-masha-feedly__pinball-light { animation: none; opacity: 0; }
 }

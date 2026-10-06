@@ -1118,17 +1118,19 @@ test('bringt den Flower-Power-Sonnenkreis und acht tanzende Blumen zum Leuchten'
   assert.equal(modules.flowerPower.play(document, { matchMedia: () => ({ matches: true }) }), null);
 });
 
-test('zeigt das wackelnde Flipper-Spielfeld mit Bumpern, Flippern und Tilt-Warnung', () => {
+test('rüttelt die Browseransicht und blendet die Tilt-Warnung ein', () => {
   const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
   let cleanup;
+  const rootClasses = new Set();
   const document = {
+    documentElement: { classList: { add(name) { rootClasses.add(name); }, remove(name) { rootClasses.delete(name); } } },
     body: { append(item) { this.layer = item; } },
     createElement(tagName) {
       if (tagName === 'div') return layer;
       return { style: { setProperty(name, value) { this[name] = value; } } };
     },
   };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 5600); } };
+  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 2100); } };
   const modules = {};
   vm.runInNewContext(effectSources[13], { window: { KWMashaFeedlyEffectModules: modules } });
 
@@ -1137,18 +1139,20 @@ test('zeigt das wackelnde Flipper-Spielfeld mit Bumpern, Flippern und Tilt-Warnu
   assert.equal(layer.className, 'kw-masha-feedly__pinball-tilt');
   assert.equal(layer['aria-hidden'], 'true');
   assert.equal(layer.children.length, 13);
-  assert.equal(layer.children[0].className, 'kw-masha-feedly__pinball-machine');
-  assert.match(layer.children[0].innerHTML, /kw-masha-feedly__pinball-ball/);
-  assert.match(layer.children[0].innerHTML, /kw-masha-feedly__pinball-tilt-word/);
+  assert.equal(layer.children[0].className, 'kw-masha-feedly__pinball-tilt-word');
+  assert.equal(layer.children[0].textContent, 'TILT!');
+  assert.ok(rootClasses.has('kw-masha-feedly__pinball-viewport-shake'));
   assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__pinball-light').length, 12);
   cleanup();
   assert.equal(layer.removed, true);
+  assert.equal(rootClasses.has('kw-masha-feedly__pinball-viewport-shake'), false);
   assert.equal(modules.pinballTilt.play(document, { matchMedia: () => ({ matches: true }) }), null);
 });
 
 test('wählt theme-basiert zwischen Einhorn, Rakete, Herzen, Arcade, Retro, Dino, Gummienten, Fröschen, Icon-Schauer, Geisterschwarm, Zaubertrank, Katzenpfoten, Flower Power und Pinball Tilt', () => {
   const layers = [];
   const document = {
+    documentElement: { classList: { add() {}, remove() {} } },
     body: { append(layer) { layers.push(layer); } },
     createElement(tagName) {
       return tagName === 'div'
@@ -1825,6 +1829,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
   widget.querySelectorAll = () => [];
   const document = {
     body: new Element(),
+    documentElement: { classList: { add() {}, remove() {} } },
     addEventListener(name, callback) { listeners[name] = callback; },
     dispatchEvent(event) { dispatchedEvents.push(event.type); },
     querySelector(selector) {
