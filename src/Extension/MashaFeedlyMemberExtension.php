@@ -172,6 +172,21 @@ class MashaFeedlyMemberExtension extends Extension
     /** Aktiviert die Einführung erneut, wenn das Profil die Wiederholung anfordert. */
     protected function onBeforeWrite(): void
     {
+        if (!MashaFeedlyConfigExtension::emailTestSucceeded()) {
+            $notificationFields = [
+                'MashaFeedlyEmailNotifications',
+                'MashaFeedlyNotifyNewEntries',
+                'MashaFeedlyNotifyEntryUpdates',
+                'MashaFeedlyNotifyOwnEntryChanges',
+                'MashaFeedlyNotifyComments',
+                'MashaFeedlyNotifyDueDateReminders',
+                'MashaFeedlyNotifyCostEstimates',
+            ];
+            $persisted = $this->owner->isInDB() ? Member::get()->byID((int)$this->owner->ID) : null;
+            foreach ($notificationFields as $field) {
+                $this->owner->$field = $persisted ? (bool)$persisted->$field : false;
+            }
+        }
         if (!MashaFeedlyEntry::canManageReporter(Security::getCurrentUser())) {
             $persisted = $this->owner->isInDB() ? Member::get()->byID((int)$this->owner->ID) : null;
             $this->owner->MashaFeedlyCanManageEstimates = $persisted
@@ -238,6 +253,7 @@ class MashaFeedlyMemberExtension extends Extension
         ]);
 
         $currentUser = Security::getCurrentUser();
+        $emailTestSucceeded = MashaFeedlyConfigExtension::emailTestSucceeded();
         $isEstimateManager = MashaFeedlyEntry::canManageReporter($currentUser);
         if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($currentUser) && !$isEstimateManager) {
             return;
@@ -288,6 +304,12 @@ class MashaFeedlyMemberExtension extends Extension
             self::translate('PROFILE_NOTIFY_ENTRY_UPDATES', 'Bei Änderungen an Einträgen benachrichtigen')
         )->setDescription(self::translate('PROFILE_NOTIFY_ENTRY_UPDATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn sich Status, Beschreibung, Zuständigkeit oder andere Eintragsdetails ändern. Für eigene Änderungen gilt zusätzlich die separate Option für eigene Einträge.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
 
+        if (!$emailTestSucceeded) {
+            foreach ([$newEntries, $entryUpdates, $ownEntryUpdates, $comments, $dueDateReminders, $costEstimates] as $field) {
+                $field->setDisabled(true);
+            }
+        }
+
         $fields->addFieldsToTab('Root.MashaFeedly', [
             LiteralField::create(
                 'MashaFeedlyPreferencesIntro',
@@ -323,7 +345,10 @@ class MashaFeedlyMemberExtension extends Extension
                 CheckboxField::create(
                     'MashaFeedlyEmailNotifications',
                     self::translate('PROFILE_EMAIL_NOTIFICATIONS', 'E-Mail-Benachrichtigungen von Masha:Feedly erhalten')
-                )->setDescription(self::translate('PROFILE_EMAIL_DESCRIPTION', 'Wenn diese Hauptoption eingeschaltet ist, erhältst du die unten ausgewählten E-Mails. Du kannst einzelne Arten oder alle Benachrichtigungen jederzeit ausschalten.')),
+                )->setDescription($emailTestSucceeded
+                    ? self::translate('PROFILE_EMAIL_DESCRIPTION', 'Wenn diese Hauptoption eingeschaltet ist, erhältst du die unten ausgewählten E-Mails. Du kannst einzelne Arten oder alle Benachrichtigungen jederzeit ausschalten.')
+                    : self::translate('PROFILE_EMAIL_TEST_REQUIRED', 'E-Mail-Einstellungen sind gesperrt. Ein Masha:Feedly-Administrator muss zuerst unter Masha:Feedly → Konfiguration eine Test-E-Mail erfolgreich versenden.'))
+                    ->setDisabled(!$emailTestSucceeded),
                 $newEntries,
                 $entryUpdates,
                 $ownEntryUpdates,

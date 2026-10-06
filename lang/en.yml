@@ -581,6 +581,7 @@ en:
     PROFILE_AVATAR: 'Profile and avatar'
     PROFILE_EMAIL_NOTIFICATIONS: 'Receive Masha:Feedly email notifications'
     PROFILE_EMAIL_DESCRIPTION: 'When this main option is on, you receive the email types selected below. You can turn off individual types or all notifications at any time.'
+    PROFILE_EMAIL_TEST_REQUIRED: 'Email settings are locked. A Masha:Feedly administrator must first send a test email successfully under Masha:Feedly → Configuration.'
     PROFILE_EMAIL_SETTINGS: 'Email notifications'
     PROFILE_SHOW_ONBOARDING: 'Show tour again'
     PROFILE_SHOW_ONBOARDING_DESCRIPTION: 'Enable this to see the step-by-step tour again on your next visit.'

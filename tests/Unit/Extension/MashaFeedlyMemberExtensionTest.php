@@ -44,6 +44,9 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
     /** Prüft, dass freigegebene Mitglieder die Einstellungen im Profilformular sehen. */
     public function testAllowedMemberSeesEmailPreferencesInProfile(): void
     {
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
         $member = $this->objFromFixture(Member::class, 'allowed');
         $this->allowMember($member);
         $this->logInAs($member);
@@ -125,6 +128,45 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertStringContainsString('selbst erstellst oder änderst', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyOwnEntryChanges')->getDescription());
         $this->assertStringContainsString('oder den du erstellt hast', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyComments')->getDescription());
         $this->assertStringContainsString('Status, Beschreibung, Zuständigkeit', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyEntryUpdates')->getDescription());
+    }
+
+    /** Sperrt Profilfelder und Änderungen, bis ein Testversand erfolgreich war. */
+    public function testEmailPreferencesStayLockedUntilSuccessfulTest(): void
+    {
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailTestSucceeded = false;
+        $config->write();
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($member);
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
+        $member->MashaFeedlyEmailNotifications = true;
+        $member->MashaFeedlyNotifyNewEntries = true;
+        $member->write();
+        $config->MashaFeedlyEmailTestSucceeded = false;
+        $config->write();
+        $this->logInAs($member);
+
+        $fields = $member->getCMSFields();
+        $emailGroup = $fields->findTab('Root.MashaFeedly')->Fields()->fieldByName('MashaFeedlyEmailSettings');
+        $mainPreference = $emailGroup->getChildren()->dataFieldByName('MashaFeedlyEmailNotifications');
+        $newEntries = $emailGroup->getChildren()->dataFieldByName('MashaFeedlyNotifyNewEntries');
+        $this->assertTrue($mainPreference->isDisabled());
+        $this->assertTrue($newEntries->isDisabled());
+        $this->assertStringContainsString('Test-E-Mail erfolgreich versenden', $mainPreference->getDescription());
+
+        $member->MashaFeedlyEmailNotifications = false;
+        $member->MashaFeedlyNotifyNewEntries = false;
+        $member->write();
+        $reloaded = Member::get()->byID((int)$member->ID);
+        $this->assertTrue((bool)$reloaded->MashaFeedlyEmailNotifications);
+        $this->assertTrue((bool)$reloaded->MashaFeedlyNotifyNewEntries);
+
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
+        $fields = $reloaded->getCMSFields();
+        $enabledGroup = $fields->findTab('Root.MashaFeedly')->Fields()->fieldByName('MashaFeedlyEmailSettings');
+        $this->assertFalse($enabledGroup->getChildren()->dataFieldByName('MashaFeedlyEmailNotifications')->isDisabled());
     }
 
     /** Prüft, dass Mitglieder ohne Freigabe keine Masha-Feedly-Einstellungen im Profil sehen. */

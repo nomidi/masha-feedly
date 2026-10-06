@@ -581,6 +581,7 @@ de:
     PROFILE_AVATAR: 'Profil und Avatar'
     PROFILE_EMAIL_NOTIFICATIONS: 'E-Mail-Benachrichtigungen von Masha:Feedly erhalten'
     PROFILE_EMAIL_DESCRIPTION: 'Wenn diese Hauptoption eingeschaltet ist, erhältst du die unten ausgewählten E-Mails. Du kannst einzelne Arten oder alle Benachrichtigungen jederzeit ausschalten.'
+    PROFILE_EMAIL_TEST_REQUIRED: 'E-Mail-Einstellungen sind gesperrt. Ein Masha:Feedly-Administrator muss zuerst unter Masha:Feedly → Konfiguration eine Test-E-Mail erfolgreich versenden.'
     PROFILE_EMAIL_SETTINGS: 'E-Mail-Benachrichtigungen'
     PROFILE_SHOW_ONBOARDING: 'Einführung erneut anzeigen'
     PROFILE_SHOW_ONBOARDING_DESCRIPTION: 'Aktiviere diese Option, wenn du die Schritt-für-Schritt-Einführung beim nächsten Besuch noch einmal sehen möchtest.'

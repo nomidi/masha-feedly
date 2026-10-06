@@ -6,6 +6,8 @@ use SilverStripe\Core\Extension;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\SiteConfig\SiteConfig;
+use SilverStripe\ORM\DB;
+use SilverStripe\ORM\Connect\DatabaseException;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
 use KW\MashaFeedly\Model\MashaFeedlyMiteTrigger;
 
@@ -16,6 +18,7 @@ use KW\MashaFeedly\Model\MashaFeedlyMiteTrigger;
  * @property string $MashaFeedlyTheme Website-Vorgabe für das persönliche Masha-Feedly-Erscheinungsbild.
  * @property string $MashaFeedlyAllowedMemberIDs JSON-Liste freigegebener Mitglieds-IDs.
  * @property bool $MashaFeedlyClosedCategoriesMigrated Kennzeichnet die einmalige Übernahme abgeschlossener Kategorien.
+ * @property bool $MashaFeedlyEmailTestSucceeded Kennzeichnet einen erfolgreichen globalen E-Mail-Test.
  * @property int $MashaFeedlyMiteProjectID Standardprojekt für den persönlichen Mite-Timer.
  * @property bool $MashaFeedlyMiteEnabled Aktiviert die Mite-Timerfunktion für diese Website.
  * @method \SilverStripe\ORM\HasManyList<MashaFeedlyMiteTrigger> MashaFeedlyMiteTriggers() Auslösende Statuskategorien.
@@ -41,6 +44,7 @@ class MashaFeedlyConfigExtension extends Extension
         'MashaFeedlyEstimateCategoriesSeeded' => 'Boolean',
         'MashaFeedlyDueDateReminderLastRunDate' => 'Date',
         'MashaFeedlyClosedCategoriesMigrated' => 'Boolean',
+        'MashaFeedlyEmailTestSucceeded' => 'Boolean',
     ];
 
     private static $defaults = [
@@ -64,6 +68,22 @@ class MashaFeedlyConfigExtension extends Extension
     public static function miteEnabled(): bool
     {
         return (bool)self::currentSiteConfig()->MashaFeedlyMiteEnabled;
+    }
+
+    /** Prüft, ob der globale E-Mail-Versand bereits erfolgreich getestet wurde. */
+    public static function emailTestSucceeded(): bool
+    {
+        // requireDefaultRecords kann während dev/build vor dem Schema-Update laufen.
+        if (!DB::get_schema()->hasField('SiteConfig', 'MashaFeedlyEmailTestSucceeded')) {
+            return false;
+        }
+
+        try {
+            return (bool)self::currentSiteConfig()->MashaFeedlyEmailTestSucceeded;
+        } catch (DatabaseException) {
+            // Während eines laufenden dev/build kann die neue Spalte noch fehlen.
+            return false;
+        }
     }
 
     /** @return int[] IDs der für den Timerdialog konfigurierten Statuskategorien. */

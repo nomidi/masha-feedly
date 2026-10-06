@@ -29,6 +29,8 @@ class MashaFeedlyConfigExtensionTest extends SapphireTest
         $this->assertArrayHasKey('MashaFeedlyFontSize', $fields);
         $this->assertArrayHasKey('MashaFeedlyDueDateReminderMode', $fields);
         $this->assertArrayHasKey('MashaFeedlyDueDateReminderLastRunDate', $fields);
+        $this->assertArrayHasKey('MashaFeedlyEmailTestSucceeded', $fields);
+        $this->assertFalse(MashaFeedlyConfigExtension::emailTestSucceeded());
 
         // Eine echte ORM-Abfrage deckt fehlende Spalten auf, die eine reine Config-Prüfung übersieht.
         $siteConfig = SiteConfig::create();

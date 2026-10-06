@@ -1291,6 +1291,9 @@ class MashaFeedlyAdmin extends ModelAdmin
         }
         try {
             MashaFeedlyNotificationService::sendTestEmail($member);
+            $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
+            $siteConfig->MashaFeedlyEmailTestSucceeded = true;
+            $siteConfig->write();
             $form->sessionMessage(self::translate('CONFIG_TEST_EMAIL_SENT', 'Test-E-Mail wurde an {email} gesendet.', ['email' => (string)$member->Email]), 'good');
         } catch (\Throwable $exception) {
             error_log('[Masha:Feedly] Test-E-Mail fehlgeschlagen (' . get_class($exception) . '): ' . $exception->getMessage());

@@ -635,6 +635,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     /** CMS-Administratoren können die konfigurierte Mailstrecke aus der Modulkonfiguration testen. */
     public function testConfigurationCanSendTestEmailToCurrentAdmin(): void
     {
+        $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
+        $siteConfig->MashaFeedlyEmailTestSucceeded = false;
+        $siteConfig->write();
         $this->logInWithPermission('ADMIN');
         $admin = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $admin);
@@ -660,6 +663,16 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $originalMailer = $injector->get(MailerInterface::class);
         $injector->registerService($mailer, MailerInterface::class);
         try {
+            $mailer->failure = new \RuntimeException('Simulierter SMTP-Ausfall vor dem ersten erfolgreichen Versand.');
+            $initialFailure = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'action_sendTestEmail' => 'Test-E-Mail senden',
+            ]);
+            $this->assertSame(200, $initialFailure->getStatusCode());
+            $this->assertFalse(MashaFeedlyConfigExtension::emailTestSucceeded());
+            $this->assertCount(0, $mailer->messages);
+
+            $mailer->failure = null;
             $sent = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
                 'SecurityID' => SecurityToken::getSecurityID(),
                 'action_sendTestEmail' => 'Test-E-Mail senden',
@@ -669,6 +682,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             $this->assertCount(1, $mailer->messages);
             $this->assertSame((string)$admin->Email, $mailer->messages[0]->getTo()[0]->getAddress());
             $this->assertSame('Masha:Feedly – Test-E-Mail', $mailer->messages[0]->getSubject());
+            $this->assertTrue(MashaFeedlyConfigExtension::emailTestSucceeded());
 
             $mailer->failure = new \RuntimeException('Simulierter SMTP-Ausfall.');
             $failed = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
@@ -678,6 +692,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             $this->assertSame(200, $failed->getStatusCode());
             $this->assertStringContainsString('Test-E-Mail konnte nicht gesendet werden', $failed->getBody());
             $this->assertCount(1, $mailer->messages);
+            $this->assertTrue(MashaFeedlyConfigExtension::emailTestSucceeded());
         } finally {
             $injector->registerService($originalMailer, MailerInterface::class);
         }
