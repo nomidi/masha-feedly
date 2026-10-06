@@ -277,6 +277,7 @@ en:
     CREATE_SAVE_ERROR: 'Could not save entry.'
     EDIT_SAVING: 'Saving changes …'
     EDIT_SAVE_ERROR: 'Could not save changes.'
+    EDIT_UNCLEAR_RESULT_ERROR: 'The connection was interrupted or the server returned an unexpected response. It is unclear whether the changes were saved. Reload the entry list before trying again.'
     SAVE_CONFIRMED_DISPLAY_ERROR: 'Saved. The display could not be updated. Please reload the entry list.'
     MEMBER_FALLBACK: 'Member'
     UNKNOWN_BROWSER: 'Unknown browser'

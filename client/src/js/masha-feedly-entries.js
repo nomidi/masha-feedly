@@ -1761,8 +1761,19 @@ document.addEventListener('DOMContentLoaded', () => {
     data.set('SecurityID', editForm.dataset.securityId);
     let saveConfirmed = false;
     try {
-      const response = await fetch(editForm.dataset.updateUrl, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: data });
-      const result = await response.json();
+      let response;
+      try {
+        response = await fetch(editForm.dataset.updateUrl, { method: 'POST', credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: data });
+      } catch (_) {
+        throw new Error(t('EDIT_UNCLEAR_RESULT_ERROR'));
+      }
+      let result;
+      try {
+        result = await response.json();
+      } catch (_) {
+        throw new Error(t('EDIT_UNCLEAR_RESULT_ERROR'));
+      }
+      if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error(t('EDIT_UNCLEAR_RESULT_ERROR'));
       if (!response.ok || !result.success) throw new Error(result.message || t('EDIT_SAVE_ERROR'));
       saveConfirmed = true;
       editStatus.textContent = result.message;

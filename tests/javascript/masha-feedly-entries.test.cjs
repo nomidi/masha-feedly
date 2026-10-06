@@ -67,6 +67,7 @@ const messages = {
   SUCCESS_PAGE_MESSAGE: 'Auf dieser Seite gibt es derzeit keine offenen Einträge.',
   SUCCESS_EMPTY_PAGE_MESSAGE: 'Für diese Seite wurden noch keine Einträge erfasst.',
   EDIT_SAVING: 'Änderungen werden gespeichert …', EDIT_SAVE_ERROR: 'Änderungen konnten nicht gespeichert werden.',
+  EDIT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderungen gespeichert wurden, ist unklar. Bitte lade die Eintragsliste neu, bevor du es erneut versuchst.',
   SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Eintragsliste neu.',
   COMMENT_SAVING: 'Kommentar wird gesendet …',
   COMMENT_SAVED: 'Kommentar gesendet.',
@@ -2731,6 +2732,55 @@ test('zeigt serverseitig abgelehnte Anhänge beim Bearbeiten an und hält den Di
   assert.equal(env.editModal.hidden, false);
   assert.equal(env.editAttachments.children.length, 0);
   assert.equal(env.editForm.submitButton.disabled, false);
+});
+
+test('meldet beim Eintrags-Update einen unklaren Speicherstatus nach Netzwerk- oder Antwortfehler', async () => {
+  for (const failure of [
+    new Error('Failed to fetch'),
+    { ok: true, json: async () => { throw new SyntaxError('Unexpected token'); } },
+  ]) {
+    const env = createWidgetEnvironment();
+    await env.listeners['kw-masha-feedly:opened']();
+    await env.openListButton.listeners.click();
+    const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
+    env.listContainer.listeners.click({ target: card, preventDefault() {} });
+    env.postResponses.push(failure);
+
+    await env.editForm.listeners.submit({ preventDefault() {} });
+
+    assert.equal(env.editStatus.textContent, messages.EDIT_UNCLEAR_RESULT_ERROR);
+    assert.equal(env.editForm.submitButton.disabled, false);
+    assert.equal(env.editModal.hidden, false);
+    assert.equal(env.postCalls.length, 1, 'Ein unklarer Ausgang darf keinen automatischen zweiten Speicherversuch auslösen.');
+  }
+});
+
+test('meldet Eintrag und Anhang nach bestätigter Speicherung als gespeichert, wenn die Anzeige scheitert', async () => {
+  const env = createWidgetEnvironment();
+  await env.listeners['kw-masha-feedly:opened']();
+  await env.openListButton.listeners.click();
+  const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
+  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  const selectedFile = { name: 'plan.pdf' };
+  env.editAttachmentInput.files = [selectedFile];
+  env.postResponses.push({ ok: true, json: async () => ({
+    success: true,
+    message: 'Eintrag und Anhang wurden gespeichert.',
+    attachments: [{ name: 'plan.pdf', mimeType: 'application/pdf', url: '/assets/private/plan.pdf' }],
+    history: [{ type: 'status', oldValue: 'Neu', newValue: 'In Bearbeitung' }],
+  }) });
+  const originalRenderHistory = env.window.KWMashaFeedlyEntries.renderHistory;
+  env.window.KWMashaFeedlyEntries.renderHistory = () => { throw new Error('Anzeige fehlgeschlagen.'); };
+  try {
+    await env.editForm.listeners.submit({ preventDefault() {} });
+  } finally {
+    env.window.KWMashaFeedlyEntries.renderHistory = originalRenderHistory;
+  }
+
+  assert.deepEqual(Array.from(env.postCalls[0].options.body.values.Attachments), [selectedFile]);
+  assert.equal(env.editStatus.textContent, messages.SAVE_CONFIRMED_DISPLAY_ERROR);
+  assert.equal(env.editForm.submitButton.disabled, false);
+  assert.equal(env.postCalls.length, 1, 'Ein Anzeige-Fehler darf den bestätigten Speichervorgang nicht wiederholen.');
 });
 
 test('startet erst nach bestätigtem Feedback-Abschluss zufällig einen passenden Effekt', async () => {

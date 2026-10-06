@@ -277,6 +277,7 @@ de:
     CREATE_SAVE_ERROR: 'Der Eintrag konnte nicht gespeichert werden.'
     EDIT_SAVING: 'Änderungen werden gespeichert …'
     EDIT_SAVE_ERROR: 'Änderungen konnten nicht gespeichert werden.'
+    EDIT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderungen gespeichert wurden, ist unklar. Bitte lade die Eintragsliste neu, bevor du es erneut versuchst.'
     SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Eintragsliste neu.'
     MEMBER_FALLBACK: 'Mitglied'
     UNKNOWN_BROWSER: 'Unbekannter Browser'
