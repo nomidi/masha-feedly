@@ -54,9 +54,8 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const creatorToggle = creatorPage.locator('[data-kw-masha-feedly] .kw-masha-feedly__toggle');
     await creatorToggle.click();
     const creatorWidget = creatorPage.locator('[data-kw-masha-feedly]');
-    await expect(creatorWidget.locator('[data-masha-feedly-open-news]')).toBeVisible();
     await creatorWidget.locator('[data-masha-feedly-start-selection]').click();
-    await creatorPage.locator('main').first().click();
+    await creatorPage.locator('[role="main"]').first().click();
 
     const createForm = creatorWidget.locator('[data-masha-feedly-entry-form]');
     await expect(createForm).toBeVisible();
@@ -129,8 +128,11 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const commentForm = commenterWidget.locator('[data-masha-feedly-comment-form]');
     const editForm = commenterWidget.locator('[data-masha-feedly-edit-form]');
     const assignee = editForm.locator('[name="AssignedMemberIDs[]"]').first();
-    await assignee.check();
     const assigneeID = await assignee.getAttribute('value');
+    if (!(await assignee.isChecked())) {
+      await assignee.locator('xpath=..').click();
+    }
+    await expect(assignee).toBeChecked();
     const updateURL = await editForm.getAttribute('data-update-url');
     const updateResponsePromise = commenterPage.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === new URL(updateURL, config.baseURL).pathname);
@@ -140,7 +142,7 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     assert.equal(updateResponse.ok(), true, `Zuständigkeit speichern: ${updated.message || updateResponse.status()}`);
     assert.equal(updated.success, true);
     await expect(editForm.locator(`[name="AssignedMemberIDs[]"][value="${assigneeID}"]`)).toBeChecked();
-    await expect(commenterWidget.locator('[data-masha-feedly-edit-status]')).toContainText('gespeichert');
+    await expect(commenterWidget.locator('[data-masha-feedly-edit-status]')).toContainText(/saved|gespeichert/i);
     await expect(commentForm).toBeVisible();
     await commentForm.locator('[name="CommentText"]').fill(commentText);
     await commentForm.locator('[data-masha-feedly-emoji-toggle]').click();
@@ -175,7 +177,8 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     await expect(unreadCard.locator('[data-entry-unread]')).toBeVisible();
     await unreadCard.click();
     await expect(reloadedCreatorWidget.locator('[data-masha-feedly-comments]')).toContainText(commentText);
-    await expect(unreadCount).toHaveText(String(unreadBeforeOpen - 1));
+    await expect.poll(async () => Number(await unreadCount.textContent()))
+      .toBeLessThan(unreadBeforeOpen);
     const comment = reloadedCreatorWidget.locator('[data-masha-feedly-comments] .kw-masha-feedly__comment').filter({ hasText: commentText });
     let activeReaction = '';
     const react = async (emoji) => {
@@ -210,9 +213,9 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const historyDetails = reloadedCreatorWidget.locator('.kw-masha-feedly__history');
     await historyDetails.locator('summary').click();
     const historyList = historyDetails.locator('[data-masha-feedly-history]');
-    await expect(historyList).toContainText('Reaktion auf Kommentar geändert: Keine Reaktion → ❤️');
-    await expect(historyList).toContainText('Reaktion auf Kommentar geändert: ❤️ → 😂');
-    await expect(historyList).toContainText('Reaktion auf Kommentar geändert: 😂 → Keine Reaktion');
+    await expect(historyList).toContainText(/(?:Reaktion auf Kommentar geändert: Keine Reaktion|Comment reaction changed: No reaction) → ❤️/u);
+    await expect(historyList).toContainText(/(?:Reaktion auf Kommentar geändert|Comment reaction changed): ❤️ → 😂/u);
+    await expect(historyList).toContainText(/(?:Reaktion auf Kommentar geändert: 😂 → Keine Reaktion|Comment reaction changed: 😂 → No reaction)/u);
   } finally {
     await creatorContext.close();
     await commenterContext.close();

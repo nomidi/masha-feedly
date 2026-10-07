@@ -14,10 +14,8 @@ if (fs.existsSync(localEnvPath)) {
 }
 const config = {
   baseURL: process.env.MASHA_FEEDLY_E2E_BASE_URL || localEnv.MASHA_FEEDLY_E2E_BASE_URL,
-  onboardingEmail: process.env.MASHA_FEEDLY_E2E_ONBOARDING_EMAIL || localEnv.MASHA_FEEDLY_E2E_ONBOARDING_EMAIL
-    || process.env.MASHA_FEEDLY_E2E_CREATOR_EMAIL || localEnv.MASHA_FEEDLY_E2E_CREATOR_EMAIL,
-  onboardingPassword: process.env.MASHA_FEEDLY_E2E_ONBOARDING_PASSWORD || localEnv.MASHA_FEEDLY_E2E_ONBOARDING_PASSWORD
-    || process.env.MASHA_FEEDLY_E2E_CREATOR_PASSWORD || localEnv.MASHA_FEEDLY_E2E_CREATOR_PASSWORD,
+  onboardingEmail: process.env.MASHA_FEEDLY_E2E_CREATOR_EMAIL || localEnv.MASHA_FEEDLY_E2E_CREATOR_EMAIL,
+  onboardingPassword: process.env.MASHA_FEEDLY_E2E_CREATOR_PASSWORD || localEnv.MASHA_FEEDLY_E2E_CREATOR_PASSWORD,
 };
 const missingConfig = Object.entries(config).filter(([, value]) => !value).map(([name]) => name);
 
@@ -62,7 +60,7 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     await widget.locator('.kw-masha-feedly__toggle').click();
     await expect(tip).toContainText('Schritt 2 von 8');
     await widget.locator('[data-masha-feedly-start-selection]').click();
-    await page.getByText('Home', { exact: true }).first().click();
+    await page.locator('[role="main"]').first().click();
     await expect(widget.locator('[data-masha-feedly-modal]')).toBeVisible();
     await expect(tip).toContainText('Schritt 4 von 8');
 
@@ -109,7 +107,8 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     const feedback = statusSelect.locator('option').filter({ hasText: /^Feedback$/ }).first();
     await statusSelect.selectOption(await feedback.getAttribute('value'));
     const assignee = editForm.locator('[name="AssignedMemberIDs[]"]').first();
-    if (!(await assignee.isChecked())) await assignee.check();
+    if (!(await assignee.isChecked())) await assignee.locator('xpath=..').click();
+    await expect(assignee).toBeChecked();
     const updateResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/updateEntry'));
     await editForm.locator('[type="submit"]').click();
