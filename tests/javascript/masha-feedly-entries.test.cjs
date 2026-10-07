@@ -7,12 +7,9 @@ const vm = require('node:vm');
 /** Tests für Sortierung, Kategorien und am Seitenbereich verankerte Eintragsblasen. @author Kooperative Web */
 const source = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-entries.js'), 'utf8');
 const compiledSource = fs.readFileSync(path.resolve(__dirname, '../../client/dist/js/masha-feedly-entries.js'), 'utf8');
-const effectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'dino', 'ducks', 'frogs', 'icon-shower', 'ghost-swarm', 'potion', 'cat-paws', 'flower-power', 'pinball-tilt', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/js/effects/${name}.js`), 'utf8'));
-const compiledEffectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'dino', 'ducks', 'frogs', 'icon-shower', 'ghost-swarm', 'potion', 'cat-paws', 'flower-power', 'pinball-tilt', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/dist/js/effects/${name}.js`), 'utf8'));
 const scss = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly.scss'), 'utf8');
 const compiledStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly.css'), 'utf8');
 const compiledAdminStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly-admin.css'), 'utf8');
-const effectStyles = ['_confetti.scss', '_unicorn.scss', '_rocket.scss', '_hearts.scss', '_arcade.scss', '_retro.scss', '_dino.scss', '_check.scss', '_glow.scss', '_rings.scss', '_confirmation.scss', '_ducks.scss', '_frogs.scss', '_icon-shower.scss', '_ghost-swarm.scss', '_potion.scss', '_cat-paws.scss', '_flower-power.scss', '_pinball-tilt.scss'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/scss/effects/${name}`), 'utf8'));
 const widgetTemplate = fs.readFileSync(path.resolve(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
 const germanTranslations = fs.readFileSync(path.resolve(__dirname, '../../lang/de.yml'), 'utf8');
 const messages = {
@@ -104,12 +101,14 @@ const document = { addEventListener() {} };
 const window = {
   KWMashaFeedlyTranslate: translate,
   KWMashaFeedlyTranslations: {},
-  KWMashaFeedlyEffectModules: {},
+  KWMashaFeedlyEffects: { playOnDone() { return Promise.resolve(null); } },
 };
-effectSources.forEach((effectSource) => vm.runInNewContext(effectSource, { window }));
 vm.runInNewContext(source, { document, window, URL });
+const sharedEffects = { playOnDone(_document, simulatedWindow, _image, theme) {
+  simulatedWindow.effectCalls = [...(simulatedWindow.effectCalls || []), theme];
+  return Promise.resolve({ played: true });
+} };
 const entriesUI = window.KWMashaFeedlyEntries;
-const sharedEffects = window.KWMashaFeedlyEffects;
 test('beschriftet den Zähler als Zahl abgeschlossener Einträge und nennt die Zielübersicht', () => {
   assert.match(germanTranslations, /OPEN_CLOSED_ENTRIES: 'Abgeschlossene Einträge ansehen'/);
   assert.match(germanTranslations, /CLOSED_ENTRIES_BUTTON: 'abgeschlossene Einträge'/);
@@ -829,560 +828,6 @@ test('färbt das Website-Symbol in Prioritätsfarbe und zeigt es immer als Fehle
   assert.match(compiledStyles, /\.kw-masha-feedly__page-marker:focus-visible\{outline-color:var\(--masha-feedly-priority-color/);
 });
 
-test('erzeugt 128 Konfettiteile aus allen Richtungen für Done und räumt sie wieder auf', () => {
-  let cleanup;
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(piece) { this.children.push(piece); }, remove() { this.removed = true; } };
-  let created = 0;
-  const document = { body: { append(item) { this.layer = item; } }, createElement() { created += 1; return created === 1 ? layer : { style: {}, dataset: {}, setAttribute(name, value) { this[name] = value; } }; } };
-  const window = { setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 13000); } };
-  const confetti = entriesUI.celebrateDone(document, window);
-  assert.equal(confetti, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__confetti');
-  assert.equal(layer.children.length, 128);
-  assert.equal(layer.children[0].style.animationDuration, '8.80s');
-  assert.equal(layer.children[11].style.animationDuration, '11.44s');
-  assert.deepEqual([...new Set(layer.children.map((piece) => piece.dataset.origin))], ['oben', 'rechts', 'unten', 'links']);
-  cleanup();
-  assert.equal(layer.removed, true);
-});
-
-test('lässt nach einem Abschluss das Einhorn-Asset über die Seite laufen', () => {
-  let cleanup;
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(...items) { this.children.push(...items); }, remove() { this.removed = true; } };
-  let created = 0;
-  const document = { body: { append(item) { this.layer = item; } }, createElement() { created += 1; return created === 1 ? layer : {}; } };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 13000); } };
-  const runner = entriesUI.celebrateClosedCategory(document, window, '/_resources/kooperativeweb/masha-feedly/client/dist/icons/masha-feedly-unicorn.svg');
-  assert.equal(runner, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__unicorn-runner');
-  assert.equal(layer.children[0].className, 'kw-masha-feedly__unicorn');
-  assert.equal(layer.children[0].src, '/_resources/kooperativeweb/masha-feedly/client/dist/icons/masha-feedly-unicorn.svg');
-  assert.equal(layer.children[0].alt, '');
-  cleanup();
-  assert.equal(layer.removed, true);
-});
-
-test('bricht alle achtzehn Abschlussanimationen beim nächsten Klick vollständig ab', () => {
-  const runnerSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/effects/runner.js'), 'utf8');
-  const animationNames = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'dino', 'ducks', 'frogs', 'iconShower', 'ghostSwarm', 'potion', 'catPaws', 'flowerPower', 'pinballTilt', 'check', 'glow', 'rings', 'confirmation'];
-  const removedByEffect = new Map();
-  const modules = Object.fromEntries(animationNames.map((name) => [name, {
-    play() {
-      const nodes = [
-        { remove() { this.removed = true; } },
-        ...(name === 'unicorn' ? [{ remove() { this.removed = true; } }] : []),
-      ];
-      removedByEffect.set(name, nodes);
-      return name === 'unicorn' ? { confetti: nodes[0], unicorn: nodes[1] } : { [name]: nodes[0] };
-    },
-  }]));
-  const simulatedWindow = {
-    KWMashaFeedlyEffectModules: modules,
-    matchMedia: () => ({ matches: false }),
-    setTimeout: () => 1,
-    clearTimeout() {},
-  };
-  let clickHandler;
-  const document = { addEventListener(type, callback, capture) {
-    assert.equal(type, 'pointerdown');
-    assert.equal(capture, true);
-    clickHandler = callback;
-  } };
-  vm.runInNewContext(runnerSource, { window: simulatedWindow });
-
-  animationNames.forEach((name) => {
-    simulatedWindow.KWMashaFeedlyEffects.play(name, document, simulatedWindow);
-    const nodes = removedByEffect.get(name);
-    clickHandler({ type: 'click' });
-    assert.ok(nodes.every((node) => node.removed), `${name} entfernt auch seine sichtbaren Ebenen.`);
-
-    simulatedWindow.KWMashaFeedlyEffects.play(name, document, simulatedWindow);
-    const newlyStartedNodes = removedByEffect.get(name);
-    assert.ok(newlyStartedNodes.every((node) => !node.removed), `${name} bleibt nach dem Klick als neue Vorschau sichtbar.`);
-    clickHandler({ type: 'pointerdown' });
-    assert.ok(newlyStartedNodes.every((node) => node.removed), `${name} endet erst beim darauffolgenden Klick.`);
-  });
-});
-
-test('startet beim Raketenstart eine barrierefreie Rakete mit Sternenspur und räumt sie auf', () => {
-  let cleanup;
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(...items) { this.children.push(...items); }, remove() { this.removed = true; } };
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { tagName, children: [], style: {}, dataset: {}, setAttribute(name, value) { this[name] = value; }, append(...items) { this.children.push(...items); } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 5200); } };
-  const rocket = entriesUI.celebrateRocketLaunch(document, window);
-  assert.equal(rocket, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__rocket-runner');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.filter((child) => child.className === 'kw-masha-feedly__rocket-star').length, 14);
-  const smoke = layer.children.find((child) => child.className === 'kw-masha-feedly__rocket-smoke');
-  assert.ok(smoke, 'Der Start enthält eine graue Rauchwolke.');
-  assert.deepEqual(smoke.children.map((puff) => puff.dataset.attempt), ['1', '2', '3']);
-  assert.equal(layer.children.at(-1).className, 'kw-masha-feedly__rocket');
-  assert.match(layer.children.at(-1).innerHTML, /kw-masha-feedly__rocket-nose/);
-  assert.match(layer.children.at(-1).innerHTML, /kw-masha-feedly__rocket-body/);
-  assert.match(layer.children.at(-1).innerHTML, /kw-masha-feedly-rocket-rainbow/);
-  assert.equal((layer.children.at(-1).innerHTML.match(/kw-masha-feedly__rocket-speedline /g) || []).length, 5);
-  cleanup();
-  assert.equal(layer.removed, true);
-});
-
-test('lässt sieben Gummienten mit Abstand watschelnd durchs Bild ziehen', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } }, setAttribute(name, value) { this[name] = value; } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 12000); } };
-  const modules = {};
-  const simulatedWindow = { matchMedia: window.matchMedia, setTimeout: window.setTimeout, KWMashaFeedlyEffectModules: modules };
-  vm.runInNewContext(effectSources[6], { window: simulatedWindow });
-
-  const effect = modules.ducks.play(document, window);
-  assert.equal(effect.ducks, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__duck-parade');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 7);
-  assert.equal(layer.children[0].className, 'kw-masha-feedly__parade-duck');
-  assert.equal(layer.children[0].style.animationDelay, '0s');
-  assert.equal(layer.children[6].style.animationDelay, '2.88s');
-  assert.equal(layer.children[0].style['--duck-body-color'], '#fec80e');
-  assert.equal(layer.children[3].style['--duck-body-color'], '#242424');
-  assert.match(layer.children[0].innerHTML, /viewBox="0 0 512 512"/);
-  assert.match(layer.children[0].innerHTML, /kw-masha-feedly__duck-beak/);
-  assert.match(layer.children[0].innerHTML, /m252\.59 211\.91/);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.ducks.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('lässt fünf bunte Frösche versetzt durchs Bild hüpfen', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 10000); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[7], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.frogs.play(document, window);
-  assert.equal(effect.frogs, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__frog-parade');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 5);
-  assert.equal(layer.children[0].style.animationDelay, '0s');
-  assert.equal(layer.children[4].style.animationDelay, '2.08s');
-  assert.match(layer.children[0].innerHTML, /kw-masha-feedly__frog-smile/);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.frogs.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('lässt fünfzig wechselnde Motive als Icon-Schauer einfliegen', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 10500); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[8], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.iconShower.play(document, window);
-  assert.equal(effect.iconShower, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__icon-shower');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 50);
-  assert.match(layer.children[0].innerHTML, /viewBox="0 0 64 64"/);
-  assert.notEqual(layer.children[0].innerHTML, layer.children[1].innerHTML);
-  assert.ok(layer.children.every((icon) => icon.style['--icon-duration'].endsWith('s')));
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.iconShower.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('lässt einen geisterschwarm durch nebel schweben und kurz flackern', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 8500); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[9], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.ghostSwarm.play(document, window);
-  assert.equal(effect.ghostSwarm, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__ghost-swarm');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__swarm-ghost').length, 9);
-  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__ghost-mist').length, 12);
-  assert.match(layer.children[0].innerHTML, /kw-masha-feedly__ghost-shape/);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.ghostSwarm.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('blubbert Zauberblasen in leuchtenden Farben aus dem Kessel', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 7600); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[10], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.potion.play(document, window);
-  assert.equal(effect.potion, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__potion-effect');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 20);
-  assert.equal(layer.children[0].className, 'kw-masha-feedly__potion-glow');
-  assert.match(layer.children[1].innerHTML, /kw-masha-feedly__cauldron-brew/);
-  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__potion-bubble').length, 18);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.potion.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('lässt Katzenpfoten in einer geschwungenen Spur verblassen', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 6500); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[11], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.catPaws.play(document, window);
-  assert.equal(effect.catPaws, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__cat-paw-trail');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 18);
-  assert.equal(layer.children[0].style['--paw-x'], '-3vw');
-  assert.equal(layer.children[1].style['--paw-delay'], '0.22s');
-  assert.equal(layer.children[0].style['--paw-color'], '#ff1744');
-  assert.match(layer.children[0].innerHTML, /viewBox="0 0 64 64"/);
-  assert.match(layer.children[0].innerHTML, /m40\.1 33\.51a11\.78 11\.78/);
-  assert.match(layer.children[0].innerHTML, /kw-masha-feedly__cat-paw-toe-4/);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.catPaws.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('bringt den Flower-Power-Sonnenkreis und acht tanzende Blumen zum Leuchten', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 6200); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[12], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.flowerPower.play(document, window);
-  assert.equal(effect.flowerPower, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__flower-power');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 10);
-  assert.equal(layer.children[0].className, 'kw-masha-feedly__flower-power-sun');
-  assert.equal(layer.children[1].textContent, 'GROOVY!');
-  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__flower-power-flower').length, 8);
-  assert.equal((layer.children[2].innerHTML.match(/<ellipse/g) || []).length, 10);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.flowerPower.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('rüttelt die Browseransicht und blendet die Tilt-Warnung ein', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const rootClasses = new Set();
-  const document = {
-    documentElement: { classList: { add(name) { rootClasses.add(name); }, remove(name) { rootClasses.delete(name); } } },
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 2100); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[13], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.pinballTilt.play(document, window);
-  assert.equal(effect.pinball, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__pinball-tilt');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 13);
-  assert.equal(layer.children[0].className, 'kw-masha-feedly__pinball-tilt-word');
-  assert.equal(layer.children[0].textContent, 'TILT!');
-  assert.ok(rootClasses.has('kw-masha-feedly__pinball-viewport-shake'));
-  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__pinball-light').length, 12);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(rootClasses.has('kw-masha-feedly__pinball-viewport-shake'), false);
-  assert.equal(modules.pinballTilt.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('wählt theme-basiert zwischen Einhorn, Rakete, Herzen, Arcade, Retro, Dino, Gummienten, Fröschen, Icon-Schauer, Geisterschwarm, Zaubertrank, Katzenpfoten, Flower Power und Pinball Tilt', () => {
-  const layers = [];
-  const document = {
-    documentElement: { classList: { add() {}, remove() {} } },
-    body: { append(layer) { layers.push(layer); } },
-    createElement(tagName) {
-      return tagName === 'div'
-        ? { children: [], style: { setProperty(name, value) { this[name] = value; } }, setAttribute(name, value) { this[name] = value; }, append(item) { this.children.push(item); }, remove() {} }
-        : { children: [], style: { setProperty(name, value) { this[name] = value; } }, dataset: {}, setAttribute(name, value) { this[name] = value; }, append(...items) { this.children.push(...items); } };
-    },
-  };
-  const window = { innerWidth: 1200, innerHeight: 800, matchMedia: () => ({ matches: false }), setTimeout() {} };
-  const unicornCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.04);
-  assert.ok(unicornCompletion.confetti);
-  assert.ok(unicornCompletion.unicorn);
-  assert.equal(unicornCompletion.rocket, undefined);
-  assert.equal(unicornCompletion.unicorn.children[0].src, '/unicorn.svg');
-  const rocketCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.1);
-  assert.deepEqual(Object.keys(rocketCompletion), ['rocket']);
-  assert.equal(layers.at(-1).className, 'kw-masha-feedly__rocket-runner');
-  const heartsCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.18);
-  assert.deepEqual(Object.keys(heartsCompletion), ['hearts']);
-  assert.equal(heartsCompletion.hearts.className, 'kw-masha-feedly__heart-burst');
-  assert.equal(heartsCompletion.hearts.children.length, 28);
-  assert.equal(heartsCompletion.hearts.children[0].textContent, '♥');
-  assert.equal(heartsCompletion.hearts.children[0].style.color, '#ff3b91');
-  const arcadeCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.25);
-  assert.deepEqual(Object.keys(arcadeCompletion), ['arcade']);
-  assert.equal(arcadeCompletion.arcade.className, 'kw-masha-feedly__arcade-effect');
-  const arcadeScreen = arcadeCompletion.arcade.children[0];
-  assert.equal(arcadeScreen.className, 'kw-masha-feedly__arcade-screen');
-  assert.equal(arcadeScreen.children.filter((child) => child.className === 'kw-masha-feedly__arcade-pixel').length, 56);
-  assert.equal(arcadeScreen.children.filter((child) => child.className === 'kw-masha-feedly__arcade-invader').length, 4);
-  assert.equal(arcadeScreen.children.at(-1).textContent, 'MISSION COMPLETE!');
-  const retroCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.32);
-  assert.deepEqual(Object.keys(retroCompletion), ['retro']);
-  assert.equal(retroCompletion.retro.className, 'kw-masha-feedly__retro-effect');
-  assert.equal(retroCompletion.retro.children[0].className, 'kw-masha-feedly__retro-dialog');
-  const dinoCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.39);
-  assert.deepEqual(Object.keys(dinoCompletion), ['dino']);
-  assert.equal(dinoCompletion.dino.className, 'kw-masha-feedly__dino-effect');
-  assert.equal(dinoCompletion.dino.children[0].textContent, 'Speichern');
-  assert.match(dinoCompletion.dino.children[1].innerHTML, /viewBox="0 0 56 60"/);
-  assert.equal(dinoCompletion.dino.children[2].textContent, 'HAPS!');
-  assert.equal(dinoCompletion.dino.children.filter((child) => child.className === 'kw-masha-feedly__dino-pixel').length, 10);
-  const ducksCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.46);
-  assert.equal(ducksCompletion.ducks.className, 'kw-masha-feedly__duck-parade');
-  assert.equal(ducksCompletion.ducks.children.length, 7);
-  const frogsCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.53);
-  assert.equal(frogsCompletion.frogs.className, 'kw-masha-feedly__frog-parade');
-  assert.equal(frogsCompletion.frogs.children.length, 5);
-  const iconShowerCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.6);
-  assert.equal(iconShowerCompletion.iconShower.children.length, 50);
-  const ghostSwarmCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.68);
-  assert.equal(ghostSwarmCompletion.ghostSwarm.children.length, 21);
-  const potionCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.75);
-  assert.equal(potionCompletion.potion.children.length, 20);
-  const catPawsCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.82);
-  assert.equal(catPawsCompletion.catPaws.children.length, 18);
-  const flowerPowerCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.9);
-  assert.equal(flowerPowerCompletion.flowerPower.children.length, 10);
-  const pinballCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.97);
-  assert.equal(pinballCompletion.pinball.children.length, 13);
-  const rocketPreview = entriesUI.previewCompletionAnimation(document, window, 'rocket', '/unicorn.svg');
-  assert.equal(rocketPreview.confetti, undefined);
-  assert.equal(rocketPreview.unicorn, undefined);
-  assert.ok(rocketPreview.rocket);
-  const heartsPreview = entriesUI.previewCompletionAnimation(document, window, 'hearts', '/unicorn.svg');
-  assert.equal(heartsPreview.hearts.children.length, 28);
-  const arcadePreview = entriesUI.previewCompletionAnimation(document, window, 'arcade', '/unicorn.svg');
-  assert.equal(arcadePreview.arcade.children[0].children.at(-1).textContent, 'MISSION COMPLETE!');
-  const retroPreview = entriesUI.previewCompletionAnimation(document, window, 'retro', '/unicorn.svg');
-  assert.equal(retroPreview.retro.className, 'kw-masha-feedly__retro-effect');
-  const dinoPreview = entriesUI.previewCompletionAnimation(document, window, 'dino', '/unicorn.svg');
-  assert.equal(dinoPreview.dino.children[0].textContent, 'Speichern');
-  const ducksPreview = entriesUI.previewCompletionAnimation(document, window, 'ducks', '/unicorn.svg');
-  assert.equal(ducksPreview.ducks.children.length, 7);
-  const frogsPreview = entriesUI.previewCompletionAnimation(document, window, 'frogs', '/unicorn.svg');
-  assert.equal(frogsPreview.frogs.children.length, 5);
-  const iconShowerPreview = entriesUI.previewCompletionAnimation(document, window, 'iconShower', '/unicorn.svg');
-  assert.equal(iconShowerPreview.iconShower.children.length, 50);
-  const ghostSwarmPreview = entriesUI.previewCompletionAnimation(document, window, 'ghostSwarm', '/unicorn.svg');
-  assert.equal(ghostSwarmPreview.ghostSwarm.children.length, 21);
-  const potionPreview = entriesUI.previewCompletionAnimation(document, window, 'potion', '/unicorn.svg');
-  assert.equal(potionPreview.potion.children.length, 20);
-  const catPawsPreview = entriesUI.previewCompletionAnimation(document, window, 'catPaws', '/unicorn.svg');
-  assert.equal(catPawsPreview.catPaws.children.length, 18);
-  const flowerPowerPreview = entriesUI.previewCompletionAnimation(document, window, 'flowerPower', '/unicorn.svg');
-  assert.equal(flowerPowerPreview.flowerPower.children.length, 10);
-  const pinballPreview = entriesUI.previewCompletionAnimation(document, window, 'pinballTilt', '/unicorn.svg');
-  assert.equal(pinballPreview.pinball.children.length, 13);
-  const playful = entriesUI.previewCompletionAnimation(document, window, 'playful', '/unicorn.svg');
-  assert.ok(playful.confetti);
-  assert.ok(playful.unicorn);
-  const seriousEffects = ['check', 'glow', 'rings', 'confirmation'];
-  seriousEffects.forEach((name, index) => {
-    const result = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'serious', () => (index + 0.1) / seriousEffects.length);
-    assert.deepEqual(Object.keys(result), [name]);
-  });
-  assert.equal(entriesUI.previewCompletionAnimation(document, window, 'check').check.className, 'kw-masha-feedly__serious-check');
-  const reducedWindow = { matchMedia: () => ({ matches: true }) };
-  assert.equal(entriesUI.previewCompletionAnimation(document, reducedWindow, 'rocket'), null);
-  assert.equal(entriesUI.celebrateCompletion(document, reducedWindow, '/unicorn.svg', 'playful', () => { throw new Error('Zufall darf bei reduzierter Bewegung nicht ausgewertet werden.'); }), null);
-});
-
-test('lässt den grünen T-Rex zum Speichern-Button laufen und zerbeißt dessen Darstellung', () => {
-  const layer = { children: [], style: { setProperty(name, value) { this[name] = value; } }, setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() {} };
-  const saveButton = { textContent: 'Änderungen speichern →', getClientRects: () => [{}], getBoundingClientRect: () => ({ left: 320, top: 460, width: 180, height: 48 }) };
-  let created = 0;
-  const document = {
-    querySelectorAll(selector) { assert.equal(selector, 'button.kw-masha-feedly__submit[type="submit"]'); return [saveButton]; },
-    createElement() { created += 1; return created === 1 ? layer : { className: '', style: {}, children: [], append(child) { this.children.push(child); } }; },
-    body: { append(item) { this.layer = item; } },
-  };
-  const simulatedWindow = { innerWidth: 1200, innerHeight: 800, matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { assert.equal(delay, 3400); }, KWMashaFeedlyEffectModules: {} };
-  vm.runInNewContext(effectSources[5], { window: simulatedWindow });
-  const result = simulatedWindow.KWMashaFeedlyEffectModules.dino.play(document, simulatedWindow);
-  assert.equal(result.dino, layer);
-  assert.equal(layer.style['--dino-target-left'], '320px');
-  assert.equal(layer.style['--dino-target-top'], '460px');
-  assert.equal(layer.style['--dino-target-width'], '180px');
-  assert.equal(layer.style['--dino-bite-left'], '452px');
-  assert.equal(layer.children[0].textContent, 'Änderungen speichern →');
-  assert.equal(layer.children[1].className, 'kw-masha-feedly__dino-character');
-  assert.match(layer.children[1].innerHTML, /viewBox="0 0 56 60"/);
-  assert.match(layer.children[1].innerHTML, /fill="#60a917"/);
-  assert.match(effectStyles[6], /translateX\(calc\(100vw \+ 17rem\)\)/);
-  assert.match(effectStyles[6], /--dino-bite-left/);
-  assert.doesNotMatch(effectStyles[6], /scaleX\(-1\)/);
-  assert.equal(layer.children[2].textContent, 'HAPS!');
-  assert.equal(layer.children.filter((child) => child.className === 'kw-masha-feedly__dino-pixel').length, 10);
-  assert.equal(saveButton.className, undefined, 'Die gespeicherte Schaltfläche wird nur visuell überlagert, nicht im DOM verändert.');
-});
-
-test('spielt beim 8-Bit-Erfolg eine kurze, freigeschaltete Chiptune-Siegsmelodie', async () => {
-  const oscillators = [];
-  const listeners = {};
-  const fakeContext = {
-    state: 'suspended', currentTime: 2, destination: {},
-    resume() { this.state = 'running'; return Promise.resolve(); },
-    createOscillator() {
-      const oscillator = { frequency: { setValueAtTime(value, at) { this.value = value; this.at = at; } }, connect(target) { this.target = target; }, start(at) { this.startedAt = at; }, stop(at) { this.stoppedAt = at; } };
-      oscillators.push(oscillator);
-      return oscillator;
-    },
-    createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; },
-  };
-  const simulatedWindow = {
-    AudioContext: function AudioContext() { return fakeContext; },
-    addEventListener(type, callback, options) { listeners[type] = { callback, options }; },
-  };
-  vm.runInNewContext(effectSources[3], { window: simulatedWindow });
-  assert.equal(listeners.pointerdown.options.once, true);
-  listeners.pointerdown.callback();
-  await Promise.resolve();
-  const played = simulatedWindow.KWMashaFeedlyEffectModules.arcade.playVictorySound(simulatedWindow);
-  assert.equal(played, true);
-  assert.equal(oscillators.length, 6);
-  assert.ok(oscillators.every((oscillator) => oscillator.type === 'square'));
-  assert.deepEqual(oscillators.map((oscillator) => oscillator.frequency.value), [659.25, 783.99, 987.77, 1318.51, 987.77, 1318.51]);
-  assert.ok(oscillators.every((oscillator) => oscillator.stoppedAt > oscillator.startedAt));
-});
-
-test('Admin-Vorschau nutzt die auswählbaren verspielten Abschlussanimationen', () => {
-  const adminSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-admin.js'), 'utf8');
-  const adminStyleSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
-  assert.match(adminSource, /data-masha-feedly-animation-preview/);
-  assert.match(adminSource, /previewCompletionAnimation/);
-  assert.match(adminStyleSource, /&__grid/);
-  const adminPHP = fs.readFileSync(path.resolve(__dirname, '../../src/Admin/MashaFeedlyAdmin.php'), 'utf8');
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="hearts"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="arcade"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="retro"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="dino"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="ducks"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="frogs"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="iconShower"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="ghostSwarm"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="potion"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="catPaws"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="flowerPower"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="pinballTilt"/);
-  const widgetPHP = fs.readFileSync(path.resolve(__dirname, '../../src/Extension/MashaFeedlyWidgetExtension.php'), 'utf8');
-  for (const name of ['check', 'glow', 'rings', 'confirmation']) {
-    assert.match(adminPHP, new RegExp(`data-masha-feedly-animation-preview="${name}"`));
-  }
-  const orderedEffects = 'effects/unicorn\\.js[\\s\\S]*effects/rocket\\.js[\\s\\S]*effects/hearts\\.js[\\s\\S]*effects/arcade\\.js[\\s\\S]*effects/retro\\.js[\\s\\S]*effects/dino\\.js[\\s\\S]*effects/ducks\\.js[\\s\\S]*effects/frogs\\.js[\\s\\S]*effects/icon-shower\\.js[\\s\\S]*effects/ghost-swarm\\.js[\\s\\S]*effects/potion\\.js[\\s\\S]*effects/cat-paws\\.js[\\s\\S]*effects/flower-power\\.js[\\s\\S]*effects/pinball-tilt\\.js[\\s\\S]*effects/check\\.js[\\s\\S]*effects/glow\\.js[\\s\\S]*effects/rings\\.js[\\s\\S]*effects/confirmation\\.js[\\s\\S]*effects/runner\\.js[\\s\\S]*masha-feedly-entries\\.js';
-  assert.match(adminPHP, new RegExp(orderedEffects));
-  assert.match(widgetPHP, new RegExp(orderedEffects));
-  assert.match(scss, /@use 'effects\/confetti';[\s\S]*@use 'effects\/unicorn';[\s\S]*@use 'effects\/rocket';[\s\S]*@use 'effects\/hearts';[\s\S]*@use 'effects\/arcade';[\s\S]*@use 'effects\/retro';[\s\S]*@use 'effects\/dino';[\s\S]*@use 'effects\/ducks';[\s\S]*@use 'effects\/frogs';[\s\S]*@use 'effects\/icon-shower';[\s\S]*@use 'effects\/ghost-swarm';[\s\S]*@use 'effects\/potion';[\s\S]*@use 'effects\/cat-paws';[\s\S]*@use 'effects\/flower-power';[\s\S]*@use 'effects\/pinball-tilt';[\s\S]*@use 'effects\/check';[\s\S]*@use 'effects\/glow';[\s\S]*@use 'effects\/rings';[\s\S]*@use 'effects\/confirmation';/);
-  assert.deepEqual(compiledEffectSources, effectSources);
-  assert.match(effectStyles[0], /kw-masha-feedly__confetti-piece/);
-  assert.match(effectStyles[1], /kw-masha-feedly__unicorn-runner/);
-  assert.match(effectStyles[2], /kw-masha-feedly__rocket-runner/);
-  assert.match(effectStyles[2], /kw-masha-feedly__rocket-speedline/);
-  assert.match(effectStyles[2], /kw-masha-feedly-rocket-speedline/);
-  assert.match(effectStyles[2], /kw-masha-feedly__rocket-smoke-puff:nth-child\(3\) \{[^}]*animation-delay: 1\.52s/);
-  assert.match(effectStyles[2], /kw-masha-feedly__rocket-flame \{[^}]*animation: kw-masha-feedly-rocket-flame[^}]*1\.88s/);
-  assert.ok(effectStyles[2].includes('65% { opacity: 1; transform: translate(34vw, -43vh)'));
-  assert.ok(effectStyles[2].includes('82% { opacity: 1; transform: translate(82vw, -97vh)'));
-  assert.match(effectStyles[3], /kw-masha-feedly__burst-heart/);
-  assert.match(effectStyles[3], /kw-masha-feedly-heart-pop/);
-  assert.match(effectStyles[3], /animation: kw-masha-feedly-heart-bloom 2\.5s/);
-  assert.match(effectStyles[3], /animation: kw-masha-feedly-heart-pop 2\.5s/);
-  assert.match(effectStyles[4], /kw-masha-feedly__arcade-pixel/);
-  assert.match(effectStyles[4], /kw-masha-feedly__arcade-invader/);
-  assert.match(effectStyles[4], /kw-masha-feedly__arcade-message/);
-  assert.match(effectStyles[5], /kw-masha-feedly__retro-dialog/);
-  assert.match(effectStyles[5], /#000080/);
-  assert.match(effectStyles[6], /kw-masha-feedly__dino-character/);
-  assert.match(effectStyles[6], /kw-masha-feedly-dino-eaten/);
-  assert.match(effectStyles[7], /kw-masha-feedly__serious-check-mark/);
-  assert.match(effectStyles[8], /kw-masha-feedly__serious-glow/);
-  assert.match(effectStyles[8], /::before[\s\S]*?radial-gradient[\s\S]*?opacity: 1[\s\S]*?scale\(1\.7\)/);
-  assert.match(effectStyles[8], /::after[\s\S]*?border: 3px solid[\s\S]*?scale\(3\.4\)/);
-  assert.match(effectStyles[9], /kw-masha-feedly__serious-ring/);
-  assert.match(effectStyles[10], /kw-masha-feedly__serious-confirmation-card/);
-  assert.match(effectStyles[11], /kw-masha-feedly__duck-parade/);
-  assert.match(effectStyles[11], /kw-masha-feedly-duck-waddle/);
-  assert.match(compiledStyles, /kw-masha-feedly__rocket-runner/);
-});
-
 test('ausgeliefertes JavaScript entspricht der getesteten Quelldatei', () => {
   assert.equal(compiledSource, source);
 });
@@ -1407,8 +852,6 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(compiledStyles, /\.kw-masha-feedly__entry-description a,\.kw-masha-feedly__entry-card p a,\.kw-masha-feedly__comment p a\{color:#9e1c60/);
   assert.match(scss, /\.kw-masha-feedly__entry-description\s*\{[^}]*font-size:\s*calc\(24px \* var\(--masha-font-scale, 1\)\)/s);
   assert.match(scss, /kw-masha-feedly-fan-from-under/);
-  assert.match(effectStyles[1], /kw-masha-feedly-unicorn-run/);
-  assert.match(effectStyles[1], /kw-masha-feedly-unicorn-run 4\.8s/);
   assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button \{ box-sizing: border-box; width: 56px; min-width: 56px; height: 56px; min-height: 56px; flex: 0 0 56px; align-self: flex-start; margin: 0; padding: 6px; border-radius: 14px;/);
   for (const button of ['news-button', 'mite-button', 'rainbow', 'help-button', 'feedback-button', 'closed-button', 'estimate-queue-button']) {
     assert.match(widgetTemplate, new RegExp(`kw-masha-feedly__${button}[^\"]*kw-masha-feedly__action-icon-button`));
@@ -2840,30 +2283,7 @@ test('startet erst nach bestätigtem Feedback-Abschluss zufällig einen passende
     success: true, message: 'Erledigt.', categoryID: 4, categoryTitle: 'Fertig', categoryIsClosed: true, celebrateCompletion: true,
   }) });
   await env.editForm.listeners.submit({ preventDefault() {} });
-  const party = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__confetti');
-  const unicorn = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__unicorn-runner');
-  const rocket = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__rocket-runner');
-  const hearts = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__heart-burst');
-  const arcade = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__arcade-effect');
-  const retro = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__retro-effect');
-  const dino = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__dino-effect');
-  const ducks = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__duck-parade');
-  const frogs = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__frog-parade');
-  const iconShower = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__icon-shower');
-  const ghostSwarm = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__ghost-swarm');
-  const potion = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__potion-effect');
-  const catPaws = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__cat-paw-trail');
-  const flowerPower = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__flower-power');
-  const pinball = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__pinball-tilt');
-  const playfulEffects = [party && unicorn, rocket, hearts, arcade, retro, dino, ducks, frogs, iconShower, ghostSwarm, potion, catPaws, flowerPower, pinball].filter(Boolean);
-  assert.equal(playfulEffects.length, 1, 'Es läuft genau ein zufällig gewählter Effekt.');
-  if (party && unicorn) {
-    assert.equal(party.children.length, 128);
-    assert.equal(unicorn.children[0].src, env.widget.dataset.unicornUrl);
-  }
-  if (retro) assert.equal(retro.children[0].className, 'kw-masha-feedly__retro-dialog');
-  if (dino) assert.equal(dino.children[0].className, 'kw-masha-feedly__dino-save-copy');
-  assert.equal(env.editContext.textContent, 'Status: Fertig');
+  assert.deepEqual(env.window.effectCalls, ['playful']);
 });
 
 test('meldet bestätigtes Speichern auch dann als Erfolg, wenn die Abschlussanimation einen Fehler auslöst', async () => {
@@ -2914,10 +2334,7 @@ test('spielt im seriösen Theme nach bestätigtem Abschluss einen ruhigen Effekt
     success: true, message: 'Erledigt.', categoryID: 4, categoryTitle: 'Fertig', categoryIsClosed: true, celebrateCompletion: true,
   }) });
   await env.editForm.listeners.submit({ preventDefault() {} });
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__confetti'), false);
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__unicorn-runner'), false);
-  const calmEffects = ['kw-masha-feedly__serious-check', 'kw-masha-feedly__serious-glow', 'kw-masha-feedly__serious-rings', 'kw-masha-feedly__serious-confirmation'];
-  assert.equal(env.document.body.children.filter((child) => calmEffects.includes(child.className)).length, 1);
+  assert.deepEqual(env.window.effectCalls, ['serious']);
 });
 
 test('startet keine Erfolgsanimation ohne serverseitig bestätigten Abschluss', async () => {
@@ -2933,8 +2350,7 @@ test('startet keine Erfolgsanimation ohne serverseitig bestätigten Abschluss', 
 
   await env.editForm.listeners.submit({ preventDefault() {} });
 
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__confetti'), false);
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__unicorn-runner'), false);
+  assert.equal(env.window.effectCalls, undefined);
 });
 
 test('startet keine Erfolgsanimation beim Wechsel in die Archivkategorie', async () => {
@@ -2948,9 +2364,7 @@ test('startet keine Erfolgsanimation beim Wechsel in die Archivkategorie', async
     success: true, message: 'Gespeichert.', categoryID: 5, categoryTitle: 'Archiv', categoryIsClosed: true, celebrateCompletion: false,
   }) });
   await env.editForm.listeners.submit({ preventDefault() {} });
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__confetti'), false);
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__unicorn-runner'), false);
-  assert.equal(env.editContext.textContent, 'Status: Archiv');
+  assert.equal(env.window.effectCalls, undefined);
 });
 
 test('lässt den Dialog offen und zeigt den Fehler, wenn das Speichern fehlschlägt', async () => {

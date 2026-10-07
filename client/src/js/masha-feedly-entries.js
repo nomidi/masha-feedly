@@ -365,9 +365,6 @@ window.KWMashaFeedlyEntries = (() => {
   };
 
   const effects = window.KWMashaFeedlyEffects || {};
-  const celebrateDone = (document, window) => effects.confetti?.(document, window) || null;
-  const celebrateClosedCategory = (document, window, imageURL) => effects.unicorn?.(document, window, imageURL) || null;
-  const celebrateRocketLaunch = (document, window) => effects.rocket?.(document, window) || null;
   const celebrateCompletion = (document, window, imageURL, theme = "playful", random = Math.random) =>
     effects.playOnDone?.(document, window, imageURL, theme, random) || null;
   const previewCompletionAnimation = (document, window, animation, imageURL) =>
@@ -491,7 +488,7 @@ window.KWMashaFeedlyEntries = (() => {
     else if (offset < text.length) container.append(documentRef.createTextNode(text.slice(offset)));
   };
 
-  return { sortEntries, toggleSorting, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, renderCommentReactions, priorityIconSVG, resolveTarget, createMarker, setActiveMarker, trackMarkers, celebrateDone, celebrateClosedCategory, celebrateRocketLaunch, celebrateCompletion, previewCompletionAnimation, trapFocus };
+  return { sortEntries, toggleSorting, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, renderCommentReactions, priorityIconSVG, resolveTarget, createMarker, setActiveMarker, trackMarkers, celebrateCompletion, previewCompletionAnimation, trapFocus };
 })();
 
 /** Lädt Einträge, zeichnet Seitenmarkierungen und zeigt die filterbare Übersicht. */

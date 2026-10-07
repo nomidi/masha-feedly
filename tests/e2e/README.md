@@ -1,6 +1,6 @@
 # Masha:Feedly Browsertests
 
-Die opt-in Playwright-Tests prüfen Kommentaraktivität, Onboarding, Kostenschätzungen und Zugriffsschutz. Die Suite enthält fünf Testfälle in vier Dateien und muss seriell laufen, weil alle Browserläufe dieselbe Website und Datenbank verwenden.
+Die opt-in Playwright-Tests prüfen Kommentaraktivität, Onboarding, Kostenschätzungen, Zugriffsschutz und den Effekt-Anbieter. Die Suite enthält sieben Testfälle in fünf Dateien und muss seriell laufen, weil alle Browserläufe dieselbe Website und Datenbank verwenden.
 
 ## Konfiguration
 
@@ -48,3 +48,18 @@ node --test --test-concurrency=1 masha-feedly/tests/e2e/*.test.cjs
 Ohne vollständige Konfiguration überspringt Node die jeweils betroffenen Tests. Zugangsdaten gehören nur in die ignorierte lokale Datei oder einen Secret Store, niemals in Git. Die Suite legt Testeinträge und Kommentare in der konfigurierten Datenbank an; nur gegen eine lokale oder dafür vorgesehene Testinstanz ausführen.
 
 Der separate **Test-E-Mail senden**-Knopf ist kein Teil der E2E-Tests. Er sendet an die Adresse des angemeldeten Masha:Feedly-Superadmins und setzt einen passend konfigurierten und erreichbaren SMTP-Dienst voraus.
+
+## Effekt-Anbieter
+
+Das separate Modul `masha-effects/` liegt im Projekt-Root. Einrichtung, CMS-Berechtigungen, saisonale Freigaben und Dateiformat stehen in [der Effekt-Dokumentation](../../../masha-effects/docs/de/README.md). Die lokale Anbieter-URL `https://feedly:8890` ist in `app/_config/masha-effects.yml` gesetzt. Nach dem Einspielen `vendor/bin/sake dev/build flush=1` ausführen.
+
+Der zusätzliche Browserfall `effects-provider.test.cjs` verwendet das vorhandene SUPERADMIN-Konto (CMS-ADMIN und Feedly-Freigabe), prüft Katalog, versionierte Dateien, Shadow-Root-CSS und CMS-Vorschauen. Mindestens ein Effekt muss für das aktive Theme freigegeben sein. Dafür wird kein weiteres Konto benötigt.
+
+Vom Projekt-Root:
+
+```sh
+SS_DATABASE_SOCKET=/Applications/MAMP/tmp/mysql/mysql.sock SS_PHPUNIT_FLUSH=1 vendor/bin/phpunit -c masha-effects/tests/phpunit.xml.dist
+node --test masha-feedly/tests/e2e/effects-provider.test.cjs
+```
+
+Der Effekt-Anbieter benötigt serverseitig die Schlüssel aus der [Anbieter-Dokumentation](../../../masha-effects/docs/de/README.md). Sie gehören in die Projekt-`.env`, niemals in `.env.e2e` oder den Browser. Der Effekt-Test prüft auch, dass Gäste weder API- noch Proxy-Dateien abrufen können und dass alte statische Ressourcen-URLs gesperrt sind.

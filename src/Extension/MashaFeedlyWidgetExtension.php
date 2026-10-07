@@ -45,25 +45,7 @@ class MashaFeedlyWidgetExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-emoji.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-create-entry.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-onboarding.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/unicorn.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rocket.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/hearts.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/arcade.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/retro.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/dino.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/ducks.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/frogs.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/icon-shower.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/ghost-swarm.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/potion.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/cat-paws.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/flower-power.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/pinball-tilt.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/check.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/glow.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rings.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/confirmation.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/runner.js');
+        \KW\MashaFeedly\Service\MashaFeedlyEffectProvider::requireLoader();
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-entries.js');
         MashaFeedlyCategory::ensureDefaultCategories();
         MashaFeedlyPriority::ensureDefaultPriorities();
@@ -417,6 +399,10 @@ class MashaFeedlyWidgetExtension extends Extension
             'SUCCESS_PAGE_MESSAGE' => 'Auf dieser Seite gibt es derzeit keine offenen Einträge.',
             'SUCCESS_EMPTY_PAGE_MESSAGE' => 'Für diese Seite wurden noch keine Einträge erfasst.',
         ];
+        $translationDefaults['EFFECT_PROVIDER_UNAVAILABLE'] = 'Effekt-Anbieter nicht erreichbar.';
+        $translationDefaults['EFFECT_PREVIEW_UNAVAILABLE'] = 'Dieser Effekt ist momentan nicht verfügbar.';
+        $translationDefaults['CONFIG_ANIMATION_PREVIEW'] = 'Vorschau ansehen';
+        $translationDefaults['CONFIG_ANIMATION_PREVIEW_STARTED'] = 'Vorschau gestartet.';
         $translations = [];
         foreach ($translationDefaults as $key => $default) {
             $translations[$key] = i18n::_t('KW\\MashaFeedly\\Translations.' . $key, $default);

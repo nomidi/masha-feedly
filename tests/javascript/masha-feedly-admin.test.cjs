@@ -218,7 +218,7 @@ test('speichert eine ausgewählte Meldeperson aus der CMS-Übersicht mit Statusm
   assert.equal(button.disabled, false);
 });
 
-test('spielt die im Konfigurationsbereich angeklickte Animationsvorschau ab', () => {
+test('spielt die im Konfigurationsbereich angeklickte Animationsvorschau ab', async () => {
   const previewCalls = [];
   const entriesAPI = {
     previewCompletionAnimation(...args) {
@@ -239,6 +239,7 @@ test('spielt die im Konfigurationsbereich angeklickte Animationsvorschau ab', ()
 
   documentListeners.click({ target: button });
 
+  await Promise.resolve();
   assert.deepEqual(previewCalls, [['rocket', '/unicorn.svg']]);
   assert.equal(preview.status.textContent, 'Vorschau gestartet.');
 });

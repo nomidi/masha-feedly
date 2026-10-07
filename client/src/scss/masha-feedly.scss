@@ -1,22 +1,3 @@
-@use 'effects/confetti';
-@use 'effects/unicorn';
-@use 'effects/rocket';
-@use 'effects/hearts';
-@use 'effects/arcade';
-@use 'effects/retro';
-@use 'effects/dino';
-@use 'effects/ducks';
-@use 'effects/frogs';
-@use 'effects/icon-shower';
-@use 'effects/ghost-swarm';
-@use 'effects/potion';
-@use 'effects/cat-paws';
-@use 'effects/flower-power';
-@use 'effects/pinball-tilt';
-@use 'effects/check';
-@use 'effects/glow';
-@use 'effects/rings';
-@use 'effects/confirmation';
 
 /* Shadow-DOM-Grenze: geerbte Seitentypografie endet an der inneren Oberfläche. */
 :host { all: initial !important; display: contents !important; }

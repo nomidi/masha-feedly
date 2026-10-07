@@ -20,9 +20,50 @@
     const themeField = document.querySelector('select[name="MashaFeedlyTheme"]');
     const selectedTheme = themeField?.value === 'serious' ? 'serious' : 'playful';
     document.querySelectorAll('[data-masha-feedly-animation-preview-card]').forEach((card) => {
-      card.hidden = card.dataset.mashaFeedlyTheme !== selectedTheme;
+      card.hidden = card.dataset.mashaFeedlyTheme !== selectedTheme && card.dataset.mashaFeedlyTheme !== 'both';
     });
   };
+
+  const effectText = (key, fallback) => {
+    const translated = window.KWMashaFeedlyTranslate?.(key);
+    return translated && translated !== key ? translated : fallback;
+  };
+  /** Erstellt die Vorschauen aus dem aktuellen Katalog statt aus einer festen Theme-Liste. */
+  const loadEffectPreviews = async () => {
+    const grids = [...document.querySelectorAll('[data-masha-feedly-effect-catalog]')].filter((grid) => !grid.dataset.effectsLoaded);
+    grids.forEach((grid) => { grid.dataset.effectsLoaded = 'loading'; });
+    if (!grids.length) return;
+    try {
+      const effects = await window.KWMashaFeedlyEffects.refresh();
+      grids.forEach((grid) => {
+        grid.replaceChildren();
+        effects.forEach((effect) => {
+          const card = document.createElement('article');
+          card.className = 'masha-feedly-animation-preview';
+          card.setAttribute('data-masha-feedly-animation-preview-card', '');
+          card.dataset.mashaFeedlyTheme = effect.theme;
+          const title = document.createElement('strong'); title.textContent = effect.name;
+          const button = document.createElement('button'); button.type = 'button';
+          button.dataset.mashaFeedlyAnimationPreview = effect.id;
+          button.textContent = effectText('CONFIG_ANIMATION_PREVIEW', 'Vorschau ansehen');
+          card.append(title, button); grid.append(card);
+        });
+        grid.dataset.effectsLoaded = 'true';
+      });
+      applyAnimationTheme();
+    } catch (error) {
+      grids.forEach((grid) => { grid.dataset.effectsLoaded = 'error'; grid.textContent = effectText('EFFECT_PROVIDER_UNAVAILABLE', 'Effekt-Anbieter nicht erreichbar.'); });
+    }
+  };
+  const initialiseEffectPreviews = () => {
+    loadEffectPreviews();
+    if (typeof MutationObserver !== 'undefined' && document.body) {
+      new MutationObserver(loadEffectPreviews).observe(document.body, { childList: true, subtree: true });
+    }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialiseEffectPreviews, { once: true });
+  else initialiseEffectPreviews();
+  document.addEventListener('kw-masha-feedly:opened', loadEffectPreviews);
 
   document.addEventListener('change', (event) => {
     if (event.target?.matches?.('select[name="MashaFeedlyTheme"]')) applyAnimationTheme();
@@ -63,11 +104,13 @@
         animation,
         preview?.dataset.unicornUrl
       );
-      if (status) {
-        status.textContent = result
-          ? previewButton.dataset.previewMessage || ''
-          : previewButton.dataset.reducedMotionMessage || '';
-      }
+      Promise.resolve(result).then((played) => {
+        if (status) status.textContent = played
+          ? effectText('CONFIG_ANIMATION_PREVIEW_STARTED', 'Vorschau gestartet.')
+          : effectText('EFFECT_PREVIEW_UNAVAILABLE', 'Dieser Effekt ist momentan nicht verfügbar.');
+      }).catch(() => {
+        if (status) status.textContent = effectText('EFFECT_PROVIDER_UNAVAILABLE', 'Effekt-Anbieter nicht erreichbar.');
+      });
       return;
     }
     const button = event.target?.closest?.('[data-open-category-form]');

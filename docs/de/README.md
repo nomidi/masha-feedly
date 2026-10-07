@@ -80,3 +80,15 @@ Im CMS findest du die Übersicht unter **Masha:Feedly → Einträge → Meldeper
 ## Installation und Tests
 
 Installation und Befehle für PHP- und JavaScript-Tests stehen in der [Projekt-README](../../../README.md). Browserbasierte Ende-zu-Ende-Tests sind in [`../../tests/e2e/README.md`](../../tests/e2e/README.md) beschrieben.
+
+## Abschluss-Effekte
+
+Die Done-Animationen werden vom eigenständigen Modul **Masha:Effects** geladen. Dort steuern berechtigte CMS-Personen Name, Dateien, Theme, Aktivierung, Monate und Zeiträume. Feedly zeigt nur passende freigegebene Vorschauen. Ein Ausfall des Anbieters verhindert das Speichern nicht.
+
+Die Anbieter-Basis-URL wird über `MASHA_FEEDLY_EFFECTS_BASE_URL` oder `MashaFeedlyEffectProvider.base_url` konfiguriert. Ohne Konfiguration wird derselbe Server verwendet. Die [Einrichtung des Effekt-Anbieters](../../../masha-effects/docs/de/README.md) beschreibt Dateien, Caching und neue Effekte.
+
+Ohne eingerichteten oder erreichbaren Effekt-Anbieter sowie ohne passenden freigegebenen Effekt zeigt ein bestätigter Abschluss ein dezentes lokales Häkchen. Dafür sind weder API-Schlüssel noch externe Dateien nötig. „Bewegung reduzieren“ unterdrückt auch diesen Ersatzeffekt; ein Klick beendet ihn.
+
+Der Anbieter ist API-schlüsselgeschützt. `MASHA_FEEDLY_EFFECTS_API_KEY` bleibt in der Server-`.env`; der Browser verwendet ausschließlich lokale Proxy-Routen mit Login- und Feedly-Freigabeprüfung. Effekt-Dateien liegen privat unter `masha-effects/private/resources/`. Details zur Schlüsselliste und Webserver-Sperre stehen in der Anbieter-Dokumentation.
+
+Website-Zugänge und API-Schlüssel können beim Anbieter unter **Masha:Effects → Effekt-Zugänge** erzeugt und widerrufen werden. Den einmal angezeigten Schlüssel in die Server-`.env` der zugehörigen Feedly-Website übernehmen.

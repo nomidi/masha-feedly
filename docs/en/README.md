@@ -80,3 +80,15 @@ In the CMS, open **Masha:Feedly → Entries → Change reporter**. Search by ent
 ## Installation and tests
 
 See the [project README](../../../README.md) for installation and PHP and JavaScript test commands. Browser-based end-to-end tests are documented in [`../../tests/e2e/README.md`](../../tests/e2e/README.md).
+
+## Completion effects
+
+Done animations load from the independent **Masha:Effects** module. Authorized CMS users manage names, files, themes, availability, months and date ranges there. Feedly previews only available effects for the selected theme. Provider failures never block saving.
+
+Set the provider base URL through `MASHA_FEEDLY_EFFECTS_BASE_URL` or `MashaFeedlyEffectProvider.base_url`; without configuration, the same server is used. See [effect provider setup](../../../masha-effects/docs/en/README.md) for files, caching and new effects.
+
+Without a configured or reachable effect provider, or when no matching effect is available, a confirmed completion shows a subtle local checkmark. It requires no API key or external files. Reduced motion also disables this fallback; clicking stops it.
+
+The provider requires an API key. Keep `MASHA_FEEDLY_EFFECTS_API_KEY` in the server `.env`; browsers use only local proxy endpoints that check login and Feedly access. Effect files are private under `masha-effects/private/resources/`. See provider documentation for key lists and web-server access rules.
+
+Website access and API keys can be created and revoked in the provider CMS under **Masha:Effects → Effekt-Zugänge**. Copy the key shown once into the corresponding Feedly website’s server `.env`.
