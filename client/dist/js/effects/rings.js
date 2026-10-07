@@ -11,7 +11,7 @@
       ring.dataset.ring = String(index + 1);
       layer.append(ring);
     }
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 2200);
     return { rings: layer };
   };

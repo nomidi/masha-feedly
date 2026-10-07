@@ -5,7 +5,7 @@
     const layer = document.createElement('div');
     layer.className = 'kw-masha-feedly__serious-glow';
     layer.setAttribute('aria-hidden', 'true');
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 1800);
     return { glow: layer };
   };

@@ -133,6 +133,7 @@ function createEnvironment(fetchImplementation = async () => ({
     ['.kw-masha-feedly__panel', panel],
     ['.kw-masha-feedly__toggle', toggle],
     ['.kw-masha-feedly__column', column],
+    ['button[type="submit"][form="kw-masha-feedly-create-form"]', submit],
   ]);
   modal.closeButtons = [close];
   widget.querySelector = (selectorText) => lookup.get(selectorText) || null;

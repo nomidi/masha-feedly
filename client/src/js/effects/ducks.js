@@ -26,7 +26,7 @@
       layer.append(duck);
     });
 
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 12000);
     return { ducks: layer };
   };

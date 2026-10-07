@@ -9,11 +9,11 @@ const compiled = read('../../client/dist/js/masha-feedly-emoji.js');
 const scss = read('../../client/src/scss/masha-feedly.scss');
 
 test('Emoji-Auswahl liegt außerhalb des Dialogs und positioniert sich im sichtbaren Fenster', () => {
-  assert.match(source, /document\.body\.append\(picker\)/);
+  assert.match(source, /overlayRoot\(\).*\.append\(picker\)/);
   assert.match(source, /getBoundingClientRect\(\)/);
   assert.match(source, /window\.innerWidth - width - edge/);
   assert.match(source, /window\.innerHeight - height - edge/);
-  assert.match(source, /!picker\.contains\(event\.target\)/);
+  assert.match(source, /!picker\.contains\(.*eventTarget\(event\)/);
 });
 
 test('Kategorienamen verwenden nachgeladene Übersetzungen und zeigen niemals rohe Schlüssel', () => {

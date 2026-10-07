@@ -11,6 +11,7 @@ use SilverStripe\Assets\Image;
 use SilverStripe\Security\SecurityToken;
 use SilverStripe\ORM\ArrayList;
 use SilverStripe\View\Requirements;
+use SilverStripe\Core\Manifest\ModuleResourceLoader;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Admin\CMSProfileController;
 use SilverStripe\CMS\Controllers\ContentController;
@@ -425,7 +426,8 @@ class MashaFeedlyWidgetExtension extends Extension
         }
         $translations['FORMAL_ADDRESS'] = MashaFeedlyConfigExtension::address();
         Requirements::customScript(
-            'window.KWMashaFeedlyTranslations = ' . json_encode($translations, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) . ';'
+            'window.KWMashaFeedlyWidgetStylesheet = ' . json_encode((string)ModuleResourceLoader::resourceURL('kooperativeweb/masha-feedly:client/dist/css/masha-feedly.css')) . ';'
+                . 'window.KWMashaFeedlyTranslations = ' . json_encode($translations, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) . ';'
                 . 'window.KWMashaFeedlyWidgetMarkup = ' . json_encode($markup, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) . ';',
             'kw-masha-feedly-widget-markup'
         );

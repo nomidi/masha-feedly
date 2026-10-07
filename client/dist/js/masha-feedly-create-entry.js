@@ -65,7 +65,7 @@ window.KWMashaFeedlyEnvironment = (() => {
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
-  const widget = document.querySelector('[data-kw-masha-feedly]');
+  const widget = (window.KWMashaFeedlyDOM?.widget() || document.querySelector('[data-kw-masha-feedly]'));
   if (!widget) return;
 
   const startButton = widget.querySelector('[data-masha-feedly-start-selection]');
@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
           .filter((element) => !element.hidden && element.getAttribute('aria-hidden') !== 'true');
         const first = candidates[0] || dialog;
         const last = candidates[candidates.length - 1] || dialog;
-        if ((event.shiftKey && document.activeElement === first) || (!event.shiftKey && document.activeElement === last)) {
+        if ((event.shiftKey && (window.KWMashaFeedlyDOM?.activeElement() || document.activeElement) === first) || (!event.shiftKey && (window.KWMashaFeedlyDOM?.activeElement() || document.activeElement) === last)) {
           event.preventDefault();
           (event.shiftKey ? last : first).focus();
         }
@@ -212,17 +212,17 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.addEventListener('pointerover', (event) => {
-    if (!selecting || widget.contains(event.target)) return;
+    if (!selecting || widget.contains((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target))) return;
     if (highlighted) highlighted.classList.remove('kw-masha-feedly-selected-target');
-    highlighted = event.target.closest('body *');
+    highlighted = (window.KWMashaFeedlyDOM?.eventTarget(event) || event.target).closest('body *');
     if (highlighted && highlighted !== document.body) highlighted.classList.add('kw-masha-feedly-selected-target');
   });
 
   document.addEventListener('click', (event) => {
-    if (!selecting || widget.contains(event.target)) return;
+    if (!selecting || widget.contains((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target))) return;
     event.preventDefault();
     event.stopPropagation();
-    const element = event.target.closest('body *');
+    const element = (window.KWMashaFeedlyDOM?.eventTarget(event) || event.target).closest('body *');
     const elementPosition = window.KWMashaFeedlyEnvironment.elementPosition(element, event.clientX, event.clientY);
     stopSelection();
     if (element && element !== document.body) {
@@ -240,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-form-closed'));
   }));
   modal?.addEventListener('click', (event) => {
-    if (event.target === modal) { modal.hidden = true; toggleButton?.focus?.(); }
+    if ((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target) === modal) { modal.hidden = true; toggleButton?.focus?.(); }
   });
 
   form?.addEventListener('submit', async (event) => {
@@ -248,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Der Speichern-Button liegt im Dialog-Footer außerhalb des <form> und ist
     // über das HTML-Attribut form="…" zugeordnet.
     const submit = form.querySelector('[type="submit"]')
-      || (form.id ? document.querySelector(`button[type="submit"][form="${CSS.escape(form.id)}"]`) : null);
+      || (form.id ? widget.querySelector(`button[type="submit"][form="${CSS.escape(form.id)}"]`) : null);
     if (!submit) {
       status.textContent = t('CREATE_SAVE_ERROR');
       return;

@@ -27,7 +27,7 @@
       layer.append(bubble);
     }
 
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 7600);
     return { potion: layer };
   };

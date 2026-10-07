@@ -1,6 +1,6 @@
 /** Führt neue Masha-Feedly-Mitglieder abbrechbar durch die erste Fehlermeldung. */
 document.addEventListener('DOMContentLoaded', () => {
-  const widget = document.querySelector('[data-kw-masha-feedly]');
+  const widget = (window.KWMashaFeedlyDOM?.widget() || document.querySelector('[data-kw-masha-feedly]'));
   if (!widget) return;
 
   const welcome = widget.querySelector('[data-masha-feedly-onboarding-welcome]');
@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   shade.className = 'kw-masha-feedly__onboarding-shade';
   shade.hidden = true;
   shade.setAttribute('aria-hidden', 'true');
-  document.body.append(shade);
+  (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(shade);
   let step = 'welcome';
   // Nach abgeschlossenem oder nicht gestarteten Onboarding dürfen normale Eintragsaktionen
   // keine Tour-Schritte auslösen. Ein expliziter Neustart setzt finished wieder zurück.
@@ -72,10 +72,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!focusable.length) return;
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
+    if (event.shiftKey && (window.KWMashaFeedlyDOM?.activeElement() || document.activeElement) === first) {
       event.preventDefault();
       last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
+    } else if (!event.shiftKey && (window.KWMashaFeedlyDOM?.activeElement() || document.activeElement) === last) {
       event.preventDefault();
       first.focus();
     }
@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const allowClick = (event) => {
-    const target = event.target;
+    const target = (window.KWMashaFeedlyDOM?.eventTarget(event) || event.target);
     if (matches(target, '[data-masha-feedly-tour-cancel]')) return true;
     if (step === 'icon') return Boolean(matches(target, '.kw-masha-feedly__toggle'));
     if (step === 'plus') return Boolean(matches(target, '[data-masha-feedly-start-selection]'));
@@ -148,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
         : !widget.contains(target);
     }
     if (step === 'form') {
-      // Bei Klick auf den Text oder das Icon im Submit-Button ist event.target
+      // Bei Klick auf den Text oder das Icon im Submit-Button ist (window.KWMashaFeedlyDOM?.eventTarget(event) || event.target)
       // ein Kind-Element. Die Formularzuordnung sitzt aber auf dem Button.
       const clickedControl = target?.closest?.('button, input, select, textarea');
       return Boolean(matches(target, '[data-masha-feedly-entry-form]')
@@ -219,11 +219,11 @@ document.addEventListener('DOMContentLoaded', () => {
       comment: '[data-masha-feedly-comment-form]',
       manage: '[data-masha-feedly-edit-form]',
     }[step];
-    if (matches(event.target, '[data-masha-feedly-tour-cancel]')) return;
+    if (matches((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target), '[data-masha-feedly-tour-cancel]')) return;
     if (step === 'target' && (event.key === 'Tab'
-      || matches(event.target, '[data-masha-feedly-cancel-selection]')
-      || (!widget.contains(event.target) && ['Enter', ' '].includes(event.key)))) return;
-    if (allowedSelector && matches(event.target, allowedSelector)) return;
+      || matches((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target), '[data-masha-feedly-cancel-selection]')
+      || (!widget.contains((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target)) && ['Enter', ' '].includes(event.key)))) return;
+    if (allowedSelector && matches((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target), allowedSelector)) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     showBlockedFeedback();
@@ -273,7 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
     widget.querySelector('.kw-masha-feedly__toggle')?.focus?.();
   });
   thanks?.addEventListener('click', (event) => {
-    if (event.target === thanks) {
+    if ((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target) === thanks) {
       thanks.hidden = true;
       widget.querySelector('.kw-masha-feedly__toggle')?.focus?.();
     }

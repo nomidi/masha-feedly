@@ -10,7 +10,7 @@
     layer.setAttribute('aria-hidden', 'true');
     let target = null;
     try {
-      target = [...(document.querySelectorAll?.('button.kw-masha-feedly__submit[type="submit"]') || [])]
+      target = [...((window.KWMashaFeedlyDOM?.root() || document).querySelectorAll?.('button.kw-masha-feedly__submit[type="submit"]') || [])]
         .find((button) => button.getClientRects?.().length);
     } catch (_) { /* Vorschau und ältere Browser verwenden die mittige Ersatzfläche. */ }
     const bounds = target?.getBoundingClientRect?.();
@@ -43,7 +43,7 @@
       pixel.setAttribute?.('aria-hidden', 'true');
       layer.append(pixel);
     }
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 3400);
     return { dino: layer };
   };

@@ -43,7 +43,7 @@
       + '<path class="kw-masha-feedly__rocket-speedline kw-masha-feedly__rocket-speedline--five" d="m17.073 424.221 67.73-67.74c3.905-3.906 3.905-10.237-.001-14.143-3.904-3.904-10.237-3.904-14.142.001l-67.73 67.74c-3.905 3.906-3.905 10.237.001 14.143 3.905 3.905 10.237 3.905 14.142-.001z"/>'
       + '</svg>';
     layer.append(trail, rocket);
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 5200);
     return { rocket: layer };
   };
