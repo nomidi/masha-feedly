@@ -814,6 +814,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__toggle {
   right: 0;
   bottom: 28px;
+  margin-right: 0;
   display: grid;
   width: var(--kw-feedly-panel-width, 64px);
   max-width: 100vw;
