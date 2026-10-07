@@ -34,7 +34,7 @@
 
     dialog.append(titlebar, content, footer);
     layer.append(dialog);
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 3600);
     return { retro: layer };
   };

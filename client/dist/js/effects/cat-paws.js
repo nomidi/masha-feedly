@@ -22,7 +22,7 @@
       layer.append(paw);
     }
 
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 6500);
     return { catPaws: layer };
   };

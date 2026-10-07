@@ -15,7 +15,7 @@
     lines.innerHTML = '<i></i><i></i>';
     card.append(icon, lines);
     layer.append(card);
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 2100);
     return { confirmation: layer };
   };

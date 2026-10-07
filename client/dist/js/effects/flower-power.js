@@ -33,7 +33,7 @@
       layer.append(flower);
     }
 
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 6200);
     return { flowerPower: layer };
   };

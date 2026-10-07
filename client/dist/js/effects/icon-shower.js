@@ -29,7 +29,7 @@
       layer.append(icon);
     }
 
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 10500);
     return { iconShower: layer };
   };

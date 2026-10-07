@@ -91,7 +91,7 @@
     message.textContent = 'MISSION COMPLETE!';
     screen.append(message);
     layer.append(screen);
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 2900);
     return { arcade: layer };
   };

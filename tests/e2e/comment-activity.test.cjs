@@ -99,7 +99,7 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const ownCard = creatorWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
     await expect(ownCard).toBeVisible();
     const baselineRead = await creatorPage.evaluate(async (id) => {
-      const widget = document.querySelector('[data-kw-masha-feedly]');
+      const widget = window.KWMashaFeedlyDOM.widget();
       const body = new FormData();
       body.set('SecurityID', widget.dataset.securityId);
       body.set('EntryID', String(id));

@@ -90,12 +90,12 @@ window.KWMashaFeedlyEntries = (() => {
     const focusable = candidates.length ? candidates : [container];
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
-    if (event.shiftKey && (document.activeElement === first || !container.contains(document.activeElement))) {
+    if (event.shiftKey && ((window.KWMashaFeedlyDOM?.activeElement() || document.activeElement) === first || !container.contains((window.KWMashaFeedlyDOM?.activeElement() || document.activeElement)))) {
       event.preventDefault();
       last.focus();
       return true;
     }
-    if (!event.shiftKey && (document.activeElement === last || !container.contains(document.activeElement))) {
+    if (!event.shiftKey && ((window.KWMashaFeedlyDOM?.activeElement() || document.activeElement) === last || !container.contains((window.KWMashaFeedlyDOM?.activeElement() || document.activeElement)))) {
       event.preventDefault();
       first.focus();
       return true;
@@ -496,7 +496,7 @@ window.KWMashaFeedlyEntries = (() => {
 
 /** Lädt Einträge, zeichnet Seitenmarkierungen und zeigt die filterbare Übersicht. */
 document.addEventListener('DOMContentLoaded', () => {
-  const widget = document.querySelector('[data-kw-masha-feedly]');
+  const widget = (window.KWMashaFeedlyDOM?.widget() || document.querySelector('[data-kw-masha-feedly]'));
   if (!widget) return;
 
   // Der Betreiber kann Mite unabhängig von einem Eintragswechsel starten oder stoppen.
@@ -807,7 +807,7 @@ document.addEventListener('DOMContentLoaded', () => {
     textarea.setAttribute('aria-hidden', 'true');
     textarea.style.position = 'fixed';
     textarea.style.opacity = '0';
-    document.body.append(textarea);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(textarea);
     textarea.select();
     const copied = document.execCommand?.('copy') === true;
     textarea.remove();
@@ -932,7 +932,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let editReturnFocus = null;
   let listReturnFocus = null;
   let helpReturnFocus = null;
-  const openEntry = (entry, trigger = document.activeElement) => {
+  const openEntry = (entry, trigger = (window.KWMashaFeedlyDOM?.activeElement() || document.activeElement)) => {
     if (!entry || !editForm || !editModal) return;
     if (entry.isUnread) {
       const readData = new FormData();
@@ -1233,7 +1233,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const repositionMarkers = () => markers.forEach((marker) => marker.reposition?.());
 
-  const openList = (mode = 'page', trigger = document.activeElement) => {
+  const openList = (mode = 'page', trigger = (window.KWMashaFeedlyDOM?.activeElement() || document.activeElement)) => {
     modeField.value = mode;
     savedViewSelect.value = '';
     deleteViewButton.disabled = true;
@@ -1261,7 +1261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         openEntry(entry, event.currentTarget);
         target.scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
-      document.body.append(marker);
+      (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(marker);
       markers.push(marker);
     });
     if (activeEntry) window.KWMashaFeedlyEntries.setActiveMarker(markers, activeEntry.id);
