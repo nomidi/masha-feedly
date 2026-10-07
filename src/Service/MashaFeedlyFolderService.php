@@ -5,6 +5,7 @@ namespace KW\MashaFeedly\Service;
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use SilverStripe\Assets\Folder;
 use SilverStripe\Security\InheritedPermissions;
+use SilverStripe\Security\Group;
 
 /** Stellt die geschützte Ordnerstruktur für Masha:Feedly-Dateien her. */
 class MashaFeedlyFolderService
@@ -19,9 +20,9 @@ class MashaFeedlyFolderService
     /** Erstellt den privaten Oberordner, verschiebt Altordner hinein und synchronisiert Zugriffe. */
     public static function ensureStructure(): array
     {
-        $allowedMemberIDs = MashaFeedlyConfigExtension::memberIDs();
+        $permissionGroup = self::permissionGroup();
         $parent = Folder::find_or_make(self::PARENT_FOLDER);
-        self::restrictFolder($parent, $allowedMemberIDs);
+        self::restrictFolder($parent, $permissionGroup);
 
         $folders = [];
         foreach (self::CHILD_FOLDERS as $folderName) {
@@ -42,7 +43,7 @@ class MashaFeedlyFolderService
             if ((int)$folder->ParentID !== (int)$parent->ID) {
                 $folder->ParentID = (int)$parent->ID;
             }
-            self::restrictFolder($folder, $allowedMemberIDs);
+            self::restrictFolder($folder, $permissionGroup);
             $folders[$folderName] = $folder;
         }
 
@@ -50,10 +51,26 @@ class MashaFeedlyFolderService
     }
 
     /** Beschränkt das Anzeigen jedes Ordners auf die aktuell freigegebenen Mitglieder. */
-    private static function restrictFolder(Folder $folder, array $memberIDs): void
+    /** Stellt eine Silverstripe-4-Gruppe für die Dateiberechtigungen synchron zur SiteConfig bereit. */
+    public static function permissionGroup(): Group
     {
-        $folder->CanViewType = InheritedPermissions::ONLY_THESE_MEMBERS;
-        $folder->ViewerMembers()->setByIDList($memberIDs);
+        $group = Group::get()->filter('Code', 'MashaFeedlyUsers')->first();
+        if (!$group) {
+            $group = Group::create([
+                'Title' => 'Masha Feedly Benutzer',
+                'Code' => 'MashaFeedlyUsers',
+            ]);
+            $group->write();
+        }
+        $group->Members()->setByIDList(MashaFeedlyConfigExtension::memberIDs());
+        return $group;
+    }
+
+    /** Beschränkt Ordner auf die dedizierte Masha-Feedly-Gruppe. */
+    private static function restrictFolder(Folder $folder, Group $permissionGroup): void
+    {
+        $folder->CanViewType = InheritedPermissions::ONLY_THESE_USERS;
+        $folder->ViewerGroups()->setByIDList([(int)$permissionGroup->ID]);
         $folder->write();
     }
 }

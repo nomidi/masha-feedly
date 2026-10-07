@@ -13,9 +13,7 @@ use SilverStripe\Dev\SapphireTest;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mailer\Envelope;
-use Symfony\Component\Mime\RawMessage;
+use SilverStripe\Control\Email\Mailer;
 
 /**
  * Tests für den E-Mail-Versand bei neuen Masha-Feedly-Einträgen.
@@ -56,23 +54,23 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->Title = 'Projekt Wolke';
         $config->write();
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] */
+        $mailer = new class implements Mailer {
+            /** @var Mailer[] */
             public array $messages = [];
-            public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
+            public function send($message) { $this->messages[] = $message; }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
         try {
             MashaFeedlyNotificationService::sendTestEmail($member);
 
             $this->assertCount(1, $mailer->messages);
-            $this->assertSame('allowed@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
+            $this->assertSame('allowed@example.test', array_key_first($mailer->messages[0]->getTo()));
             $this->assertSame('Masha:Feedly – Test-E-Mail', $mailer->messages[0]->getSubject());
-            $this->assertStringContainsString('Projekt Wolke', (string)$mailer->messages[0]->getTextBody());
+            $this->assertStringContainsString('Projekt Wolke', (string)$mailer->messages[0]->getBody());
         } finally {
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 
@@ -88,13 +86,13 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
         $config->write();
 
-        $mailer = new class implements MailerInterface {
+        $mailer = new class implements Mailer {
             public array $messages = [];
-            public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
+            public function send($message) { $this->messages[] = $message; }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
         $previousMember = Security::getCurrentUser();
         try {
             Security::setCurrentUser($member);
@@ -107,15 +105,15 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $mailer->messages = [];
 
             $this->assertSame(1, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
-            $this->assertSame('allowed@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
+            $this->assertSame('allowed@example.test', array_key_first($mailer->messages[0]->getTo()));
             $this->assertSame('Projekt Wolke: Heute fällig – Termin für den Regressionstest.', $mailer->messages[0]->getSubject());
-            $this->assertStringContainsString('2026-10-04', (string)$mailer->messages[0]->getTextBody());
+            $this->assertStringContainsString('2026-10-04', (string)$mailer->messages[0]->getBody());
             $this->assertNotEmpty($entry->DueDateReminderSentAt);
             $this->assertSame(0, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
             $this->assertCount(1, $mailer->messages);
         } finally {
             Security::setCurrentUser($previousMember);
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 
@@ -129,18 +127,18 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $config->Title = 'Projekt Wolke';
         $config->write();
 
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] Gespeicherte Testnachrichten. */
+        $mailer = new class implements Mailer {
+            /** @var Mailer[] Gespeicherte Testnachrichten. */
             public array $messages = [];
 
-            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            public function send($message)
             {
                 $this->messages[] = $message;
             }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
 
         try {
             MashaFeedlyNotificationService::notifyAccessGranted($member);
@@ -148,12 +146,12 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertCount(1, $mailer->messages);
             $message = $mailer->messages[0];
             $this->assertStringContainsString('Projekt Wolke', $message->getSubject());
-            $this->assertStringContainsString('Eine Meldung erstellen', (string)$message->getTextBody());
-            $this->assertStringContainsString('Status und Zuständigkeit', (string)$message->getTextBody());
-            $this->assertStringContainsString('Benachrichtigungen und Profil', (string)$message->getTextBody());
-            $this->assertStringContainsString('freigegeben sind', (string)$message->getTextBody());
+            $this->assertStringContainsString('Eine Meldung erstellen', (string)$message->getBody());
+            $this->assertStringContainsString('Status und Zuständigkeit', (string)$message->getBody());
+            $this->assertStringContainsString('Benachrichtigungen und Profil', (string)$message->getBody());
+            $this->assertStringContainsString('freigegeben sind', (string)$message->getBody());
         } finally {
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 
@@ -167,13 +165,13 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
         $config->write();
-        $mailer = new class implements MailerInterface {
+        $mailer = new class implements Mailer {
             public array $messages = [];
-            public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
+            public function send($message) { $this->messages[] = $message; }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
         $previousMember = Security::getCurrentUser();
         try {
             Security::setCurrentUser($member);
@@ -185,7 +183,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertEmpty($entry->DueDateReminderSentAt);
         } finally {
             Security::setCurrentUser($previousMember);
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 
@@ -209,18 +207,18 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         ]);
         $config->write();
 
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] Gespeicherte Testnachrichten. */
+        $mailer = new class implements Mailer {
+            /** @var Mailer[] Gespeicherte Testnachrichten. */
             public array $messages = [];
 
-            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            public function send($message)
             {
                 $this->messages[] = $message;
             }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
 
         try {
             $entry = MashaFeedlyEntry::create([
@@ -231,20 +229,20 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
 
             $this->assertCount(1, $mailer->messages);
             $message = $mailer->messages[0];
-            $this->assertSame('allowed@example.test', $message->getTo()[0]->getAddress());
+            $this->assertSame('allowed@example.test', array_key_first($message->getTo()));
             $this->assertSame(
                 'Projekt Wolke: Neuer Masha-Feedly-Bug: Der Speichern-Button löst einen Fehler aus.',
                 $message->getSubject()
             );
-            $this->assertStringContainsString('Der Speichern-Button löst einen Fehler aus.', (string)$message->getTextBody());
-            $this->assertStringContainsString('/admin/masha-feedly/', (string)$message->getTextBody());
-            $this->assertStringContainsString('Projekt Wolke', (string)$message->getTextBody());
+            $this->assertStringContainsString('Der Speichern-Button löst einen Fehler aus.', (string)$message->getBody());
+            $this->assertStringContainsString('/admin/masha-feedly/', (string)$message->getBody());
+            $this->assertStringContainsString('Projekt Wolke', (string)$message->getBody());
 
             $entry->Content = 'Aktualisierte Beschreibung';
             $entry->write();
             $this->assertCount(1, $mailer->messages);
         } finally {
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 
@@ -259,18 +257,18 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
         $config->write();
 
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] Gespeicherte Testnachrichten. */
+        $mailer = new class implements Mailer {
+            /** @var Mailer[] Gespeicherte Testnachrichten. */
             public array $messages = [];
 
-            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            public function send($message)
             {
                 $this->messages[] = $message;
             }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
 
         try {
             MashaFeedlyEntry::create([
@@ -280,7 +278,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
 
             $this->assertCount(0, $mailer->messages);
         } finally {
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 
@@ -301,18 +299,18 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         ]);
         $config->write();
 
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] Gespeicherte Testnachrichten. */
+        $mailer = new class implements Mailer {
+            /** @var Mailer[] Gespeicherte Testnachrichten. */
             public array $messages = [];
 
-            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            public function send($message)
             {
                 $this->messages[] = $message;
             }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
 
         try {
             $entry = MashaFeedlyEntry::create([
@@ -326,24 +324,24 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $entry->write();
 
             $this->assertCount(1, $mailer->messages);
-            $this->assertStringContainsString('Aktuelle Kategorie: Doing', (string)$mailer->messages[0]->getTextBody());
+            $this->assertStringContainsString('Aktuelle Kategorie: Doing', (string)$mailer->messages[0]->getBody());
 
             $entry->Content = 'Der Fehler tritt jetzt beim Aktualisieren auf.';
             $entry->write();
 
             $this->assertCount(2, $mailer->messages);
             $message = $mailer->messages[1];
-            $this->assertSame('allowed@example.test', $message->getTo()[0]->getAddress());
+            $this->assertSame('allowed@example.test', array_key_first($message->getTo()));
             $this->assertSame(
                 'Masha Feedly: Masha-Feedly-Eintrag geändert: Der Fehler tritt jetzt beim Aktualisieren auf.',
                 $message->getSubject()
             );
-            $this->assertStringContainsString('Aktuelle Kategorie: Doing', (string)$message->getTextBody());
+            $this->assertStringContainsString('Aktuelle Kategorie: Doing', (string)$message->getBody());
 
             $entry->write();
             $this->assertCount(2, $mailer->messages);
         } finally {
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 
@@ -357,18 +355,18 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $config->write();
         $this->logInAs($member);
 
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] Gespeicherte Testnachrichten. */
+        $mailer = new class implements Mailer {
+            /** @var Mailer[] Gespeicherte Testnachrichten. */
             public array $messages = [];
 
-            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            public function send($message)
             {
                 $this->messages[] = $message;
             }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
 
         try {
             $entry = MashaFeedlyEntry::create([
@@ -395,9 +393,9 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $newEntry->write();
 
             $this->assertCount(2, $mailer->messages);
-            $this->assertSame('allowed@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
+            $this->assertSame('allowed@example.test', array_key_first($mailer->messages[0]->getTo()));
         } finally {
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 
@@ -427,27 +425,27 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         ]);
         $comment->write();
 
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] */
+        $mailer = new class implements Mailer {
+            /** @var Mailer[] */
             public array $messages = [];
-            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            public function send($message)
             {
                 $this->messages[] = $message;
             }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
         try {
             MashaFeedlyNotificationService::notifyNewComment($entry, $comment, $author);
 
             $this->assertCount(1, $mailer->messages);
             $message = $mailer->messages[0];
-            $this->assertSame('normalize@example.test', $message->getTo()[0]->getAddress());
+            $this->assertSame('normalize@example.test', array_key_first($message->getTo()));
             $this->assertSame('Projekt Wolke: Neuer Kommentar zu Fehler im Formular speichern.', $message->getSubject());
-            $this->assertStringContainsString('Erika Muster', (string)$message->getTextBody());
-            $this->assertStringContainsString('Der Button bleibt deaktiviert.', (string)$message->getTextBody());
-            $this->assertStringContainsString('/admin/masha-feedly/', (string)$message->getTextBody());
+            $this->assertStringContainsString('Erika Muster', (string)$message->getBody());
+            $this->assertStringContainsString('Der Button bleibt deaktiviert.', (string)$message->getBody());
+            $this->assertStringContainsString('/admin/masha-feedly/', (string)$message->getBody());
 
             $assignee->MashaFeedlyEmailNotifications = false;
             $assignee->write();
@@ -460,7 +458,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             MashaFeedlyNotificationService::notifyNewComment($entry, $comment, $author);
             $this->assertCount(1, $mailer->messages);
         } finally {
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 
@@ -478,17 +476,17 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$author->ID, (int)$creator->ID]);
         $config->write();
 
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] */
+        $mailer = new class implements Mailer {
+            /** @var Mailer[] */
             public array $messages = [];
-            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            public function send($message)
             {
                 $this->messages[] = $message;
             }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
         $previousMember = Security::getCurrentUser();
         try {
             Security::setCurrentUser($creator);
@@ -506,7 +504,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             MashaFeedlyNotificationService::notifyNewComment($entry, $comment, $author);
 
             $this->assertCount(1, $mailer->messages);
-            $this->assertSame('normalize@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
+            $this->assertSame('normalize@example.test', array_key_first($mailer->messages[0]->getTo()));
             $this->assertSame('Projekt Wolke: Neuer Kommentar zu Fehler der Erstellerin.', $mailer->messages[0]->getSubject());
 
             $creator->MashaFeedlyNotifyComments = false;
@@ -515,7 +513,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertCount(1, $mailer->messages, 'Abgewählte Kommentar-Mails müssen auch beim Ersteller respektiert werden.');
         } finally {
             Security::setCurrentUser($previousMember);
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 
@@ -528,30 +526,30 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->Title = 'Projekt Wolke';
 
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] */
+        $mailer = new class implements Mailer {
+            /** @var Mailer[] */
             public array $messages = [];
-            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            public function send($message)
             {
                 $this->messages[] = $message;
             }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
         try {
             $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
             $config->write();
             $this->assertCount(1, $mailer->messages);
             $message = $mailer->messages[0];
-            $this->assertSame('allowed@example.test', $message->getTo()[0]->getAddress());
+            $this->assertSame('allowed@example.test', array_key_first($message->getTo()));
             $this->assertSame('Willkommen bei Masha:Feedly auf Projekt Wolke', $message->getSubject());
-            $this->assertStringContainsString('klicke auf das plus', mb_strtolower((string)$message->getTextBody()));
+            $this->assertStringContainsString('klicke auf das plus', mb_strtolower((string)$message->getBody()));
 
             $config->write();
             $this->assertCount(1, $mailer->messages);
         } finally {
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 }

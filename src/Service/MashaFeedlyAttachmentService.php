@@ -2,7 +2,6 @@
 
 namespace KW\MashaFeedly\Service;
 
-use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use KW\MashaFeedly\Model\MashaFeedlyAttachment;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use SilverStripe\Assets\File;
@@ -73,8 +72,8 @@ class MashaFeedlyAttachmentService
             $asset->ParentID = (int)$folder->ID;
             $asset->Title = mb_substr($originalName, 0, 255);
             $asset->write();
-            $asset->CanViewType = InheritedPermissions::ONLY_THESE_MEMBERS;
-            $asset->ViewerMembers()->setByIDList(MashaFeedlyConfigExtension::memberIDs());
+            $asset->CanViewType = InheritedPermissions::ONLY_THESE_USERS;
+            $asset->ViewerGroups()->setByIDList([(int)MashaFeedlyFolderService::permissionGroup()->ID]);
             $asset->write();
             $asset->publishSingle();
             $asset->protectFile();

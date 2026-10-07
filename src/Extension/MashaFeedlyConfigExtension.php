@@ -80,7 +80,7 @@ class MashaFeedlyConfigExtension extends Extension
 
         try {
             return (bool)self::currentSiteConfig()->MashaFeedlyEmailTestSucceeded;
-        } catch (DatabaseException) {
+        } catch (DatabaseException $exception) {
             // Während eines laufenden dev/build kann die neue Spalte noch fehlen.
             return false;
         }
@@ -99,7 +99,7 @@ class MashaFeedlyConfigExtension extends Extension
     }
 
     /** Ermittelt neue Freigaben, bevor SiteConfig die bisherige Liste überschreibt. */
-    protected function onBeforeWrite(): void
+    public function onBeforeWrite(): void
     {
         $owner = $this->getOwner();
         $persisted = $owner->isInDB() ? SiteConfig::get()->byID((int)$owner->ID) : null;
@@ -110,7 +110,7 @@ class MashaFeedlyConfigExtension extends Extension
     }
 
     /** Begrüßt Mitglieder nach erfolgreicher Speicherung ihrer neuen Freigabe. */
-    protected function onAfterWrite(): void
+    public function onAfterWrite(): void
     {
         foreach ($this->newlyAllowedMemberIDs as $memberID) {
             $member = Member::get()->byID($memberID);

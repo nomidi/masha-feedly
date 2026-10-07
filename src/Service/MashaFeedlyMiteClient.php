@@ -11,10 +11,12 @@ use RuntimeException;
 /** Kommuniziert serverseitig mit dem persönlichen Mite-Konto, ohne Zugangsdaten auszugeben. */
 class MashaFeedlyMiteClient
 {
+    private ?ClientInterface $http;
+
     /** @param ClientInterface|null $http Austauschbarer HTTP-Client für isolierte API-Tests. */
-    public function __construct(private ?ClientInterface $http = null)
+    public function __construct(?ClientInterface $http = null)
     {
-        $this->http ??= new Client();
+        $this->http = $http !== null ? $http : new Client();
     }
 
     /** Prüft, ob API-Schlüssel und ein gültiger Mite-Kontoname vorhanden sind. */
@@ -154,11 +156,14 @@ class MashaFeedlyMiteClient
         }
         $status = $response->getStatusCode();
         if ($status < 200 || $status >= 300) {
-            throw new RuntimeException(match ($status) {
-                401, 403 => 'Mite hat den Zugriff abgelehnt. Bitte API-Schlüssel und Freigabe prüfen.',
-                404 => 'Mite-Konto, Projekt oder Zeiteintrag wurde nicht gefunden.',
-                default => 'Mite konnte die Anfrage nicht ausführen (HTTP ' . $status . ').',
-            });
+            if ($status === 401 || $status === 403) {
+                $message = 'Mite hat den Zugriff abgelehnt. Bitte API-Schlüssel und Freigabe prüfen.';
+            } elseif ($status === 404) {
+                $message = 'Mite-Konto, Projekt oder Zeiteintrag wurde nicht gefunden.';
+            } else {
+                $message = 'Mite konnte die Anfrage nicht ausführen (HTTP ' . $status . ').';
+            }
+            throw new RuntimeException($message);
         }
         $body = (string)$response->getBody();
         if (trim($body) === '') {

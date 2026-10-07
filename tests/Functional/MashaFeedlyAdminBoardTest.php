@@ -17,9 +17,7 @@ use SilverStripe\i18n\i18n;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\SecurityToken;
 use SilverStripe\Core\Injector\Injector;
-use Symfony\Component\Mailer\Envelope;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\RawMessage;
+use SilverStripe\Control\Email\Mailer;
 use SilverStripe\Security\Security;
 
 /**
@@ -647,11 +645,11 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $response = $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig');
         $this->assertSame(200, $response->getStatusCode());
         $this->assertStringContainsString('action_sendTestEmail', $response->getBody());
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] */
+        $mailer = new class implements Mailer {
+            /** @var Mailer[] */
             public array $messages = [];
             public ?\Throwable $failure = null;
-            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            public function send($message)
             {
                 if ($this->failure) {
                     throw $this->failure;
@@ -660,8 +658,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
         try {
             $mailer->failure = new \RuntimeException('Simulierter SMTP-Ausfall vor dem ersten erfolgreichen Versand.');
             $initialFailure = $this->submitForm('Form_EditForm', 'action_sendTestEmail');
@@ -670,24 +668,24 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             $this->assertCount(0, $mailer->messages);
 
             $mailer->failure = null;
-            $injector->registerService($mailer, MailerInterface::class);
+            $injector->registerService($mailer, Mailer::class);
             $sent = $this->submitForm('Form_EditForm', 'action_sendTestEmail');
 
             $this->assertSame(200, $sent->getStatusCode());
             $this->assertCount(1, $mailer->messages);
-            $this->assertSame((string)$admin->Email, $mailer->messages[0]->getTo()[0]->getAddress());
+            $this->assertSame((string)$admin->Email, array_key_first($mailer->messages[0]->getTo()));
             $this->assertSame('Masha:Feedly – Test-E-Mail', $mailer->messages[0]->getSubject());
             $this->assertTrue(MashaFeedlyConfigExtension::emailTestSucceeded());
 
             $mailer->failure = new \RuntimeException('Simulierter SMTP-Ausfall.');
-            $injector->registerService($mailer, MailerInterface::class);
+            $injector->registerService($mailer, Mailer::class);
             $failed = $this->submitForm('Form_EditForm', 'action_sendTestEmail');
             $this->assertSame(200, $failed->getStatusCode());
             $this->assertStringContainsString('Test-E-Mail konnte nicht gesendet werden', $failed->getBody());
             $this->assertCount(1, $mailer->messages);
             $this->assertTrue(MashaFeedlyConfigExtension::emailTestSucceeded());
         } finally {
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 

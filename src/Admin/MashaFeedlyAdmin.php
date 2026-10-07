@@ -14,6 +14,7 @@ use KW\MashaFeedly\Service\MashaFeedlyMiteClient;
 use KW\MashaFeedly\Service\MashaFeedlyMiteService;
 use KW\MashaFeedly\Service\MashaFeedlyResetService;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
+use KW\MashaFeedly\Service\MashaFeedlyFolderService;
 use SilverStripe\Assets\Image;
 use SilverStripe\Admin\ModelAdmin;
 use SilverStripe\Control\Controller;
@@ -143,7 +144,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             $form = parent::getEditForm($id, $fields);
             if (
                 $this->modelClass === MashaFeedlyEntry::class
-                && !str_contains((string)$this->getRequest()->getURL(), '/item/')
+                && strpos((string)$this->getRequest()->getURL(), '/item/') === false
             ) {
                 $gridFieldName = $this->sanitiseClassName($this->modelTab);
                 $gridField = $form->Fields()->dataFieldByName($gridFieldName);
@@ -1171,7 +1172,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             $fragment = substr($pageURL, $fragmentPosition);
             $pageURL = substr($pageURL, 0, $fragmentPosition);
         }
-        $separator = str_contains($pageURL, '?') ? '&' : '?';
+        $separator = strpos($pageURL, '?') !== false ? '&' : '?';
         return $pageURL . $separator . 'masha-feedly-entry=' . (int)$entry->ID . $fragment;
     }
 
@@ -1271,8 +1272,8 @@ class MashaFeedlyAdmin extends ModelAdmin
         if ($canManageSensitiveSettings) {
             $folder = MashaFeedlyMemberExtension::protectedIconFolder();
             foreach (Image::get()->filter('ParentID', (int)$folder->ID) as $profileImage) {
-                $profileImage->CanViewType = \SilverStripe\Security\InheritedPermissions::ONLY_THESE_MEMBERS;
-                $profileImage->ViewerMembers()->setByIDList($memberIDs);
+                $profileImage->CanViewType = \SilverStripe\Security\InheritedPermissions::ONLY_THESE_USERS;
+                $profileImage->ViewerGroups()->setByIDList([(int)MashaFeedlyFolderService::permissionGroup()->ID]);
                 $profileImage->write();
                 $profileImage->publishSingle();
                 $profileImage->protectFile();

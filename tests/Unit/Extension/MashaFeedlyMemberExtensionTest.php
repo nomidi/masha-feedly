@@ -41,6 +41,20 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         i18n::set_locale('de_DE');
     }
 
+    /** Regressionstest: Silverstripe ruft Member-Extension-Hooks beim Schreiben über den Owner auf. */
+    public function testMemberCanBeWrittenWithExtensionHooks(): void
+    {
+        $member = Member::create([
+            'FirstName' => 'Build Hook',
+            'Surname' => 'Regression',
+            'Email' => 'build-hook-regression@example.test',
+        ]);
+
+        $member->write();
+
+        $this->assertGreaterThan(0, (int)$member->ID);
+    }
+
     /** Prüft, dass freigegebene Mitglieder die Einstellungen im Profilformular sehen. */
     public function testAllowedMemberSeesEmailPreferencesInProfile(): void
     {
@@ -110,19 +124,19 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
 
         $this->assertSame(
             'MashaFeedlyEmailNotifications',
-            $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyNewEntries')->DisplayLogicDispatchers()
+            $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyNewEntries')->DisplayLogicMasters()
         );
         $this->assertSame(
             'MashaFeedlyEmailNotifications',
-            $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyEntryUpdates')->DisplayLogicDispatchers()
+            $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyEntryUpdates')->DisplayLogicMasters()
         );
         $this->assertSame(
             'MashaFeedlyEmailNotifications',
-            $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyOwnEntryChanges')->DisplayLogicDispatchers()
+            $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyOwnEntryChanges')->DisplayLogicMasters()
         );
         $this->assertSame(
             'MashaFeedlyEmailNotifications',
-            $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyComments')->DisplayLogicDispatchers()
+            $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyComments')->DisplayLogicMasters()
         );
         $this->assertStringContainsString('Erhalte eine E-Mail', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyNewEntries')->getDescription());
         $this->assertStringContainsString('selbst erstellst oder änderst', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyOwnEntryChanges')->getDescription());
@@ -255,6 +269,7 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $allowedMember = $this->objFromFixture(Member::class, 'allowed');
         $blockedMember = $this->objFromFixture(Member::class, 'notAllowed');
         $this->allowMember($allowedMember);
+        $permissionGroup = MashaFeedlyFolderService::permissionGroup();
         TestAssetStore::activate('masha-feedly-avatar-security-test');
         $temporaryImage = tempnam(sys_get_temp_dir(), 'masha-feedly-avatar-');
         file_put_contents(
@@ -272,8 +287,8 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
             ]);
             $legacyAttachment->setFromLocalFile($temporaryImage, 'bestehender-anhaeng.png');
             $legacyAttachment->ParentID = (int)$legacyAttachmentFolder->ID;
-            $legacyAttachment->CanViewType = InheritedPermissions::ONLY_THESE_MEMBERS;
-            $legacyAttachment->ViewerMembers()->setByIDList([(int)$allowedMember->ID]);
+            $legacyAttachment->CanViewType = InheritedPermissions::ONLY_THESE_USERS;
+            $legacyAttachment->ViewerGroups()->setByIDList([(int)$permissionGroup->ID]);
             $legacyAttachment->write();
             $legacyAvatar = Image::create([
                 'Name' => 'bestehendes-profilbild.png',
@@ -281,8 +296,8 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
             ]);
             $legacyAvatar->setFromLocalFile($temporaryImage, 'bestehendes-profilbild.png');
             $legacyAvatar->ParentID = (int)$legacyProfileFolder->ID;
-            $legacyAvatar->CanViewType = InheritedPermissions::ONLY_THESE_MEMBERS;
-            $legacyAvatar->ViewerMembers()->setByIDList([(int)$allowedMember->ID]);
+            $legacyAvatar->CanViewType = InheritedPermissions::ONLY_THESE_USERS;
+            $legacyAvatar->ViewerGroups()->setByIDList([(int)$permissionGroup->ID]);
             $legacyAvatar->write();
             $allowedMember->MashaFeedlyIconImageID = (int)$legacyAvatar->ID;
             $allowedMember->write();
@@ -291,18 +306,18 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
             $parent = $structure['parent'];
             $this->assertSame('masha-feedly', (string)$parent->Name);
             $this->assertSame('masha-feedly', (string)$parent->Title);
-            $this->assertSame(InheritedPermissions::ONLY_THESE_MEMBERS, $parent->CanViewType);
-            $this->assertSame([(int)$allowedMember->ID], array_map('intval', $parent->ViewerMembers()->column('ID')));
+            $this->assertSame(InheritedPermissions::ONLY_THESE_USERS, $parent->CanViewType);
+            $this->assertSame([(int)$permissionGroup->ID], array_map('intval', $parent->ViewerGroups()->column('ID')));
             foreach ($structure['children'] as $child) {
                 $this->assertSame((int)$parent->ID, (int)$child->ParentID);
-                $this->assertSame(InheritedPermissions::ONLY_THESE_MEMBERS, $child->CanViewType);
-                $this->assertSame([(int)$allowedMember->ID], array_map('intval', $child->ViewerMembers()->column('ID')));
+                $this->assertSame(InheritedPermissions::ONLY_THESE_USERS, $child->CanViewType);
+                $this->assertSame([(int)$permissionGroup->ID], array_map('intval', $child->ViewerGroups()->column('ID')));
             }
             $movedAttachment = File::get()->byID((int)$legacyAttachment->ID);
             $movedAvatar = Image::get()->byID((int)$legacyAvatar->ID);
             $this->assertSame((int)$structure['children']['masha-feedly-attachments']->ID, (int)$movedAttachment->ParentID);
             $this->assertSame((int)$structure['children']['masha-feedly-profile-images']->ID, (int)$movedAvatar->ParentID);
-            $this->assertTrue($movedAvatar->canView($allowedMember), 'MOVED avatar parent=' . $movedAvatar->Parent()->Name . ' canUse=' . (int)MashaFeedlyConfigExtension::canUse($allowedMember) . ' type=' . $movedAvatar->CanViewType . ' viewers=' . implode(',', $movedAvatar->ViewerMembers()->column('ID')));
+            $this->assertTrue($movedAvatar->canView($allowedMember), 'MOVED avatar parent=' . $movedAvatar->Parent()->Name . ' canUse=' . (int)MashaFeedlyConfigExtension::canUse($allowedMember) . ' type=' . $movedAvatar->CanViewType . ' viewer groups=' . implode(',', $movedAvatar->ViewerGroups()->column('ID')));
             $this->assertFalse($movedAvatar->canView($blockedMember));
             $this->logOut();
             $this->assertFalse($movedAvatar->canView());
@@ -323,9 +338,9 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
             $fileID = $assetStore->getFileID($savedImage->getFilename(), $savedImage->getHash());
             $publicPath = TestAssetStore::base_path() . '/' . $fileID;
 
-            $this->assertSame(InheritedPermissions::ONLY_THESE_MEMBERS, $savedImage->CanViewType);
-            $this->assertSame([(int)$allowedMember->ID], array_map('intval', $savedImage->ViewerMembers()->column('ID')));
-            $this->assertGreaterThan(0, $savedImage->ViewerMembers()->filter('ID', (int)$allowedMember->ID)->count());
+            $this->assertSame(InheritedPermissions::ONLY_THESE_USERS, $savedImage->CanViewType);
+            $this->assertSame([(int)$permissionGroup->ID], array_map('intval', $savedImage->ViewerGroups()->column('ID')));
+            $this->assertGreaterThan(0, $savedImage->ViewerGroups()->filter('ID', (int)$permissionGroup->ID)->count());
             $this->logInAs($allowedMember);
             $this->assertTrue(MashaFeedlyConfigExtension::canUse($allowedMember));
             $this->assertSame('masha-feedly-profile-images', (string)$savedImage->Parent()->Name);

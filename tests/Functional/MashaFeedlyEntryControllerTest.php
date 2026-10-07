@@ -24,9 +24,7 @@ use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\Security;
 use SilverStripe\Security\SecurityToken;
-use Symfony\Component\Mailer\Envelope;
-use Symfony\Component\Mailer\MailerInterface;
-use Symfony\Component\Mime\RawMessage;
+use SilverStripe\Control\Email\Mailer;
 
 /** Prüft das Erstellen eines Eintrags aus der Masha-Feedly-Auswahl.
  *
@@ -868,19 +866,19 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             $file = File::get()->byID((int)$attachment->FileID);
             $this->assertNotNull($file);
             $this->assertTrue($file->canView($allowed));
+            $fileURL = $file->getURL(false);
 
-            // Check unauthorized sessions first: a permitted protected-file request
-            // can grant the URL to that same session in SilverStripe's asset store.
+            // Avoid granting the URL to the current session while checking access.
             $this->logInAs($blocked);
-            $blockedResponse = $this->get($file->getURL());
+            $blockedResponse = $this->get($fileURL);
             $this->assertNotSame($imageBytes, $blockedResponse->getBody());
 
             $this->logOut();
-            $anonymousResponse = $this->get($file->getURL());
+            $anonymousResponse = $this->get($fileURL);
             $this->assertNotSame($imageBytes, $anonymousResponse->getBody());
 
             $this->logInAs($allowed);
-            $allowedResponse = $this->get($file->getURL());
+            $allowedResponse = $this->get($fileURL);
             $this->assertSame(200, $allowedResponse->getStatusCode());
             $this->assertSame($imageBytes, $allowedResponse->getBody());
         } finally {
@@ -1824,15 +1822,15 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $config->write();
         $this->logInAs($author);
 
-        $mailer = new class implements MailerInterface {
-            public function send(RawMessage $message, ?Envelope $envelope = null): void
+        $mailer = new class implements Mailer {
+            public function send($message)
             {
                 throw new \RuntimeException('Simulierter SMTP-Ausfall.');
             }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
         try {
             $response = $this->post('/__masha-feedly/createEntry', [
                 'SecurityID' => SecurityToken::getSecurityID(),
@@ -1844,7 +1842,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             $this->assertTrue($data['success']);
             $this->assertNotNull(MashaFeedlyEntry::get()->byID((int)$data['entryID']));
         } finally {
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 
@@ -1867,17 +1865,17 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$author->ID, (int)$assignee->ID]);
         $config->write();
 
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] */
+        $mailer = new class implements Mailer {
+            /** @var Mailer[] */
             public array $messages = [];
-            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            public function send($message)
             {
                 $this->messages[] = $message;
             }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
         try {
             $this->logInAs($author);
             $entry = MashaFeedlyEntry::create(['Content' => 'Fehler mit der Suche.', 'PageURL' => 'https://example.test']);
@@ -1893,8 +1891,8 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
 
             $this->assertSame(200, $response->getStatusCode());
             $this->assertCount(1, $mailer->messages);
-            $this->assertSame('normalize@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
-            $this->assertStringContainsString('Die Suche findet keine Ergebnisse.', (string)$mailer->messages[0]->getTextBody());
+            $this->assertSame('normalize@example.test', array_key_first($mailer->messages[0]->getTo()));
+            $this->assertStringContainsString('Die Suche findet keine Ergebnisse.', (string)$mailer->messages[0]->getBody());
             $listData = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
             $entryPayload = array_values(array_filter(
                 $listData['entries'],
@@ -1909,7 +1907,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             $this->assertSame('created', $history[1]['type']);
             $this->assertSame('Erika Muster', $history[1]['actor']);
         } finally {
-            $injector->registerService($originalMailer, MailerInterface::class);
+            $injector->registerService($originalMailer, Mailer::class);
         }
     }
 

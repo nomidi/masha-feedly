@@ -106,6 +106,7 @@ class MashaFeedlyWidgetExtension extends Extension
                 ];
             }
         }
+        $currentMember = Security::getCurrentUser();
         $markup = $this->owner->renderWith('KW/MashaFeedly/Includes/MashaFeedlyWidget', [
             'CreateEntryURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'createEntry'),
             'ListEntriesURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'listEntries'),
@@ -125,9 +126,9 @@ class MashaFeedlyWidgetExtension extends Extension
             'TokenValue' => SecurityToken::inst()->getValue(),
             // Admins may use the widget for configuration, but the guided tour is
             // only for members explicitly added to the Masha:Feedly access list.
-            'OnboardingEnabled' => MashaFeedlyConfigExtension::isExplicitlyAllowed(Security::getCurrentUser())
-                && (!((bool)(Security::getCurrentUser()?->MashaFeedlyOnboardingCompleted ?? false))
-                    || (bool)(Security::getCurrentUser()?->MashaFeedlyShowOnboarding ?? false)),
+            'OnboardingEnabled' => MashaFeedlyConfigExtension::isExplicitlyAllowed($currentMember)
+                && (!((bool)($currentMember ? $currentMember->MashaFeedlyOnboardingCompleted : false))
+                    || (bool)($currentMember ? $currentMember->MashaFeedlyShowOnboarding : false)),
             // Silverstripe templates iterate SS_List instances; plain PHP arrays
             // render as empty items in <% loop %> and leave these selects blank.
             'Categories' => ArrayList::create($categories),

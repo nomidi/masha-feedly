@@ -38,8 +38,8 @@ class MashaFeedlyEntryHistory extends DataObject
             'ChangeType' => $type,
             'OldValue' => $oldValue,
             'NewValue' => $newValue,
-            'ActorMemberID' => (int)($actor?->ID ?? 0),
-            'ActorName' => mb_substr($actor?->getName() ?: 'System', 0, 120),
+            'ActorMemberID' => $actor ? (int)$actor->ID : 0,
+            'ActorName' => mb_substr($actor ? ($actor->getName() ?: 'System') : 'System', 0, 120),
             'RelatedID' => $relatedID,
         ])->write();
     }

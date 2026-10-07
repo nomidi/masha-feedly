@@ -3,12 +3,15 @@
 namespace KW\MashaFeedly\Tests\Unit\Model;
 
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
+use KW\MashaFeedly\Service\MashaFeedlyFolderService;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Forms\DropdownField;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use SilverStripe\ORM\DB;
 use SilverStripe\SiteConfig\SiteConfig;
+use SilverStripe\Assets\Folder;
+use SilverStripe\Security\InheritedPermissions;
 
 /**
  * Tests für die GTD-Statuskategorien von Masha Feedly.
@@ -54,6 +57,20 @@ class MashaFeedlyCategoryTest extends SapphireTest
         $this->assertTrue((bool)MashaFeedlyCategory::get()->filter('Title', 'Done')->first()->IsClosed);
         $this->assertTrue((bool)MashaFeedlyCategory::get()->filter('Title', 'Archiv')->first()->IsClosed);
         $this->assertFalse((bool)MashaFeedlyCategory::get()->filter('Title', 'Backlog')->first()->IsClosed);
+    }
+
+    /** Regressionstest für den Category-RequireDefaultRecords-Hook während dev/build. */
+    public function testRequireDefaultRecordsCreatesRestrictedAssetFolders(): void
+    {
+        MashaFeedlyCategory::singleton()->requireDefaultRecords();
+
+        $folder = Folder::get()->filter('Name', 'masha-feedly')->first();
+        $this->assertNotNull($folder);
+        $this->assertSame(InheritedPermissions::ONLY_THESE_USERS, $folder->CanViewType);
+        $this->assertSame(
+            [(int)MashaFeedlyFolderService::permissionGroup()->ID],
+            array_map('intval', $folder->ViewerGroups()->column('ID'))
+        );
     }
 
     /** Prüft, dass eigene Kategorien zusätzlich zu den Standardkategorien angelegt werden können. */

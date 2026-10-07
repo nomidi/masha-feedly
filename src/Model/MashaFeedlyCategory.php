@@ -284,7 +284,7 @@ class MashaFeedlyCategory extends DataObject
         }
         if ($this->isInDB()) {
             $stored = self::get()->byID((int)$this->ID);
-            $oldRole = (string)($stored?->SystemKey ?? '');
+            $oldRole = $stored ? (string)$stored->SystemKey : '';
             if (!self::$roleTransferInProgress
                 && in_array($oldRole, ['backlog', 'done', 'feedback'], true) && $oldRole !== $role
                 && !self::get()->filter('SystemKey', $oldRole)->exclude('ID', (int)$this->ID)->exists()

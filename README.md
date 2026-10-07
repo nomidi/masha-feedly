@@ -40,8 +40,8 @@ sake dev/build flush=1
 
 ## Anforderungen
 
-- PHP 8.3 oder neuer
-- Silverstripe Framework 6.2 oder neuer
+- PHP 7.4 oder neuer
+- Silverstripe CMS 4.13 oder neuer innerhalb der Silverstripe-4-Reihe
 
 ## Fälligkeitserinnerungen
 

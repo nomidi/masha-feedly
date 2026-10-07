@@ -137,7 +137,7 @@ class MashaFeedlyMemberExtension extends Extension
     /** Liefert das persönliche Theme oder bei leerer Auswahl die konfigurierte Website-Vorgabe. */
     public static function themeFor(?Member $member): string
     {
-        $theme = strtolower(trim((string)($member?->MashaFeedlyTheme ?? '')));
+        $theme = strtolower(trim((string)($member ? $member->MashaFeedlyTheme : '')));
         return in_array($theme, ['playful', 'serious'], true)
             ? $theme
             : MashaFeedlyConfigExtension::theme();
@@ -153,8 +153,13 @@ class MashaFeedlyMemberExtension extends Extension
                 $counts[$normalized]++;
             }
         }
-        asort($counts);
-        return (string)array_key_first($counts);
+        $selectedColor = (string)array_key_first($counts);
+        foreach ($counts as $color => $count) {
+            if ($count < $counts[$selectedColor]) {
+                $selectedColor = (string)$color;
+            }
+        }
+        return $selectedColor;
     }
 
     /** Liefert die Initialen des Mitglieds als Avatar-Fallback. */
@@ -170,7 +175,7 @@ class MashaFeedlyMemberExtension extends Extension
     }
 
     /** Aktiviert die Einführung erneut, wenn das Profil die Wiederholung anfordert. */
-    protected function onBeforeWrite(): void
+    public function onBeforeWrite(): void
     {
         if (!MashaFeedlyConfigExtension::emailTestSucceeded()) {
             $notificationFields = [
@@ -199,7 +204,7 @@ class MashaFeedlyMemberExtension extends Extension
     }
 
     /** Sichert das Masha-Feedly-Profilbild ab und begrenzt es auf freigegebene Mitglieder. */
-    protected function onAfterWrite(): void
+    public function onAfterWrite(): void
     {
         $this->protectMashaFeedlyIconImage();
     }
@@ -212,8 +217,8 @@ class MashaFeedlyMemberExtension extends Extension
             return;
         }
 
-        $image->CanViewType = InheritedPermissions::ONLY_THESE_MEMBERS;
-        $image->ViewerMembers()->setByIDList(MashaFeedlyConfigExtension::memberIDs());
+        $image->CanViewType = InheritedPermissions::ONLY_THESE_USERS;
+        $image->ViewerGroups()->setByIDList([(int)MashaFeedlyFolderService::permissionGroup()->ID]);
         $image->write();
         $image->publishSingle();
         $image->protectFile();
@@ -234,7 +239,7 @@ class MashaFeedlyMemberExtension extends Extension
     }
 
     /** Fügt die Benachrichtigungsoptionen zum normalen Mitgliederformular hinzu. */
-    protected function updateCMSFields(FieldList $fields): void
+    public function updateCMSFields(FieldList $fields): void
     {
         $fields->removeByName([
             'MashaFeedlyEmailNotifications',

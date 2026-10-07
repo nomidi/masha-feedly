@@ -8,53 +8,28 @@ use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
 use SilverStripe\ORM\DB;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\SiteConfig\SiteConfig;
+use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Dev\BuildTask;
-use SilverStripe\PolyExecution\PolyOutput;
-use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputInterface;
 
 /** Versendet einmal täglich E-Mail-Erinnerungen für fällige offene Einträge. */
 class MashaFeedlyDueDateReminderTask extends BuildTask
 {
-    protected static string $commandName = 'MashaFeedlyDueDateReminderTask';
+    private static $segment = 'MashaFeedlyDueDateReminderTask';
+    protected $title = 'Masha:Feedly – Fälligkeitserinnerungen';
+    protected $description = 'Versendet einmalige Erinnerungen für heute oder überfällige Einträge.';
+    protected $enabled = true;
 
-    public function __construct()
+    /** Führt den täglichen Erinnerungsversand mit dem klassischen Silverstripe-4-Taskrunner aus. */
+    public function run($request)
     {
-        parent::__construct();
-        $this->title = 'Masha:Feedly – Fälligkeitserinnerungen';
-        $this->description = 'Versendet einmalige Erinnerungen für heute oder überfällige Einträge.';
-    }
-
-    /** Führt den täglichen Erinnerungsversand aus. */
-    protected function execute(InputInterface $input, PolyOutput $output): int
-    {
-        if (MashaFeedlyConfigExtension::dueDateReminderMode() !== 'cron') {
-            $output->writeln('Fälligkeitserinnerungen werden bei Websitebesuchen geprüft; Cronjob übersprungen.');
-            return Command::SUCCESS;
-        }
-
-        $today = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Berlin')))->format('Y-m-d');
-        $sent = self::sendDueRemindersForDate($today);
-        $output->writeln(sprintf('Fälligkeitserinnerungen versendet: %d', $sent));
-        return Command::SUCCESS;
-    }
-
-    /** Unterstützt den klassischen Task-Aufruf aus Silverstripe 5 und PolyExecution in Silverstripe 6. */
-    public function run($input, $output = null): int
-    {
-        if ($output instanceof PolyOutput) {
-            return parent::run($input, $output);
-        }
-
         if (MashaFeedlyConfigExtension::dueDateReminderMode() !== 'cron') {
             echo 'Fälligkeitserinnerungen werden bei Websitebesuchen geprüft; Cronjob übersprungen.';
-            return Command::SUCCESS;
+            return;
         }
 
         $today = (new \DateTimeImmutable('now', new \DateTimeZone('Europe/Berlin')))->format('Y-m-d');
         $sent = self::sendDueRemindersForDate($today);
         echo sprintf('Fälligkeitserinnerungen versendet: %d', $sent);
-        return Command::SUCCESS;
     }
 
     /** Führt die Prüfung bei der ersten Websiteanfrage des konfigurierten Tages höchstens einmal aus. */

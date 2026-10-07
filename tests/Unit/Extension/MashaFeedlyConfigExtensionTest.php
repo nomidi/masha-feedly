@@ -20,6 +20,17 @@ class MashaFeedlyConfigExtensionTest extends SapphireTest
 {
     protected static $fixture_file = '../../fixtures/MashaFeedlyConfig.yml';
 
+    /** Regressionstest: Silverstripe ruft Extension-Hooks beim Schreiben über den Owner auf. */
+    public function testSiteConfigCanBeWrittenWithExtensionHooks(): void
+    {
+        $siteConfig = SiteConfig::create();
+        $siteConfig->MashaFeedlyAllowedMemberIDs = json_encode([]);
+
+        $siteConfig->write();
+
+        $this->assertGreaterThan(0, (int)$siteConfig->ID);
+    }
+
     /** Stellt sicher, dass SiteConfig-Felder physisch angelegt sind und regulär gelesen werden können. */
     public function testThemeFieldExistsInSiteConfigSchema(): void
     {

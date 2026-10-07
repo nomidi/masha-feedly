@@ -192,17 +192,26 @@ class MashaFeedlyEntry extends DataObject
                     ->setRows(3),
             ]);
         }
-        $fields->fieldByName('PageURL')?->setTitle($this->translate('FIELD_PAGE_URL', 'Seitenadresse'))->setReadonly(true);
-        $fields->fieldByName('ElementSelector')?->setTitle($this->translate('FIELD_SELECTOR', 'Ausgewählter Bereich'))->setReadonly(true);
-        $fields->fieldByName('ElementText')?->setTitle($this->translate('FIELD_ELEMENT_TEXT', 'Text im ausgewählten Bereich'))->setReadonly(true);
-        $fields->fieldByName('ElementPositionX')?->setTitle($this->translate('FIELD_ELEMENT_POSITION_X', 'Klickstelle X (relativ)'))->setReadonly(true);
-        $fields->fieldByName('ElementPositionY')?->setTitle($this->translate('FIELD_ELEMENT_POSITION_Y', 'Klickstelle Y (relativ)'))->setReadonly(true);
-        $fields->fieldByName('OperatingSystem')?->setTitle($this->translate('FIELD_OPERATING_SYSTEM', 'Betriebssystem'))->setReadonly(true);
-        $fields->fieldByName('Browser')?->setTitle($this->translate('FIELD_BROWSER', 'Browser'))->setReadonly(true);
-        $fields->fieldByName('UserAgent')?->setTitle($this->translate('FIELD_USER_AGENT', 'Browserkennung'))->setReadonly(true);
-        $fields->fieldByName('Resolution')?->setTitle($this->translate('FIELD_RESOLUTION', 'Bildschirmauflösung'))->setReadonly(true);
-        $fields->fieldByName('BrowserWindow')?->setTitle($this->translate('FIELD_BROWSER_WINDOW', 'Browserfenster'))->setReadonly(true);
-        $fields->fieldByName('ColorDepth')?->setTitle($this->translate('FIELD_COLOR_DEPTH', 'Farbtiefe (Bit)'))->setReadonly(true);
+        $readonlyFields = [
+            'PageURL' => ['FIELD_PAGE_URL', 'Seitenadresse'],
+            'ElementSelector' => ['FIELD_SELECTOR', 'Ausgewählter Bereich'],
+            'ElementText' => ['FIELD_ELEMENT_TEXT', 'Text im ausgewählten Bereich'],
+            'ElementPositionX' => ['FIELD_ELEMENT_POSITION_X', 'Klickstelle X (relativ)'],
+            'ElementPositionY' => ['FIELD_ELEMENT_POSITION_Y', 'Klickstelle Y (relativ)'],
+            'OperatingSystem' => ['FIELD_OPERATING_SYSTEM', 'Betriebssystem'],
+            'Browser' => ['FIELD_BROWSER', 'Browser'],
+            'UserAgent' => ['FIELD_USER_AGENT', 'Browserkennung'],
+            'Resolution' => ['FIELD_RESOLUTION', 'Bildschirmauflösung'],
+            'BrowserWindow' => ['FIELD_BROWSER_WINDOW', 'Browserfenster'],
+            'ColorDepth' => ['FIELD_COLOR_DEPTH', 'Farbtiefe (Bit)'],
+        ];
+        foreach ($readonlyFields as $fieldName => $title) {
+            $field = $fields->fieldByName($fieldName);
+            if ($field) {
+                $field->setTitle($this->translate($title[0], $title[1]));
+                $field->setReadonly(true);
+            }
+        }
         if ($this->Attachments()->exists()) {
             $attachmentHTML = '<ul class="masha-feedly-admin-attachments">';
             foreach ($this->Attachments() as $attachment) {
@@ -329,7 +338,7 @@ class MashaFeedlyEntry extends DataObject
             ->sort('Created ASC, ID ASC')
             ->first();
 
-        return (int)($createdEvent?->ActorMemberID ?? 0);
+        return $createdEvent ? (int)$createdEvent->ActorMemberID : 0;
     }
 
     /** Prüft die explizite Betreiberfreigabe; CMS-ADMIN-Rechte allein reichen absichtlich nicht. */
@@ -433,7 +442,7 @@ class MashaFeedlyEntry extends DataObject
             ->filter(['EntryID' => (int)$this->ID, 'ChangeType' => 'created'])
             ->sort('Created ASC, ID ASC')
             ->first();
-        return (string)($createdEvent?->ActorName ?: '');
+        return $createdEvent ? (string)($createdEvent->ActorName ?: '') : '';
     }
 
     private function resolveReporterName(int $memberID): string
@@ -453,7 +462,7 @@ class MashaFeedlyEntry extends DataObject
             ->filter(['EntryID' => (int)$this->ID, 'ChangeType' => 'created'])
             ->sort('Created ASC, ID ASC')
             ->first();
-        return (string)($createdEvent?->ActorName ?: '');
+        return $createdEvent ? (string)($createdEvent->ActorName ?: '') : '';
     }
 
     /** Merkt sich, ob der Eintrag neu angelegt wird. */
@@ -473,7 +482,7 @@ class MashaFeedlyEntry extends DataObject
             if ($storedEntry) {
                 $oldRole = (string)$storedEntry->Category()->SystemKey;
                 $newCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
-                $newRole = (string)($newCategory?->SystemKey ?? '');
+                $newRole = $newCategory ? (string)$newCategory->SystemKey : '';
                 $invalidEstimateTransition = ($newRole === 'estimate_pending'
                         && !self::canManageEstimate()
                         && !($oldRole === 'estimate_pending' && (int)$storedEntry->CategoryID === (int)$this->CategoryID))
@@ -491,7 +500,7 @@ class MashaFeedlyEntry extends DataObject
                 $this->notifyCostEstimateRequestedAfterWrite = $oldRole !== 'estimate_pending'
                     && $newRole === 'estimate_pending'
                     && self::canManageEstimate();
-                if (self::canManageEstimate() && (string)($newCategory?->SystemKey ?? '') === 'estimate_pending') {
+                if (self::canManageEstimate() && $newCategory && (string)$newCategory->SystemKey === 'estimate_pending') {
                     $calculated = self::calculateEstimate((string)$this->EstimatedCostDuration, MashaFeedlyConfigExtension::hourlyRate());
                     if ($calculated) {
                         $this->EstimatedCostAmount = $calculated['minimum'];
@@ -509,7 +518,7 @@ class MashaFeedlyEntry extends DataObject
                 || (string)$storedEntry->EstimatedCostNote !== (string)$this->EstimatedCostNote
             )) {
                 $targetCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
-                if (!self::canManageEstimate() || (string)($targetCategory?->SystemKey ?? '') !== 'estimate_pending') {
+                if (!self::canManageEstimate() || !$targetCategory || (string)$targetCategory->SystemKey !== 'estimate_pending') {
                     $this->EstimatedCostAmount = $storedEntry->EstimatedCostAmount;
                     $this->EstimatedCostAmountMax = $storedEntry->EstimatedCostAmountMax;
                     $this->EstimatedCostDuration = $storedEntry->EstimatedCostDuration;
@@ -549,7 +558,7 @@ class MashaFeedlyEntry extends DataObject
             }
             if (!self::canManageEstimate()) {
                 $requestedCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
-                if (in_array((string)($requestedCategory?->SystemKey ?? ''), ['estimate_pending', 'estimate_approved'], true)) {
+                if (in_array($requestedCategory ? (string)$requestedCategory->SystemKey : '', ['estimate_pending', 'estimate_approved'], true)) {
                     $this->CategoryID = (int)MashaFeedlyCategory::defaultCategory()->ID;
                 }
                 $this->EstimatedCostAmount = null;
@@ -560,7 +569,7 @@ class MashaFeedlyEntry extends DataObject
             }
         }
         $targetCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
-        if (self::canManageEstimate() && (string)($targetCategory?->SystemKey ?? '') === 'estimate_pending') {
+        if (self::canManageEstimate() && $targetCategory && (string)$targetCategory->SystemKey === 'estimate_pending') {
             $calculated = self::calculateEstimate((string)$this->EstimatedCostDuration, MashaFeedlyConfigExtension::hourlyRate());
             if ($calculated) {
                 $this->EstimatedCostAmount = $calculated['minimum'];
@@ -598,11 +607,12 @@ class MashaFeedlyEntry extends DataObject
     {
         $result = parent::validate();
         $newCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
-        $newRole = (string)($newCategory?->SystemKey ?? '');
+        $newRole = $newCategory ? (string)$newCategory->SystemKey : '';
         $oldRole = '';
         if ($this->isInDB()) {
             $storedEntry = self::get()->byID((int)$this->ID);
-            $oldRole = (string)($storedEntry?->Category()->SystemKey ?? '');
+            $oldCategory = $storedEntry ? $storedEntry->Category() : null;
+            $oldRole = $oldCategory ? (string)$oldCategory->SystemKey : '';
             if ($oldRole === 'estimate_pending' && !in_array($newRole, ['estimate_pending', 'estimate_approved'], true)) {
                 $result->addFieldError('CategoryID', $this->translate(
                     'ESTIMATE_APPROVAL_REQUIRED',

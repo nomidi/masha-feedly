@@ -140,7 +140,8 @@ class MashaFeedlyNotificationService
         );
         $bugDescription = trim(html_entity_decode(strip_tags((string)$entry->Content), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
         $siteTitle = trim((string)SiteConfig::current_site_config()->Title);
-        $currentMemberID = (int)(Security::getCurrentUser()?->ID ?? 0);
+        $currentMember = Security::getCurrentUser();
+        $currentMemberID = $currentMember ? (int)$currentMember->ID : 0;
         if ($siteTitle === '') {
             $siteTitle = 'Masha:Feedly';
         }
@@ -186,7 +187,8 @@ class MashaFeedlyNotificationService
             MashaFeedlyAdmin::singleton()->getCMSEditLinkForManagedDataObject($entry)
         );
         $siteTitle = trim((string)SiteConfig::current_site_config()->Title);
-        $currentMemberID = (int)(Security::getCurrentUser()?->ID ?? 0);
+        $currentMember = Security::getCurrentUser();
+        $currentMemberID = $currentMember ? (int)$currentMember->ID : 0;
         if ($siteTitle === '') {
             $siteTitle = 'Masha:Feedly';
         }
