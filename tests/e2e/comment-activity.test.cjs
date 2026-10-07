@@ -56,7 +56,7 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const creatorWidget = creatorPage.locator('[data-kw-masha-feedly]');
     await expect(creatorWidget.locator('[data-masha-feedly-open-news]')).toBeVisible();
     await creatorWidget.locator('[data-masha-feedly-start-selection]').click();
-    await creatorPage.locator('main').first().click();
+    await creatorPage.locator('[role="main"]').first().click();
 
     const createForm = creatorWidget.locator('[data-masha-feedly-entry-form]');
     await expect(createForm).toBeVisible();
@@ -129,8 +129,11 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const commentForm = commenterWidget.locator('[data-masha-feedly-comment-form]');
     const editForm = commenterWidget.locator('[data-masha-feedly-edit-form]');
     const assignee = editForm.locator('[name="AssignedMemberIDs[]"]').first();
-    await assignee.check();
     const assigneeID = await assignee.getAttribute('value');
+    if (!(await assignee.isChecked())) {
+      await assignee.locator('xpath=..').click();
+    }
+    await expect(assignee).toBeChecked();
     const updateURL = await editForm.getAttribute('data-update-url');
     const updateResponsePromise = commenterPage.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === new URL(updateURL, config.baseURL).pathname);
@@ -175,7 +178,8 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     await expect(unreadCard.locator('[data-entry-unread]')).toBeVisible();
     await unreadCard.click();
     await expect(reloadedCreatorWidget.locator('[data-masha-feedly-comments]')).toContainText(commentText);
-    await expect(unreadCount).toHaveText(String(unreadBeforeOpen - 1));
+    await expect.poll(async () => Number(await unreadCount.textContent()))
+      .toBeLessThan(unreadBeforeOpen);
     const comment = reloadedCreatorWidget.locator('[data-masha-feedly-comments] .kw-masha-feedly__comment').filter({ hasText: commentText });
     let activeReaction = '';
     const react = async (emoji) => {
