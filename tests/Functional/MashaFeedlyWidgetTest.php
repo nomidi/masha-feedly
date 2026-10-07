@@ -69,9 +69,20 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->logInAs($allowedMember);
         $allowedResponse = $this->get('/masha-feedly-widget-test');
         $this->assertSame(200, $allowedResponse->getStatusCode());
-        $this->assertStringContainsString('data-address="du"', $this->widgetMarkup($allowedResponse->getBody()));
-        $this->assertStringContainsString('data-theme="playful"', $this->widgetMarkup($allowedResponse->getBody()));
-        $this->assertStringContainsString('data-font-size="small"', $this->widgetMarkup($allowedResponse->getBody()));
+        $widgetMarkup = $this->widgetMarkup($allowedResponse->getBody());
+        $this->assertStringContainsString('data-address="du"', $widgetMarkup);
+        $this->assertStringContainsString('data-theme="playful"', $widgetMarkup);
+        $this->assertStringContainsString('data-font-size="small"', $widgetMarkup);
+        $this->assertMatchesRegularExpression(
+            '/<select name="CategoryID" data-masha-feedly-create-category>(?:(?!<\/select>).)*<option[^>]*>Backlog<\/option>(?:(?!<\/select>).)*<\/select>/s',
+            $widgetMarkup,
+            'Das Formular zum Erstellen eines Feedly-Eintrags zeigt Statusoptionen.'
+        );
+        $this->assertMatchesRegularExpression(
+            '/<select name="PriorityID">(?:(?!<\/select>).)*<option[^>]*>Normal<\/option>(?:(?!<\/select>).)*<option[^>]*>Info<\/option>(?:(?!<\/select>).)*<\/select>/s',
+            $widgetMarkup,
+            'Das Formular zum Erstellen eines Feedly-Eintrags zeigt Prioritätsoptionen.'
+        );
         $this->assertStringContainsString('window.KWMashaFeedlyWidgetMarkup', $allowedResponse->getBody());
         $this->assertStringContainsString('"HISTORY_COMMENT":"Kommentar: {text}"', $allowedResponse->getBody());
         $this->assertStringContainsString('"HISTORY_META":"{actor} · {when}"', $allowedResponse->getBody());
@@ -148,7 +159,10 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('data-masha-feedly-saved-view', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-saved-view-name', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-rainbow', $allowedResponse->getBody());
-        $this->assertStringContainsString('class="kw-masha-feedly__rainbow" type="button"', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertMatchesRegularExpression(
+            '/<button class="[^"]*\bkw-masha-feedly__rainbow\b[^"]*" type="button"/',
+            $this->widgetMarkup($allowedResponse->getBody())
+        );
         $this->assertStringContainsString('data-masha-feedly-rainbow-copy hidden', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-rainbow-title', $allowedResponse->getBody());
         $this->assertStringContainsString('kw-masha-feedly__rainbow-icon', $allowedResponse->getBody());

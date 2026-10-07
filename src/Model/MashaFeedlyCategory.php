@@ -29,6 +29,9 @@ use SilverStripe\SiteConfig\SiteConfig;
  */
 class MashaFeedlyCategory extends DataObject
 {
+    /** Erlaubt beim internen Rollenwechsel kurzzeitig das Freigeben der bisherigen Kategorie. */
+    private static bool $roleTransferInProgress = false;
+
     private static $table_name = 'MashaFeedlyCategory';
 
     private const REQUIRED_SYSTEM_KEYS = ['backlog', 'done', 'feedback'];
@@ -255,7 +258,12 @@ class MashaFeedlyCategory extends DataObject
                 if (in_array($role, ['done', 'archive'], true)) {
                     $previousOwner->IsClosed = false;
                 }
-                $previousOwner->write(false, false, false, false, true);
+                self::$roleTransferInProgress = true;
+                try {
+                    $previousOwner->write();
+                } finally {
+                    self::$roleTransferInProgress = false;
+                }
             }
         }
         if (in_array($role, ['done', 'archive'], true)) {
@@ -277,7 +285,8 @@ class MashaFeedlyCategory extends DataObject
         if ($this->isInDB()) {
             $stored = self::get()->byID((int)$this->ID);
             $oldRole = (string)($stored?->SystemKey ?? '');
-            if (in_array($oldRole, ['backlog', 'done', 'feedback'], true) && $oldRole !== $role
+            if (!self::$roleTransferInProgress
+                && in_array($oldRole, ['backlog', 'done', 'feedback'], true) && $oldRole !== $role
                 && !self::get()->filter('SystemKey', $oldRole)->exclude('ID', (int)$this->ID)->exists()
             ) {
                 $result->addFieldError('SystemKey', 'Diese erforderliche Funktion muss einer Kategorie zugeordnet bleiben.');

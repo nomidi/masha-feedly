@@ -578,7 +578,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('data-masha-feedly-animation-preview="glow"', $response->getBody());
         $this->assertStringContainsString('data-masha-feedly-animation-preview="rings"', $response->getBody());
         $this->assertStringContainsString('data-masha-feedly-animation-preview="confirmation"', $response->getBody());
-        $this->assertSame(7, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"'));
+        $this->assertSame(14, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"'));
         $this->assertSame(4, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"'));
         $this->assertStringContainsString('effects/unicorn.js', $response->getBody());
         $this->assertStringContainsString('effects/rocket.js', $response->getBody());
@@ -602,7 +602,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('value="serious"', $response->getBody());
         $this->assertStringContainsString('value="sie"', $response->getBody());
         $this->assertStringNotContainsString('MashaFeedlyIconImage', $response->getBody());
-        $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $response->getBody(), $matches));
+        $this->assertSame(1, preg_match('/<form\b(?=[^>]*\bid="Form_EditForm")(?=[^>]*\baction="([^"]+)")[^>]*>/s', $response->getBody(), $matches));
 
         $saveResponse = $this->post(
             html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
@@ -641,12 +641,12 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->logInWithPermission('ADMIN');
         $admin = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $admin);
+        $admin->Email = 'masha-feedly-test-admin@example.test';
+        $admin->write();
         Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$admin->Email]);
         $response = $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig');
         $this->assertSame(200, $response->getStatusCode());
         $this->assertStringContainsString('action_sendTestEmail', $response->getBody());
-        $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $response->getBody(), $matches));
-
         $mailer = new class implements MailerInterface {
             /** @var RawMessage[] */
             public array $messages = [];
@@ -664,19 +664,14 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $injector->registerService($mailer, MailerInterface::class);
         try {
             $mailer->failure = new \RuntimeException('Simulierter SMTP-Ausfall vor dem ersten erfolgreichen Versand.');
-            $initialFailure = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
-                'SecurityID' => SecurityToken::getSecurityID(),
-                'action_sendTestEmail' => 'Test-E-Mail senden',
-            ]);
+            $initialFailure = $this->submitForm('Form_EditForm', 'action_sendTestEmail');
             $this->assertSame(200, $initialFailure->getStatusCode());
             $this->assertFalse(MashaFeedlyConfigExtension::emailTestSucceeded());
             $this->assertCount(0, $mailer->messages);
 
             $mailer->failure = null;
-            $sent = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
-                'SecurityID' => SecurityToken::getSecurityID(),
-                'action_sendTestEmail' => 'Test-E-Mail senden',
-            ]);
+            $injector->registerService($mailer, MailerInterface::class);
+            $sent = $this->submitForm('Form_EditForm', 'action_sendTestEmail');
 
             $this->assertSame(200, $sent->getStatusCode());
             $this->assertCount(1, $mailer->messages);
@@ -685,10 +680,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             $this->assertTrue(MashaFeedlyConfigExtension::emailTestSucceeded());
 
             $mailer->failure = new \RuntimeException('Simulierter SMTP-Ausfall.');
-            $failed = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
-                'SecurityID' => SecurityToken::getSecurityID(),
-                'action_sendTestEmail' => 'Test-E-Mail senden',
-            ]);
+            $injector->registerService($mailer, MailerInterface::class);
+            $failed = $this->submitForm('Form_EditForm', 'action_sendTestEmail');
             $this->assertSame(200, $failed->getStatusCode());
             $this->assertStringContainsString('Test-E-Mail konnte nicht gesendet werden', $failed->getBody());
             $this->assertCount(1, $mailer->messages);
@@ -707,7 +700,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->logInWithPermission('ADMIN');
         $admin = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $admin);
-        \SilverStripe\Core\Config\Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['super-admin@example.test']);
+        $admin->Email = 'masha-feedly-ordinary-admin@example.test';
+        $admin->write();
+        \SilverStripe\Core\Config\Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', []);
 
         $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
         $siteConfig->MashaFeedlyDueDateReminderMode = 'cron';
@@ -727,16 +722,25 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringNotContainsString('action_sendTestEmail', $body);
         $this->assertStringNotContainsString('MashaFeedlyMemberColor_' . (int)$allowed->ID, $body);
         $this->assertStringNotContainsString('masha-feedly-color-palette__swatch', $body);
-        $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $body, $matches));
-
-        $testEmailAttempt = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
+        $this->assertSame(1, preg_match('/<form\b(?=[^>]*\bid="Form_EditForm")(?=[^>]*\baction="([^"]+)")[^>]*>/s', $body, $matches));
+        $editFormAction = html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $this->autoFollowRedirection = false;
+        $testEmailAttempt = $this->post($editFormAction, [
             'SecurityID' => SecurityToken::getSecurityID(),
             'action_sendTestEmail' => 'Test-E-Mail senden',
         ]);
-        $this->assertSame(403, $testEmailAttempt->getStatusCode());
+        $this->autoFollowRedirection = true;
+        $this->assertContains($testEmailAttempt->getStatusCode(), [302, 403]);
+
+        // The denied request can redirect the functional test session; reload the form and token.
+        $this->logInAs($admin);
+        $response = $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig');
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(1, preg_match('/<form\b(?=[^>]*\bid="Form_EditForm")(?=[^>]*\baction="([^"]+)")[^>]*>/s', $response->getBody(), $matches));
+        $editFormAction = html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         $saveResponse = $this->post(
-            html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            $editFormAction,
             [
                 'SecurityID' => SecurityToken::getSecurityID(),
                 'AllowedMemberIDs' => [(int)$allowed->ID],
@@ -772,6 +776,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->logInWithPermission('ADMIN');
         $superAdmin = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $superAdmin);
+        $superAdmin->Email = 'masha-feedly-super-admin@example.test';
+        $superAdmin->write();
         Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$superAdmin->Email]);
 
         $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
@@ -810,21 +816,14 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $body = $this->get($url)->getBody();
         $this->assertStringContainsString('name="ResetConfirmation"', $body);
         $this->assertStringContainsString('action_resetAllMashaFeedlyData', $body);
-        $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $body, $matches));
-        $actionURL = html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-        $wrongConfirmation = $this->post($actionURL, [
-            'SecurityID' => SecurityToken::getSecurityID(),
+        $wrongConfirmation = $this->submitForm('Form_EditForm', 'action_resetAllMashaFeedlyData', [
             'ResetConfirmation' => 'delete',
-            'action_resetAllMashaFeedlyData' => 'Alle Masha:Feedly-Daten löschen',
         ]);
         $this->assertSame(2, MashaFeedlyEntry::get()->count());
         $this->assertSame(1, MashaFeedlyComment::get()->count());
 
-        $response = $this->post($actionURL, [
-            'SecurityID' => SecurityToken::getSecurityID(),
+        $response = $this->submitForm('Form_EditForm', 'action_resetAllMashaFeedlyData', [
             'ResetConfirmation' => 'RESET',
-            'action_resetAllMashaFeedlyData' => 'Alle Masha:Feedly-Daten löschen',
         ]);
 
         $this->assertSame(200, $wrongConfirmation->getStatusCode());

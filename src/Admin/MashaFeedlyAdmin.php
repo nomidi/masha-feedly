@@ -1219,6 +1219,13 @@ class MashaFeedlyAdmin extends ModelAdmin
         if (!$member || !Permission::checkMember($member, 'ADMIN')) {
             return Security::permissionFailure($this);
         }
+        if (
+            !MashaFeedlyEntry::canManageReporter($member)
+            && ($this->getRequest()->postVar('action_sendTestEmail') !== null
+                || $this->getRequest()->postVar('action_resetAllMashaFeedlyData') !== null)
+        ) {
+            $this->httpError(403);
+        }
 
         $memberIDs = MashaFeedlyConfigExtension::normalizeMemberIDs($data['AllowedMemberIDs'] ?? []);
         $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();

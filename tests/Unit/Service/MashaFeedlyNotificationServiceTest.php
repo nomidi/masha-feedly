@@ -33,6 +33,20 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
     {
         parent::setUp();
         i18n::set_locale('de_DE');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
+        foreach (['allowed', 'notAllowed', 'normalize'] as $fixtureName) {
+            $member = $this->objFromFixture(Member::class, $fixtureName);
+            $member->MashaFeedlyEmailNotifications = true;
+            $member->MashaFeedlyNotifyNewEntries = true;
+            $member->MashaFeedlyNotifyEntryUpdates = true;
+            $member->MashaFeedlyNotifyOwnEntryChanges = false;
+            $member->MashaFeedlyNotifyComments = true;
+            $member->MashaFeedlyNotifyDueDateReminders = true;
+            $member->MashaFeedlyNotifyCostEstimates = true;
+            $member->write();
+        }
     }
 
     /** Der allgemeine Testversand adressiert das Konto und enthält eine einfache Zustellbestätigung. */
@@ -165,6 +179,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             Security::setCurrentUser($member);
             $entry = MashaFeedlyEntry::create(['Content' => 'Erinnerung aus.', 'EntryDate' => '2026-10-01', 'DueDate' => '2026-10-04']);
             $entry->write();
+            $mailer->messages = [];
             $this->assertSame(0, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
             $this->assertCount(0, $mailer->messages);
             $this->assertEmpty($entry->DueDateReminderSentAt);

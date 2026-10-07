@@ -9,6 +9,7 @@ use SilverStripe\Control\Director;
 use SilverStripe\Security\Member;
 use SilverStripe\Assets\Image;
 use SilverStripe\Security\SecurityToken;
+use SilverStripe\ORM\ArrayList;
 use SilverStripe\View\Requirements;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Admin\CMSProfileController;
@@ -127,9 +128,11 @@ class MashaFeedlyWidgetExtension extends Extension
             'OnboardingEnabled' => MashaFeedlyConfigExtension::isExplicitlyAllowed(Security::getCurrentUser())
                 && (!((bool)(Security::getCurrentUser()?->MashaFeedlyOnboardingCompleted ?? false))
                     || (bool)(Security::getCurrentUser()?->MashaFeedlyShowOnboarding ?? false)),
-            'Categories' => $categories,
-            'Priorities' => $priorities,
-            'Members' => $members,
+            // Silverstripe templates iterate SS_List instances; plain PHP arrays
+            // render as empty items in <% loop %> and leave these selects blank.
+            'Categories' => ArrayList::create($categories),
+            'Priorities' => ArrayList::create($priorities),
+            'Members' => ArrayList::create($members),
             'Address' => MashaFeedlyConfigExtension::address(),
             'FontSize' => MashaFeedlyConfigExtension::fontSize(),
             'Theme' => MashaFeedlyMemberExtension::themeFor(Security::getCurrentUser()),

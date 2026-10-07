@@ -1851,14 +1851,19 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
     /** Prüft den echten Kommentar-Endpunkt einschließlich E-Mail an eine zugewiesene Person. */
     public function testPostingCommentEmailsAssignedMember(): void
     {
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
         $author = $this->objFromFixture(Member::class, 'allowed');
         $assignee = $this->objFromFixture(Member::class, 'normalize');
+        $author->MashaFeedlyEmailNotifications = true;
+        $assignee->MashaFeedlyEmailNotifications = true;
+        $assignee->MashaFeedlyNotifyComments = true;
         $author->MashaFeedlyNotifyNewEntries = false;
         $assignee->MashaFeedlyNotifyNewEntries = false;
         $author->write();
         $assignee->write();
         $this->allowMember($author);
-        $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$author->ID, (int)$assignee->ID]);
         $config->write();
 

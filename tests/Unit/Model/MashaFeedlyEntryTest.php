@@ -69,7 +69,7 @@ class MashaFeedlyEntryTest extends SapphireTest
             ]);
             $dateField = $entry->getCMSFields()->dataFieldByName('EntryDate');
             $this->assertInstanceOf(DatetimeField::class, $dateField);
-            $this->assertSame('2026-10-01T12:34:56', $dateField->getFormattedValue());
+            $this->assertSame('2026-10-01T12:34:56', $dateField->Value());
             $entry->write();
             $this->assertSame('2026-10-01 12:34:56', $entry->EntryDate);
         } finally {
