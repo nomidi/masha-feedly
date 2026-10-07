@@ -1,6 +1,7 @@
 en:
   KW\MashaFeedly\Translations:
     MODULE_NAME: 'Masha:Feedly'
+    CONFIG_TEST_EMAIL_FAILED: 'Test email failed: {error}. Check the mail server configuration and PHP error log.'
     MITE_TAB: 'Mite'
     MITE_SAVED_PROJECT: 'Saved project #{id}'
     MITE_SERVICE: 'Mite service'

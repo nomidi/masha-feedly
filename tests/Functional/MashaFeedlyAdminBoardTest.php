@@ -688,13 +688,14 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             $configuredResponse = $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig');
             $this->assertStringNotContainsString('masha-feedly-email-test-notice', $configuredResponse->getBody());
 
-            $mailer->failure = new \RuntimeException('Simulierter SMTP-Ausfall.');
+            $mailer->failure = new \RuntimeException('Verbindung über smtp://mailuser:geheim@example.test:587 fehlgeschlagen.');
             $failed = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
                 'SecurityID' => SecurityToken::getSecurityID(),
                 'action_sendTestEmail' => 'Test-E-Mail senden',
             ]);
             $this->assertSame(200, $failed->getStatusCode());
-            $this->assertStringContainsString('Test-E-Mail konnte nicht gesendet werden', $failed->getBody());
+            $this->assertStringContainsString('Verbindung über smtp://[redacted]@example.test:587 fehlgeschlagen.', $failed->getBody());
+            $this->assertStringNotContainsString('geheim', $failed->getBody());
             $this->assertCount(1, $mailer->messages);
             $this->assertTrue(MashaFeedlyConfigExtension::emailTestSucceeded());
         } finally {

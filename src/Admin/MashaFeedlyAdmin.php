@@ -1307,11 +1307,31 @@ class MashaFeedlyAdmin extends ModelAdmin
             $form->sessionMessage(self::translate('CONFIG_TEST_EMAIL_SENT', 'Test-E-Mail wurde an {email} gesendet.', ['email' => (string)$member->Email]), 'good');
         } catch (\Throwable $exception) {
             error_log('[Masha:Feedly] Test-E-Mail fehlgeschlagen (' . get_class($exception) . '): ' . $exception->getMessage());
-            $form->sessionMessage(self::translate('CONFIG_TEST_EMAIL_FAILED', 'Test-E-Mail konnte nicht gesendet werden. Prüfe die Mailserver-Konfiguration und das PHP-Fehlerprotokoll.'), 'bad');
+            $form->sessionMessage(self::translate(
+                'CONFIG_TEST_EMAIL_FAILED',
+                'Test-E-Mail fehlgeschlagen: {error}. Prüfe die Mailserver-Konfiguration und das PHP-Fehlerprotokoll.',
+                ['error' => self::emailTestErrorDetails($exception)]
+            ), 'bad');
         }
         return $this->getResponseNegotiator()->respond($request, [
             'CurrentForm' => fn(): string => $this->getEditForm()->forTemplate(),
         ]);
+    }
+
+    /** Bereitet den SMTP-Fehler für die Adminmeldung auf und entfernt mögliche Zugangsdaten. */
+    private static function emailTestErrorDetails(\Throwable $exception): string
+    {
+        $message = preg_replace('/[\x00-\x1F\x7F]+/', ' ', $exception->getMessage()) ?? '';
+        $message = preg_replace('~([a-z][a-z0-9+.-]*://)[^/@\s]+@~i', '$1[redacted]@', $message) ?? $message;
+        $message = preg_replace(
+            '~\b(password|passwd|pwd|secret|token)\b(\s*[:=]\s*)(?:"[^"]*"|\'[^\']*\'|[^\s,;]+)~i',
+            '$1$2[redacted]',
+            $message
+        ) ?? $message;
+        $message = mb_substr(trim($message), 0, 600);
+        $class = substr(strrchr('\\' . get_class($exception), '\\'), 1);
+
+        return $message === '' ? $class : $class . ': ' . $message;
     }
 
     /**
