@@ -858,7 +858,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   .kw-masha-feedly__toggle:hover,
   .kw-masha-feedly__toggle:focus-visible { animation: none; }
 }
-.kw-masha-feedly__dialog-header .kw-masha-feedly__close { padding-bottom: 6px; }
+.kw-masha-feedly__dialog-header .kw-masha-feedly__close { padding-bottom: 0; }
 .kw-masha-feedly__entries-modal { right: 256px; }
 .kw-masha-feedly__entries-modal { overflow: visible; }
 .kw-masha-feedly__entries-dialog { box-shadow: -14.4px 0 40px #1f142b48, 4px 0 0 #ffffff22 inset; }
