@@ -191,6 +191,16 @@ class MashaFeedlyAdmin extends ModelAdmin
                 ->setValue(MashaFeedlyConfigExtension::memberIDs())
                 ->setDescription(self::translate('CONFIG_ALLOWED_MEMBERS_DESCRIPTION', 'Wähle alle Benutzer aus, die das Widget und die Einträge verwenden dürfen. Auch Administratoren benötigen eine Freigabe.'))
         );
+        if (!MashaFeedlyConfigExtension::emailTestSucceeded()) {
+            $fields->insertBefore('MashaFeedlyAddress', LiteralField::create(
+                'MashaFeedlyEmailTestNotice',
+                '<section class="masha-feedly-email-test-notice" role="alert">'
+                    . '<span class="masha-feedly-email-test-notice__icon" aria-hidden="true">!</span>'
+                    . '<div><strong>' . self::translate('CONFIG_EMAIL_TEST_REQUIRED_TITLE', 'E-Mail-Test noch nicht erfolgreich durchgeführt') . '</strong>'
+                    . '<p>' . self::translate('CONFIG_EMAIL_TEST_REQUIRED_DESCRIPTION', 'Sende zuerst eine Test-E-Mail über die Schaltfläche „Test-E-Mail senden“. Erst danach können Mitglieder ihre persönlichen E-Mail-Benachrichtigungen einrichten.') . '</p></div>'
+                    . '</section>'
+            ));
+        }
         if ($canManageSensitiveSettings) {
             $fields->insertBefore('AllowedMemberIDs', DropdownField::create('MashaFeedlyDueDateReminderMode', self::translate('CONFIG_DUE_DATE_REMINDER_MODE', 'Fälligkeitserinnerungen ausführen'), [
                 'cron' => self::translate('CONFIG_DUE_DATE_REMINDER_CRON', 'Serverseitig per Cronjob'),

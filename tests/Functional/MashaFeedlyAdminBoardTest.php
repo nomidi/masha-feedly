@@ -578,7 +578,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('data-masha-feedly-animation-preview="glow"', $response->getBody());
         $this->assertStringContainsString('data-masha-feedly-animation-preview="rings"', $response->getBody());
         $this->assertStringContainsString('data-masha-feedly-animation-preview="confirmation"', $response->getBody());
-        $this->assertSame(7, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"'));
+        $this->assertSame(14, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"'));
         $this->assertSame(4, substr_count($response->getBody(), 'data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"'));
         $this->assertStringContainsString('effects/unicorn.js', $response->getBody());
         $this->assertStringContainsString('effects/rocket.js', $response->getBody());
@@ -645,6 +645,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $response = $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig');
         $this->assertSame(200, $response->getStatusCode());
         $this->assertStringContainsString('action_sendTestEmail', $response->getBody());
+        $this->assertStringContainsString('masha-feedly-email-test-notice', $response->getBody());
+        $this->assertStringContainsString('E-Mail-Test noch nicht erfolgreich durchgeführt', $response->getBody());
         $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $response->getBody(), $matches));
 
         $mailer = new class implements MailerInterface {
@@ -683,6 +685,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             $this->assertSame((string)$admin->Email, $mailer->messages[0]->getTo()[0]->getAddress());
             $this->assertSame('Masha:Feedly – Test-E-Mail', $mailer->messages[0]->getSubject());
             $this->assertTrue(MashaFeedlyConfigExtension::emailTestSucceeded());
+            $configuredResponse = $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig');
+            $this->assertStringNotContainsString('masha-feedly-email-test-notice', $configuredResponse->getBody());
 
             $mailer->failure = new \RuntimeException('Simulierter SMTP-Ausfall.');
             $failed = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [

@@ -148,7 +148,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('data-masha-feedly-saved-view', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-saved-view-name', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-rainbow', $allowedResponse->getBody());
-        $this->assertStringContainsString('class="kw-masha-feedly__rainbow" type="button"', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertStringContainsString('class="kw-masha-feedly__rainbow kw-masha-feedly__action-icon-button" type="button"', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-rainbow-copy hidden', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-rainbow-title', $allowedResponse->getBody());
         $this->assertStringContainsString('kw-masha-feedly__rainbow-icon', $allowedResponse->getBody());

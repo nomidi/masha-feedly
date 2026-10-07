@@ -33,6 +33,9 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
     {
         parent::setUp();
         i18n::set_locale('de_DE');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
     }
 
     /** Der allgemeine Testversand adressiert das Konto und enthält eine einfache Zustellbestätigung. */
@@ -180,6 +183,8 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $allowedMember = $this->objFromFixture(Member::class, 'allowed');
         $notAllowedMember = $this->objFromFixture(Member::class, 'notAllowed');
         $disabledMember = $this->objFromFixture(Member::class, 'normalize');
+        $allowedMember->MashaFeedlyEmailNotifications = true;
+        $allowedMember->MashaFeedlyNotifyNewEntries = true;
         $disabledMember->MashaFeedlyNotifyNewEntries = false;
         $disabledMember->MashaFeedlyNotifyEntryUpdates = false;
         $allowedMember->MashaFeedlyNotifyEntryUpdates = false;
@@ -274,6 +279,9 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
     {
         $allowedMember = $this->objFromFixture(Member::class, 'allowed');
         $disabledMember = $this->objFromFixture(Member::class, 'normalize');
+        $allowedMember->MashaFeedlyEmailNotifications = true;
+        $allowedMember->MashaFeedlyNotifyEntryUpdates = true;
+        $allowedMember->write();
         $disabledMember->MashaFeedlyNotifyEntryUpdates = false;
         $disabledMember->MashaFeedlyNotifyNewEntries = false;
         $disabledMember->write();
@@ -336,6 +344,9 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
     public function testOwnEntryAndUpdateEmailsAreConfigurable(): void
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
+        $member->MashaFeedlyEmailNotifications = true;
+        $member->MashaFeedlyNotifyNewEntries = true;
+        $member->MashaFeedlyNotifyEntryUpdates = true;
         $member->write();
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
@@ -394,6 +405,8 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $optedOut = $this->objFromFixture(Member::class, 'notAllowed');
         $author->MashaFeedlyNotifyNewEntries = false;
         $assignee->MashaFeedlyNotifyNewEntries = false;
+        $assignee->MashaFeedlyEmailNotifications = true;
+        $assignee->MashaFeedlyNotifyComments = true;
         $author->write();
         $assignee->write();
         $optedOut->MashaFeedlyNotifyComments = false;
@@ -458,6 +471,9 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $member->MashaFeedlyNotifyNewEntries = false;
             $member->write();
         }
+        $creator->MashaFeedlyEmailNotifications = true;
+        $creator->MashaFeedlyNotifyComments = true;
+        $creator->write();
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->Title = 'Projekt Wolke';
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$author->ID, (int)$creator->ID]);

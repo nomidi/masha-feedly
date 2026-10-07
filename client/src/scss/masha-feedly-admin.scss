@@ -22,6 +22,26 @@
   &__hex { color: #77717e; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.68rem; }
 }
 
+/* E-Mail-Test-Hinweis */
+.masha-feedly-email-test-notice {
+  display: flex;
+  max-width: 58rem;
+  align-items: center;
+  gap: 1rem;
+  margin: 0 0 1.25rem;
+  padding: 1.15rem 1.35rem;
+  border: 1px solid #ff9a9a;
+  border-left: 6px solid #dc2626;
+  border-radius: 1rem;
+  background: linear-gradient(120deg, #fff1f1 0%, #ffe3e3 55%, #fff5f5 100%);
+  color: #641b1b;
+  box-shadow: 0 0.6rem 1.7rem rgba(153, 27, 27, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  &__icon { display: grid; width: 2.8rem; height: 2.8rem; flex: 0 0 auto; place-items: center; border: 2px solid #dc2626; border-radius: 50%; background: #dc2626; color: #fff; font-size: 1.65rem; font-weight: 900; line-height: 1; box-shadow: 0 0 0 0.3rem rgba(220, 38, 38, 0.12); }
+  strong { display: block; color: #a31515; font-size: 1.12rem; font-weight: 850; }
+  p { margin: 0.25rem 0 0; color: #762323; font-size: 0.95rem; line-height: 1.5; }
+}
+
 .masha-feedly-animation-previews {
   margin: 0 0 1.25rem;
   padding: 1rem 1.1rem;

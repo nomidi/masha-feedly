@@ -1813,6 +1813,9 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
     /** Ein Mailserverfehler darf den Erstellungsrequest nicht abbrechen oder den Eintrag verhindern. */
     public function testEntryIsSavedWhenNewEntryNotificationFails(): void
     {
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
         $author = $this->objFromFixture(Member::class, 'allowed');
         $recipient = $this->objFromFixture(Member::class, 'normalize');
         $recipient->MashaFeedlyEmailNotifications = true;
@@ -1853,12 +1856,16 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
     {
         $author = $this->objFromFixture(Member::class, 'allowed');
         $assignee = $this->objFromFixture(Member::class, 'normalize');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
         $author->MashaFeedlyNotifyNewEntries = false;
         $assignee->MashaFeedlyNotifyNewEntries = false;
+        $assignee->MashaFeedlyEmailNotifications = true;
+        $assignee->MashaFeedlyNotifyComments = true;
         $author->write();
         $assignee->write();
         $this->allowMember($author);
-        $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$author->ID, (int)$assignee->ID]);
         $config->write();
 
