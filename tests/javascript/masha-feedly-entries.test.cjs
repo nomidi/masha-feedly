@@ -1591,12 +1591,12 @@ test('zeigt das Prioritätssymbol im Kopf des geöffneten Eintrags an', () => {
   assert.doesNotMatch(scss, /\.kw-masha-feedly__close:hover \{ transform: rotate\(90deg\)/);
   assert.match(scss, /\.kw-masha-feedly__close \{[^}]*place-items: center; padding: 0;/);
   assert.match(scss, /\.kw-masha-feedly__dialog-header \.kw-masha-feedly__close \{[^}]*padding: 0;/);
-  assert.match(scss, /\.kw-masha-feedly__dialog-header \.kw-masha-feedly__close \{ padding-bottom: 6px; \}/);
+  assert.match(scss, /\.kw-masha-feedly__dialog-header \.kw-masha-feedly__close \{ padding-bottom: 0; \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__dialog-header\{[^}]*align-items:center/);
   assert.match(compiledStyles, /\.kw-masha-feedly__dialog-header\{padding:23\.2px 30\.4px\}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__close:hover\{border-color:#e6007e;background:#e6007e;color:#fff;box-shadow:/);
   assert.match(compiledStyles, /\.kw-masha-feedly__close\{[^}]*place-items:center;padding:0;/);
-  assert.match(compiledStyles, /\.kw-masha-feedly__dialog-header \.kw-masha-feedly__close\{padding-bottom:6px\}/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__dialog-header \.kw-masha-feedly__close\{padding-bottom:0\}/);
 });
 
 test('hält die Eintragsanlage schlank und bietet typisierte Verknüpfungen beim Bearbeiten an', () => {
