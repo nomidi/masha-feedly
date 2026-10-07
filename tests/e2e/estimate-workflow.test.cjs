@@ -17,8 +17,9 @@ const config = {
   baseURL: process.env.MASHA_FEEDLY_E2E_BASE_URL || localEnv.MASHA_FEEDLY_E2E_BASE_URL,
   memberEmail: process.env.MASHA_FEEDLY_E2E_CREATOR_EMAIL || localEnv.MASHA_FEEDLY_E2E_CREATOR_EMAIL,
   memberPassword: process.env.MASHA_FEEDLY_E2E_CREATOR_PASSWORD || localEnv.MASHA_FEEDLY_E2E_CREATOR_PASSWORD,
-  managerEmail: process.env.MASHA_FEEDLY_E2E_ESTIMATE_MANAGER_EMAIL || localEnv.MASHA_FEEDLY_E2E_ESTIMATE_MANAGER_EMAIL,
-  managerPassword: process.env.MASHA_FEEDLY_E2E_ESTIMATE_MANAGER_PASSWORD || localEnv.MASHA_FEEDLY_E2E_ESTIMATE_MANAGER_PASSWORD,
+  // Der Kommentator übernimmt zugleich die Freigaberolle; so bleibt ein viertes Konto ausreichend.
+  managerEmail: process.env.MASHA_FEEDLY_E2E_COMMENTER_EMAIL || localEnv.MASHA_FEEDLY_E2E_COMMENTER_EMAIL,
+  managerPassword: process.env.MASHA_FEEDLY_E2E_COMMENTER_PASSWORD || localEnv.MASHA_FEEDLY_E2E_COMMENTER_PASSWORD,
   superadminEmail: process.env.MASHA_FEEDLY_E2E_SUPERADMIN_EMAIL || localEnv.MASHA_FEEDLY_E2E_SUPERADMIN_EMAIL,
   superadminPassword: process.env.MASHA_FEEDLY_E2E_SUPERADMIN_PASSWORD || localEnv.MASHA_FEEDLY_E2E_SUPERADMIN_PASSWORD,
 };
@@ -61,7 +62,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     const memberToggle = memberWidget.locator('.kw-masha-feedly__toggle');
     if ((await memberToggle.getAttribute('aria-expanded')) !== 'true') await memberToggle.click();
     await memberWidget.locator('[data-masha-feedly-start-selection]').click();
-    await memberPage.locator('main').first().click();
+    await memberPage.locator('[role="main"]').first().click();
 
     const createForm = memberWidget.locator('[data-masha-feedly-entry-form]');
     await expect(createForm).toBeVisible();
@@ -85,7 +86,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     assert.ok(hourlyRate > 0, `Ein positiver Stundensatz muss hinterlegt und nur an den Superadmin ausgegeben werden (Wert: ${hourlyRateValue || 'leer'}).`);
     const managerWidget = await signIn(managerPage, config.managerEmail, config.managerPassword);
     assert.equal(await managerWidget.getAttribute('data-can-manage-estimate'), '0', 'Die Freigabeperson darf die Kostenschätzung nicht bearbeiten.');
-    assert.equal(await managerWidget.getAttribute('data-can-approve-estimate'), '1', 'Das separate Testkonto muss für Freigaben freigeschaltet sein.');
+    assert.equal(await managerWidget.getAttribute('data-can-approve-estimate'), '1', 'Das Commenter-Konto muss im Mitgliederprofil für Kostenschätzungsfreigaben freigeschaltet sein.');
     assert.equal(await managerWidget.getAttribute('data-estimate-hourly-rate'), '0', 'Der Stundensatz bleibt für die Freigabeperson verborgen.');
     await openEntryList(superadminPage, superadminWidget);
     const superadminCard = superadminWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
@@ -140,9 +141,11 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     const reviewerEstimate = reviewerForm.locator('[data-masha-feedly-estimate]');
     await expect(reviewerEstimate).toBeVisible();
     await expect(reviewerForm.locator('[name="EstimatedCostDuration"], [name="EstimatedCostNote"]')).toHaveCount(0, 'Freigabeperson sieht keinen Bearbeitungsdialog.');
-    await expect(reviewerEstimate.locator('[data-masha-feedly-estimate-summary]')).toContainText('2–4 Stunden');
-    await expect(reviewerEstimate.locator('[data-masha-feedly-estimate-summary]')).toContainText('Durchgängiger Browser-Test der Preisberechnung');
-    await expect(reviewerEstimate.locator('[data-masha-feedly-estimate-summary]')).toContainText(`${hourlyRate * 2}`);
+    const estimateReadonly = reviewerEstimate.locator('[data-masha-feedly-estimate-readonly]');
+    await expect(estimateReadonly).toBeVisible();
+    await expect(estimateReadonly.locator('[data-masha-feedly-estimate-duration]')).toHaveText('2–4 Stunden');
+    await expect(estimateReadonly.locator('[data-masha-feedly-estimate-note]')).toHaveText('Durchgängiger Browser-Test der Preisberechnung');
+    await expect(estimateReadonly.locator('[data-masha-feedly-estimate-amount]')).toContainText(`${hourlyRate * 2}`);
     const reviewerCategory = reviewerForm.locator('[name="CategoryID"]');
     const approvedOption = reviewerCategory.locator('option[data-system-key="estimate_approved"]');
     await reviewerCategory.selectOption(await approvedOption.getAttribute('value'));
@@ -186,6 +189,16 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     await expect(memberCategorySelect.locator('option[data-system-key="estimate_pending"]')).toHaveCount(0);
     await expect(memberCategorySelect.locator('option[data-system-key="estimate_approved"]')).toHaveCount(0);
     await expect(memberCategorySelect.locator('option').filter({ hasText: approvedTitle })).toHaveCount(0, 'Der vertrauliche Statusname erscheint nicht als auswählbare Kategorie.');
+
+    // Der Superadmin hat die Freigabe in einer anderen Sitzung erhalten. Lade den
+    // Eintrag neu, damit die folgende Statusänderung auf dem bestätigten Stand basiert.
+    await superadminPage.reload();
+    const refreshedSuperadminWidget = superadminPage.locator('[data-kw-masha-feedly]');
+    await refreshedSuperadminWidget.waitFor({ state: 'attached' });
+    await openEntryList(superadminPage, refreshedSuperadminWidget);
+    const refreshedSuperadminCard = refreshedSuperadminWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
+    await expect(refreshedSuperadminCard).toBeVisible();
+    await refreshedSuperadminCard.click();
 
     const doingOption = categorySelect.locator('option[data-system-key="doing"]');
     await categorySelect.selectOption(await doingOption.getAttribute('value'));

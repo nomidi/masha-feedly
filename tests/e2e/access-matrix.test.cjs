@@ -46,7 +46,7 @@ const createProtectedContent = async (page, expect) => {
   const toggle = widget.locator('.kw-masha-feedly__toggle');
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
   await widget.locator('[data-masha-feedly-start-selection]').click();
-  await page.locator('main').first().click();
+  await page.locator('[role="main"]').first().click();
 
   const createForm = widget.locator('[data-masha-feedly-entry-form]');
   await expect(createForm).toBeVisible();
