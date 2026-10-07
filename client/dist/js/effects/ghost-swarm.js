@@ -25,7 +25,7 @@
       layer.append(mist);
     }
 
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 8500);
     return { ghostSwarm: layer };
   };

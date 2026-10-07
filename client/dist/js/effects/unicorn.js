@@ -22,7 +22,7 @@
       piece.style.transform = `rotate(${(index * 41) % 360}deg)`;
       layer.append(piece);
     }
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 13000);
     return layer;
   };
@@ -37,7 +37,7 @@
     unicorn.src = imageURL;
     unicorn.alt = '';
     layer.append(unicorn);
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 13000);
     return layer;
   };

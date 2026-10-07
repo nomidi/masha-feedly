@@ -18,7 +18,7 @@
       heart.style.animationDelay = `${(index % 5) * 12}ms`;
       layer.append(heart);
     }
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 2850);
     return { hearts: layer };
   };

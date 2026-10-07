@@ -50,15 +50,21 @@ function renderWidget(frameElement = null, captureEvents = false) {
     setAttribute() {},
     contains(element) { return element === trigger; },
   };
+  const surface = { append(element) { appendedElements.push(element); }, setAttribute() {} };
+  const root = { append() {}, querySelector(selector) {
+    return selector === '[data-kw-masha-feedly]' ? widget : surface;
+  } };
+  const host = { setAttribute() {}, attachShadow(options) { assert.equal(options.mode, 'open'); this.shadowRoot = root; return root; } };
+  const stylesheet = { addEventListener(name, callback) { if (name === 'load') this.loaded = callback; } };
   const document = {
     addEventListener(name, callback) {
       if (name === 'DOMContentLoaded') ready = callback;
       else documentListeners.set(name, callback);
     },
-    querySelector() { return null; },
+    querySelector(selector) { return inserted && selector === '[data-masha-feedly-host]' ? host : null; },
     createElement() {
       createdElements += 1;
-      return createdElements === 1 ? { innerHTML: '', firstElementChild: widget } : tooltip;
+      return [{ innerHTML: '', firstElementChild: widget }, host, stylesheet, surface, tooltip][createdElements - 1];
     },
     body: { append(element) { inserted += 1; appendedElements.push(element); } },
     dispatchEvent() {},
@@ -77,6 +83,8 @@ function renderWidget(frameElement = null, captureEvents = false) {
   if (!captureEvents) return inserted;
   return {
     inserted,
+    root, surface, stylesheet, host,
+    dom: window.KWMashaFeedlyDOM,
     trigger,
     dispatch(name, event) { documentListeners.get(name)?.(event); },
     get tooltip() { return appendedElements.find((element) => element === tooltip); },
@@ -106,7 +114,7 @@ test('zeigt Hover-Hinweise als schwebendes Tooltip außerhalb des scrollenden Pa
     assert.match(css, /\.kw-masha-feedly__hover-tooltip\.is-visible/);
     assert.doesNotMatch(css, /--kw-feedly-panel-width:\s*min\(248px, calc\(100vw - 16px\)\)/);
   }
-  assert.match(source, /document\.body\.append\(hoverHint\)/);
+  assert.match(source, /surface\.append\(hoverHint\)/);
   assert.match(source, /aria-describedby/);
   assert.match(source, /\[data-masha-feedly-rainbow\]/);
 });
@@ -127,4 +135,18 @@ test('blendet einen vollständig im Viewport platzierten Tooltip ein und stellt 
   state.dispatch('pointerout', { target: state.trigger, relatedTarget: null });
   assert.equal(state.tooltip.hidden, true);
   assert.equal(state.trigger.getAttribute('aria-describedby'), 'vorhandene-hilfe');
+});
+
+
+test('kapselt Widget und Overlays gemeinsam und löst retargetete Ereignisse auf', () => {
+  const state = renderWidget(null, true);
+  assert.equal(state.dom.root(), state.root);
+  assert.equal(state.dom.overlayRoot(), state.surface);
+  assert.equal(state.surface.hidden, true);
+  state.stylesheet.loaded();
+  assert.equal(state.surface.hidden, false);
+  state.root.activeElement = state.trigger;
+  assert.equal(state.dom.activeElement(), state.trigger);
+  state.dispatch('pointerover', { target: state.host, composedPath: () => [state.trigger, state.root, state.host] });
+  assert.ok(state.tooltip);
 });

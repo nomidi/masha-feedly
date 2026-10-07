@@ -1391,11 +1391,11 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(widgetTemplate, /saved-view-select[\s\S]*?<details class="kw-masha-feedly__saved-views-details">[\s\S]*?SAVED_VIEW_DETAILS[\s\S]*?data-masha-feedly-saved-views/);
   assert.match(scss, /\.kw-masha-feedly__comment-form textarea \{ font-size: 18px; line-height: 1\.5; \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__comment-form textarea\{font-size:18px;line-height:1\.5\}/);
-  assert.match(scss, /\.kw-masha-feedly__toggle\s*\{\s*right: 0;\s*bottom: 28px;[\s\S]*?width: var\(--kw-feedly-panel-width, 64px\);\s*max-width: 100vw;\s*height: 64px;[\s\S]*?border-radius: 16px 0 0 16px;/);
+  assert.match(scss, /\.kw-masha-feedly__toggle\s*\{\s*right: 0;\s*bottom: 28px;[\s\S]*?width: var\(--kw-feedly-panel-width, 64px\);\s*max-width: 100vw;\s*margin-right: 0;\s*height: 64px;[\s\S]*?border-radius: 16px 0 0 16px;/);
   assert.match(scss, /\.kw-masha-feedly__toggle:hover,[\s\S]*?\.kw-masha-feedly__toggle:focus-visible\s*\{\s*animation: kw-masha-feedly-toggle-sway 460ms ease-in-out; transform-origin: right center;/);
   assert.match(scss, /@keyframes kw-masha-feedly-toggle-sway \{ 0%, 100% \{ transform: rotate\(0\); \} 25% \{ transform: rotate\(-3deg\); \} 55% \{ transform: rotate\(2deg\); \} 78% \{ transform: rotate\(-1deg\); \} \}/);
   assert.match(scss, /\.kw-masha-feedly\[data-panel-open="true"\] \.kw-masha-feedly__toggle \.kw-masha-feedly__logo\s*\{\s*transform: rotate\(-12deg\) scale\(\.94\);/);
-  assert.match(compiledStyles, /\.kw-masha-feedly__toggle\{right:0;bottom:28px;[\s\S]*?width:var\(--kw-feedly-panel-width, 64px\);max-width:100vw;height:64px;[\s\S]*?border-radius:16px 0 0 16px/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__toggle\{right:0;bottom:28px;[\s\S]*?width:var\(--kw-feedly-panel-width, 64px\);max-width:100vw;margin-right:0;height:64px;[\s\S]*?border-radius:16px 0 0 16px/);
   assert.match(compiledStyles, /@keyframes kw-masha-feedly-toggle-sway/);
   assert.match(scss, /\.kw-masha-feedly__saved-views-details > summary \{[^}]*cursor: pointer;/);
   assert.match(scss, /\.kw-masha-feedly__entries-count \{ padding-top: 4px; padding-bottom: 6\.4px; \}/);
@@ -1456,6 +1456,7 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /data-success-visible="true"\]\[data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ width: min\(688px, calc\(100vw - 688px\)\); \}/);
   assert.match(scss, /\.kw-masha-feedly\[data-edit-open="true"\] \.kw-masha-feedly__entries-modal \{ visibility: hidden; \}/);
   assert.match(scss, /\.kw-masha-feedly__add > span:first-child\s*\{ display: block; margin: 0; font-size: calc\(88px \* var\(--masha-font-scale, 1\)\); font-weight: 400; line-height: 1; transform: translateY\(-4px\);/);
+  assert.match(scss, /\.kw-masha-feedly__actions > \.kw-masha-feedly__add > span:first-child \{ font-size: 40px; transform: translateY\(1px\); \}/);
   assert.match(scss, /\.kw-masha-feedly__help-button\s*\{ display: grid; width: 52px; min-width: 52px; height: 52px; min-height: 52px; flex: 0 0 52px; aspect-ratio: 1; margin-top: 32px; padding: 0; place-items: center;/);
   assert.match(scss, /\.kw-masha-feedly__entries-modal\s*\{ right: 256px;/);
   assert.match(scss, /data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ right: 560px;/);
@@ -2099,6 +2100,8 @@ test('zeigt Neuigkeiten im ersten Panel und öffnet die Liste ungelesener Eintr�
 });
 
 test('zeigt den Neuigkeiten-Button nur bei ungelesenen Einträgen oder Kommentaren', async () => {
+  assert.match(scss, /\.kw-masha-feedly__actions > \.kw-masha-feedly__news-mite-row > \.kw-masha-feedly__news-button \{[^}]*overflow: visible;/);
+  assert.match(scss, /\.kw-masha-feedly__news-mite-row \.kw-masha-feedly__news-button strong \{[^}]*display: grid;[^}]*place-items: center;/);
   const env = createWidgetEnvironment();
   await env.listeners['kw-masha-feedly:opened']();
   assert.equal(env.openNewsButton.hidden, true);

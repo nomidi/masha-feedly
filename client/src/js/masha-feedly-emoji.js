@@ -63,7 +63,7 @@
     grid.setAttribute('role', 'listbox');
     picker.append(search, tabs, grid);
     field.append(toggle);
-    document.body.append(picker);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(picker);
 
     const positionPicker = () => {
       if (picker.hidden) return;
@@ -80,6 +80,7 @@
     };
     window.addEventListener('resize', positionPicker);
     document.addEventListener('scroll', positionPicker, true);
+    window.KWMashaFeedlyDOM?.root().addEventListener('scroll', positionPicker, true);
 
     let selectedCategory = 'SMILEYS';
     const render = () => {
@@ -112,16 +113,16 @@
     search.addEventListener('input', render);
     toggle.addEventListener('click', () => {
       const isOpen = !picker.hidden;
-      document.querySelectorAll('.kw-masha-feedly__emoji-picker:not([hidden])').forEach((openPicker) => {
+      (window.KWMashaFeedlyDOM?.root() || document).querySelectorAll('.kw-masha-feedly__emoji-picker:not([hidden])').forEach((openPicker) => {
         openPicker.hidden = true;
-        document.querySelector(`[aria-controls="${openPicker.id}"]`)?.setAttribute('aria-expanded', 'false');
+        (window.KWMashaFeedlyDOM?.root() || document).querySelector(`[aria-controls="${openPicker.id}"]`)?.setAttribute('aria-expanded', 'false');
       });
       picker.hidden = isOpen;
       toggle.setAttribute('aria-expanded', String(!isOpen));
       if (!isOpen) { render(); positionPicker(); search.focus(); }
     });
     grid.addEventListener('click', (event) => {
-      const choice = event.target.closest('[data-emoji]');
+      const choice = (window.KWMashaFeedlyDOM?.eventTarget(event) || event.target).closest('[data-emoji]');
       if (!choice) return;
       const start = textarea.selectionStart ?? textarea.value.length;
       const end = textarea.selectionEnd ?? start;
@@ -141,19 +142,19 @@
       }
     });
     document.addEventListener('pointerdown', (event) => {
-      if (!field.contains(event.target) && !picker.contains(event.target)) { picker.hidden = true; toggle.setAttribute('aria-expanded', 'false'); }
+      if (!field.contains((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target)) && !picker.contains((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target))) { picker.hidden = true; toggle.setAttribute('aria-expanded', 'false'); }
     });
   };
 
   const init = () => {
     const scan = (root) => {
-      if (root.matches?.('[data-kw-masha-feedly]')) root.querySelectorAll('textarea[name="Content"],textarea[name="CommentText"]').forEach(decorate);
-      root.querySelectorAll?.('[data-kw-masha-feedly] textarea[name="Content"],[data-kw-masha-feedly] textarea[name="CommentText"]').forEach(decorate);
+      if (root.matches?.('textarea')) decorate(root);
+      root.querySelectorAll?.('textarea[name="Content"],textarea[name="CommentText"]').forEach(decorate);
     };
-    document.querySelectorAll('[data-kw-masha-feedly]').forEach(scan);
+    (window.KWMashaFeedlyDOM?.root() || document).querySelectorAll('[data-kw-masha-feedly]').forEach(scan);
     new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => {
       if (node.nodeType === 1) scan(node);
-    }))).observe(document.body, { childList: true, subtree: true });
+    }))).observe(window.KWMashaFeedlyDOM?.overlayRoot() || document.body, { childList: true, subtree: true });
   };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });

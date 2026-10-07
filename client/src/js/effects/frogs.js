@@ -17,7 +17,7 @@
       layer.append(frog);
     });
 
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => layer.remove(), 10000);
     return { frogs: layer };
   };

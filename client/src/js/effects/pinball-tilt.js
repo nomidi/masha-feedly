@@ -21,7 +21,7 @@
       layer.append(light);
     }
 
-    document.body.append(layer);
+    (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(layer);
     window.setTimeout(() => {
       layer.remove();
       document.documentElement.classList.remove('kw-masha-feedly__pinball-viewport-shake');

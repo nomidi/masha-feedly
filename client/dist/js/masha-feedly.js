@@ -7,9 +7,18 @@ window.KWMashaFeedlyTranslate = (key, values = {}) => {
   return message;
 };
 
+/** Gemeinsame DOM-Grenze: CMS-Vorschauen ohne Widget verwenden weiterhin das Dokument. */
+window.KWMashaFeedlyDOM = {
+  root: () => document.querySelector('[data-masha-feedly-host]')?.shadowRoot || document,
+  widget: () => window.KWMashaFeedlyDOM.root().querySelector('[data-kw-masha-feedly]'),
+  overlayRoot: () => window.KWMashaFeedlyDOM.root().querySelector('[data-masha-feedly-surface]') || document.body,
+  activeElement: () => window.KWMashaFeedlyDOM.root().activeElement || document.activeElement,
+  eventTarget: (event) => event.composedPath?.()[0] || event.target,
+};
+
 /** Fügt das globale Masha-Feedly-Aufklappfeld in die Seite ein. */
 document.addEventListener('DOMContentLoaded', () => {
-  if (!window.KWMashaFeedlyWidgetMarkup || document.querySelector('[data-kw-masha-feedly]')) {
+  if (!window.KWMashaFeedlyWidgetMarkup || window.KWMashaFeedlyDOM.widget()) {
     return;
   }
 
@@ -31,7 +40,23 @@ document.addEventListener('DOMContentLoaded', () => {
   container.innerHTML = window.KWMashaFeedlyWidgetMarkup;
   const widget = container.firstElementChild;
   if (!widget) return;
-  document.body.append(widget);
+  const host = document.createElement('div');
+  host.setAttribute('data-masha-feedly-host', '');
+  const root = host.attachShadow({ mode: 'open' });
+  const stylesheet = document.createElement('link');
+  stylesheet.rel = 'stylesheet';
+  stylesheet.href = window.KWMashaFeedlyWidgetStylesheet;
+  const surface = document.createElement('div');
+  surface.setAttribute('data-masha-feedly-surface', '');
+  // Verhindert ungestaltete Dialoge, während der Browser das Stylesheet lädt.
+  surface.hidden = true;
+  stylesheet.addEventListener('load', () => { surface.hidden = false; });
+  stylesheet.addEventListener('error', () => {
+    console.error('[Masha:Feedly] Widget-Stylesheet konnte nicht geladen werden.');
+  });
+  surface.append(widget);
+  root.append(stylesheet, surface);
+  document.body.append(host);
 
   const hoverHintSelector = [
     '.kw-masha-feedly__add',
@@ -72,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
       hoverHint.id = 'kw-masha-feedly-hover-tooltip';
       hoverHint.setAttribute('role', 'tooltip');
       hoverHint.setAttribute('aria-hidden', 'true');
-      document.body.append(hoverHint);
+      surface.append(hoverHint);
     }
     if (hoverHintTarget !== target) {
       if (hoverHintTarget) {
@@ -128,23 +153,23 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   document.addEventListener('pointerover', (event) => {
-    const target = getHoverHintTarget(event.target);
+    const target = getHoverHintTarget(window.KWMashaFeedlyDOM.eventTarget(event));
     if (target) showHoverHint(target);
   });
   document.addEventListener('pointerout', (event) => {
-    const target = getHoverHintTarget(event.target);
+    const target = getHoverHintTarget(window.KWMashaFeedlyDOM.eventTarget(event));
     if (target && target === hoverHintTarget && !target.contains(event.relatedTarget)) hideHoverHint();
   });
-  document.addEventListener('focusin', (event) => showHoverHint(getHoverHintTarget(event.target)));
+  document.addEventListener('focusin', (event) => showHoverHint(getHoverHintTarget(window.KWMashaFeedlyDOM.eventTarget(event))));
   document.addEventListener('focusout', (event) => {
-    const target = getHoverHintTarget(event.target);
+    const target = getHoverHintTarget(window.KWMashaFeedlyDOM.eventTarget(event));
     if (target && target === hoverHintTarget && !target.contains(event.relatedTarget)) hideHoverHint();
   });
   document.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') hideHoverHint();
   });
   document.addEventListener('click', (event) => {
-    if (getHoverHintTarget(event.target)) hideHoverHint();
+    if (getHoverHintTarget(window.KWMashaFeedlyDOM.eventTarget(event))) hideHoverHint();
   });
 
   const toggle = widget.querySelector('.kw-masha-feedly__toggle');
