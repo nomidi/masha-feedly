@@ -151,7 +151,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'MiteStopURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'stopMiteTimer'),
             'ProfileURL' => CMSProfileController::singleton()->Link() . '#Root_MashaFeedly',
             'ProfilePreferencesURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'saveProfilePreferences'),
-            'ProfileThemeOptions' => $profileThemeOptions,
+            'ProfileThemeOptions' => ArrayList::create($profileThemeOptions),
             'ProfileDisableSoundEffects' => (bool)$currentMember?->MashaFeedlyDisableSoundEffects,
             'ProfileTheme' => (string)($currentMember?->MashaFeedlyTheme ?? ''),
             'ProfileAddress' => (string)($currentMember?->MashaFeedlyAddress ?? ''),
@@ -160,7 +160,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'ProfileAvatarPreviewHTML' => $canPersonalize ? $currentMember->renderAvatarPreview() : '',
             'ProfileEmailNotifications' => (bool)($currentMember?->MashaFeedlyEmailNotifications ?? false),
             'ProfileEmailTestSucceeded' => $emailTestSucceeded,
-            'ProfileEmailOptions' => $profileEmailOptions,
+            'ProfileEmailOptions' => ArrayList::create($profileEmailOptions),
             'AvatarColorPaletteHTML' => $canPersonalize
                 ? MashaFeedlyMemberExtension::renderColorPalette('MashaFeedlyColor', (string)$currentMember?->MashaFeedlyColor)
                 : '',
