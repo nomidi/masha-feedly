@@ -100,9 +100,24 @@ test('Profil: Avatarfarbe und stumme CMS-Vorschau bleiben nach dem Speichern erh
     await expect(page.locator(`.masha-feedly-profile-appearance [data-color="${selectedColor}"]`)).toHaveAttribute('aria-pressed', 'true');
     // Regression: Auch die Konfigurationsvorschau muss nach dem Profil-Speichern stumm bleiben.
     await page.goto(new URL('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig', config.BASE_URL).href);
+    const previews = page.locator('[data-masha-feedly-animation-previews]');
+    const themeSelect = page.locator('#Form_EditForm_MashaFeedlyTheme');
+    if (!await previews.isVisible()) {
+      await page.getByRole('tab', { name: /Allgemein|General/u }).getByRole('link').click();
+    }
+    await expect(previews).toBeVisible();
     assert.equal(await page.evaluate(() => window.KWMashaFeedlyDisableSoundEffects), true);
     assert.equal(await page.evaluate(() => window.KWMashaFeedlyEffects.soundDisabled()), true);
-    await page.locator('[data-masha-feedly-animation-preview="arcade"]').click();
+    const arcadePreview = previews.locator('[data-masha-feedly-animation-preview="arcade"]');
+    await expect(arcadePreview).toBeAttached();
+    const arcadeCategories = await arcadePreview.evaluate(button => button.closest('[data-masha-feedly-animation-preview-card]').dataset.mashaFeedlyCategories.split(',').filter(Boolean));
+    const availableCategories = await themeSelect.locator('option').evaluateAll(options => options.map(option => option.value));
+    const arcadeCategory = arcadeCategories.find(category => availableCategories.includes(category));
+    assert.ok(arcadeCategory, 'Der Katalog muss eine auswählbare Kategorie für die Arcade-Vorschau liefern.');
+    // Chosen versteckt das native Select. selectOption löst weiterhin den regulären change-Handler aus.
+    await themeSelect.selectOption(arcadeCategory, { force: true });
+    await expect(arcadePreview).toBeVisible();
+    await arcadePreview.click();
     await expect(page.locator('.kw-masha-feedly__arcade-effect')).toBeVisible();
     assert.equal(await page.evaluate(() => window.effectAudioStarts), 0, 'Die Animation erscheint ohne Tonerzeugung. Anbieter beachtet muted: ' + await page.evaluate(() => window.KWMashaFeedlyEffectModules.arcade.play.toString().includes('muted')));
     await page.evaluate(() => window.KWMashaFeedlyEffects.cancelActive());

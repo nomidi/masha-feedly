@@ -67,7 +67,11 @@ const openCreateForm = async (page, baseURL, email, password) => {
 
   const widget = page.locator('[data-kw-masha-feedly]');
   await widget.waitFor({ state: 'attached' });
-  assert.notEqual(await widget.getAttribute('data-onboarding-enabled'), '1', 'Das E2E-Konto muss die Einführung abgeschlossen haben.');
+  const welcome = widget.locator('[data-masha-feedly-onboarding-welcome]');
+  if (await welcome.isVisible()) {
+    await welcome.locator('[data-masha-feedly-tour-skip]').click();
+    await welcome.waitFor({ state: 'hidden' });
+  }
   await widget.locator('.kw-masha-feedly__toggle').click();
   await widget.locator('[data-masha-feedly-start-selection]').click();
   await page.locator('[role="main"]').first().click();

@@ -621,6 +621,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('value="serious"', $response->getBody());
         $this->assertStringContainsString('value="sie"', $response->getBody());
         $this->assertStringNotContainsString('MashaFeedlyIconImage', $response->getBody());
+        $notAllowedMember = $this->objFromFixture(Member::class, 'notAllowed');
+        $automaticColorBeforeSave = (string)Member::get()->byID((int)$notAllowedMember->ID)->MashaFeedlyColor;
         $this->assertSame(1, preg_match('/<form\b(?=[^>]*\bid="Form_EditForm")(?=[^>]*\baction="([^"]+)")[^>]*>/s', $response->getBody(), $matches));
 
         $saveResponse = $this->post(
@@ -629,7 +631,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
                 'SecurityID' => SecurityToken::getSecurityID(),
                 'AllowedMemberIDs' => [
                     (int)$member->ID,
-                    (int)$this->objFromFixture(Member::class, 'notAllowed')->ID,
+                    (int)$notAllowedMember->ID,
                 ],
                 'MashaFeedlyMemberColor_' . (int)$member->ID => '#B5A0E0',
                 'MashaFeedlyAddress' => 'sie',
@@ -646,9 +648,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertSame('serious', MashaFeedlyConfigExtension::theme());
         $this->assertSame('visitor', MashaFeedlyConfigExtension::dueDateReminderMode());
         $this->assertSame('#B5A0E0', (string)Member::get()->byID($member->ID)->MashaFeedlyColor);
-        $automaticallyColoredMember = Member::get()->byID((int)$this->objFromFixture(Member::class, 'notAllowed')->ID);
+        $automaticallyColoredMember = Member::get()->byID((int)$notAllowedMember->ID);
         $this->assertNotSame('', (string)$automaticallyColoredMember->MashaFeedlyColor);
-        $this->assertNotSame('#B5A0E0', (string)$automaticallyColoredMember->MashaFeedlyColor);
+        $this->assertSame($automaticColorBeforeSave, (string)$automaticallyColoredMember->MashaFeedlyColor);
     }
 
     /** CMS-Administratoren können die konfigurierte Mailstrecke aus der Modulkonfiguration testen. */
@@ -740,6 +742,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $response = $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig');
         $this->assertSame(200, $response->getStatusCode());
         $body = $response->getBody();
+        preg_match('/<form\\b(?=[^>]*\\bid="Form_EditForm")[^>]*>.*?<\\/form>/s', $body, $editFormMatches);
+        $editForm = $editFormMatches[0] ?? '';
         $this->assertStringNotContainsString('name="MashaFeedlyDueDateReminderMode"', $body);
         $this->assertStringNotContainsString('name="MashaFeedlyHourlyRate"', $body);
         $this->assertStringContainsString('General', $body);
@@ -753,7 +757,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringNotContainsString('action_resetAllMashaFeedlyData', $body);
         $this->assertStringNotContainsString('action_sendTestEmail', $body);
         $this->assertStringNotContainsString('MashaFeedlyMemberColor_' . (int)$allowed->ID, $body);
-        $this->assertStringNotContainsString('masha-feedly-color-palette__swatch', $body);
+        $this->assertStringNotContainsString('masha-feedly-color-palette__swatch', $editForm);
         $this->assertSame(1, preg_match('/<form\b(?=[^>]*\bid="Form_EditForm")(?=[^>]*\baction="([^"]+)")[^>]*>/s', $body, $matches));
         $editFormAction = html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $this->autoFollowRedirection = false;

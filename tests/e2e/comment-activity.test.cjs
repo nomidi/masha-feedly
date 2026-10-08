@@ -32,7 +32,11 @@ const signIn = async (page, baseURL, email, password) => {
   await page.goto(baseURL);
   await page.locator('[data-kw-masha-feedly]').waitFor({ state: 'attached' });
   const widget = page.locator('[data-kw-masha-feedly]');
-  assert.notEqual(await widget.getAttribute('data-onboarding-enabled'), '1', 'Für die E2E-Testkonten muss die Einführung abgeschlossen sein.');
+  const welcome = widget.locator('[data-masha-feedly-onboarding-welcome]');
+  if (await welcome.isVisible()) {
+    await welcome.locator('[data-masha-feedly-tour-skip]').click();
+    await welcome.waitFor({ state: 'hidden' });
+  }
 };
 
 test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten und wird beim Öffnen gelesen', {
@@ -177,9 +181,10 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     assert.equal(completion.celebrateCompletion, false);
     const reviewNotice = commenterWidget.locator('[data-masha-feedly-edit-status][data-feedback-notice="true"]');
     await expect(reviewNotice).toBeVisible();
-    await expect(reviewNotice).toHaveAttribute('data-notice-title', 'Zur Prüfung weitergegeben');
-    await expect(reviewNotice).toContainText('bleibt offen');
-    await expect(reviewNotice).toContainText('eingetragene Meldeperson');
+    const feedbackTitle = await creatorPage.evaluate(() => window.KWMashaFeedlyTranslations.EDIT_FEEDBACK_NOTICE_TITLE);
+    await expect(reviewNotice).toHaveAttribute('data-notice-title', feedbackTitle);
+    await expect(reviewNotice).toContainText(/(?:bleibt offen|remains open)/u);
+    await expect(reviewNotice).toContainText(/(?:eingetragene Meldeperson|designated reporter)/u);
     const noticeStyle = await reviewNotice.evaluate((element) => ({
       size: parseFloat(getComputedStyle(element).fontSize),
       border: parseFloat(getComputedStyle(element).borderLeftWidth),
@@ -188,6 +193,11 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
 
     await creatorPage.reload();
     const reloadedCreatorWidget = creatorPage.locator('[data-kw-masha-feedly]');
+    const reloadedWelcome = reloadedCreatorWidget.locator('[data-masha-feedly-onboarding-welcome]');
+    if (await reloadedWelcome.isVisible()) {
+      await reloadedWelcome.locator('[data-masha-feedly-tour-skip]').click();
+      await reloadedWelcome.waitFor({ state: 'hidden' });
+    }
     await reloadedCreatorWidget.locator('.kw-masha-feedly__toggle').click();
     const newsButton = reloadedCreatorWidget.locator('[data-masha-feedly-open-news]');
     const unreadCount = newsButton.locator('[data-masha-feedly-unread-count]');

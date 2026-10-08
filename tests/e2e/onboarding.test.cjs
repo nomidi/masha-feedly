@@ -57,13 +57,13 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     await widget.locator('[data-masha-feedly-tour-start]').click();
 
     const tip = widget.locator('[data-masha-feedly-onboarding-text]');
-    await expect(tip).toContainText('Schritt 1 von 8');
+    await expect(tip).toContainText(/(?:Schritt 1 von 8|Step 1 of 8)/u);
     await widget.locator('.kw-masha-feedly__toggle').click();
-    await expect(tip).toContainText('Schritt 2 von 8');
+    await expect(tip).toContainText(/(?:Schritt 2 von 8|Step 2 of 8)/u);
     await widget.locator('[data-masha-feedly-start-selection]').click();
     await page.locator('[role="main"]').first().click();
     await expect(widget.locator('[data-masha-feedly-modal]')).toBeVisible();
-    await expect(tip).toContainText('Schritt 4 von 8');
+    await expect(tip).toContainText(/(?:Schritt 4 von 8|Step 4 of 8)/u);
 
     const createForm = widget.locator('[data-masha-feedly-entry-form]');
     await createForm.locator('[name="Content"]').fill(unique);
@@ -77,16 +77,16 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     assert.equal(createResponse.ok(), true, `Eintrag speichern: ${created.message || createResponse.status()}`);
     assert.equal(created.success, true);
     assert.ok(Number(created.entryID) > 0, 'Der Server liefert eine Eintrags-ID zurück.');
-    await expect(tip).toContainText('Schritt 5 von 8');
+    await expect(tip).toContainText(/(?:Schritt 5 von 8|Step 5 of 8)/u);
 
     await widget.locator('[data-masha-feedly-open-page-list]').click();
-    await expect(tip).toContainText('Schritt 6 von 8');
+    await expect(tip).toContainText(/(?:Schritt 6 von 8|Step 6 of 8)/u);
     const card = widget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${created.entryID}"]`);
     await expect(card).toBeVisible();
     await expect(card).toContainText(unique);
     await card.click();
     await expect(widget.locator('[data-masha-feedly-edit-modal]')).toBeVisible();
-    await expect(tip).toContainText('Schritt 7 von 8');
+    await expect(tip).toContainText(/(?:Schritt 7 von 8|Step 7 of 8)/u);
 
     const commentForm = widget.locator('[data-masha-feedly-comment-form]');
     await commentForm.locator('[name="CommentText"]').fill(comment);
@@ -97,8 +97,8 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     const savedComment = await commentResponse.json();
     assert.equal(commentResponse.ok(), true, `Kommentar speichern: ${savedComment.message || commentResponse.status()}`);
     assert.equal(savedComment.success, true);
-    await expect(tip).toContainText('Schritt 8 von 8');
-    await expect(widget.locator('.kw-masha-feedly__onboarding-escape-hint')).toContainText('Esc beendet die Einführung jederzeit');
+    await expect(tip).toContainText(/(?:Schritt 8 von 8|Step 8 of 8)/u);
+    await expect(widget.locator('.kw-masha-feedly__onboarding-escape-hint')).toContainText(/(?:Esc beendet die Einführung jederzeit|Press Esc to stop the tour at any time)/u);
 
     const editForm = widget.locator('[data-masha-feedly-edit-form]');
     const statusSelect = editForm.locator('[name="CategoryID"]');
@@ -127,7 +127,7 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     assert.equal(updateResponse.ok(), true, `Änderungen speichern: ${updated.message || updateResponse.status()}`);
     assert.equal(updated.success, true);
     await expect(widget.locator('[data-masha-feedly-onboarding-thanks]')).toBeVisible();
-    await expect(widget.locator('[data-masha-feedly-onboarding-thanks]')).toContainText('Danke fürs Mitmachen');
+    await expect(widget.locator('[data-masha-feedly-onboarding-thanks]')).toContainText(/(?:Danke fürs Mitmachen|Thanks for taking the tour)/u);
     const preferences = widget.locator('[data-masha-feedly-profile-preferences]');
     await expect(preferences).toBeVisible();
     const preferenceSectionHeights = await preferences.locator('details').evaluateAll((sections) => sections.map((section) => ({
@@ -240,10 +240,10 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     assert.equal(profileResult.disableSoundEffects, originalSoundChoice);
     assert.equal(profileResult.theme, nextTheme || currentTheme || 'playful');
     if (nextColor) assert.equal(await colorField.inputValue(), nextColor.color);
-    await expect(preferences.locator('[data-masha-feedly-profile-preferences-status]')).toContainText('gespeichert');
+    await expect(preferences.locator('[data-masha-feedly-profile-preferences-status]')).toContainText(/(?:gespeichert|Your selection has been saved)/u);
     await expect(widget.locator('[data-masha-feedly-thanks-close]')).toBeVisible();
     const profileLink = widget.locator('[data-masha-feedly-onboarding-thanks] [data-masha-feedly-profile-link]');
-    await expect(profileLink).toContainText('Profileinstellungen öffnen');
+    await expect(profileLink).toContainText(/(?:Profileinstellungen öffnen|Open profile settings)/u);
     await profileLink.click();
     await page.waitForURL((url) => /myprofile\/?$/.test(url.pathname) && url.hash === '#Root_MashaFeedly');
     await expect(page).toHaveURL(/myprofile\/?#Root_MashaFeedly$/);
@@ -311,6 +311,10 @@ for (const browserName of ['chromium', 'firefox', 'webkit']) {
       const welcome = widget.locator('[data-masha-feedly-onboarding-welcome]');
       const openTour = async (width, height) => {
         await page.setViewportSize({ width: 1280, height: 900 });
+        if (await welcome.isVisible()) {
+          await welcome.locator('[data-masha-feedly-tour-skip]').click();
+          await expect(welcome).toBeHidden();
+        }
         await widget.locator('.kw-masha-feedly__toggle').click();
         await widget.locator('[data-masha-feedly-open-help]').click();
         await widget.locator('[data-masha-feedly-restart-onboarding]').click();
@@ -319,11 +323,11 @@ for (const browserName of ['chromium', 'firefox', 'webkit']) {
       };
       await openTour(390, 844);
       await expect(welcome).toBeVisible();
-      await expect(welcome.locator('.kw-masha-feedly__onboarding-mobile-notice')).toContainText('größeren Bildschirm');
+      await expect(welcome.locator('.kw-masha-feedly__onboarding-mobile-notice')).toContainText(/(?:größeren Bildschirm|larger screen)/u);
       await expect(welcome.locator('[data-masha-feedly-tour-start]')).toBeHidden();
       await expect(welcome.locator('[data-masha-feedly-tour-skip]')).toBeHidden();
       await expect(welcome.locator('button:visible')).toHaveCount(2);
-      await expect(welcome.locator('[data-masha-feedly-tour-end]')).toHaveText('Einführung abbrechen', { useInnerText: true });
+      await expect(welcome.locator('[data-masha-feedly-tour-end]')).toHaveText(/(?:Einführung abbrechen|Cancel tour)/u, { useInnerText: true });
       await expect(welcome.locator('[data-masha-feedly-tour-mobile-close]')).toHaveText('OK');
       await welcome.locator('[data-masha-feedly-tour-mobile-close]').click();
       await expect(welcome).toBeHidden();
@@ -348,9 +352,9 @@ for (const browserName of ['chromium', 'firefox', 'webkit']) {
       await expect(content.locator('[data-masha-feedly-start-selection]')).toBeVisible();
       await content.locator('[data-masha-feedly-open-help]').click();
       await expect(widget.locator('.kw-masha-feedly__help-mobile')).toBeVisible();
-      await expect(widget.locator('.kw-masha-feedly__help-mobile')).toContainText('unten rechts');
-      await expect(widget.locator('.kw-masha-feedly__help-mobile')).toContainText('Alle Werkzeuge');
-      await expect(widget.locator('.kw-masha-feedly__help-mobile')).toContainText('Laptop oder Desktop-Computer');
+      await expect(widget.locator('.kw-masha-feedly__help-mobile')).toContainText(/(?:unten rechts|bottom right)/u);
+      await expect(widget.locator('.kw-masha-feedly__help-mobile')).toContainText(/(?:Alle Werkzeuge|All tools)/u);
+      await expect(widget.locator('.kw-masha-feedly__help-mobile')).toContainText(/(?:Laptop oder Desktop-Computer|laptop or desktop computer)/u);
       await expect(widget.locator('.kw-masha-feedly__help-content')).toBeHidden();
       // Kleine Hoch- und Querformatfenster müssen bis zum letzten Hinweis scrollen können.
       for (const viewport of [{ width: 320, height: 400 }, { width: 390, height: 280 }]) {

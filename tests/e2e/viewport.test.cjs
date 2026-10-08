@@ -48,7 +48,10 @@ for (const browserName of ['chromium', 'firefox', 'webkit']) {
       await page.goto(config.baseURL);
       const widget = page.locator('[data-kw-masha-feedly]');
       const welcome = widget.locator('[data-masha-feedly-onboarding-welcome]');
-      if (await welcome.isVisible()) await welcome.locator('[data-masha-feedly-tour-skip]').click();
+      if (await welcome.isVisible()) {
+        await welcome.locator('[data-masha-feedly-tour-skip]').click();
+        await expect(welcome).toBeHidden();
+      }
       const toggle = widget.locator('.kw-masha-feedly__toggle');
       if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
       await widget.locator('[data-masha-feedly-open-help]').click();
@@ -72,7 +75,7 @@ for (const browserName of ['chromium', 'firefox', 'webkit']) {
       await welcome.locator('[data-masha-feedly-tour-start]').click();
       await toggle.click();
       const tip = widget.locator('[data-masha-feedly-onboarding-text]');
-      await expect(tip).toContainText('Schritt 2 von 8');
+      await expect(tip).toContainText(/(?:Schritt 2 von 8|Step 2 of 8)/u);
       await page.setViewportSize({ width: 390, height: 844 });
       await expect(welcome).toBeVisible();
       await expect(welcome.locator('[data-masha-feedly-tour-mobile-close]')).toBeEnabled();
@@ -83,7 +86,7 @@ for (const browserName of ['chromium', 'firefox', 'webkit']) {
       await expect(welcome).toBeVisible();
       await expect(welcome.locator('[data-masha-feedly-tour-start]')).toBeVisible();
       await welcome.locator('[data-masha-feedly-tour-start]').click();
-      await expect(tip).toContainText('Schritt 1 von 8');
+      await expect(tip).toContainText(/(?:Schritt 1 von 8|Step 1 of 8)/u);
       await toggle.click();
       await widget.locator('[data-masha-feedly-start-selection]').click();
       // Bereichsauswahl beendet weder die Tour noch sperrt sie nach dem Wechsel die Website.

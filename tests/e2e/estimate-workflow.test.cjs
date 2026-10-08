@@ -147,7 +147,8 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     await openEntryList(managerPage, managerWidget);
     const reviewerCard = managerWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
     await expect(reviewerCard).toBeVisible({ timeout: 30000 });
-    await expect(reviewerCard.locator('.kw-masha-feedly__entry-estimate-status')).toHaveAttribute('aria-label', /Kostenschätzung wartet auf Freigabe/u);
+    const pendingEstimateLabel = await memberPage.evaluate(() => window.KWMashaFeedlyTranslations.ESTIMATE_PENDING);
+    await expect(reviewerCard.locator('.kw-masha-feedly__entry-estimate-status')).toHaveAttribute('aria-label', pendingEstimateLabel);
     await reviewerCard.click();
     const reviewerForm = managerWidget.locator('[data-masha-feedly-edit-form]');
     const reviewerEstimate = reviewerForm.locator('[data-masha-feedly-estimate]');

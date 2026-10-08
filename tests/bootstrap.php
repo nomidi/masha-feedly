@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+// Silverstripe 4 liest den Flush-Schalter aus argv, nicht aus SS_PHPUNIT_FLUSH.
+// PHPUnit hat seine Optionen bereits verarbeitet, bevor dieser Bootstrap läuft.
+if (getenv('SS_PHPUNIT_FLUSH') === '1') {
+    $_SERVER['argv'][] = 'flush=1';
+}
+
 // Nur ein eigenständiger Modul-Checkout benötigt die minimalen Seitenklassen.
 // In einem Hostprojekt dürfen keine Fixtures angelegt werden: Dessen Klassen
 // können in beliebigen Unterordnern liegen und sind vor dem Framework-Boot

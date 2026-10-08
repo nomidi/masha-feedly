@@ -349,14 +349,14 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertTrue((bool)$member->MashaFeedlyEmailNotifications);
         $this->assertTrue((bool)$member->MashaFeedlyNotifyNewEntries);
         $this->assertTrue((bool)$member->MashaFeedlyNotifyOwnEntryChanges);
-        $mailer = new class implements MailerInterface {
-            /** @var RawMessage[] Gespeicherte Testnachrichten. */
+        $mailer = new class implements Mailer {
+            /** @var \Swift_Message[] Gespeicherte Testnachrichten. */
             public array $messages = [];
-            public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
+            public function send($message) { $this->messages[] = $message; }
         };
         $injector = Injector::inst();
-        $originalMailer = $injector->get(MailerInterface::class);
-        $injector->registerService($mailer, MailerInterface::class);
+        $originalMailer = $injector->get(Mailer::class);
+        $injector->registerService($mailer, Mailer::class);
         MashaFeedlyCategory::ensureDefaultCategories();
         $category = MashaFeedlyCategory::defaultCategory();
         $this->logInAs($member);
@@ -386,10 +386,12 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertCount(1, $mailer->messages);
-        $mailBody = (string)$mailer->messages[0]->getTextBody();
+        $plainPart = $mailer->messages[0]->findPlainPart();
+        $this->assertNotFalse($plainPart);
+        $mailBody = (string)$plainPart->getBody();
         $this->assertStringContainsString('Verantwortlich: ' . $member->getName(), $mailBody);
         $this->assertStringNotContainsString('Noch niemand zugeordnet', $mailBody);
-        $injector->registerService($originalMailer, MailerInterface::class);
+        $injector->registerService($originalMailer, Mailer::class);
         $data = json_decode($response->getBody(), true);
         $this->assertTrue($data['success']);
         $this->assertSame('2026-10-10', $data['dueDate']);
