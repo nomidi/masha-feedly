@@ -121,7 +121,14 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     await expect(commenterCard).toHaveAttribute('data-entry-unread', 'true');
     const commenterUnreadCount = Number(await commenterWidget.locator('[data-masha-feedly-unread-count]').textContent());
     assert.ok(commenterUnreadCount > 0, 'Der neue Eintrag muss im Neuigkeiten-Zähler erscheinen.');
+    const markReadResponsePromise = commenterPage.waitForResponse((response) =>
+      response.request().method() === 'POST'
+      && new URL(response.url()).pathname.endsWith('/markEntryRead'));
     await commenterCard.click();
+    const markReadResponse = await markReadResponsePromise;
+    const markReadResult = await markReadResponse.json();
+    assert.equal(markReadResponse.ok(), true, `Gelesen-Markierung: ${markReadResult.message || markReadResponse.status()}`);
+    assert.equal(markReadResult.success, true);
     await expect(commenterCard).not.toHaveAttribute('data-entry-unread', 'true');
     await expect(commenterWidget.locator('[data-masha-feedly-edit-attachments] img')).toBeVisible();
     await expect(commenterWidget.locator('[data-masha-feedly-unread-count]'))

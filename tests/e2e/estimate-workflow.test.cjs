@@ -70,6 +70,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
   try {
     const memberWidget = await signIn(memberPage, config.memberEmail, config.memberPassword);
     assert.equal(await memberWidget.getAttribute('data-can-manage-estimate'), '0', 'Das normale Testmitglied darf keine Kostenschätzung verwalten.');
+    assert.equal(await memberWidget.getAttribute('data-can-approve-estimate'), '0', 'Das Creator-Testkonto darf keine Kostenschätzungen freigeben. Deaktiviere im Mitgliederprofil „Darf Kostenschätzungen freigeben“.');
     const memberToggle = memberWidget.locator('.kw-masha-feedly__toggle');
     if ((await memberToggle.getAttribute('aria-expanded')) !== 'true') await memberToggle.click();
     await memberWidget.locator('[data-masha-feedly-start-selection]').click();
