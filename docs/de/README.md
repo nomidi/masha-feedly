@@ -4,6 +4,8 @@ Masha:Feedly ist ein gemeinsamer Fehler- und Feedback-Tracker direkt auf der Web
 
 Die Oberfläche verwendet „Meldung“ für Fehler und Änderungswünsche. Unter **Profileinstellungen öffnen** findest du **Profilfarbe**, **Danke-Animation** und die persönliche Anrede. In der Einführung und in Fehlermeldungen wird der nächste Handlungsschritt genannt. Die Vorschau zeigt Änderungen sofort; dauerhaft übernommen werden sie erst beim Speichern.
 
+Plus und Speichern bleiben in beiden Erscheinungsbildern pink. Der Neuigkeiten-Button hat einen hellen Hintergrund ohne dunkle Fläche hinter dem NEW-Symbol.
+
 ## Zugang und Einrichtung
 
 Administratoren öffnen im CMS **Masha:Feedly → Konfiguration**. Die Einstellungen stehen auf einer Seite in den Abschnitten **Allgemein**, **Zugriff & Darstellung**, **Erinnerungen & Schätzungen**, **Daten zurücksetzen** und **E-Mail-Footer**. Die Betreiberabschnitte sind nur für das ausdrücklich konfigurierte Betreiberkonto sichtbar; der E-Mail-Footer ist standardmäßig eingeklappt. Auch Test-E-Mail und Zurücksetzen sieht nur dieses Konto; normale CMS-Administratoren sehen diese Funktionen nicht. Unter **Zugriff & Darstellung** wählst du die Personen aus, die das Modul verwenden dürfen. Auch Administratoren sehen das Widget nur, wenn sie ausdrücklich ausgewählt wurden. Unter **Allgemein** stellst du Ansprache, Schriftgröße und Website-Vorgabe für die Effekt-Kategorie ein. Die Vorgabe ist bei neuen Installationen **Verspielt**. Jede berechtigte Person kann im eigenen Profil eine andere Effekt-Kategorie wählen. Die Kategorien für Startstatus, Erledigt und Freigabe sind erforderlich; ihre Namen können angepasst werden.

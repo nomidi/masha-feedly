@@ -78,3 +78,7 @@ Vom Projekt-Root: `node --test masha-feedly/tests/e2e/touch.test.cjs`. Chromium 
 ## Mobiler Hinweis in Du, Sie und Englisch
 
 Vom Projekt-Root: `node --test masha-feedly/tests/e2e/mobile-language.test.cjs`. Die drei Sprachvarianten laufen jeweils in Chromium, Firefox und WebKit. Die Browserantwort erhält dafür Texte aus den tatsächlichen Sprachdateien und die passende Anrede; Website-Sprache und Benutzerprofile bleiben unverändert. Geprüft werden der sichtbare mobile Hinweis, genau zwei korrekt beschriftete Knöpfe sowie ihre Bedeutung: „OK“ verschiebt die Einführung, „Einführung abbrechen“ beziehungsweise „Cancel tour“ beendet sie. Die Abschlussanfragen werden abgefangen, sodass der gespeicherte Tourstatus unverändert bleibt. Dieser Test prüft die Browserdarstellung, nicht die serverseitige Auswahl der Website-Sprache.
+
+## Farben der Aktionsbuttons
+
+`node --test --test-concurrency=1 masha-feedly/tests/e2e/news-button.test.cjs` prüft Chromium, Firefox und WebKit jeweils mit heller und dunkler Systemdarstellung und beiden Themes. Der Neuigkeiten-Button behält einen hellen Hintergrund mit Verlauf; hinter dem NEW-Symbol liegt keine dunkle Fläche. Plus und Speichern verwenden die pinke Aktionsfarbe auch im sachlichen Theme. Neuigkeiten werden nur in der Browserantwort simuliert; der Test legt keine Meldungen an.

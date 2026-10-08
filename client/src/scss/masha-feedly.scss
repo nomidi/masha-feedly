@@ -1547,10 +1547,8 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__edit-dialog { border-color: $masha-color-d7dce2; background: $masha-color-fff; box-shadow: -5.6px 0 20px $masha-color-1f293714; }
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__header,
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__dialog-header { border-color: $masha-color-e2e6eb; background: $masha-color-f8fafc; }
-  .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__add,
-  .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__submit { border-color: $masha-color-334155; background: $masha-color-334155; box-shadow: none; }
-  .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__add:hover,
-  .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__submit:hover { background: $masha-color-1f2937; box-shadow: none; }
+  /* Primäre Aktionen behalten die gemeinsame Akzentfarbe. NEW braucht keine dunkle Trägerfläche. */
+  .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__news-icon { border: 0; background: $masha-color-transparent; box-shadow: none; }
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__news-button,
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__page-summary,
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__entry-card,
@@ -1560,7 +1558,6 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__news-button:hover,
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__page-summary:hover,
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__entry-card:hover { transform: none; border-color: $masha-color-64748b; box-shadow: 0 0 0 1px $masha-color-64748b1a; }
-  .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__news-icon,
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__news-button[data-has-news="true"] strong { border-color: $masha-color-334155; background: $masha-color-334155; box-shadow: none; }
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__news-title,
   .kw-masha-feedly[data-theme="serious"] .kw-masha-feedly__entry-card a { color: $masha-color-334155; }
@@ -2268,14 +2265,15 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 
   /* Die Neuigkeiten- und Mite-Kacheln stehen gleich groß nebeneinander. */
   .kw-masha-feedly__news-mite-row { display: contents; }
-  .kw-masha-feedly__actions > .kw-masha-feedly__news-mite-row > .kw-masha-feedly__news-button { grid-template-columns: 1fr; justify-items: center; overflow: visible; border-color: $masha-color-c5e2bc; background: linear-gradient(150deg, $masha-color-fff, $masha-color-f0faec); color: $masha-color-39882d; }
+  .kw-masha-feedly__actions > .kw-masha-feedly__news-mite-row > .kw-masha-feedly__news-button { grid-template-columns: 1fr; justify-items: center; overflow: visible; border-color: $masha-color-c5e2bc; background: $masha-color-fff linear-gradient(150deg, $masha-color-fff, $masha-color-f0faec); color: $masha-color-39882d; }
   .kw-masha-feedly__actions > .kw-masha-feedly__news-mite-row > .kw-masha-feedly__news-button:hover,
   .kw-masha-feedly__actions > .kw-masha-feedly__news-mite-row > .kw-masha-feedly__news-button:focus-visible { z-index: 7; transform: translateY(-3px); border-color: $masha-color-62a84b; box-shadow: 0 8.8px 19.2px $masha-color-39882d30, inset 0 1px 0 $masha-color-fff; }
   .kw-masha-feedly__news-mite-row .kw-masha-feedly__news-icon { width: 38px; height: 38px; justify-self: center; }
   .kw-masha-feedly__news-mite-row .kw-masha-feedly__news-icon svg { width: 36px; height: 36px; }
   .kw-masha-feedly__news-mite-row .kw-masha-feedly__news-button strong { position: absolute; top: -5px; right: -5px; display: grid; min-width: 20px; width: auto; height: 20px; place-items: center; padding: 0 4px; font-size: 11px; line-height: 1; }
   .kw-masha-feedly__column { gap: 8px; }
-  .kw-masha-feedly .kw-masha-feedly__action-icon-button { box-sizing: border-box; width: 56px; min-width: 56px; height: 56px; min-height: 56px; flex: 0 0 56px; align-self: flex-start; margin: 0; padding: 6px; border-radius: 14px; transition: transform 180ms cubic-bezier(.2, .8, .2, 1), box-shadow 180ms ease, border-color 180ms ease; }
+  /* Safari darf im dunklen Systemmodus keine native Button-Fläche unter den Verlauf legen. */
+  .kw-masha-feedly .kw-masha-feedly__action-icon-button { box-sizing: border-box; width: 56px; min-width: 56px; height: 56px; min-height: 56px; flex: 0 0 56px; align-self: flex-start; margin: 0; padding: 6px; border-radius: 14px; -webkit-appearance: none; appearance: none; transition: transform 180ms cubic-bezier(.2, .8, .2, 1), box-shadow 180ms ease, border-color 180ms ease; }
   .kw-masha-feedly .kw-masha-feedly__action-icon-button:hover,
   .kw-masha-feedly .kw-masha-feedly__action-icon-button:focus-visible,
   .kw-masha-feedly .kw-masha-feedly__action-icon-button[aria-expanded="true"] { z-index: 7; transform: translateY(-3px); border-color: currentColor; box-shadow: 0 8.8px 19.2px $masha-color-213b2922, inset 0 1px 0 $masha-color-fff; }

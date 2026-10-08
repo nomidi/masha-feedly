@@ -4,6 +4,8 @@ Masha:Feedly is a shared issue and feedback tracker built into your website. Peo
 
 The interface uses “report” for issues and change requests. Under **Open profile settings**, choose your **Profile color**, **Thank-you animation**, and form of address. Tour prompts and error messages explain the next action. The preview updates immediately; changes become permanent when you save.
 
+The plus and save buttons stay pink in both appearances. The news button has a light background without a dark rectangle behind the NEW icon.
+
 ## Access and setup
 
 Administrators open **Masha:Feedly → Configuration** in the CMS. Settings are grouped on one page into **General**, **Access & appearance**, **Reminders & estimates**, **Reset data**, and **Email footer**. Operator settings are visible only to the explicitly configured operator account; the email footer section starts collapsed. Only that account also sees the test email and reset actions; regular CMS administrators do not. Select the people allowed to use the module under **Access & appearance**. Administrators also need explicit access to see the widget. Under **General**, set the form of address, font size, and website default effect category. New installations default to **Playful**. Each allowed member can choose a different category in their profile. The categories for initial status, completion, and approval are required; their names can be customised.
