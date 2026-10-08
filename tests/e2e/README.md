@@ -50,20 +50,17 @@ Ohne vollständige Konfiguration überspringt Node die jeweils betroffenen Tests
 
 Der separate **Test-E-Mail senden**-Knopf ist kein Teil der E2E-Tests. Er sendet an die Adresse des angemeldeten Masha:Feedly-Superadmins und setzt einen passend konfigurierten und erreichbaren SMTP-Dienst voraus.
 
-## Effekt-Anbieter
+## Externer Effekt-Anbieter
 
-Das separate Modul `masha-effects/` liegt im Projekt-Root. Einrichtung, CMS-Berechtigungen, saisonale Freigaben und Dateiformat stehen in [der Effekt-Dokumentation](../../../masha-effects/docs/de/README.md). Die lokale Anbieter-URL `https://feedly:8890` ist in `app/_config/masha-effects.yml` gesetzt. Nach dem Einspielen `vendor/bin/sake dev/build flush=1` ausführen.
+Masha:Effects kann auf einem getrennten Server laufen. Feedly verbindet sich mit der serverseitig konfigurierten Anbieter-URL und gibt die Effekte über seinen eigenen, zugriffsgeschützten Proxy an den Browser weiter. Adresse und Zugangsschlüssel bleiben auf dem Feedly-Server und gehören weder in `.env.e2e` noch in den Browser.
 
-Der zusätzliche Browserfall `effects-provider.test.cjs` verwendet das vorhandene SUPERADMIN-Konto (CMS-ADMIN und Feedly-Freigabe), prüft Katalog, versionierte Dateien, Shadow-Root-CSS und CMS-Vorschauen. Mindestens ein Effekt muss für das aktive Theme freigegeben sein. Dafür wird kein weiteres Konto benötigt.
+`effects-provider.test.cjs` prüft ausschließlich Feedlys Proxy, dessen Zugriffsschutz, den Icon-Katalog und die Wiedergabe im Widget. Der Test ruft keine Masha:Effects-Routen oder CMS-Seiten auf dem Feedly-Host auf. CMS-, Schlüssel- und Dateizugriffstests des Anbieters gehören in dessen eigenes Repository und müssen gegen dessen Testinstanz laufen.
 
 Vom Projekt-Root:
 
 ```sh
-SS_DATABASE_SOCKET=/Applications/MAMP/tmp/mysql/mysql.sock SS_PHPUNIT_FLUSH=1 vendor/bin/phpunit -c masha-effects/tests/phpunit.xml.dist
 node --test masha-feedly/tests/e2e/effects-provider.test.cjs
 ```
-
-Der Effekt-Anbieter benötigt serverseitig die Schlüssel aus der [Anbieter-Dokumentation](../../../masha-effects/docs/de/README.md). Sie gehören in die Projekt-`.env`, niemals in `.env.e2e` oder den Browser. Der Effekt-Test prüft auch, dass Gäste weder API- noch Proxy-Dateien abrufen können und dass alte statische Ressourcen-URLs gesperrt sind.
 
 Der mobile Ablauf in `onboarding.test.cjs` prüft die Feedly-Lasche, das Seitenpanel, den mobilen Hilfetext und beide Onboarding-Auswege in Chromium, Firefox und WebKit (Safari-Engine). In Fenstern mit 320 × 400 und 390 × 280 Pixeln wird geprüft, dass der Hilfetext tatsächlich scrollt und der Schließen-Knopf erreichbar bleibt. Dafür müssen die drei Playwright-Browser installiert sein.
 
