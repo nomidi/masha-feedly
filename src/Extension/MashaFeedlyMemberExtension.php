@@ -17,6 +17,7 @@ use SilverStripe\Security\Security;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\InheritedPermissions;
 use KW\MashaFeedly\Service\MashaFeedlyFolderService;
+use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use SilverStripe\i18n\i18n;
 use SilverStripe\View\Requirements;
@@ -33,6 +34,7 @@ use SilverStripe\View\Requirements;
  * @property bool $MashaFeedlyNotifyCostEstimates Benachrichtigung bei angefragten Kostenschätzungen.
  * @property int $MashaFeedlyIconImageID ID des geschützten Profilbildes für Masha Feedly.
  * @property Image $MashaFeedlyIconImage Geschütztes Masha-Feedly-Profilbild.
+ * @property string $MashaFeedlyAvatarIcon Kennung eines ausgewählten Anbieter-Icons.
  * @property string $MashaFeedlyColor Individuelle Avatarfarbe im Masha-Feedly-Board.
  * @property string $MashaFeedlyTheme Persönliches Masha-Feedly-Theme oder leere Website-Vorgabe.
  * @package MashaFeedly
@@ -52,7 +54,8 @@ class MashaFeedlyMemberExtension extends Extension
         'MashaFeedlyNotifyCostEstimates' => 'Boolean',
         'MashaFeedlyCanManageEstimates' => 'Boolean',
         'MashaFeedlyColor' => 'Varchar(7)',
-        'MashaFeedlyTheme' => 'Varchar(20)',
+        'MashaFeedlyAvatarIcon' => 'Varchar(50)',
+        'MashaFeedlyTheme' => 'Varchar(80)',
         'MashaFeedlyOnboardingCompleted' => 'Boolean',
         'MashaFeedlyShowOnboarding' => 'Boolean',
     ];
@@ -138,7 +141,7 @@ class MashaFeedlyMemberExtension extends Extension
     public static function themeFor(?Member $member): string
     {
         $theme = strtolower(trim((string)($member?->MashaFeedlyTheme ?? '')));
-        return in_array($theme, ['playful', 'serious'], true)
+        return preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $theme)
             ? $theme
             : MashaFeedlyConfigExtension::theme();
     }
@@ -233,6 +236,35 @@ class MashaFeedlyMemberExtension extends Extension
             ?? (string)array_key_first(self::colorOptions());
     }
 
+    /** Liefert das ausgewählte Anbieter-Icon oder das geschützte Upload-Bild für Avatar-Ausgaben. @return string Geschützte Bild-URL oder leer. */
+    public function getMashaFeedlyAvatarURL(): string
+    {
+        $iconID = (string)$this->owner->MashaFeedlyAvatarIcon;
+        if ($iconID !== '') {
+            try {
+                foreach ((new MashaFeedlyEffectClient())->avatarIcons()['icons'] as $icon) {
+                    if ($icon['id'] === $iconID) {
+                        $color = self::iconColorForAvatarColor($this->getMashaFeedlyDisplayColor());
+                        return $icon['files'][$color];
+                    }
+                }
+            } catch (\Throwable) {
+                // Ein nicht erreichbarer Anbieter lässt vorhandene Profilbilder weiter funktionieren.
+            }
+        }
+        $image = $this->owner->MashaFeedlyIconImage();
+        return $image instanceof Image && $image->exists() ? (string)$image->getURL() : '';
+    }
+
+    /** Wählt für die gewählte Avatarfarbe eine kontrastreiche Icon-Farbe. @param string $color Hex-Farbwert. @return string Schwarz oder Weiß. */
+    public static function iconColorForAvatarColor(string $color): string
+    {
+        $color = self::normalizeColor($color) ?? (string)array_key_first(self::colorOptions());
+        $channels = array_map(static fn(string $channel): float => hexdec($channel) / 255, str_split(substr($color, 1), 2));
+        $luminance = 0.2126 * $channels[0] + 0.7152 * $channels[1] + 0.0722 * $channels[2];
+        return $luminance > 0.52 ? 'black' : 'white';
+    }
+
     /** Fügt die Benachrichtigungsoptionen zum normalen Mitgliederformular hinzu. */
     protected function updateCMSFields(FieldList $fields): void
     {
@@ -248,8 +280,12 @@ class MashaFeedlyMemberExtension extends Extension
             'MashaFeedlyOnboardingCompleted',
             'MashaFeedlyShowOnboarding',
             'MashaFeedlyIconImage',
+            'MashaFeedlyAvatarIcon',
             'MashaFeedlyColor',
             'MashaFeedlyTheme',
+            'MashaFeedlyProfileAppearance',
+            'MashaFeedlyOnboardingSettings',
+            'MashaFeedlyEstimateSettings',
         ]);
 
         $currentUser = Security::getCurrentUser();
@@ -259,14 +295,20 @@ class MashaFeedlyMemberExtension extends Extension
             return;
         }
 
-        if ($isEstimateManager) {
-            $fields->addFieldToTab('Root.MashaFeedly', CheckboxField::create(
+        $estimateSettings = $isEstimateManager
+            ? CompositeField::create(CheckboxField::create(
                 'MashaFeedlyCanManageEstimates',
                 self::translate('PROFILE_CAN_MANAGE_ESTIMATES', 'Darf Kostenschätzungen freigeben')
-            )->setDescription(self::translate('PROFILE_CAN_MANAGE_ESTIMATES_DESCRIPTION', 'Die Person sieht Dauer, Erläuterung und geschätzten Preis und darf die Schätzung freigeben. Bearbeiten kann sie nur der konfigurierte Masha:Feedly-Superadmin.')));
-        }
+            )->setDescription(self::translate('PROFILE_CAN_MANAGE_ESTIMATES_DESCRIPTION', 'Die Person sieht Dauer, Erläuterung und geschätzten Preis und darf die Schätzung freigeben. Bearbeiten kann sie nur der konfigurierte Masha:Feedly-Superadmin.')))
+                ->setName('MashaFeedlyEstimateSettings')
+                ->setTitle(self::translate('PROFILE_ESTIMATE_SETTINGS', 'Kostenschätzungen'))
+                ->addExtraClass('masha-feedly-profile-settings masha-feedly-estimate-settings')
+            : null;
 
         if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($currentUser)) {
+            if ($estimateSettings) {
+                $fields->addFieldToTab('Root.MashaFeedly', $estimateSettings);
+            }
             return;
         }
 
@@ -274,6 +316,10 @@ class MashaFeedlyMemberExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-colors.js');
         self::protectedIconFolder();
+        $avatarIconPicker = self::renderAvatarIconPicker(
+            (string)$this->owner->MashaFeedlyAvatarIcon,
+            self::normalizeColor((string)$this->owner->MashaFeedlyColor)
+        );
         $logoURL = htmlspecialchars(
             (string)ModuleResourceLoader::resourceURL('kooperativeweb/masha-feedly:client/dist/icons/masha-feedly.svg'),
             ENT_QUOTES | ENT_SUBSTITUTE,
@@ -310,37 +356,45 @@ class MashaFeedlyMemberExtension extends Extension
             }
         }
 
+        $avatarFields = [
+            UploadField::create('MashaFeedlyIconImage', self::translate('PROFILE_IMAGE', 'Dein Masha:Feedly-Avatar'))
+                ->setFolderName('masha-feedly/masha-feedly-profile-images')
+                ->setAllowedFileCategories('image/supported')
+                ->setAllowedMaxFileNumber(1)
+                ->setAttachEnabled(false)
+                ->setDescription(self::translate('PROFILE_IMAGE_DESCRIPTION', 'Das Bild ist geschützt und nur für freigegebene Masha-Feedly-Benutzer sichtbar. Ohne Bild werden deine Initialen angezeigt.')),
+        ];
+        if ($avatarIconPicker !== '') {
+            $avatarFields[] = CompositeField::create(
+                LiteralField::create('MashaFeedlyAvatarIconChoices', $avatarIconPicker),
+                HiddenField::create('MashaFeedlyAvatarIcon', null, (string)$this->owner->MashaFeedlyAvatarIcon)
+                    ->setAttribute('data-masha-feedly-avatar-icon-value', 'true')
+            )->setName('MashaFeedlyAvatarIconSelection')->setTitle(self::translate('PROFILE_ICON_SELECTION', 'Oder ein eigenes Masha-Icon wählen'));
+            Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-avatar-icons.js');
+        }
+        $avatarColor = CompositeField::create(
+            LiteralField::create('MashaFeedlyColorPalette', self::renderColorPalette(
+                'MashaFeedlyColor', self::normalizeColor((string)$this->owner->MashaFeedlyColor)
+            )),
+            HiddenField::create('MashaFeedlyColor', null, self::normalizeColor((string)$this->owner->MashaFeedlyColor) ?? '')
+        )->setName('MashaFeedlyAvatarColor')->setTitle(self::translate('PROFILE_COLOR', 'Avatarfarbe'));
+
+        $appearanceSettings = CompositeField::create(
+            $avatarColor,
+            DropdownField::create('MashaFeedlyTheme', self::translate('PROFILE_THEME', 'Effekt-Kategorie'), MashaFeedlyEffectClient::themeOptions((string)$this->owner->MashaFeedlyTheme))
+                ->setValue((string)$this->owner->MashaFeedlyTheme)
+                ->setEmptyString(self::translate('PROFILE_THEME_DEFAULT', 'Website-Vorgabe'))
+                ->setDescription(self::translate('PROFILE_THEME_DESCRIPTION', 'Wähle dein persönliches Erscheinungsbild. Bei Website-Vorgabe gilt das Theme aus Masha:Feedly → Konfiguration; neue Installationen verwenden Verspielt.'))
+        )->setName('MashaFeedlyProfileAppearance')->setTitle(self::translate('PROFILE_APPEARANCE', 'Darstellung'))->addExtraClass('masha-feedly-profile-settings masha-feedly-profile-appearance');
+
         $fields->addFieldsToTab('Root.MashaFeedly', [
             LiteralField::create(
                 'MashaFeedlyPreferencesIntro',
                 '<div class="masha-feedly-profile-intro"><img src="' . $logoURL . '" alt="" width="44" height="44">'
                 . '<div><h2>' . self::translate('PROFILE_TITLE', 'Masha:Feedly') . '</h2><p>' . self::translate('PROFILE_INTRO', 'Verwalte dein Profil und bestimme, worüber dich Masha:Feedly per E-Mail informiert.') . '</p></div></div>'
             ),
-            CompositeField::create(
-                UploadField::create('MashaFeedlyIconImage', self::translate('PROFILE_IMAGE', 'Dein Masha:Feedly-Avatar'))
-                    ->setFolderName('masha-feedly/masha-feedly-profile-images')
-                    ->setAllowedFileCategories('image/supported')
-                    ->setAllowedMaxFileNumber(1)
-                    ->setAttachEnabled(false)
-                    ->setDescription(self::translate('PROFILE_IMAGE_DESCRIPTION', 'Das Bild ist geschützt und nur für freigegebene Masha-Feedly-Benutzer sichtbar. Ohne Bild werden deine Initialen angezeigt.')),
-                CompositeField::create(
-                    LiteralField::create('MashaFeedlyColorPalette', self::renderColorPalette(
-                        'MashaFeedlyColor',
-                        self::normalizeColor((string)$this->owner->MashaFeedlyColor)
-                    )),
-                    HiddenField::create(
-                        'MashaFeedlyColor',
-                        null,
-                        self::normalizeColor((string)$this->owner->MashaFeedlyColor) ?? ''
-                    )
-                )->setName('MashaFeedlyAvatarColor')->setTitle(self::translate('PROFILE_COLOR', 'Avatarfarbe'))
-            )->setName('MashaFeedlyProfileSettings')->setTitle(self::translate('PROFILE_AVATAR', 'Profil und Avatar'))->addExtraClass('masha-feedly-profile-settings'),
-            DropdownField::create('MashaFeedlyTheme', self::translate('PROFILE_THEME', 'Erscheinungsbild'), [
-                'playful' => self::translate('CONFIG_THEME_PLAYFUL', 'Verspielt'),
-                'serious' => self::translate('CONFIG_THEME_SERIOUS', 'Seriös'),
-            ])->setValue((string)$this->owner->MashaFeedlyTheme)
-                ->setEmptyString(self::translate('PROFILE_THEME_DEFAULT', 'Website-Vorgabe'))
-                ->setDescription(self::translate('PROFILE_THEME_DESCRIPTION', 'Wähle dein persönliches Erscheinungsbild. Bei Website-Vorgabe gilt das Theme aus Masha:Feedly → Konfiguration; neue Installationen verwenden Verspielt.')),
+            CompositeField::create(...$avatarFields)->setName('MashaFeedlyProfileSettings')->setTitle(self::translate('PROFILE_AVATAR', 'Profil und Avatar'))->addExtraClass('masha-feedly-profile-settings'),
+            $appearanceSettings,
             CompositeField::create(
                 CheckboxField::create(
                     'MashaFeedlyEmailNotifications',
@@ -356,15 +410,74 @@ class MashaFeedlyMemberExtension extends Extension
                 $dueDateReminders,
                 $costEstimates
             )->setName('MashaFeedlyEmailSettings')->setTitle(self::translate('PROFILE_EMAIL_SETTINGS', 'E-Mail-Benachrichtigungen'))->addExtraClass('masha-feedly-email-settings'),
-            CheckboxField::create(
-                'MashaFeedlyShowOnboarding',
-                self::translate('PROFILE_SHOW_ONBOARDING', 'Einführung erneut anzeigen')
-            )->setDescription(self::translate('PROFILE_SHOW_ONBOARDING_DESCRIPTION', 'Aktiviere diese Option, wenn du die Schritt-für-Schritt-Einführung beim nächsten Besuch noch einmal sehen möchtest.')),
-            CheckboxField::create(
-                'MashaFeedlyOnboardingCompleted',
-                self::translate('PROFILE_ONBOARDING_COMPLETED', 'Einführung abgeschlossen')
-            )->setDescription(self::translate('PROFILE_ONBOARDING_COMPLETED_DESCRIPTION', 'Zeigt an, ob die Einführung bereits abgeschlossen wurde. Zum erneuten Anzeigen aktiviere „Einführung erneut anzeigen“.')),
+            CompositeField::create(
+                CheckboxField::create(
+                    'MashaFeedlyShowOnboarding',
+                    self::translate('PROFILE_SHOW_ONBOARDING', 'Einführung erneut anzeigen')
+                )->setDescription(self::translate('PROFILE_SHOW_ONBOARDING_DESCRIPTION', 'Aktiviere diese Option, wenn du die Schritt-für-Schritt-Einführung beim nächsten Besuch noch einmal sehen möchtest.')),
+                CheckboxField::create(
+                    'MashaFeedlyOnboardingCompleted',
+                    self::translate('PROFILE_ONBOARDING_COMPLETED', 'Einführung abgeschlossen')
+                )->setDescription(self::translate('PROFILE_ONBOARDING_COMPLETED_DESCRIPTION', 'Zeigt an, ob die Einführung bereits abgeschlossen wurde. Zum erneuten Anzeigen aktiviere „Einführung erneut anzeigen“.'))
+            )->setName('MashaFeedlyOnboardingSettings')->setTitle(self::translate('PROFILE_ONBOARDING_SETTINGS', 'Einführung'))->addExtraClass('masha-feedly-profile-settings masha-feedly-onboarding-settings'),
         ]);
+
+        if ($estimateSettings) {
+            $fields->addFieldToTab('Root.MashaFeedly', $estimateSettings);
+        }
+    }
+
+    /**
+     * Rendert die vom Anbieter gelieferten Icon-Auswahlen für den Einführungsdialog.
+     *
+     * @param string $selectedID Gespeicherte Icon-Kennung.
+     * @param string|null $color Gewählte Avatarfarbe.
+     * @param MashaFeedlyEffectClient|null $client Optionaler Anbieter-Client für Tests.
+     * @return string Auswahlelemente oder leer, wenn kein Katalog verfügbar ist.
+     */
+    public static function renderAvatarIconPickerForWidget(string $selectedID, ?string $color, ?MashaFeedlyEffectClient $client = null): string
+    {
+        return self::renderAvatarIconPicker($selectedID, $color, $client);
+    }
+
+    /** Rendert nur einen gültigen, vom explizit konfigurierten Anbieter gelieferten Icon-Katalog. @return string Auswahlfeld oder leer. */
+    protected static function renderAvatarIconPicker(string $selectedID, ?string $color, ?MashaFeedlyEffectClient $client = null): string
+    {
+        $client ??= new MashaFeedlyEffectClient();
+        try { $catalogue = $client->avatarIcons(); }
+        catch (\Throwable) {
+            if (!$client::hasConfiguredProvider()) return '';
+            return '<p class="masha-feedly-avatar-icons__unavailable" role="status">'
+                . htmlspecialchars(self::translate('PROFILE_ICON_PROVIDER_UNAVAILABLE', 'Die Icon-Auswahl ist vorübergehend nicht verfügbar. Der Anbieter antwortet gerade nicht. Bitte versuche es später erneut.'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+                . '</p>';
+        }
+        if (!$catalogue['icons']) return '';
+        $iconColor = self::iconColorForAvatarColor($color ?? '');
+        $html = '<div class="masha-feedly-avatar-icons" data-masha-feedly-avatar-icons><p>'
+            . htmlspecialchars(self::translate('PROFILE_ICON_CHOICES_DESCRIPTION', 'Wähle ein Symbol. Seine Farbe passt sich automatisch an deine Avatarfarbe an.'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            . '</p><button type="button" class="masha-feedly-avatar-icons__clear" data-masha-feedly-avatar-icon-clear aria-pressed="' . ($selectedID === '' ? 'true' : 'false') . '">'
+            . htmlspecialchars(self::translate('PROFILE_ICON_CLEAR', 'Kein Symbol verwenden'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</button><nav aria-label="'
+            . htmlspecialchars(self::translate('PROFILE_ICON_CATEGORIES', 'Icon-Kategorien'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">';
+        foreach ($catalogue['categories'] as $index => $category) {
+            $categoryID = htmlspecialchars($category['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $categoryName = htmlspecialchars($category['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $html .= '<a href="#masha-feedly-icons-' . $categoryID . '">' . $categoryName . '</a>';
+        }
+        $html .= '</nav>';
+        foreach ($catalogue['categories'] as $index => $category) {
+            $categoryID = htmlspecialchars($category['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $categoryName = htmlspecialchars($category['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $html .= '<section id="masha-feedly-icons-' . $categoryID . '"><h3>' . $categoryName . '</h3><div class="masha-feedly-avatar-icons__grid">';
+            foreach ($catalogue['icons'] as $icon) {
+                if ($icon['category'] !== $category['id']) continue;
+                $id = htmlspecialchars($icon['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $name = htmlspecialchars($icon['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $pressed = $selectedID === $icon['id'];
+                $html .= '<button type="button" class="masha-feedly-avatar-icons__choice' . ($pressed ? ' is-selected' : '') . '" data-masha-feedly-avatar-icon-choice data-icon-id="' . $id . '" data-icon-black="' . htmlspecialchars($icon['files']['black'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" data-icon-white="' . htmlspecialchars($icon['files']['white'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" aria-pressed="' . ($pressed ? 'true' : 'false') . '" aria-label="' . $name . '"><img src="' . htmlspecialchars($icon['files'][$iconColor], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" alt="" loading="lazy"><span>' . $name . '</span></button>';
+            }
+            $html .= '</div></section>';
+        }
+        return $html . '</div>';
     }
     /** Liefert eine lokalisierte Modulbeschriftung mit deutschem Ersatztext. */
     private static function translate(string $key, string $fallback): string

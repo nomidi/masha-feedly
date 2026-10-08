@@ -30,10 +30,14 @@ class MashaFeedlyEffectsControllerTest extends FunctionalTest
     {
         $this->client->expects($this->never())->method('manifest');
         $this->client->expects($this->never())->method('file');
+        $this->client->expects($this->never())->method('avatarIcons');
+        $this->client->expects($this->never())->method('avatarIcon');
         foreach ([null, $this->objFromFixture(Member::class, 'notAllowed')] as $member) {
             if ($member) $this->logInAs($member); else $this->logOut();
             $this->assertSame(403, $this->get('/__masha-feedly-effects/manifest')->getStatusCode());
             $this->assertSame(403, $this->get('/__masha-feedly-effects/file/1/' . str_repeat('a', 64) . '/js')->getStatusCode());
+            $this->assertSame(403, $this->get('/__masha-feedly-effects/icons')->getStatusCode());
+            $this->assertSame(403, $this->get('/__masha-feedly-effects/icon/person/' . str_repeat('a', 64) . '/black')->getStatusCode());
         }
     }
 
@@ -43,7 +47,9 @@ class MashaFeedlyEffectsControllerTest extends FunctionalTest
         $this->logInAs($this->objFromFixture(Member::class, 'allowed'));
         $this->client->expects($this->once())->method('manifest')->willReturn(['version' => 1, 'maxAge' => 300, 'effects' => []]);
         $this->client->expects($this->once())->method('file')->willReturn(['body' => 'window.effect = true;', 'mime' => 'text/javascript']);
-        foreach (['/__masha-feedly-effects/manifest', '/__masha-feedly-effects/file/1/' . str_repeat('a', 64) . '/js'] as $url) {
+        $this->client->expects($this->once())->method('avatarIcons')->willReturn(['version' => 1, 'categories' => [], 'icons' => []]);
+        $this->client->expects($this->once())->method('avatarIcon')->willReturn(['body' => '<svg/>', 'mime' => 'image/svg+xml']);
+        foreach (['/__masha-feedly-effects/manifest', '/__masha-feedly-effects/file/1/' . str_repeat('a', 64) . '/js', '/__masha-feedly-effects/icons', '/__masha-feedly-effects/icon/person/' . str_repeat('a', 64) . '/black'] as $url) {
             $response = $this->get($url);
             $this->assertSame(200, $response->getStatusCode());
             $this->assertSame('private, no-store', $response->getHeader('Cache-Control'));

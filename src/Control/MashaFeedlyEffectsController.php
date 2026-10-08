@@ -13,8 +13,8 @@ use SilverStripe\Security\Security;
 /** Liefert gecachte Effekte ausschließlich an angemeldete, für Feedly freigegebene Personen. */
 class MashaFeedlyEffectsController extends Controller
 {
-    private static $allowed_actions = ['manifest', 'file'];
-    private static $url_handlers = ['file/$ID/$Version/$Type' => 'file', 'manifest' => 'manifest'];
+    private static $allowed_actions = ['manifest', 'file', 'icons', 'icon'];
+    private static $url_handlers = ['icon/$ID/$Version/$Color' => 'icon', 'file/$ID/$Version/$Type' => 'file', 'icons' => 'icons', 'manifest' => 'manifest'];
 
     /** @param HTTPRequest $request Browser-Anfrage. @return HTTPResponse Privater Katalog oder Ablehnung. */
     public function manifest(HTTPRequest $request): HTTPResponse
@@ -23,7 +23,13 @@ class MashaFeedlyEffectsController extends Controller
         try {
             $manifest = Injector::inst()->get(MashaFeedlyEffectClient::class)->manifest();
             return $this->response(json_encode($manifest, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'application/json');
-        } catch (\Throwable $error) { return $this->response('Effekt-Anbieter nicht verfügbar.', 'text/plain', 502); }
+        } catch (\Throwable $error) {
+            $status = $error instanceof \RuntimeException && $error->getCode() === 503 ? 503 : 502;
+            return $this->response(json_encode([
+                'error' => 'effect_provider_unavailable',
+                'message' => 'Der Effekt-Anbieter ist momentan nicht verfügbar.',
+            ], JSON_UNESCAPED_UNICODE), 'application/json', $status);
+        }
     }
 
     /** @param HTTPRequest $request Browser-Anfrage mit ID, Hash und Typ. @return HTTPResponse Autorisierte Ressource oder Ablehnung. */
@@ -34,6 +40,33 @@ class MashaFeedlyEffectsController extends Controller
             $file = Injector::inst()->get(MashaFeedlyEffectClient::class)->file((int)$request->param('ID'), (string)$request->param('Version'), (string)$request->param('Type'));
             return $this->response($file['body'], $file['mime']);
         } catch (\Throwable $error) { return $this->response('', 'text/plain', $error->getCode() === 404 ? 404 : 502); }
+    }
+
+    /** Liefert den Icon-Katalog nur bei aktivem externen Anbieter an berechtigte Mitglieder. @param HTTPRequest $request Browser-Anfrage. @return HTTPResponse Privater Katalog oder Ablehnung. */
+    public function icons(HTTPRequest $request): HTTPResponse
+    {
+        if ($denied = $this->deniedResponse($request)) return $denied;
+        try {
+            $catalogue = Injector::inst()->get(MashaFeedlyEffectClient::class)->avatarIcons();
+            return $this->response(json_encode($catalogue, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), 'application/json');
+        } catch (\Throwable $error) {
+            $status = $error instanceof \RuntimeException && $error->getCode() === 503 ? 503 : 502;
+            return $this->response(json_encode(['error' => 'profile_icons_unavailable', 'message' => 'Die Profil-Icon-Auswahl ist nicht verfügbar.'], JSON_UNESCAPED_UNICODE), 'application/json', $status);
+        }
+    }
+
+    /** Liefert eine geprüfte Icon-Datei ausschließlich an freigegebene Mitglieder. @param HTTPRequest $request Browser-Anfrage. @return HTTPResponse Geschützte SVG-Datei oder Ablehnung. */
+    public function icon(HTTPRequest $request): HTTPResponse
+    {
+        if ($denied = $this->deniedResponse($request)) return $denied;
+        try {
+            $file = Injector::inst()->get(MashaFeedlyEffectClient::class)->avatarIcon(
+                (string)$request->param('ID'), (string)$request->param('Version'), (string)$request->param('Color')
+            );
+            return $this->response($file['body'], $file['mime']);
+        } catch (\Throwable $error) {
+            return $this->response('', 'text/plain', $error->getCode() === 404 ? 404 : 502);
+        }
     }
 
     /** @param HTTPRequest $request Aktuelle Sitzung. @return HTTPResponse|null Ablehnung vor jedem Cache-Zugriff. */

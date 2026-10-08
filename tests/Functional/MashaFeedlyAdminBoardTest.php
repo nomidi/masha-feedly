@@ -564,6 +564,13 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('#E95DAB', $response->getBody());
         $this->assertStringContainsString('aria-label="Pink, #E95DAB"', $response->getBody());
         $this->assertStringContainsString('name="MashaFeedlyAddress"', $response->getBody());
+        $this->assertStringContainsString('General', $response->getBody());
+        $this->assertStringContainsString('Access &amp; appearance', $response->getBody());
+        $this->assertStringContainsString('Reminders &amp; estimates', $response->getBody());
+        $this->assertStringContainsString('Reset data', $response->getBody());
+        $this->assertStringContainsString('masha-feedly-config-section--general', $response->getBody());
+        $this->assertStringContainsString('masha-feedly-config-section--operations ss-toggle ss-toggle-start-closed', $response->getBody());
+        $this->assertStringContainsString('masha-feedly-config-section--reset ss-toggle ss-toggle-start-closed', $response->getBody());
         $this->assertStringContainsString('name="MashaFeedlyFontSize"', $response->getBody());
         $this->assertStringContainsString('name="MashaFeedlyTheme"', $response->getBody());
         $this->assertStringContainsString('name="MashaFeedlyDueDateReminderMode"', $response->getBody());
@@ -707,6 +714,12 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $body = $response->getBody();
         $this->assertStringNotContainsString('name="MashaFeedlyDueDateReminderMode"', $body);
         $this->assertStringNotContainsString('name="MashaFeedlyHourlyRate"', $body);
+        $this->assertStringContainsString('General', $body);
+        $this->assertStringContainsString('Access &amp; appearance', $body);
+        $this->assertStringNotContainsString('Reminders &amp; estimates', $body);
+        $this->assertStringNotContainsString('Reset data', $body);
+        $this->assertStringNotContainsString('masha-feedly-config-section--operations', $body);
+        $this->assertStringNotContainsString('masha-feedly-config-section--reset', $body);
         $this->assertStringNotContainsString('data-masha-feedly-animation-previews', $body);
         $this->assertStringNotContainsString('name="ResetConfirmation"', $body);
         $this->assertStringNotContainsString('action_resetAllMashaFeedlyData', $body);

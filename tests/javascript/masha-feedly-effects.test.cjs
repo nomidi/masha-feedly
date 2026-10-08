@@ -4,7 +4,8 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 const source = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-effects.js'), 'utf8');
-const definition = (id = 'ducks', theme = 'playful', weight = 1) => ({ id, name: id, theme, weight, files: { js: `/${id}.js`, css: `/${id}.css` } });
+const definition = (id = 'ducks', categories = ['playful'], weight = 1) => ({ id, name: id, categories, weight, files: { js: `/${id}.js`, css: `/${id}.css` } });
+const categoryList = [{ id: 'playful', name: 'Verspielt' }, { id: 'serious', name: 'Sachlich' }, { id: 'winterzauber', name: 'Winterzauber' }];
 
 /** Simuliert echte Datei-Ladeereignisse getrennt für Dokument und Shadow Root. */
 function environment(effects = [definition()], options = {}) {
@@ -29,7 +30,7 @@ function environment(effects = [definition()], options = {}) {
       assert.equal(init.cache, 'no-cache');
       if (options.fetch) return options.fetch();
       if (options.failManifest) throw new Error('offline');
-      return { ok: true, json: async () => ({ version: 1, maxAge: 300, effects }) };
+      return { ok: true, json: async () => ({ version: 2, maxAge: 300, categories: categoryList, effects }) };
     },
   };
   const append = (element, root) => {
@@ -69,8 +70,20 @@ test('führt parallele Manifest-Anfragen zusammen und aktualisiert nach fünf Mi
   env.expire(); await env.api.refresh(); assert.equal(env.requests(), 2);
 });
 
-test('wählt nur Theme oder beide und berücksichtigt das CMS-Gewicht', async () => {
-  const env = environment([definition('ducks', 'playful', 1), definition('check', 'serious', 1), definition('common', 'both', 3)]);
+test('liefert dynamische Kategorien aus dem Anbieter-Katalog', async () => {
+  const env = environment([definition('snow', ['winterzauber'])]);
+  const catalogue = await env.api.refreshCatalogue();
+  assert.deepEqual(catalogue.categories.map(category => category.id), ['playful', 'serious', 'winterzauber']);
+  assert.deepEqual(catalogue.effects[0].categories, ['winterzauber']);
+});
+
+test('reicht die sichere Diagnose des lokalen Anbieter-Proxys an die CMS-Vorschau weiter', async () => {
+  const env = environment([], { fetch: async () => ({ ok: false, json: async () => ({ message: 'Der Effekt-Anbieter lehnt den API-Schlüssel ab.' }) }) });
+  await assert.rejects(env.api.refreshCatalogue(), /lehnt den API-Schlüssel ab/);
+});
+
+test('wählt nach Anbieter-Kategorie und berücksichtigt das CMS-Gewicht', async () => {
+  const env = environment([definition('ducks', ['playful'], 1), definition('check', ['serious'], 1), definition('common', ['playful', 'serious'], 3)]);
   await env.api.playOnDone(env.document, env.window, '', 'serious', () => 0);
   await env.api.playOnDone(env.document, env.window, '', 'playful', () => 0.5);
   assert.deepEqual(env.played.map(item => item.id), ['check', 'common']);
@@ -94,7 +107,7 @@ test('spielt nach einem Abbruch auch eine noch wartende Manifest-Anfrage nicht a
   const playback = env.api.preview('ducks', env.document);
   await new Promise(setImmediate);
   env.api.cancelActive();
-  resolve({ ok: true, json: async () => ({ version: 1, effects: [definition()] }) });
+  resolve({ ok: true, json: async () => ({ version: 2, categories: categoryList, effects: [definition()] }) });
   assert.equal(await playback, null);
   assert.equal(env.played.length, 0);
 });
@@ -113,6 +126,17 @@ test('reduzierte Bewegung verhindert sowohl Downloads als auch Wiedergabe', asyn
   await env.api.preload(env.document, 'playful');
   assert.equal(await env.api.preview('ducks', env.document), null);
   assert.equal(env.requests(), 0); assert.equal(env.appended.length, 0);
+});
+
+test('lokale Standardvorschau läuft ohne Katalog und verwendet dieselbe aufräumbare Häkchenanimation', async () => {
+  const env = environment([], { failManifest: true });
+  const result = await env.api.previewFallback(env.document);
+  assert.equal(env.requests(), 0);
+  assert.equal(result.layer.textContent, '✓');
+  assert.equal(env.appended.length, 1);
+  assert.equal(env.api.cancelActive(), 1);
+  assert.equal(result.layer.removed, true);
+  assert.equal(result.layer.animation.cancelled, true);
 });
 
 test('leere saisonale Freigabe nutzt den lokalen Abschluss und fremde Datei-Hosts werden abgelehnt', async () => {

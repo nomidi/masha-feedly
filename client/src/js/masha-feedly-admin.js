@@ -18,15 +18,95 @@
    */
   const applyAnimationTheme = () => {
     const themeField = document.querySelector('select[name="MashaFeedlyTheme"]');
-    const selectedTheme = themeField?.value === 'serious' ? 'serious' : 'playful';
+    const selectedTheme = themeField?.value || 'playful';
     document.querySelectorAll('[data-masha-feedly-animation-preview-card]').forEach((card) => {
-      card.hidden = card.dataset.mashaFeedlyTheme !== selectedTheme && card.dataset.mashaFeedlyTheme !== 'both';
+      const categories = (card.dataset.mashaFeedlyCategories || '').split(',').filter(Boolean);
+      card.hidden = categories.length > 0 && !categories.includes(selectedTheme);
     });
+  };
+
+  /** Übernimmt Anbieter-Kategorien in Konfiguration und persönliches Profil. */
+  const populateThemeOptions = (categories) => {
+    document.querySelectorAll('select[name="MashaFeedlyTheme"]').forEach((field) => {
+      const selected = field.value;
+      const emptyOption = [...field.options].find((option) => option.value === '');
+      field.replaceChildren(...(emptyOption ? [emptyOption] : []));
+      categories.forEach((category) => {
+        const option = document.createElement('option');
+        option.value = category.id;
+        option.textContent = category.name;
+        field.append(option);
+      });
+      if (selected && !categories.some((category) => category.id === selected)) {
+        const option = document.createElement('option');
+        option.value = selected;
+        option.textContent = `${selected} (gespeicherte Auswahl)`;
+        field.append(option);
+      }
+      field.value = selected;
+    });
+    applyAnimationTheme();
   };
 
   const effectText = (key, fallback) => {
     const translated = window.KWMashaFeedlyTranslate?.(key);
     return translated && translated !== key ? translated : fallback;
+  };
+  /** Rendert den Anbieterstatus getrennt vom lokalen Effekt. */
+  const createEffectProviderCard = (providerError = '', effectCount = 0) => {
+    const card = document.createElement('article');
+    card.className = `masha-feedly-animation-preview masha-feedly-animation-preview--provider${providerError ? ' is-unavailable' : ' is-connected'}`;
+    card.setAttribute('data-masha-feedly-animation-preview-card', '');
+    card.dataset.mashaFeedlyCategories = '';
+    const icon = document.createElement('span');
+    icon.className = 'masha-feedly-animation-preview__icon masha-feedly-animation-preview__icon--provider';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '↗';
+    const copy = document.createElement('div');
+    const title = document.createElement('strong');
+    title.textContent = effectText('EFFECT_PROVIDER_CARD_TITLE', 'Effekt-Anbieter');
+    const status = document.createElement('p');
+    status.className = 'masha-feedly-animation-preview__provider-status';
+    status.setAttribute('role', 'status');
+    status.textContent = providerError
+      ? `${effectText('EFFECT_PROVIDER_ERROR_LABEL', 'Verbindung fehlgeschlagen')}: ${providerError}`
+      : effectText('EFFECT_PROVIDER_CONNECTED', `${effectCount} Anbieter-Effekte verfügbar.`).replace('{count}', String(effectCount));
+    const link = document.createElement('a');
+    link.href = 'https://github.com/nomidi/masha-feedly/blob/main/docs/de/README.md#abschluss-effekte';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = effectText('EFFECT_PROVIDER_SETUP_LINK', 'Effekt-Anbieter einrichten ↗');
+    copy.append(title, status, link);
+    card.append(icon, copy);
+    return card;
+  };
+  /** Rendert den zuverlässigen lokalen Abschluss als eigenständige Vorschaukarte. */
+  const createLocalFallbackCard = () => {
+    const card = document.createElement('article');
+    card.className = 'masha-feedly-animation-preview masha-feedly-animation-preview--local';
+    card.setAttribute('data-masha-feedly-animation-preview-card', '');
+    card.dataset.mashaFeedlyCategories = '';
+    const icon = document.createElement('span');
+    icon.className = 'masha-feedly-animation-preview__icon masha-feedly-animation-preview__icon--local';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '✓';
+    const copy = document.createElement('div');
+    const title = document.createElement('strong');
+    title.textContent = effectText('EFFECT_LOCAL_DEFAULT_TITLE', 'Lokaler Standard: Ruhiges Häkchen');
+    const description = document.createElement('p');
+    description.textContent = effectText('EFFECT_LOCAL_DEFAULT_DESCRIPTION', 'Funktioniert unabhängig vom Effekt-Anbieter.');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.mashaFeedlyAnimationPreview = '__localCheck';
+    button.textContent = effectText('CONFIG_ANIMATION_PREVIEW', 'Vorschau ansehen');
+    copy.append(title, description, button);
+    card.append(icon, copy);
+    return card;
+  };
+  const renderLocalFallback = (grid, providerError = '') => {
+    grid.replaceChildren(createEffectProviderCard(providerError), createLocalFallbackCard());
+    grid.dataset.effectsLoaded = 'fallback';
+    applyAnimationTheme();
   };
   /** Erstellt die Vorschauen aus dem aktuellen Katalog statt aus einer festen Theme-Liste. */
   const loadEffectPreviews = async () => {
@@ -34,25 +114,29 @@
     grids.forEach((grid) => { grid.dataset.effectsLoaded = 'loading'; });
     if (!grids.length) return;
     try {
-      const effects = await window.KWMashaFeedlyEffects.refresh();
+      const catalogue = await window.KWMashaFeedlyEffects.refreshCatalogue();
+      const effects = catalogue.effects;
+      populateThemeOptions(catalogue.categories);
       grids.forEach((grid) => {
-        grid.replaceChildren();
+        grid.replaceChildren(createEffectProviderCard('', effects.length));
         effects.forEach((effect) => {
           const card = document.createElement('article');
           card.className = 'masha-feedly-animation-preview';
           card.setAttribute('data-masha-feedly-animation-preview-card', '');
-          card.dataset.mashaFeedlyTheme = effect.theme;
+          card.dataset.mashaFeedlyCategories = effect.categories.join(',');
           const title = document.createElement('strong'); title.textContent = effect.name;
           const button = document.createElement('button'); button.type = 'button';
           button.dataset.mashaFeedlyAnimationPreview = effect.id;
           button.textContent = effectText('CONFIG_ANIMATION_PREVIEW', 'Vorschau ansehen');
           card.append(title, button); grid.append(card);
         });
+        grid.append(createLocalFallbackCard());
         grid.dataset.effectsLoaded = 'true';
       });
       applyAnimationTheme();
     } catch (error) {
-      grids.forEach((grid) => { grid.dataset.effectsLoaded = 'error'; grid.textContent = effectText('EFFECT_PROVIDER_UNAVAILABLE', 'Effekt-Anbieter nicht erreichbar.'); });
+      const providerError = error instanceof Error ? error.message : effectText('EFFECT_PROVIDER_UNAVAILABLE', 'Effekt-Anbieter nicht erreichbar.');
+      grids.forEach((grid) => renderLocalFallback(grid, providerError));
     }
   };
   const initialiseEffectPreviews = () => {
@@ -98,7 +182,9 @@
       const preview = previewButton.closest('[data-masha-feedly-animation-previews]');
       const status = preview?.querySelector('[data-masha-feedly-animation-preview-status]');
       const animation = previewButton.dataset.mashaFeedlyAnimationPreview;
-      const result = window.KWMashaFeedlyEntries?.previewCompletionAnimation(
+      const result = animation === '__localCheck'
+        ? window.KWMashaFeedlyEffects?.previewFallback?.(document)
+        : window.KWMashaFeedlyEntries?.previewCompletionAnimation(
         document,
         window,
         animation,

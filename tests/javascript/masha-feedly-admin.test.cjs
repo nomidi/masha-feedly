@@ -250,14 +250,33 @@ test('zeigt im CMS nur die Vorschauen des ausgewählten Themes', () => {
   assert.match(styles, /\.masha-feedly-animation-preview\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
   const themeSelect = new TestElement('theme-select');
   themeSelect.value = 'playful';
-  const cards = ['playful', 'playful', 'serious', 'serious'].map((theme) =>
-    new TestElement('animation-preview-card', { mashaFeedlyTheme: theme }));
+  const cards = [['playful'], ['playful'], ['serious'], ['serious']].map((categories) =>
+    new TestElement('animation-preview-card', { mashaFeedlyCategories: categories.join(',') }));
   const { documentListeners } = createBoardEnvironment(undefined, true, 'du', () => true, 'complete', true, null, { themeSelect, cards });
 
   assert.deepEqual(cards.map((card) => card.hidden), [false, false, true, true]);
   themeSelect.value = 'serious';
   documentListeners.change({ target: themeSelect });
   assert.deepEqual(cards.map((card) => card.hidden), [true, true, false, false]);
+});
+
+test('zeigt bei fehlendem Effekt-Anbieter den lokalen Standard und einen Einrichtungshinweis', () => {
+  assert.match(source, /const createEffectProviderCard = \(providerError = '', effectCount = 0\) =>/);
+  assert.match(source, /const createLocalFallbackCard = \(\) =>/);
+  assert.match(source, /grid\.append\(createLocalFallbackCard\(\)\)/);
+  assert.match(source, /grid\.replaceChildren\(createEffectProviderCard\(providerError\), createLocalFallbackCard\(\)\)/);
+  assert.match(source, /createEffectProviderCard\('', effects\.length\)/);
+  assert.match(source, /EFFECT_LOCAL_DEFAULT_TITLE/);
+  assert.match(source, /EFFECT_LOCAL_DEFAULT_DESCRIPTION/);
+  assert.match(source, /EFFECT_PROVIDER_SETUP_LINK/);
+  assert.match(source, /EFFECT_PROVIDER_CONNECTED/);
+  assert.match(source, /EFFECT_PROVIDER_ERROR_LABEL/);
+  assert.match(source, /status\.textContent = providerError/);
+  assert.match(source, /const renderLocalFallback = \(grid, providerError = ''\) =>/);
+  assert.match(source, /previewFallback\?\.\(document\)/);
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
+  assert.match(styles, /&--provider\.is-unavailable/);
+  assert.match(styles, /&--provider\.is-connected/);
 });
 
 test('ordnet Admin-Karten als Kopfzeile, Titel-Auszug und Datum darunter an', () => {

@@ -45,7 +45,7 @@ class MashaFeedlyEffectClientTest extends SapphireTest
     /** @return array<string, mixed> Gültige Anbieterantwort mit versionierter Ressource. */
     private function catalogue(): array
     {
-        return ['version' => 1, 'maxAge' => 300, 'effects' => [['id' => 'test', 'name' => 'Test', 'theme' => 'both', 'weight' => 1,
+        return ['version' => 2, 'maxAge' => 300, 'categories' => [['id' => 'playful', 'name' => 'Verspielt'], ['id' => 'serious', 'name' => 'Sachlich']], 'effects' => [['id' => 'test', 'name' => 'Test', 'categories' => ['playful', 'serious'], 'weight' => 1,
             'files' => ['js' => self::BASE . 'file/1/' . hash('sha256', self::BODY) . '/js']]]];
     }
 
@@ -62,6 +62,7 @@ class MashaFeedlyEffectClientTest extends SapphireTest
     {
         $client = $this->client([new Response(200, ['Content-Type' => 'application/json'], json_encode($this->catalogue())), new Response(200, ['Content-Type' => 'text/javascript'], self::BODY)]);
         $manifest = $client->manifest();
+        $this->assertSame('Verspielt', $manifest['categories'][0]['name']);
         $this->assertStringContainsString('/__masha-feedly-effects/file/1/', $manifest['effects'][0]['files']['js']);
         $this->assertStringNotContainsString('effects.example.test', json_encode($manifest));
         $this->assertStringNotContainsString(str_repeat('a', 64), json_encode($manifest));
@@ -92,9 +93,9 @@ class MashaFeedlyEffectClientTest extends SapphireTest
     /** Auch eine bereits gecachte Datei darf nicht mehr geladen werden, wenn sie im neuen Katalog fehlt. */
     public function testUnavailableFileIsRejectedBeforeCache(): void
     {
-        $client = $this->client([new Response(200, [], json_encode($this->catalogue())), new Response(200, ['Content-Type' => 'text/javascript'], self::BODY), new Response(200, [], json_encode(['version' => 1, 'maxAge' => 300, 'effects' => []]))]);
+        $client = $this->client([new Response(200, [], json_encode($this->catalogue())), new Response(200, ['Content-Type' => 'text/javascript'], self::BODY), new Response(200, [], json_encode(['version' => 2, 'maxAge' => 300, 'categories' => [], 'effects' => []]))]);
         $client->file(1, hash('sha256', self::BODY), 'js');
-        $this->cache->delete(hash('sha256', self::BASE . "manifest\0" . str_repeat('a', 64)) . '_manifest');
+        $this->cache->delete(hash('sha256', self::BASE . "manifest\0" . str_repeat('a', 64)) . '_manifest_v2');
         $this->expectException(RuntimeException::class); $this->expectExceptionCode(404);
         $client->file(1, hash('sha256', self::BODY), 'js');
     }
@@ -102,8 +103,8 @@ class MashaFeedlyEffectClientTest extends SapphireTest
     /** Abgelaufene Metadaten werden erneuert; gültige Cache-Einträge geben nur ihre Restlaufzeit weiter. */
     public function testExpiredCatalogueIsRefreshed(): void
     {
-        $key = hash('sha256', self::BASE . "manifest\0" . str_repeat('a', 64)) . '_manifest';
-        $this->cache->set($key, ['expires' => time() - 1, 'data' => ['version' => 1, 'maxAge' => 300, 'effects' => []]], 300);
+        $key = hash('sha256', self::BASE . "manifest\0" . str_repeat('a', 64)) . '_manifest_v2';
+        $this->cache->set($key, ['expires' => time() - 1, 'data' => ['version' => 2, 'maxAge' => 300, 'categories' => [], 'effects' => []]], 300);
         $client = $this->client([new Response(200, [], json_encode($this->catalogue()))]);
         $this->assertCount(1, $client->manifest()['effects']);
         $this->assertCount(1, $this->history);
@@ -125,13 +126,24 @@ class MashaFeedlyEffectClientTest extends SapphireTest
         }
     }
 
+    /** Ein Effekt darf nur Kategorien verwenden, die der Anbieter im Katalog ausweist. */
+    public function testUnknownEffectCategoryIsRejected(): void
+    {
+        $data = $this->catalogue();
+        $data['effects'][0]['categories'] = ['not-listed'];
+        $client = $this->client([new Response(200, [], json_encode($data))]);
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionCode(502);
+        $client->manifest();
+    }
+
     /** Fehler enthalten weder Providerdetails noch Schlüssel, und Weiterleitungen werden nicht verfolgt. */
     public function testFailuresDoNotExposeSecrets(): void
     {
         $client = $this->client([new Response(302, ['Location' => 'https://evil.example.test'], 'Bearer ' . str_repeat('a', 64))]);
         try { $client->manifest(); $this->fail('Weiterleitung wurde akzeptiert.'); }
         catch (RuntimeException $error) {
-            $this->assertSame('Effekt-Anbieter nicht verfügbar.', $error->getMessage());
+            $this->assertSame('Der Effekt-Anbieter antwortet mit HTTP 302.', $error->getMessage());
             $this->assertStringNotContainsString(str_repeat('a', 64), $error->getMessage());
         }
         $this->assertCount(1, $this->history);
@@ -140,11 +152,61 @@ class MashaFeedlyEffectClientTest extends SapphireTest
         $client->manifest();
     }
 
+    /** Der CMS-Status erklärt eine abgewiesene Schlüsselprüfung ohne Anbieterantwort offenzulegen. */
+    public function testRejectedProviderKeyHasActionableSafeMessage(): void
+    {
+        $client = $this->client([new Response(403, [], 'secret provider response')]);
+        try { $client->manifest(); $this->fail('Abgewiesener API-Schlüssel wurde akzeptiert.'); }
+        catch (RuntimeException $error) {
+            $this->assertSame('Der Effekt-Anbieter lehnt den API-Schlüssel ab. Prüfe MASHA_FEEDLY_EFFECTS_API_KEY.', $error->getMessage());
+            $this->assertStringNotContainsString('secret provider response', $error->getMessage());
+        }
+    }
+
     /** Manipulierte Inhalte mit einem anderen Hash gelangen nicht in den privaten Ressourcencache. */
     public function testHashMismatchIsRejected(): void
     {
         $client = $this->client([new Response(200, [], json_encode($this->catalogue())), new Response(200, ['Content-Type' => 'text/javascript'], 'different')]);
         $this->expectException(RuntimeException::class); $this->expectExceptionCode(502);
         $client->file(1, hash('sha256', self::BODY), 'js');
+    }
+
+    /** Katalog und SVGs werden validiert, gecacht und ausschließlich als lokale Proxy-Adressen ausgegeben. */
+    public function testAvatarIconsRequireProviderAndUseVersionedLocalProxy(): void
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1" stroke="#171717"><path d="M0 0h1"/></svg>';
+        $version = hash('sha256', $svg);
+        $payload = ['version' => 1, 'categories' => [['id' => 'people', 'name' => 'Menschen']], 'icons' => [[
+            'id' => 'person', 'name' => 'Person', 'category' => 'people',
+            'files' => ['black' => self::BASE . 'icon/person/' . $version . '/black', 'white' => self::BASE . 'icon/person/' . $version . '/white'],
+        ]]];
+        $client = $this->client([
+            new Response(200, ['Content-Type' => 'application/json'], json_encode($payload)),
+            new Response(200, ['Content-Type' => 'image/svg+xml'], $svg),
+        ]);
+        $catalogue = $client->avatarIcons();
+        $this->assertSame('people', $catalogue['categories'][0]['id']);
+        $this->assertStringContainsString('/__masha-feedly-effects/icon/person/' . $version . '/black', $catalogue['icons'][0]['files']['black']);
+        $this->assertStringNotContainsString('effects.example.test', json_encode($catalogue));
+        $file = $client->avatarIcon('person', $version, 'black');
+        $this->assertSame($svg, $file['body']);
+        $this->assertSame('image/svg+xml', $file['mime']);
+        $this->assertCount(2, $this->history);
+    }
+
+    /** Ohne ausdrücklich gesetzte HTTPS-Basis und Schlüssel bleibt die Symbolauswahl aus. */
+    public function testAvatarIconPickerIsUnavailableWithoutProviderConfiguration(): void
+    {
+        $previousBase = MashaFeedlyEffectProvider::config()->get('base_url');
+        Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', '');
+        Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', '');
+        Config::modify()->set(MashaFeedlyEffectProvider::class, 'base_url', '');
+        try {
+            $this->expectException(RuntimeException::class);
+            $this->expectExceptionCode(503);
+            (new MashaFeedlyEffectClient(null, $this->cache))->avatarIcons();
+        } finally {
+            Config::modify()->set(MashaFeedlyEffectProvider::class, 'base_url', $previousBase);
+        }
     }
 }

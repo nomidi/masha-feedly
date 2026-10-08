@@ -34,7 +34,7 @@ test('Effekt-Anbieter: CMS-Katalog lädt versionierte Dateien und spielt im Shad
       const effects = await window.KWMashaFeedlyEffects.refresh();
       const widget = window.KWMashaFeedlyDOM.widget();
       const theme = widget.dataset.theme || 'playful';
-      const suitable = effects.filter(effect => effect.theme === theme || effect.theme === 'both');
+      const suitable = effects.filter(effect => effect.categories.includes(theme));
       if (!suitable.length) throw new Error('Für das aktive Theme muss mindestens ein Test-Effekt freigegeben sein.');
       await window.KWMashaFeedlyEffects.preload(document, theme);
       const effect = suitable[0];

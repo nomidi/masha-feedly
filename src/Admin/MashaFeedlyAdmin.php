@@ -14,6 +14,7 @@ use KW\MashaFeedly\Service\MashaFeedlyMiteClient;
 use KW\MashaFeedly\Service\MashaFeedlyMiteService;
 use KW\MashaFeedly\Service\MashaFeedlyResetService;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
+use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
 use SilverStripe\Assets\Image;
 use SilverStripe\Admin\ModelAdmin;
 use SilverStripe\Control\Controller;
@@ -32,6 +33,7 @@ use SilverStripe\Forms\LiteralField;
 use SilverStripe\Forms\HiddenField;
 use SilverStripe\Forms\ListboxField;
 use SilverStripe\Forms\NumericField;
+use SilverStripe\Forms\ToggleCompositeField;
 use SilverStripe\Forms\TextField;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
@@ -181,10 +183,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             ])
                 ->setValue(MashaFeedlyConfigExtension::fontSize())
                 ->setDescription(self::translate('CONFIG_FONT_SIZE_DESCRIPTION', 'Passt die Schriftgröße für alle Masha:Feedly-Ansichten an.')),
-            DropdownField::create('MashaFeedlyTheme', self::translate('CONFIG_THEME', 'Erscheinungsbild'), [
-                'playful' => self::translate('CONFIG_THEME_PLAYFUL', 'Verspielt'),
-                'serious' => self::translate('CONFIG_THEME_SERIOUS', 'Seriös'),
-            ])
+            DropdownField::create('MashaFeedlyTheme', self::translate('CONFIG_THEME', 'Standard-Effekt-Kategorie'), MashaFeedlyEffectClient::themeOptions(MashaFeedlyConfigExtension::theme()))
                 ->setValue(MashaFeedlyConfigExtension::theme())
                 ->setDescription(self::translate('CONFIG_THEME_DESCRIPTION', 'Legt Farben, Erfolgsmeldungen und Abschlussanimationen im Widget fest.')),
             ListboxField::create('AllowedMemberIDs', self::translate('CONFIG_ALLOWED_MEMBERS', 'Benutzer mit Zugriff'), $members)
@@ -228,6 +227,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                 self::translate('RESET_CONFIRMATION_LABEL', 'Bestätigung')
             )->setAttribute('autocomplete', 'off')->setAttribute('spellcheck', 'false'));
         }
+        $memberColorFieldNames = [];
         foreach ($canManageSensitiveSettings && $authorizedMemberIDs ? Member::get()->filter('ID', $authorizedMemberIDs)->sort('Surname ASC, FirstName ASC') : [] as $authorizedMember) {
             $colorFieldName = 'MashaFeedlyMemberColor_' . (int)$authorizedMember->ID;
             $fields->push(CompositeField::create(
@@ -245,11 +245,41 @@ class MashaFeedlyAdmin extends ModelAdmin
                 )
             )->setName('MashaFeedlyMemberColorGroup_' . (int)$authorizedMember->ID)
                 ->setTitle(self::translate('CONFIG_AVATAR_COLOR', 'Avatarfarbe: {name}', ['name' => $authorizedMember->getName()])));
+            $memberColorFieldNames[] = 'MashaFeedlyMemberColorGroup_' . (int)$authorizedMember->ID;
         }
+        $takeFields = static function (array $names) use ($fields): FieldList {
+            $group = FieldList::create();
+            foreach ($names as $name) {
+                $field = $fields->fieldByName($name);
+                if ($field) {
+                    $fields->removeByName($name);
+                    $group->push($field);
+                }
+            }
+            return $group;
+        };
+        $generalFields = $takeFields(['MashaFeedlyEmailTestNotice', 'MashaFeedlyAddress', 'MashaFeedlyFontSize', 'MashaFeedlyTheme', 'MashaFeedlyAnimationPreviews']);
+        $accessFields = $takeFields(array_merge(['AllowedMemberIDs'], $memberColorFieldNames));
+        $sections = [
+            ToggleCompositeField::create('GeneralSettings', self::translate('CONFIG_SECTION_GENERAL', 'Allgemein'), $generalFields)
+                ->setStartClosed(false)->addExtraClass('masha-feedly-config-section masha-feedly-config-section--general'),
+            ToggleCompositeField::create('AccessSettings', self::translate('CONFIG_SECTION_ACCESS', 'Zugriff & Darstellung'), $accessFields)
+                ->setStartClosed(false)->addExtraClass('masha-feedly-config-section masha-feedly-config-section--access'),
+        ];
+        if ($canManageSensitiveSettings) {
+            $operationsFields = $takeFields(['MashaFeedlyDueDateReminderMode', 'MashaFeedlyHourlyRate']);
+            $resetFields = $takeFields(['MashaFeedlyResetHeading', 'ResetConfirmation']);
+            $sections[] = ToggleCompositeField::create('OperationsSettings', self::translate('CONFIG_SECTION_OPERATIONS', 'Erinnerungen & Schätzungen'), $operationsFields)
+                ->addExtraClass('masha-feedly-config-section masha-feedly-config-section--operations');
+            $sections[] = ToggleCompositeField::create('ResetSettings', self::translate('CONFIG_SECTION_RESET', 'Daten zurücksetzen'), $resetFields)
+                ->addExtraClass('masha-feedly-config-section masha-feedly-config-section--reset');
+        }
+        $fields = FieldList::create(...$sections);
         Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly-admin.css');
         Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly.css');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-colors.js');
         \KW\MashaFeedly\Service\MashaFeedlyEffectProvider::requireLoader();
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-admin.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-entries.js');
         $actions = FieldList::create(
             FormAction::create('saveConfiguration', self::translate('CONFIG_SAVE', 'Konfiguration speichern'))
@@ -1090,6 +1120,10 @@ class MashaFeedlyAdmin extends ModelAdmin
     /** Liefert das Profilbild eines Mitglieds, falls ein passendes Bildfeld vorhanden ist. */
     private function memberProfileImageURL(Member $member): string
     {
+        if (method_exists($member, 'getMashaFeedlyAvatarURL')) {
+            $avatarURL = (string)$member->getMashaFeedlyAvatarURL();
+            if ($avatarURL !== '') return $avatarURL;
+        }
         foreach (['MashaFeedlyIconImage', 'ProfileImage', 'Photo', 'Portrait'] as $relationName) {
             if (!$member->hasMethod($relationName)) {
                 continue;
@@ -1139,7 +1173,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         $fontSize = strtolower((string)($data['MashaFeedlyFontSize'] ?? 'small'));
         $siteConfig->MashaFeedlyFontSize = in_array($fontSize, ['small', 'medium', 'large'], true) ? $fontSize : 'small';
         $theme = strtolower((string)($data['MashaFeedlyTheme'] ?? 'playful'));
-        $siteConfig->MashaFeedlyTheme = in_array($theme, ['playful', 'serious'], true) ? $theme : 'playful';
+        $siteConfig->MashaFeedlyTheme = preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $theme) ? $theme : 'playful';
         $canManageSensitiveSettings = MashaFeedlyEntry::canManageReporter($member);
         if ($canManageSensitiveSettings) {
             $reminderMode = strtolower((string)($data['MashaFeedlyDueDateReminderMode'] ?? MashaFeedlyConfigExtension::dueDateReminderMode()));

@@ -4,7 +4,7 @@ Masha:Feedly is a shared issue and feedback tracker built into your website. Peo
 
 ## Access and setup
 
-Administrators open **Masha:Feedly → Configuration** in the CMS and select who may use the module. Administrators only see the widget when explicitly selected as well. The same screen controls the form of address, font size, website default appearance, categories, and priorities. The default is **Playful** on new installations. Each approved user can choose a different theme in their own profile. The categories for the initial status, completion, and approval are required; their labels can be changed.
+Administrators open **Masha:Feedly → Configuration** in the CMS. Settings are grouped on one page into **General**, **Access & appearance**, **Reminders & estimates**, and **Reset data**. The last two sections start collapsed and are visible only to the explicitly configured operator account. Only that account also sees the test email and reset actions; regular CMS administrators do not. Select the people allowed to use the module under **Access & appearance**. Administrators also need explicit access to see the widget. Under **General**, set the form of address, font size, and website default effect category. New installations default to **Playful**. Each allowed member can choose a different category in their profile. The categories for initial status, completion, and approval are required; their names can be customised.
 
 Newly approved users receive a welcome email. On their first visit, an onboarding tour walks them through the key steps. They can stop the tour at any time and restart it from their profile or the help panel.
 
@@ -31,7 +31,9 @@ In the expandable **Relationships** section, link entries as duplicates, themati
 
 ## Profile and notifications
 
-In the Masha:Feedly section of your profile, set your avatar and color, choose your personal appearance, manage each type of email notification, and restart the onboarding tour. Choose **Website default**, **Playful**, or **Serious**. Administrators set the website default under **Masha:Feedly → Configuration**; new installations use **Playful** by default. You can separately choose emails for new entries, entry updates, comments on entries assigned to you or created by you, due dates, and cost estimate requests. Emails about your own entries and changes are optional and off by default. News in the widget shows activity regardless of email notification settings. Personal email settings stay locked until the configured Masha:Feedly administrator has successfully sent at least one test email from Configuration; a notice in the profile explains this.
+In the Masha:Feedly section of your profile, set your avatar and color, choose your personal appearance, manage each type of email notification, and restart the onboarding tour. Available effect categories come from the configured Masha:Effects provider. Administrators set the website default under **Masha:Feedly → Configuration**; the local check effect remains available without a provider or during an outage. New installations default to **Playful**. You can separately choose emails for new entries, entry updates, comments on entries assigned to you or created by you, due dates, and cost estimate requests. Emails about your own entries and changes are optional and off by default. News in the widget shows activity regardless of email notification settings. Personal email settings stay locked until the configured Masha:Feedly administrator has successfully sent at least one test email from Configuration; a notice in the profile explains this.
+
+When `MASHA_FEEDLY_EFFECTS_BASE_URL` and `MASHA_FEEDLY_EFFECTS_API_KEY` are set on the server and Masha:Effects returns a valid icon catalogue, you can also choose a profile icon. The 116 SVG icons live only in the provider's private resources and are delivered through Feedly's protected proxy. They are grouped into people, animals, nature, everyday, hobbies and technology, fruit and vegetables, food and drink, aliens and UFOs, space, spooky, and dinosaurs. Icon color switches between black and white to contrast with your avatar color. The picker stays hidden when the provider is not fully configured or its catalogue is invalid or unavailable; your profile image upload remains available.
 
 The CMS administrator configured through `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` can use **Send test email** under **Masha:Feedly → Configuration** to check delivery to the email address on their account. On failure, Configuration also displays the specific cause, with credentials in connection URLs redacted. Full technical details remain in the PHP error log. If a notification fails, the entry is still saved.
 
@@ -66,7 +68,7 @@ Configure your personal Mite connection exclusively in `.env`:
 
 ```dotenv
 MASHA_FEEDLY_MITE_API_KEY="your-personal-api-key"
-MASHA_FEEDLY_MITE_ACCOUNT="kooperative-web"
+MASHA_FEEDLY_MITE_ACCOUNT="your-mite-account"
 ```
 
 The API key belongs to your Mite user and is never exposed in the CMS or browser. After `dev/build?flush=1`, enable the integration under **Masha:Feedly → Mite**, choose this website's default project and one or more **trigger categories**, then save the configuration. Choose the **service** each time you start a timer. Mite is disabled by default. Only the CMS administrator whose email is configured through `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` can access the tab, the general Mite timer button in the widget's first section, and timer functions. Other people can still use the board but do not see the Mite button or receive a Mite dialog.
@@ -83,12 +85,44 @@ See the [project README](../../../README.md) for installation and PHP and JavaSc
 
 ## Completion effects
 
-Done animations load from the independent **Masha:Effects** module. Authorized CMS users manage names, files, themes, availability, months and date ranges there. Feedly previews only available effects for the selected theme. Provider failures never block saving.
+Effect delivery is optional. Without a reachable provider, Feedly plays a subtle local checkmark after a confirmed completion. This also applies when the catalogue is empty or an effect fails to load.
 
-Set the provider base URL through `MASHA_FEEDLY_EFFECTS_BASE_URL` or `MashaFeedlyEffectProvider.base_url`; without configuration, the same server is used. See [effect provider setup](../../../masha-effects/docs/en/README.md) for files, caching and new effects.
+For centrally managed animations, install the standalone Silverstripe **Masha:Effects** module on the same or another website. It manages categories, effects, files, and seasonal rules. Files stay private on the provider server. Feedly contains only the loader and fetches matching effects through a protected server proxy. Provider failure never blocks saving.
 
-Without a configured or reachable effect provider, or when no matching effect is available, a confirmed completion shows a subtle local checkmark. It requires no API key or external files. Reduced motion also disables this fallback; clicking stops it.
+Set `MASHA_FEEDLY_EFFECTS_BASE_URL` in the Feedly website's server `.env` to the provider base address, for example `https://effects.example.org`; Feedly appends `/__masha-effects/manifest`. Without this setting, Feedly looks on the same website, where Masha:Effects must be installed and configured. Otherwise, the local fallback plays. Provider outages and empty catalogues do not block saving.
 
-The provider requires an API key. Keep `MASHA_FEEDLY_EFFECTS_API_KEY` in the server `.env`; browsers use only local proxy endpoints that check login and Feedly access. Effect files are private under `masha-effects/private/resources/`. See provider documentation for key lists and web-server access rules.
+For an external provider, set `MASHA_FEEDLY_EFFECTS_API_KEY` in the Feedly website's server `.env`. Generate the key in the provider CMS and keep it server-side. Browsers receive only local proxy URLs; the proxy checks login and Feedly access.
 
-Website access and API keys can be created and revoked in the provider CMS under **Masha:Effects → Effekt-Zugänge**. Copy the key shown once into the corresponding Feedly website’s server `.env`.
+### External effect provider interface
+
+The provider must support HTTPS and implement these two GET endpoints. Both require `Authorization: Bearer <key>`:
+
+- `GET /__masha-effects/manifest` returns JSON with `Content-Type: application/json`.
+- `GET /__masha-effects/file/{ID}/{SHA256}/{Type}` returns a versioned JS, CSS, or image file.
+
+Example manifest:
+
+```json
+{
+  "version": 2,
+  "maxAge": 300,
+  "categories": [{"id": "serious", "name": "Serious"}],
+  "effects": [
+    {
+      "id": "myEffect",
+      "name": "My effect",
+      "categories": ["serious"],
+      "weight": 1,
+      "files": {
+        "js": "https://effects.example.org/__masha-effects/file/42/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef/js",
+        "css": "https://effects.example.org/__masha-effects/file/42/abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789/css",
+        "image": "https://effects.example.org/__masha-effects/file/42/abcdefabcdef0123456789abcdef0123456789abcdef0123456789abcdef01/image"
+      }
+    }
+  ]
+}
+```
+
+`maxAge` is the catalogue lifetime in seconds; Feedly clamps it to at most 300 seconds. `categories` contains active categories with a stable `id` and display `name`; IDs must match `/^[a-z][a-z0-9_-]{0,79}$/`. Effects need at least one category and may belong to multiple categories. `effects` may be empty and contain at most 1000 entries. Each item needs `id`, `name`, `categories`, `weight`, and `files.js`. `id` must match `/^[A-Za-z][A-Za-z0-9_-]{0,79}$/`; `weight` an integer from 1 to 100. `files.css` and `files.image` are optional.
+
+Each file URL must be absolute, use the provider's same HTTPS host and base path, and match `/__masha-effects/file/{positive ID}/{64 lowercase hexadecimal characters}/{js|css|image}`. `{SHA256}` is the SHA-256 hash of the exact file bytes. Feedly does not follow redirects and verifies the URL, file hash, and MIME type. Allowed MIME types are `text/javascript` or `application/javascript` for JavaScript, `text/css` for stylesheets, and `image/svg+xml`, `image/png`, `image/jpeg`, `image/webp`, or `image/gif` for images. The provider should return `403` without a valid key. `Cache-Control: private, no-store`, `Vary: Authorization`, and `X-Content-Type-Options: nosniff` are recommended for protected responses.

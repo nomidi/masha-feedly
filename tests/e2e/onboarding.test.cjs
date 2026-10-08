@@ -118,6 +118,38 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     assert.equal(updated.success, true);
     await expect(widget.locator('[data-masha-feedly-onboarding-thanks]')).toBeVisible();
     await expect(widget.locator('[data-masha-feedly-onboarding-thanks]')).toContainText('Danke fürs Mitmachen');
+    const preferences = widget.locator('[data-masha-feedly-profile-preferences]');
+    await expect(preferences).toBeVisible();
+    const themeSelect = preferences.locator('[name="MashaFeedlyTheme"]');
+    const currentTheme = await themeSelect.inputValue();
+    const availableThemes = await themeSelect.locator('option').evaluateAll((options) => options.map((option) => option.value));
+    const nextTheme = availableThemes.find((theme) => theme !== currentTheme);
+    assert.ok(availableThemes.length > 0, 'Mindestens die Website-Vorgabe muss verfügbar sein.');
+    if (nextTheme !== undefined) await themeSelect.selectOption(nextTheme);
+    const effectiveTheme = await widget.getAttribute('data-theme');
+
+    const colorField = preferences.locator('[name="MashaFeedlyColor"]');
+    const currentColor = await colorField.inputValue();
+    const colorChoices = await preferences.locator('[data-masha-feedly-color-option]').evaluateAll((options) => options.map((option, index) => ({ color: option.dataset.color, index })));
+    const nextColor = colorChoices.find((choice) => choice.color !== currentColor);
+    if (nextColor) await preferences.locator('[data-masha-feedly-color-option]').nth(nextColor.index).click();
+
+    const profileResponsePromise = page.waitForResponse((response) =>
+      response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/saveProfilePreferences'));
+    await preferences.locator('[type="submit"]').click();
+    const profileResponse = await profileResponsePromise;
+    const profileBody = await profileResponse.text();
+    let profileResult;
+    try {
+      profileResult = JSON.parse(profileBody);
+    } catch {
+      assert.fail(`Profileinstellungen speichern: HTTP ${profileResponse.status()} (${profileBody.slice(0, 500)})`);
+    }
+    assert.equal(profileResponse.ok(), true, `Profileinstellungen speichern: ${profileResult.message || profileResponse.status()}`);
+    assert.equal(profileResult.success, true, 'Der Server muss die Profileinstellungen bestätigen.');
+    assert.equal(profileResult.theme, nextTheme || effectiveTheme || 'playful');
+    if (nextColor) assert.equal(await colorField.inputValue(), nextColor.color);
+    await expect(preferences.locator('[data-masha-feedly-profile-preferences-status]')).toContainText('gespeichert');
     await expect(widget.locator('[data-masha-feedly-thanks-close]')).toBeVisible();
   } finally {
     await context.close();

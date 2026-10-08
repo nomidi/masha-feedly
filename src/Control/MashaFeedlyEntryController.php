@@ -4,6 +4,7 @@
 namespace KW\MashaFeedly\Control;
 
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
+use KW\MashaFeedly\Extension\MashaFeedlyMemberExtension;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyComment;
 use KW\MashaFeedly\Model\MashaFeedlyCommentReaction;
@@ -16,11 +17,11 @@ use KW\MashaFeedly\Model\MashaFeedlySavedView;
 use KW\MashaFeedly\Service\MashaFeedlyAttachmentService;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
 use KW\MashaFeedly\Service\MashaFeedlyMiteService;
+use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Control\Controller;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse;
-use SilverStripe\Assets\Image;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
 use SilverStripe\Security\SecurityToken;
@@ -36,7 +37,7 @@ use SilverStripe\i18n\i18n;
  */
 class MashaFeedlyEntryController extends Controller
 {
-    private static $allowed_actions = ['index', 'createEntry', 'listEntries', 'updateEntry', 'findSimilarEntries', 'completeOnboarding', 'restartOnboarding', 'savedViews', 'saveView', 'deleteView', 'markEntryRead', 'miteOptions', 'startMiteTimer', 'stopMiteTimer'];
+    private static $allowed_actions = ['index', 'createEntry', 'listEntries', 'updateEntry', 'findSimilarEntries', 'completeOnboarding', 'restartOnboarding', 'saveProfilePreferences', 'savedViews', 'saveView', 'deleteView', 'markEntryRead', 'miteOptions', 'startMiteTimer', 'stopMiteTimer'];
 
     /** Liefert Mite-Projekte, Leistungen und den Timer nur für die freigegebene Manager-Adresse. */
     public function miteOptions(HTTPRequest $request): HTTPResponse
@@ -289,6 +290,63 @@ class MashaFeedlyEntryController extends Controller
         $member->MashaFeedlyShowOnboarding = true;
         $member->write();
         return $this->respond(['success' => true]);
+    }
+
+    /**
+     * Speichert nur die Darstellungsoptionen des angemeldeten, freigegebenen Mitglieds.
+     *
+     * @param HTTPRequest $request CSRF-geschützte Profiländerung.
+     * @return HTTPResponse JSON-Ergebnis des Speichervorgangs.
+     */
+    public function saveProfilePreferences(HTTPRequest $request): HTTPResponse
+    {
+        $member = Security::getCurrentUser();
+        if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($member)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+        }
+        if (!$request->isPOST()) {
+            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+        }
+        if (!SecurityToken::inst()->checkRequest($request)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen.')], 400);
+        }
+
+        $color = trim((string)$request->postVar('MashaFeedlyColor'));
+        if ($color !== '' && MashaFeedlyMemberExtension::normalizeColor($color) === null) {
+            return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_INVALID_COLOR', 'Diese Avatarfarbe ist nicht verfügbar.')], 400);
+        }
+        $theme = strtolower(trim((string)$request->postVar('MashaFeedlyTheme')));
+        if ($theme !== '' && !preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $theme)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_INVALID_THEME', 'Diese Effekt-Kategorie ist ungültig.')], 400);
+        }
+
+        $postVars = $request->postVars();
+        $iconID = null;
+        if (array_key_exists('MashaFeedlyAvatarIcon', $postVars)) {
+            $iconID = trim((string)$postVars['MashaFeedlyAvatarIcon']);
+            if ($iconID !== '') {
+                try {
+                    $icons = Injector::inst()->get(MashaFeedlyEffectClient::class)->avatarIcons()['icons'];
+                } catch (\Throwable) {
+                    return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_ICON_UNAVAILABLE', 'Die Icon-Auswahl ist momentan nicht erreichbar. Deine anderen Einstellungen wurden nicht gespeichert.')], 503);
+                }
+                if (!in_array($iconID, array_column($icons, 'id'), true)) {
+                    return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_INVALID_ICON', 'Dieses Icon ist nicht verfügbar.')], 400);
+                }
+            }
+        }
+
+        $member->MashaFeedlyColor = $color === '' ? '' : MashaFeedlyMemberExtension::normalizeColor($color);
+        $member->MashaFeedlyTheme = $theme;
+        if ($iconID !== null) {
+            $member->MashaFeedlyAvatarIcon = $iconID;
+        }
+        $member->write();
+        return $this->respond([
+            'success' => true,
+            'theme' => MashaFeedlyMemberExtension::themeFor($member),
+            'message' => $this->translate('PROFILE_PREFERENCES_SAVED', 'Deine Auswahl wurde gespeichert.'),
+        ]);
     }
 
     /** Ändert ausschließlich Status und Zuständigkeiten eines bestehenden Eintrags. */
@@ -1059,18 +1117,17 @@ class MashaFeedlyEntryController extends Controller
         $creator = $entry->creatorMemberID() > 0 ? Member::get()->byID($entry->creatorMemberID()) : null;
         $reporter = $entry->reportedByMember();
         $reportedBy = $entry->reportedByName() ?: (string)($creationEvent['actor'] ?? '');
-        $reporterImage = $reporter?->MashaFeedlyIconImage();
-        $creatorImage = $creator?->MashaFeedlyIconImage();
+        $reporterImageURL = $reporter && method_exists($reporter, 'getMashaFeedlyAvatarURL') ? $reporter->getMashaFeedlyAvatarURL() : '';
+        $creatorImageURL = $creator && method_exists($creator, 'getMashaFeedlyAvatarURL') ? $creator->getMashaFeedlyAvatarURL() : '';
         $assignees = [];
         $assigneeIDs = [];
         foreach ($entry->AssignedMembers() as $assignee) {
-            $image = $assignee->MashaFeedlyIconImage();
             $assignees[] = [
                 'id' => (int)$assignee->ID,
                 'name' => (string)$assignee->getName(),
                 'initials' => (string)$assignee->getMashaFeedlyInitials(),
                 'color' => (string)$assignee->getMashaFeedlyDisplayColor(),
-                'imageURL' => $image instanceof Image && $image->exists() ? (string)$image->getURL() : '',
+                'imageURL' => method_exists($assignee, 'getMashaFeedlyAvatarURL') ? $assignee->getMashaFeedlyAvatarURL() : '',
             ];
             $assigneeIDs[] = (int)$assignee->ID;
         }
@@ -1091,7 +1148,7 @@ class MashaFeedlyEntryController extends Controller
             'reportedByName' => $reportedBy,
             'createdByInitials' => $reporter ? (string)$reporter->getMashaFeedlyInitials() : ($creator ? (string)$creator->getMashaFeedlyInitials() : ''),
             'createdByColor' => $reporter ? (string)$reporter->getMashaFeedlyDisplayColor() : ($creator ? (string)$creator->getMashaFeedlyDisplayColor() : ''),
-            'createdByImageURL' => $reporterImage instanceof Image && $reporterImage->exists() ? (string)$reporterImage->getURL() : ($creatorImage instanceof Image && $creatorImage->exists() ? (string)$creatorImage->getURL() : ''),
+            'createdByImageURL' => $reporterImageURL !== '' ? $reporterImageURL : $creatorImageURL,
             'operatingSystem' => (string)$entry->OperatingSystem,
             'browser' => (string)$entry->Browser,
             'userAgent' => (string)$entry->UserAgent,

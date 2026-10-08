@@ -1,10 +1,13 @@
-/** Übernimmt eine Avatarfarbe, wenn im Profil oder in der Konfiguration ein Farbfeld angeklickt wird. */
-document.addEventListener('click', (event) => {
-  const option = event.target.closest('[data-masha-feedly-color-option]');
+/** Übernimmt eine Avatarfarbe in CMS-Formularen und im isolierten Widget. */
+const mashaFeedlyColorRoot = () => window.KWMashaFeedlyDOM?.root() || document;
+const mashaFeedlyColorTarget = (event) => window.KWMashaFeedlyDOM?.eventTarget(event) || event.target;
+
+mashaFeedlyColorRoot().addEventListener('click', (event) => {
+  const option = mashaFeedlyColorTarget(event).closest('[data-masha-feedly-color-option]');
   if (!option) return;
 
   const fieldName = option.dataset.fieldName;
-  const colorField = [...document.querySelectorAll('input[name], select[name]')]
+  const colorField = [...mashaFeedlyColorRoot().querySelectorAll('input[name], select[name]')]
     .find((field) => field.name === fieldName);
   if (!colorField) return;
 
@@ -20,13 +23,11 @@ document.addEventListener('click', (event) => {
 });
 
 /** Markiert beim Laden den Farbton, der aktuell im verborgenen Formularfeld gespeichert ist. */
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('[data-masha-feedly-color-option]').forEach((option) => {
+document.addEventListener('DOMContentLoaded', () => mashaFeedlyColorRoot().querySelectorAll('[data-masha-feedly-color-option]').forEach((option) => {
     const fieldName = option.dataset.fieldName;
-    const colorField = [...document.querySelectorAll('input[name], select[name]')]
+    const colorField = [...mashaFeedlyColorRoot().querySelectorAll('input[name], select[name]')]
       .find((field) => field.name === fieldName);
     const selected = colorField && colorField.value === option.dataset.color;
     option.classList.toggle('is-selected', Boolean(selected));
     option.setAttribute('aria-pressed', String(Boolean(selected)));
-  });
-});
+}));

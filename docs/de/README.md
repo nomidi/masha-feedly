@@ -4,7 +4,7 @@ Masha:Feedly ist ein gemeinsamer Fehler- und Feedback-Tracker direkt auf der Web
 
 ## Zugang und Einrichtung
 
-Administratoren öffnen im CMS **Masha:Feedly → Konfiguration** und wählen die Personen aus, die das Modul verwenden dürfen. Auch Administratoren sehen das Widget nur, wenn sie ausdrücklich ausgewählt wurden. Im selben Bereich lassen sich Ansprache, Schriftgröße, Website-Vorgabe für das Erscheinungsbild, Kategorien und Prioritäten einstellen. Die Vorgabe ist bei neuen Installationen **Verspielt**. Jede berechtigte Person kann im eigenen Profil ein anderes Theme wählen. Die Kategorien für Startstatus, Erledigt und Freigabe sind erforderlich; ihre Namen können angepasst werden.
+Administratoren öffnen im CMS **Masha:Feedly → Konfiguration**. Die Einstellungen stehen auf einer Seite in den Abschnitten **Allgemein**, **Zugriff & Darstellung**, **Erinnerungen & Schätzungen** und **Daten zurücksetzen**. Die letzten beiden Abschnitte sind standardmäßig eingeklappt und nur für das ausdrücklich konfigurierte Betreiberkonto sichtbar. Auch Test-E-Mail und Zurücksetzen sieht nur dieses Konto; normale CMS-Administratoren sehen diese Funktionen nicht. Unter **Zugriff & Darstellung** wählst du die Personen aus, die das Modul verwenden dürfen. Auch Administratoren sehen das Widget nur, wenn sie ausdrücklich ausgewählt wurden. Unter **Allgemein** stellst du Ansprache, Schriftgröße und Website-Vorgabe für die Effekt-Kategorie ein. Die Vorgabe ist bei neuen Installationen **Verspielt**. Jede berechtigte Person kann im eigenen Profil eine andere Effekt-Kategorie wählen. Die Kategorien für Startstatus, Erledigt und Freigabe sind erforderlich; ihre Namen können angepasst werden.
 
 Neue berechtigte Personen erhalten eine Willkommens-E-Mail. Beim ersten Besuch führt sie das Onboarding durch die wichtigsten Schritte. Die Einführung lässt sich jederzeit abbrechen und im Profil oder im Hilfefenster erneut starten.
 
@@ -31,7 +31,9 @@ Im aufklappbaren Bereich **Zusammenhänge** kannst du Einträge als Duplikat, th
 
 ## Profil und Benachrichtigungen
 
-Im Masha:Feedly-Bereich deines Profils kannst du Avatarbild und -farbe festlegen, dein persönliches Erscheinungsbild wählen, einzelne Arten von E-Mail-Benachrichtigungen verwalten und die Einführung erneut aktivieren. Wähle **Website-Vorgabe**, **Verspielt** oder **Seriös**. Die Website-Vorgabe wird unter **Masha:Feedly → Konfiguration** festgelegt; neue Installationen verwenden standardmäßig **Verspielt**. Neue und geänderte Einträge, Kommentare zu Einträgen, für die du zuständig bist oder die du erstellt hast, Fälligkeitstermine und Kostenschätzungen lassen sich getrennt einstellen. E-Mails zu eigenen Meldungen und Änderungen sind optional und standardmäßig ausgeschaltet. Neuigkeiten im Widget zeigen Aktivitäten unabhängig von E-Mail-Benachrichtigungen. Die persönlichen E-Mail-Einstellungen bleiben gesperrt, bis der konfigurierte Masha:Feedly-Administrator in der Konfiguration mindestens eine Test-E-Mail erfolgreich versendet hat; im Profil erscheint dazu ein Hinweis.
+Im Masha:Feedly-Bereich deines Profils kannst du Avatarbild und -farbe festlegen, dein persönliches Erscheinungsbild wählen, einzelne Arten von E-Mail-Benachrichtigungen verwalten und die Einführung erneut aktivieren. Die auswählbaren Effekt-Kategorien kommen vom konfigurierten Masha:Effects-Anbieter. Die Website-Vorgabe wird unter **Masha:Feedly → Konfiguration** festgelegt; ohne Anbieter oder bei einem Ausfall bleibt der lokale Häkchen-Effekt verfügbar. Neue Installationen verwenden als Vorgabe **Verspielt**. Neue und geänderte Einträge, Kommentare zu Einträgen, für die du zuständig bist oder die du erstellt hast, Fälligkeitstermine und Kostenschätzungen lassen sich getrennt einstellen. E-Mails zu eigenen Meldungen und Änderungen sind optional und standardmäßig ausgeschaltet. Neuigkeiten im Widget zeigen Aktivitäten unabhängig von E-Mail-Benachrichtigungen. Die persönlichen E-Mail-Einstellungen bleiben gesperrt, bis der konfigurierte Masha:Feedly-Administrator in der Konfiguration mindestens eine Test-E-Mail erfolgreich versendet hat; im Profil erscheint dazu ein Hinweis.
+
+Wenn `MASHA_FEEDLY_EFFECTS_BASE_URL` und `MASHA_FEEDLY_EFFECTS_API_KEY` auf dem Server gesetzt sind und Masha:Effects einen gültigen Icon-Katalog liefert, kannst du zusätzlich eines der dort bereitgestellten Profil-Icons auswählen. Die 116 SVG-Icons liegen ausschließlich im privaten Ressourcenordner des Anbieters und werden über den geschützten Feedly-Proxy ausgeliefert. Sie sind nach Menschen, Tieren, Natur, Alltag, Hobbys & Technik, Obst & Gemüse, Essen & Trinken, Aliens & UFOs, Weltraum, Grusel und Dinosauriern sortiert. Die Icon-Farbe wechselt passend zu deiner Avatarfarbe zwischen Schwarz und Weiß. Ohne vollständige Anbieter-Konfiguration oder bei einem ungültigen bzw. nicht erreichbaren Katalog erscheint die Auswahl nicht; dein Profilbild-Upload bleibt verfügbar.
 
 Der über `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` konfigurierte CMS-Administrator kann unter **Masha:Feedly → Konfiguration** mit **Test-E-Mail senden** den Mailversand an die E-Mail-Adresse seines Kontos prüfen. Bei einem Fehler zeigt die Konfiguration zusätzlich die konkrete Ursache an; Zugangsdaten in Verbindungs-URLs werden dabei ausgeblendet. Die vollständigen technischen Details stehen im PHP-Fehlerprotokoll. Schlägt eine Benachrichtigung fehl, wird der Eintrag trotzdem gespeichert.
 
@@ -66,7 +68,7 @@ Für die persönliche Mite-Zeiterfassung hinterlegst du die Verbindung ausschlie
 
 ```dotenv
 MASHA_FEEDLY_MITE_API_KEY="dein-persoenlicher-api-schluessel"
-MASHA_FEEDLY_MITE_ACCOUNT="kooperative-web"
+MASHA_FEEDLY_MITE_ACCOUNT="dein-mite-konto"
 ```
 
 Der API-Schlüssel gehört zu deinem Mite-Benutzer und wird weder im CMS noch im Browser ausgegeben. Nach `dev/build?flush=1` aktivierst du unter **Masha:Feedly → Mite** die Integration und wählst das Standardprojekt sowie eine oder mehrere **Startkategorien** aus. Die **Leistung** wählst du beim Start jedes Timers aus. Mite ist standardmäßig deaktiviert. Der Hauptreiter, der allgemeine Mite-Timerknopf im Widget und die Timerfunktionen sind nur für das CMS-Admin-Konto mit der unter `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` konfigurierten E-Mail verfügbar. Andere Personen können das Board weiterhin benutzen, sehen den Mite-Knopf aber nicht und erhalten keinen Mite-Dialog.
@@ -83,12 +85,44 @@ Installation und Befehle für PHP- und JavaScript-Tests stehen in der [Projekt-R
 
 ## Abschluss-Effekte
 
-Die Done-Animationen werden vom eigenständigen Modul **Masha:Effects** geladen. Dort steuern berechtigte CMS-Personen Name, Dateien, Theme, Aktivierung, Monate und Zeiträume. Feedly zeigt nur passende freigegebene Vorschauen. Ein Ausfall des Anbieters verhindert das Speichern nicht.
+Die Effektversorgung ist optional. Ohne erreichbaren Anbieter spielt Feedly nach einem bestätigten Abschluss ein lokales, dezentes Häkchen ab. Das gilt auch bei leerem Katalog oder einem Fehler beim Laden eines Effekts.
 
-Die Anbieter-Basis-URL wird über `MASHA_FEEDLY_EFFECTS_BASE_URL` oder `MashaFeedlyEffectProvider.base_url` konfiguriert. Ohne Konfiguration wird derselbe Server verwendet. Die [Einrichtung des Effekt-Anbieters](../../../masha-effects/docs/de/README.md) beschreibt Dateien, Caching und neue Effekte.
+Für zentral verwaltete Animationen kann das eigenständige Silverstripe-Modul **Masha:Effects** auf derselben oder einer anderen Website installiert werden. Dort werden Kategorien, Effekte, Dateien und saisonale Regeln verwaltet. Dateien liegen privat auf dem Anbieter-Server. Feedly enthält nur den Loader und lädt passende Effekte über einen geschützten Server-Proxy. Ein Anbieterausfall verhindert das Speichern nicht.
 
-Ohne eingerichteten oder erreichbaren Effekt-Anbieter sowie ohne passenden freigegebenen Effekt zeigt ein bestätigter Abschluss ein dezentes lokales Häkchen. Dafür sind weder API-Schlüssel noch externe Dateien nötig. „Bewegung reduzieren“ unterdrückt auch diesen Ersatzeffekt; ein Klick beendet ihn.
+`MASHA_FEEDLY_EFFECTS_BASE_URL` in der Server-`.env` der Feedly-Website enthält die Basis-Adresse des Anbieters, zum Beispiel `https://effects.example.org`; Feedly ergänzt `/__masha-effects/manifest`. Ohne Einstellung sucht Feedly auf derselben Website. Dort muss Masha:Effects installiert und eingerichtet sein; andernfalls greift der lokale Ersatzeffekt. Auch bei einem nicht erreichbaren Anbieter oder einem leeren Katalog verhindert der Ersatzeffekt nicht das Speichern.
 
-Der Anbieter ist API-schlüsselgeschützt. `MASHA_FEEDLY_EFFECTS_API_KEY` bleibt in der Server-`.env`; der Browser verwendet ausschließlich lokale Proxy-Routen mit Login- und Feedly-Freigabeprüfung. Effekt-Dateien liegen privat unter `masha-effects/private/resources/`. Details zur Schlüsselliste und Webserver-Sperre stehen in der Anbieter-Dokumentation.
+Für einen externen Anbieter wird `MASHA_FEEDLY_EFFECTS_API_KEY` in der Server-`.env` der Feedly-Website hinterlegt. Der Schlüssel wird im CMS des Anbieters erzeugt und nur serverseitig verwendet. Browser erhalten ausschließlich lokale Proxy-URLs; der Proxy prüft Anmeldung und Feedly-Freigabe.
 
-Website-Zugänge und API-Schlüssel können beim Anbieter unter **Masha:Effects → Effekt-Zugänge** erzeugt und widerrufen werden. Den einmal angezeigten Schlüssel in die Server-`.env` der zugehörigen Feedly-Website übernehmen.
+### Schnittstelle eines externen Effekt-Anbieters
+
+Der Anbieter muss HTTPS unterstützen und diese beiden GET-Endpunkte bereitstellen. Beide erwarten `Authorization: Bearer <Schlüssel>`:
+
+- `GET /__masha-effects/manifest` liefert JSON mit `Content-Type: application/json`.
+- `GET /__masha-effects/file/{ID}/{SHA256}/{Typ}` liefert eine versionierte JS-, CSS- oder Bilddatei.
+
+Beispiel für ein Manifest:
+
+```json
+{
+  "version": 2,
+  "maxAge": 300,
+  "categories": [{"id": "serious", "name": "Sachlich"}],
+  "effects": [
+    {
+      "id": "myEffect",
+      "name": "Mein Effekt",
+      "categories": ["serious"],
+      "weight": 1,
+      "files": {
+        "js": "https://effects.example.org/__masha-effects/file/42/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef/js",
+        "css": "https://effects.example.org/__masha-effects/file/42/abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789/css",
+        "image": "https://effects.example.org/__masha-effects/file/42/abcdefabcdef0123456789abcdef0123456789abcdef0123456789abcdef01/image"
+      }
+    }
+  ]
+}
+```
+
+`maxAge` gibt die Katalog-Lebensdauer in Sekunden an; Feedly begrenzt sie auf höchstens 300 Sekunden. `categories` enthält aktive Kategorien mit stabiler `id` und Anzeigename `name`; IDs entsprechen `/^[a-z][a-z0-9_-]{0,79}$/`. Effekte benötigen mindestens eine Kategorie und können mehreren zugeordnet sein. `effects` darf leer sein und höchstens 1000 Einträge enthalten. Jeder Eintrag braucht `id`, `name`, `categories`, `weight` und `files.js`. `id` muss `/^[A-Za-z][A-Za-z0-9_-]{0,79}$/` entsprechen; `weight` ist eine Ganzzahl von 1 bis 100. `files.css` und `files.image` sind optional.
+
+Jede Datei-URL muss absolut sein, denselben HTTPS-Host und Basispfad wie der Anbieter verwenden und dem Muster `/__masha-effects/file/{positive ID}/{64 kleingeschriebene Hex-Zeichen}/{js|css|image}` entsprechen. `{SHA256}` ist der SHA-256-Hash der unveränderten Dateibytes. Feedly folgt keinen Weiterleitungen und prüft URL, Dateihash und MIME-Typ. Erlaubte MIME-Typen sind `text/javascript` oder `application/javascript` für JavaScript, `text/css` für Stylesheets sowie `image/svg+xml`, `image/png`, `image/jpeg`, `image/webp` oder `image/gif` für Bilder. Ohne gültigen Schlüssel soll der Anbieter `403` liefern. Für geschützte Antworten werden `Cache-Control: private, no-store`, `Vary: Authorization` und `X-Content-Type-Options: nosniff` empfohlen.

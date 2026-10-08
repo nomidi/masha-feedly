@@ -7,7 +7,6 @@ use SilverStripe\Security\Security;
 use SilverStripe\Control\Controller;
 use SilverStripe\Control\Director;
 use SilverStripe\Security\Member;
-use SilverStripe\Assets\Image;
 use SilverStripe\Security\SecurityToken;
 use SilverStripe\View\Requirements;
 use SilverStripe\Core\Manifest\ModuleResourceLoader;
@@ -18,6 +17,7 @@ use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyPriority;
 use KW\MashaFeedly\Task\MashaFeedlyDueDateReminderTask;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
+use KW\MashaFeedly\Extension\MashaFeedlyMemberExtension;
 
 /**
  * Bindet das Masha-Feedly-Widget für berechtigte Benutzer global ein.
@@ -45,6 +45,7 @@ class MashaFeedlyWidgetExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-emoji.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-create-entry.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-onboarding.js');
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-colors.js');
         \KW\MashaFeedly\Service\MashaFeedlyEffectProvider::requireLoader();
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-entries.js');
         MashaFeedlyCategory::ensureDefaultCategories();
@@ -78,13 +79,36 @@ class MashaFeedlyWidgetExtension extends Extension
         $allowedMemberIDs = MashaFeedlyConfigExtension::memberIDs();
         if ($allowedMemberIDs) {
             foreach (Member::get()->filter('ID', $allowedMemberIDs)->sort('Surname ASC, FirstName ASC') as $member) {
-                $image = $member->MashaFeedlyIconImage();
                 $members[] = [
                     'ID' => (int)$member->ID,
                     'Name' => (string)$member->getName(),
                     'Initials' => (string)$member->getMashaFeedlyInitials(),
                     'Color' => (string)$member->getMashaFeedlyDisplayColor(),
-                    'ImageURL' => $image instanceof Image && $image->exists() ? (string)$image->getURL() : '',
+                    'ImageURL' => method_exists($member, 'getMashaFeedlyAvatarURL') ? $member->getMashaFeedlyAvatarURL() : '',
+                ];
+            }
+        }
+        $currentMember = Security::getCurrentUser();
+        $onboardingEnabled = MashaFeedlyConfigExtension::isExplicitlyAllowed($currentMember)
+            && (!((bool)($currentMember?->MashaFeedlyOnboardingCompleted ?? false))
+                || (bool)($currentMember?->MashaFeedlyShowOnboarding ?? false));
+        $avatarIconPickerHTML = $onboardingEnabled
+            ? MashaFeedlyMemberExtension::renderAvatarIconPickerForWidget(
+                (string)$currentMember?->MashaFeedlyAvatarIcon,
+                MashaFeedlyMemberExtension::normalizeColor((string)$currentMember?->MashaFeedlyColor)
+            )
+            : '';
+        $avatarIconPickerAvailable = str_contains($avatarIconPickerHTML, 'data-masha-feedly-avatar-icons');
+        if ($avatarIconPickerAvailable) {
+            Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-avatar-icons.js');
+        }
+        $profileThemeOptions = [];
+        if ($onboardingEnabled) {
+            foreach (\KW\MashaFeedly\Service\MashaFeedlyEffectClient::themeOptions((string)$currentMember?->MashaFeedlyTheme) as $themeID => $themeTitle) {
+                $profileThemeOptions[] = [
+                    'ID' => $themeID,
+                    'Title' => $themeTitle,
+                    'Selected' => (string)$currentMember?->MashaFeedlyTheme === (string)$themeID,
                 ];
             }
         }
@@ -104,12 +128,20 @@ class MashaFeedlyWidgetExtension extends Extension
             'MiteStartURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'startMiteTimer'),
             'MiteStopURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'stopMiteTimer'),
             'ProfileURL' => CMSProfileController::singleton()->Link() . '#Root_MashaFeedly',
+            'ProfilePreferencesURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'saveProfilePreferences'),
+            'ProfileThemeOptions' => $profileThemeOptions,
+            'ProfileTheme' => (string)($currentMember?->MashaFeedlyTheme ?? ''),
+            'ProfileColor' => (string)($currentMember?->MashaFeedlyColor ?? ''),
+            'ProfileAvatarIcon' => (string)($currentMember?->MashaFeedlyAvatarIcon ?? ''),
+            'AvatarColorPaletteHTML' => $onboardingEnabled
+                ? MashaFeedlyMemberExtension::renderColorPalette('MashaFeedlyColor', (string)$currentMember?->MashaFeedlyColor)
+                : '',
+            'AvatarIconPickerHTML' => $avatarIconPickerHTML,
+            'AvatarIconPickerAvailable' => $avatarIconPickerAvailable,
             'TokenValue' => SecurityToken::inst()->getValue(),
             // Admins may use the widget for configuration, but the guided tour is
             // only for members explicitly added to the Masha:Feedly access list.
-            'OnboardingEnabled' => MashaFeedlyConfigExtension::isExplicitlyAllowed(Security::getCurrentUser())
-                && (!((bool)(Security::getCurrentUser()?->MashaFeedlyOnboardingCompleted ?? false))
-                    || (bool)(Security::getCurrentUser()?->MashaFeedlyShowOnboarding ?? false)),
+            'OnboardingEnabled' => $onboardingEnabled,
             'Categories' => $categories,
             'Priorities' => $priorities,
             'Members' => $members,
@@ -339,8 +371,13 @@ class MashaFeedlyWidgetExtension extends Extension
             'TOUR_BLOCKED_MANAGE' => 'Fast fertig! Status oder Zuständigkeit speichern – oder die Einführung abbrechen. Der Rest wartet kurz.',
             'TOUR_CANCEL' => 'Einführung abbrechen',
             'TOUR_THANKS_TITLE' => 'Danke fürs Mitmachen!',
-            'TOUR_THANKS_TEXT' => 'Du hast deine erste Meldung erstellt und gelernt, wie du Einträge ansiehst und bearbeitest. In deinem Profil kannst du dein Feedly-Icon und deine Avatarfarbe anpassen sowie E-Mail-Benachrichtigungen zu Kommentaren einrichten.',
-            'TOUR_PROFILE_LINK' => 'Profileinstellungen öffnen',
+            'TOUR_THANKS_TEXT' => 'Du hast deine erste Meldung erstellt und gelernt, wie du Einträge ansiehst und bearbeitest. Jetzt kannst du Masha noch persönlich gestalten.',
+            'TOUR_PROFILE_LINK' => 'Weitere Profileinstellungen',
+            'TOUR_ICON_CHOICES' => 'Eigenes Icon wählen',
+            'TOUR_SAVE_PREFERENCES' => 'Auswahl speichern',
+            'TOUR_PREFERENCES_SAVING' => 'Deine Auswahl wird gespeichert …',
+            'TOUR_PREFERENCES_SAVED' => 'Deine Auswahl wurde gespeichert.',
+            'TOUR_PREFERENCES_ERROR' => 'Deine Auswahl konnte nicht gespeichert werden. Bitte versuche es erneut.',
             'TOUR_DONE' => 'Fertig',
             'RETRO_SUCCESS_TITLE' => 'Erfolgreich erledigt!',
             'RETRO_SUCCESS_MESSAGE' => 'Der Eintrag wurde abgeschlossen.',

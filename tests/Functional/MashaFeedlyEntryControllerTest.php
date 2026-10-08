@@ -2002,6 +2002,64 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertTrue((bool)json_decode($restarted->getBody(), true)['success']);
     }
 
+    /** Speichert Theme und Avatarfarbe ausschließlich für das freigegebene Mitglied. */
+    public function testProfilePreferencesCanBeSavedOnlyByAllowedMember(): void
+    {
+        $allowed = $this->objFromFixture(Member::class, 'allowed');
+        $blocked = $this->objFromFixture(Member::class, 'notAllowed');
+        $this->allowMember($allowed);
+
+        $this->logInAs($blocked);
+        $denied = $this->post('/__masha-feedly/saveProfilePreferences', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'MashaFeedlyTheme' => 'serious',
+            'MashaFeedlyColor' => '#F4D06F',
+        ]);
+        $this->assertSame(403, $denied->getStatusCode());
+        $this->assertNotSame('serious', (string)Member::get()->byID((int)$blocked->ID)->MashaFeedlyTheme);
+
+        $this->logInAs($allowed);
+        $allowed->MashaFeedlyAvatarIcon = 'existing-icon';
+        $allowed->write();
+        $saved = $this->post('/__masha-feedly/saveProfilePreferences', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'MashaFeedlyTheme' => 'serious',
+            'MashaFeedlyColor' => '#F4D06F',
+        ]);
+
+        $this->assertSame(200, $saved->getStatusCode());
+        $result = json_decode($saved->getBody(), true);
+        $this->assertTrue($result['success']);
+        $this->assertSame('serious', $result['theme']);
+        $reloaded = Member::get()->byID((int)$allowed->ID);
+        $this->assertSame('serious', (string)$reloaded->MashaFeedlyTheme);
+        $this->assertSame('#F4D06F', (string)$reloaded->MashaFeedlyColor);
+        $this->assertSame('existing-icon', (string)$reloaded->MashaFeedlyAvatarIcon, 'Ein ausgelassenes optionales Icon darf nicht zurückgesetzt werden.');
+    }
+
+    /** Lehnt ungültige Profilwerte ab, ohne bestehende Einstellungen zu überschreiben. */
+    public function testProfilePreferencesRejectInvalidValues(): void
+    {
+        $allowed = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($allowed);
+        $allowed->MashaFeedlyTheme = 'playful';
+        $allowed->MashaFeedlyColor = '#F6B7A9';
+        $allowed->write();
+        $this->logInAs($allowed);
+
+        $response = $this->post('/__masha-feedly/saveProfilePreferences', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'MashaFeedlyTheme' => '../invalid',
+            'MashaFeedlyColor' => '#123456',
+        ]);
+
+        $this->assertSame(400, $response->getStatusCode());
+        $this->assertFalse((bool)json_decode($response->getBody(), true)['success']);
+        $reloaded = Member::get()->byID((int)$allowed->ID);
+        $this->assertSame('playful', (string)$reloaded->MashaFeedlyTheme);
+        $this->assertSame('#F6B7A9', (string)$reloaded->MashaFeedlyColor);
+    }
+
     /** Filteransichten bleiben im Profil des Mitglieds und sind über die geschützten Endpunkte verwaltbar. */
     public function testSavedViewsArePrivateValidatedAndCanBeDeleted(): void
     {

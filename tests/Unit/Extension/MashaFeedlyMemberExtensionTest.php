@@ -7,6 +7,7 @@ use KW\MashaFeedly\Extension\MashaFeedlyMemberExtension;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Service\MashaFeedlyAttachmentService;
+use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
 use KW\MashaFeedly\Service\MashaFeedlyFolderService;
 use SilverStripe\Assets\Dev\TestAssetStore;
 use SilverStripe\Assets\Image;
@@ -14,6 +15,9 @@ use SilverStripe\Assets\File;
 use SilverStripe\Assets\Folder;
 use SilverStripe\Assets\Storage\AssetStore;
 use SilverStripe\Core\Injector\Injector;
+use SilverStripe\Core\Environment;
+use SilverStripe\Core\Config\Config;
+use KW\MashaFeedly\Service\MashaFeedlyEffectProvider;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Forms\CheckboxField;
@@ -56,13 +60,19 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
 
         $this->assertNotNull($mainTab);
         $this->assertNotNull($mashaFeedlyTab);
-        $onboardingField = $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyShowOnboarding');
+        $onboardingGroup = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyOnboardingSettings');
+        $this->assertInstanceOf(\SilverStripe\Forms\CompositeField::class, $onboardingGroup);
+        $this->assertSame('Einführung', $onboardingGroup->Title());
+        $onboardingField = $onboardingGroup->getChildren()->dataFieldByName('MashaFeedlyShowOnboarding');
         $this->assertInstanceOf(CheckboxField::class, $onboardingField);
         $this->assertSame('Einführung erneut anzeigen', $onboardingField->Title());
-        $completedField = $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyOnboardingCompleted');
+        $completedField = $onboardingGroup->getChildren()->dataFieldByName('MashaFeedlyOnboardingCompleted');
         $this->assertInstanceOf(CheckboxField::class, $completedField);
         $this->assertSame('Einführung abgeschlossen', $completedField->Title());
-        $themeField = $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyTheme');
+        $appearanceGroup = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyProfileAppearance');
+        $this->assertInstanceOf(\SilverStripe\Forms\CompositeField::class, $appearanceGroup);
+        $this->assertSame('Darstellung', $appearanceGroup->Title());
+        $themeField = $appearanceGroup->getChildren()->dataFieldByName('MashaFeedlyTheme');
         $this->assertInstanceOf(DropdownField::class, $themeField);
         $this->assertSame('Website-Vorgabe', $themeField->getEmptyString());
         $this->assertSame('Verspielt – mit Konfetti und Einhorn', $themeField->getSource()['playful']);
@@ -77,7 +87,7 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertFalse($imageField->getAttachEnabled());
         $this->assertContains('png', $imageField->getAllowedExtensions());
         $this->assertContains('jpg', $imageField->getAllowedExtensions());
-        $colorGroup = $profileGroup->getChildren()->fieldByName('MashaFeedlyAvatarColor');
+        $colorGroup = $appearanceGroup->getChildren()->fieldByName('MashaFeedlyAvatarColor');
         $this->assertInstanceOf(\SilverStripe\Forms\CompositeField::class, $colorGroup);
         $this->assertInstanceOf(HiddenField::class, $colorGroup->getChildren()->dataFieldByName('MashaFeedlyColor'));
         $palette = $colorGroup->getChildren()->fieldByName('MashaFeedlyColorPalette');
@@ -93,6 +103,10 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $emailGroup = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyEmailSettings');
         $this->assertInstanceOf(\SilverStripe\Forms\CompositeField::class, $emailGroup);
         $this->assertSame('E-Mail-Benachrichtigungen', $emailGroup->Title());
+        $topLevelNames = $mashaFeedlyTab->Fields()->column();
+        $this->assertLessThan(array_search('MashaFeedlyProfileAppearance', $topLevelNames, true), array_search('MashaFeedlyProfileSettings', $topLevelNames, true));
+        $this->assertLessThan(array_search('MashaFeedlyEmailSettings', $topLevelNames, true), array_search('MashaFeedlyProfileAppearance', $topLevelNames, true));
+        $this->assertLessThan(array_search('MashaFeedlyOnboardingSettings', $topLevelNames, true), array_search('MashaFeedlyEmailSettings', $topLevelNames, true));
         $this->assertNull($mainTab->Fields()->dataFieldByName('MashaFeedlyIconImage'));
         $this->assertNull($mainTab->Fields()->dataFieldByName('MashaFeedlyColor'));
 
@@ -221,9 +235,69 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertSame('serious', MashaFeedlyMemberExtension::themeFor(Member::get()->byID($firstMember->ID)));
         $this->assertSame('playful', MashaFeedlyMemberExtension::themeFor(Member::get()->byID($secondMember->ID)));
 
-        $firstMember->MashaFeedlyTheme = 'unexpected';
+        $firstMember->MashaFeedlyTheme = 'not a valid id!';
         $firstMember->write();
         $this->assertSame('playful', MashaFeedlyMemberExtension::themeFor(Member::get()->byID($firstMember->ID)));
+    }
+
+    /** Die Icon-Auswahl erfordert explizite Anbieter-URL und Schlüssel; Avatar-Farben wählen eine Kontrastvariante. */
+    public function testAvatarIconPickerRequiresConfiguredProviderAndPicksContrastColor(): void
+    {
+        $previousURL = Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL');
+        $previousKey = Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY');
+        $previousBase = MashaFeedlyEffectProvider::config()->get('base_url');
+        try {
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', '');
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', '');
+            Config::modify()->set(MashaFeedlyEffectProvider::class, 'base_url', '');
+            $member = $this->objFromFixture(Member::class, 'allowed');
+            $this->allowMember($member);
+            $this->logInAs($member);
+            $fields = $member->getCMSFields();
+            $profile = $fields->findTab('Root.MashaFeedly')->Fields()->fieldByName('MashaFeedlyProfileSettings');
+            $this->assertNull($profile->getChildren()->fieldByName('MashaFeedlyAvatarIconSelection'));
+            $this->assertSame('black', MashaFeedlyMemberExtension::iconColorForAvatarColor('#F4D06F'));
+            $this->assertSame('white', MashaFeedlyMemberExtension::iconColorForAvatarColor('#C05CC8'));
+        } finally {
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', $previousURL);
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', $previousKey);
+            Config::modify()->set(MashaFeedlyEffectProvider::class, 'base_url', $previousBase);
+        }
+    }
+
+    /** Bei erreichbarer Konfiguration, aber ausgefallenem Anbieter wird ein Hinweis statt einer leeren Stelle gezeigt. */
+    public function testAvatarIconPickerExplainsTemporaryProviderFailure(): void
+    {
+        $previousBase = Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL');
+        $previousKey = Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY');
+        $previousConfigBase = MashaFeedlyEffectProvider::config()->get('base_url');
+        Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', 'https://effects.example.test');
+        Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', str_repeat('a', 64));
+        Config::modify()->set(MashaFeedlyEffectProvider::class, 'base_url', '');
+
+        $client = new class extends MashaFeedlyEffectClient {
+            public function avatarIcons(): array
+            {
+                throw new \RuntimeException('Interne Verbindungsdetails');
+            }
+        };
+        $extension = new class extends MashaFeedlyMemberExtension {
+            public static function renderPickerForTest(MashaFeedlyEffectClient $client): string
+            {
+                return parent::renderAvatarIconPicker('', null, $client);
+            }
+        };
+
+        try {
+            $html = $extension::renderPickerForTest($client);
+            $this->assertStringContainsString('masha-feedly-avatar-icons__unavailable', $html);
+            $this->assertStringContainsString('vorübergehend nicht verfügbar', $html);
+            $this->assertStringNotContainsString('Interne Verbindungsdetails', $html);
+        } finally {
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', $previousBase);
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', $previousKey);
+            Config::modify()->set(MashaFeedlyEffectProvider::class, 'base_url', $previousConfigBase);
+        }
     }
 
     /** Erneutes Anzeigen setzt den gespeicherten Abschlussstatus zurück. */

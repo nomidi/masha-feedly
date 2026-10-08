@@ -128,6 +128,38 @@ document.addEventListener('DOMContentLoaded', () => {
     else widget.querySelector('.kw-masha-feedly__toggle')?.focus?.();
   };
 
+  widget.querySelector('[data-masha-feedly-profile-preferences]')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const status = form.querySelector('[data-masha-feedly-profile-preferences-status]');
+    const submit = form.querySelector('[type="submit"]');
+    if (!form.dataset.saveUrl || !status || !submit) return;
+    submit.disabled = true;
+    status.textContent = t('TOUR_PREFERENCES_SAVING');
+    try {
+      const data = new FormData(form);
+      data.set('SecurityID', form.dataset.securityId || widget.dataset.securityId || '');
+      const response = await fetch(form.dataset.saveUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: data,
+      });
+      const result = await response.json();
+      if (!response.ok || result.success !== true) {
+        throw new Error(result.message || t('TOUR_PREFERENCES_ERROR'));
+      }
+      if (result.theme) widget.dataset.theme = result.theme;
+      status.textContent = result.message || t('TOUR_PREFERENCES_SAVED');
+    } catch (error) {
+      status.textContent = error instanceof Error && error.message !== 'Failed to fetch'
+        ? error.message
+        : t('TOUR_PREFERENCES_ERROR');
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
   const showTip = (message) => {
     currentMessage = message;
     tipText.textContent = t(message);

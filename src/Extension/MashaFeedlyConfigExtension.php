@@ -36,7 +36,7 @@ class MashaFeedlyConfigExtension extends Extension
         'MashaFeedlyAllowedMemberIDs' => 'Text',
         'MashaFeedlyAddress' => "Varchar(3)",
         'MashaFeedlyFontSize' => 'Varchar(10)',
-        'MashaFeedlyTheme' => 'Varchar(20)',
+        'MashaFeedlyTheme' => 'Varchar(80)',
         'MashaFeedlyDueDateReminderMode' => 'Varchar(20)',
         'MashaFeedlyHourlyRate' => 'Decimal(10,2)',
         'MashaFeedlyMiteProjectID' => 'Int',
@@ -148,7 +148,7 @@ class MashaFeedlyConfigExtension extends Extension
     public static function theme(): string
     {
         $value = strtolower((string)self::currentSiteConfig()->MashaFeedlyTheme);
-        return in_array($value, ['playful', 'serious'], true) ? $value : 'playful';
+        return preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $value) ? $value : 'playful';
     }
 
     /** Liefert den Erinnerungsmodus und nutzt für bestehende Installationen weiterhin Cronjobs. */

@@ -4,12 +4,12 @@
    * @typedef {Object} EffectDefinition
    * @property {string} id Kennung der JavaScript-Registrierung.
    * @property {string} name Anzeigename.
-   * @property {'playful'|'serious'|'both'} theme Zulässiges Theme.
+   * @property {string[]} categories IDs der zugeordneten Effekt-Kategorien.
    * @property {number} weight Gewicht in der zufälligen Auswahl.
    * @property {{js: string, css?: string, image?: string}} files Versionierte öffentliche Dateien.
    */
   window.KWMashaFeedlyEffectModules ||= {};
-  let catalog = [];
+  let catalog = { categories: [], effects: [] };
   let expires = 0;
   let manifestRequest;
   const scripts = new Map();
@@ -26,24 +26,40 @@
   };
 
   /** Aktualisiert den Katalog spätestens nach fünf Minuten; parallele Anfragen werden zusammengeführt. */
-  const refresh = async () => {
-    if (!window.KWMashaFeedlyEffectsManifestURL) return [];
+  const refreshCatalogue = async () => {
+    if (!window.KWMashaFeedlyEffectsManifestURL) return { categories: [], effects: [] };
     if (Date.now() < expires) return catalog;
     if (!manifestRequest) {
       manifestRequest = (async () => {
         const response = await window.fetch(window.KWMashaFeedlyEffectsManifestURL, { credentials: 'same-origin', cache: 'no-cache', signal: AbortSignal.timeout(5000) });
-        if (!response.ok) throw new Error('Effekt-Anbieter nicht erreichbar.');
+        if (!response.ok) {
+          let message = 'Effekt-Anbieter nicht erreichbar.';
+          try {
+            const error = await response.json();
+            if (typeof error.message === 'string' && error.message.trim()) message = error.message;
+          } catch (_) { /* Ältere oder abgewiesene Proxy-Antworten enthalten kein JSON. */ }
+          throw new Error(message);
+        }
         const data = await response.json();
-        if (data.version !== 1 || !Array.isArray(data.effects)) throw new Error('Ungültiger Effekt-Katalog.');
-        catalog = data.effects.filter((effect) => /^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(effect.id)
-          && ['playful', 'serious', 'both'].includes(effect.theme) && Number.isFinite(effect.weight) && effect.weight > 0
-          && effect.files?.js).map((effect) => ({ ...effect, files: Object.fromEntries(Object.entries(effect.files).map(([type, url]) => [type, assetURL(url)])) }));
+        if (data.version !== 2 || !Array.isArray(data.categories) || !Array.isArray(data.effects)) throw new Error('Ungültiger Effekt-Katalog.');
+        const categoryIDs = new Set(data.categories.filter((category) => /^[a-z][a-z0-9_-]{0,79}$/.test(category.id) && typeof category.name === 'string' && category.name.trim()).map((category) => category.id));
+        catalog = {
+          categories: data.categories.filter((category) => categoryIDs.has(category.id)),
+          effects: data.effects.filter((effect) => /^[A-Za-z][A-Za-z0-9_-]{0,79}$/.test(effect.id)
+            && Array.isArray(effect.categories) && effect.categories.length > 0 && effect.categories.every((id) => categoryIDs.has(id))
+            && Number.isFinite(effect.weight) && effect.weight > 0 && effect.files?.js)
+            .map((effect) => ({ ...effect, files: Object.fromEntries(Object.entries(effect.files).map(([type, url]) => [type, assetURL(url)])) })),
+        };
         expires = Date.now() + Math.min(300, Math.max(1, Number(data.maxAge) || 60)) * 1000;
         return catalog;
       })().finally(() => { manifestRequest = null; });
     }
     return manifestRequest;
   };
+  /** Liefert den vollständigen geprüften Katalog für die Theme-Auswahl im CMS. */
+  const refreshCataloguePublic = () => refreshCatalogue();
+  /** Behält die bisherige Loader-Schnittstelle für Stellen bei, die nur Effekte benötigen. */
+  const refresh = async () => (await refreshCatalogue()).effects;
 
   /** Begrenzt auch Datei-Ladevorgänge, damit ein ausgefallener Anbieter keine wartende Animation hinterlässt. */
   const loadElement = (element, parent, timeout = 5000) => new Promise((resolve, reject) => {
@@ -104,7 +120,7 @@
     record.timer = window.setTimeout(() => { record.layers.forEach((layer) => layer.remove()); active.delete(record); }, 15000);
     return result;
   };
-  const candidatesFor = (effects, theme) => effects.filter((effect) => effect.theme === theme || effect.theme === 'both');
+  const candidatesFor = (effects, categoryID) => effects.filter((effect) => effect.categories.includes(categoryID));
   /** Zeigt ohne Anbieter einen lokalen, ruhigen Abschluss; benötigt keine externen Dateien. */
   const fallback = (document, token) => {
     if (token !== generation || reducedMotion()) return null;
@@ -147,9 +163,15 @@
     const effect = (await refresh()).find((item) => item.id === id);
     return effect ? start(effect, document, token) : null;
   });
+  /** Spielt den lokalen seriösen Standard unabhängig von Anbieter und Katalog ab. */
+  const previewFallback = (document) => safely(async () => {
+    if (reducedMotion()) return null;
+    return fallback(document, generation);
+  });
   window.KWMashaFeedlyEffects = {
-    preload, refresh, choose, cancelActive,
+    preload, refresh, refreshCatalogue: refreshCataloguePublic, choose, cancelActive,
     preview: (id, document) => preview(id, document),
+    previewFallback,
     play: (id, document) => preview(id, document),
     playOnDone: (document, unusedWindow, unusedImage, theme = 'playful', random = Math.random) => safely(async () => {
       if (reducedMotion()) return null;

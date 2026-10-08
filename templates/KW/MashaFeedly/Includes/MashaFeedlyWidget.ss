@@ -51,10 +51,24 @@
         </section>
     </div>
     <div class="kw-masha-feedly__modal kw-masha-feedly__onboarding-modal" data-masha-feedly-onboarding-thanks hidden>
-        <section class="kw-masha-feedly__dialog" role="dialog" aria-modal="true" aria-labelledby="kw-masha-feedly-thanks-title">
+        <section class="kw-masha-feedly__dialog kw-masha-feedly__onboarding-thanks-dialog" role="dialog" aria-modal="true" aria-labelledby="kw-masha-feedly-thanks-title">
             <header class="kw-masha-feedly__dialog-header"><img class="kw-masha-feedly__onboarding-logo" src="$resourceURL('kooperativeweb/masha-feedly:client/dist/icons/masha-feedly.svg')" alt="" aria-hidden="true"><div><span class="kw-masha-feedly__eyebrow"><%t KW\MashaFeedly\Translations.TOUR_WELCOME_EYEBROW 'DEIN ERSTER SCHRITT' %></span><h2 id="kw-masha-feedly-thanks-title"><%t KW\MashaFeedly\Translations.TOUR_THANKS_TITLE 'Danke fürs Mitmachen!' %></h2></div></header>
-            <p class="kw-masha-feedly__onboarding-copy"><%t KW\MashaFeedly\Translations.TOUR_THANKS_TEXT 'Du hast deine erste Meldung erstellt und gelernt, wie du Einträge ansiehst und bearbeitest. In deinem Profil kannst du dein Feedly-Icon und deine Avatarfarbe anpassen sowie E-Mail-Benachrichtigungen zu Kommentaren einrichten.' %></p>
-            <footer class="kw-masha-feedly__dialog-actions"><a class="kw-masha-feedly__submit" data-masha-feedly-profile-link href="$ProfileURL"><%t KW\MashaFeedly\Translations.TOUR_PROFILE_LINK 'Profileinstellungen öffnen' %> →</a><button type="button" class="kw-masha-feedly__secondary" data-masha-feedly-thanks-close><%t KW\MashaFeedly\Translations.TOUR_DONE 'Fertig' %></button></footer>
+            <p class="kw-masha-feedly__onboarding-copy"><%t KW\MashaFeedly\Translations.TOUR_THANKS_TEXT 'Du hast deine erste Meldung erstellt und gelernt, wie du Einträge ansiehst und bearbeitest. Jetzt kannst du Masha noch persönlich gestalten.' %></p>
+            <form class="kw-masha-feedly__onboarding-preferences" data-masha-feedly-profile-preferences data-save-url="$ProfilePreferencesURL" data-security-id="$TokenValue">
+                <div class="kw-masha-feedly__onboarding-preferences-grid">
+                    <label><%t KW\MashaFeedly\Translations.PROFILE_THEME 'Effekt-Kategorie' %><select name="MashaFeedlyTheme"><option value=""><%t KW\MashaFeedly\Translations.PROFILE_THEME_DEFAULT 'Website-Vorgabe' %></option><% loop $ProfileThemeOptions %><option value="$ID" <% if $Selected %>selected<% end_if %>>$Title</option><% end_loop %></select></label>
+                </div>
+                $AvatarColorPaletteHTML.RAW
+                <input type="hidden" name="MashaFeedlyColor" value="$ProfileColor">
+                <% if $AvatarIconPickerAvailable %>
+                    <details class="kw-masha-feedly__onboarding-icon-details"><summary><%t KW\MashaFeedly\Translations.TOUR_ICON_CHOICES 'Eigenes Icon wählen' %></summary><input type="hidden" name="MashaFeedlyAvatarIcon" value="$ProfileAvatarIcon" data-masha-feedly-avatar-icon-value>$AvatarIconPickerHTML.RAW</details>
+                <% else_if $AvatarIconPickerHTML %>
+                    $AvatarIconPickerHTML.RAW
+                <% end_if %>
+                <p class="kw-masha-feedly__onboarding-preferences-status" data-masha-feedly-profile-preferences-status role="status" aria-live="polite" aria-atomic="true"></p>
+                <button type="submit" class="kw-masha-feedly__submit"><%t KW\MashaFeedly\Translations.TOUR_SAVE_PREFERENCES 'Auswahl speichern' %> <span aria-hidden="true">→</span></button>
+            </form>
+            <footer class="kw-masha-feedly__dialog-actions"><a class="kw-masha-feedly__help-link" data-masha-feedly-profile-link href="$ProfileURL"><%t KW\MashaFeedly\Translations.TOUR_PROFILE_LINK 'Weitere Profileinstellungen' %> →</a><button type="button" class="kw-masha-feedly__secondary" data-masha-feedly-thanks-close><%t KW\MashaFeedly\Translations.TOUR_DONE 'Fertig' %></button></footer>
         </section>
     </div>
     <aside class="kw-masha-feedly__onboarding-tip" data-masha-feedly-onboarding-tip hidden role="status" aria-live="polite">
