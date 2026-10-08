@@ -7,6 +7,7 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
+use Psr\Http\Message\StreamInterface;
 use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
 use KW\MashaFeedly\Service\MashaFeedlyEffectProvider;
 use RuntimeException;
@@ -50,11 +51,11 @@ class MashaFeedlyEffectClientTest extends SapphireTest
     }
 
     /** @param list<Response> $responses Erwartete Netzwerkantworten. @return MashaFeedlyEffectClient Isolierter Client. */
-    private function client(array $responses): MashaFeedlyEffectClient
+    private function client(array $responses, ?string $avatarIconStoragePath = null): MashaFeedlyEffectClient
     {
         $stack = HandlerStack::create(new MockHandler($responses));
         $stack->push(Middleware::history($this->history));
-        return new MashaFeedlyEffectClient(new Client(['handler' => $stack]), $this->cache);
+        return new MashaFeedlyEffectClient(new Client(['handler' => $stack]), $this->cache, $avatarIconStoragePath);
     }
 
     /** Katalog und Dateien werden nur einmal geladen; der Browser erhält ausschließlich lokale URLs. */
@@ -192,6 +193,82 @@ class MashaFeedlyEffectClientTest extends SapphireTest
         $this->assertSame($svg, $file['body']);
         $this->assertSame('image/svg+xml', $file['mime']);
         $this->assertCount(2, $this->history);
+    }
+
+    /** Liest einen gestreamten Anbieter-Katalog vollständig, auch wenn der HTTP-Stream nur kleine Teile liefert. */
+    public function testAvatarIconCatalogueReadsPartialStreamChunks(): void
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><path d="M0 0h1"/></svg>';
+        $version = hash('sha256', $svg);
+        $payload = json_encode(['version' => 1, 'categories' => [['id' => 'people', 'name' => 'Menschen']], 'icons' => [[
+            'id' => 'person', 'name' => 'Person', 'category' => 'people',
+            'files' => ['black' => self::BASE . 'icon/person/' . $version . '/black', 'white' => self::BASE . 'icon/person/' . $version . '/white'],
+        ]]]) . str_repeat(' ', 2048);
+        $stream = new class($payload) implements StreamInterface {
+            private int $offset = 0;
+            public function __construct(private string $content) {}
+            public function __toString(): string { return $this->content; }
+            public function close(): void { $this->offset = strlen($this->content); }
+            public function detach() { $this->close(); return null; }
+            public function getSize(): ?int { return strlen($this->content); }
+            public function tell(): int { return $this->offset; }
+            public function eof(): bool { return $this->offset >= strlen($this->content); }
+            public function isSeekable(): bool { return false; }
+            public function seek(int $offset, int $whence = SEEK_SET): void { throw new RuntimeException('Stream ist nicht durchsuchbar.'); }
+            public function rewind(): void { throw new RuntimeException('Stream ist nicht durchsuchbar.'); }
+            public function isWritable(): bool { return false; }
+            public function write(string $string): int { throw new RuntimeException('Stream ist schreibgeschützt.'); }
+            public function isReadable(): bool { return true; }
+            public function read(int $length): string
+            {
+                $chunk = substr($this->content, $this->offset, min($length, 128));
+                $this->offset += strlen($chunk);
+                return $chunk;
+            }
+            public function getContents(): string
+            {
+                $contents = '';
+                while (!$this->eof()) $contents .= $this->read(128);
+                return $contents;
+            }
+            public function getMetadata(?string $key = null) { return $key === null ? [] : null; }
+        };
+        $client = $this->client([new Response(200, ['Content-Type' => 'application/json'], $stream)]);
+
+        $catalogue = $client->avatarIcons();
+
+        $this->assertSame('person', $catalogue['icons'][0]['id']);
+        $this->assertCount(1, $this->history);
+    }
+
+    /** Speichert nur ein explizit gewähltes Symbol dauerhaft und liefert es danach ohne Anbieterzugriff aus. */
+    public function testSelectedAvatarIconIsPersistedLocally(): void
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><path d="M0 0h1"/></svg>';
+        $version = hash('sha256', $svg);
+        $payload = ['version' => 1, 'categories' => [['id' => 'people', 'name' => 'Menschen']], 'icons' => [[
+            'id' => 'person', 'name' => 'Person', 'category' => 'people',
+            'files' => ['black' => self::BASE . 'icon/person/' . $version . '/black', 'white' => self::BASE . 'icon/person/' . $version . '/white'],
+        ], [
+            'id' => 'unused', 'name' => 'Nicht gewählt', 'category' => 'people',
+            'files' => ['black' => self::BASE . 'icon/unused/' . $version . '/black', 'white' => self::BASE . 'icon/unused/' . $version . '/white'],
+        ]]];
+        $directory = sys_get_temp_dir() . '/masha-avatar-icons-' . bin2hex(random_bytes(6));
+        try {
+            $client = $this->client([
+                new Response(200, ['Content-Type' => 'application/json'], json_encode($payload)),
+                new Response(200, ['Content-Type' => 'image/svg+xml'], $svg),
+                new Response(200, ['Content-Type' => 'image/svg+xml'], $svg),
+            ], $directory);
+            $client->storeSelectedAvatarIcon('person');
+            $this->assertSame($svg, $client->storedAvatarIcon('person', 'black')['body']);
+            $this->assertSame($svg, $client->storedAvatarIcon('person', 'white')['body']);
+            $this->assertFileDoesNotExist($directory . '/unused-black.svg');
+            $this->assertCount(3, $this->history, 'Die erneute lokale Auslieferung darf den Anbieter nicht kontaktieren.');
+        } finally {
+            foreach (glob($directory . '/*') ?: [] as $file) @unlink($file);
+            @rmdir($directory);
+        }
     }
 
     /** Ohne ausdrücklich gesetzte HTTPS-Basis und Schlüssel bleibt die Symbolauswahl aus. */

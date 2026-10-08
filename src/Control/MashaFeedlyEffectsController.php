@@ -9,12 +9,13 @@ use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Security\Security;
+use SilverStripe\Security\Member;
 
 /** Liefert gecachte Effekte ausschließlich an angemeldete, für Feedly freigegebene Personen. */
 class MashaFeedlyEffectsController extends Controller
 {
-    private static $allowed_actions = ['manifest', 'file', 'icons', 'icon'];
-    private static $url_handlers = ['icon/$ID/$Version/$Color' => 'icon', 'file/$ID/$Version/$Type' => 'file', 'icons' => 'icons', 'manifest' => 'manifest'];
+    private static $allowed_actions = ['manifest', 'file', 'icons', 'icon', 'avatar'];
+    private static $url_handlers = ['avatar/$ID/$Color' => 'avatar', 'icon/$ID/$Version/$Color' => 'icon', 'file/$ID/$Version/$Type' => 'file', 'icons' => 'icons', 'manifest' => 'manifest'];
 
     /** @param HTTPRequest $request Browser-Anfrage. @return HTTPResponse Privater Katalog oder Ablehnung. */
     public function manifest(HTTPRequest $request): HTTPResponse
@@ -67,6 +68,28 @@ class MashaFeedlyEffectsController extends Controller
         } catch (\Throwable $error) {
             return $this->response('', 'text/plain', $error->getCode() === 404 ? 404 : 502);
         }
+    }
+
+    /**
+     * Gibt nur ein ausgewähltes, lokal gespeichertes Symbol an freigegebene Mitglieder aus.
+     * @param HTTPRequest $request Symbolkennung und Farbvariante.
+     * @return HTTPResponse Geschützte lokale SVG-Datei oder Ablehnung.
+     */
+    public function avatar(HTTPRequest $request): HTTPResponse
+    {
+        if ($denied = $this->deniedResponse($request)) return $denied;
+        try {
+            $id = (string)$request->param('ID');
+            $color = (string)$request->param('Color');
+            $client = Injector::inst()->get(MashaFeedlyEffectClient::class);
+            try { $file = $client->storedAvatarIcon($id, $color); }
+            catch (\RuntimeException $error) {
+                if ($error->getCode() !== 404 || !Member::get()->filter('MashaFeedlyAvatarIcon', $id)->exists()) throw $error;
+                $client->storeSelectedAvatarIcon($id);
+                $file = $client->storedAvatarIcon($id, $color);
+            }
+            return $this->response($file['body'], $file['mime']);
+        } catch (\Throwable) { return $this->response('', 'text/plain', 404); }
     }
 
     /** @param HTTPRequest $request Aktuelle Sitzung. @return HTTPResponse|null Ablehnung vor jedem Cache-Zugriff. */

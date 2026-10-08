@@ -47,7 +47,7 @@ class MashaFeedlyEffectClient
     }
 
     /** @param ClientInterface|null $http Austauschbarer HTTP-Transport. @param CacheInterface|null $cache Privater Servercache. */
-    public function __construct(private ?ClientInterface $http = null, private ?CacheInterface $cache = null)
+    public function __construct(private ?ClientInterface $http = null, private ?CacheInterface $cache = null, private ?string $avatarIconStoragePath = null)
     {
         $this->http ??= new Client();
         $this->cache ??= Injector::inst()->get(CacheInterface::class . '.MashaFeedlyEffects');
@@ -113,10 +113,10 @@ class MashaFeedlyEffectClient
 
         $response = $this->request('icons');
         try { $data = json_decode($response['body'], true, 32, JSON_THROW_ON_ERROR); }
-        catch (\JsonException) { throw new RuntimeException('Ungültiger Profil-Icon-Katalog.', 502); }
+        catch (\JsonException) { throw new RuntimeException('Der Profil-Icon-Katalog enthält kein gültiges JSON.', 502); }
         if (!is_array($data) || ($data['version'] ?? null) !== 1 || !is_array($data['categories'] ?? null)
             || !is_array($data['icons'] ?? null) || count($data['categories']) > 50 || count($data['icons']) > 500) {
-            throw new RuntimeException('Ungültiger Profil-Icon-Katalog.', 502);
+            throw new RuntimeException('Die Version oder Struktur des Profil-Icon-Katalogs ist ungültig.', 502);
         }
         $categories = [];
         foreach ($data['categories'] as $category) {
@@ -131,7 +131,7 @@ class MashaFeedlyEffectClient
             if (!is_array($icon) || !is_string($icon['id'] ?? null) || !preg_match('/^[a-z0-9-]{1,50}$/D', $icon['id'])
                 || !is_string($icon['name'] ?? null) || trim($icon['name']) === '' || !is_string($icon['category'] ?? null)
                 || !isset($categories[$icon['category']]) || !is_array($icon['files'] ?? null) || count($icon['files']) !== 2) {
-                throw new RuntimeException('Ungültiger Profil-Icon-Katalog.', 502);
+                throw new RuntimeException('Ein Eintrag im Profil-Icon-Katalog ist ungültig.', 502);
             }
             $files = [];
             foreach (['black', 'white'] as $color) {
@@ -171,6 +171,77 @@ class MashaFeedlyEffectClient
         $file['mime'] = 'image/svg+xml';
         $this->cache->set($cacheKey, $file, 86400);
         return $file;
+    }
+
+    /**
+     * Lädt ausschließlich ein explizit ausgewähltes Symbol samt Kontrastvarianten in den privaten Projektordner.
+     * @param string $id Kennung des ausgewählten Symbols.
+     * @return void
+     * @throws RuntimeException Bei ungültigem Symbol, Anbieterfehler oder fehlendem Schreibzugriff.
+     */
+    public function storeSelectedAvatarIcon(string $id): void
+    {
+        if (!preg_match('/^[a-z0-9-]{1,50}$/D', $id)) throw new RuntimeException('Unbekanntes Profil-Icon.', 404);
+        $icon = null;
+        foreach ($this->avatarIcons()['icons'] as $candidate) if ($candidate['id'] === $id) { $icon = $candidate; break; }
+        if (!$icon) throw new RuntimeException('Unbekanntes Profil-Icon.', 404);
+        foreach (['black', 'white'] as $color) {
+            $parts = $this->iconParameters($icon['files'][$color]);
+            $file = $this->avatarIcon($id, $parts[1], $color);
+            $path = $this->storedAvatarIconPath($id, $color);
+            $directory = dirname($path);
+            if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) throw new RuntimeException('Das Profil-Icon konnte nicht lokal gespeichert werden.', 500);
+            @chmod($directory, 0700);
+            $temporary = $path . '.' . bin2hex(random_bytes(6)) . '.tmp';
+            if (file_put_contents($temporary, $file['body'], LOCK_EX) === false || !rename($temporary, $path)) {
+                @unlink($temporary);
+                throw new RuntimeException('Das Profil-Icon konnte nicht lokal gespeichert werden.', 500);
+            }
+            @chmod($path, 0600);
+        }
+    }
+
+    /**
+     * Gibt eine zuvor geprüfte, dauerhaft lokal gespeicherte Icon-Variante zurück.
+     * @param string $id Gespeicherte Symbolkennung.
+     * @param string $color Kontrastvariante.
+     * @return array{body: string, mime: string} Lokal gespeicherte SVG-Datei.
+     * @throws RuntimeException Wenn Datei oder Parameter ungültig sind.
+     */
+    public function storedAvatarIcon(string $id, string $color): array
+    {
+        if (!preg_match('/^[a-z0-9-]{1,50}$/D', $id) || !in_array($color, ['black', 'white'], true)) throw new RuntimeException('Unbekannte Ressource.', 404);
+        $path = $this->storedAvatarIconPath($id, $color);
+        $body = is_file($path) ? file_get_contents($path) : false;
+        if (!is_string($body) || !str_contains($body, '<svg') || preg_match('/<script|<!DOCTYPE|<!ENTITY|onload\\s*=|javascript:/i', $body)) throw new RuntimeException('Unbekannte Ressource.', 404);
+        return ['body' => $body, 'mime' => 'image/svg+xml'];
+    }
+
+    /**
+     * Entfernt die lokal gespeicherten Varianten, wenn kein Profil das Symbol mehr ausgewählt hat.
+     * @param string $id Nicht mehr verwendete Symbolkennung.
+     * @return void
+     */
+    public function removeStoredAvatarIcon(string $id): void
+    {
+        if (!preg_match('/^[a-z0-9-]{1,50}$/D', $id)) return;
+        foreach (['black', 'white'] as $color) {
+            $path = $this->storedAvatarIconPath($id, $color);
+            if (is_file($path)) @unlink($path);
+        }
+    }
+
+    /** @param string $id Geprüfte Symbolkennung. @param string $color Geprüfte Kontrastvariante. @return string Privater Dateipfad. */
+    private function storedAvatarIconPath(string $id, string $color): string
+    {
+        return rtrim($this->avatarIconStoragePath ?? Director::baseFolder() . '/private/masha-feedly-avatar-icons', '/') . '/' . $id . '-' . $color . '.svg';
+    }
+
+    /** @return list<string> IDs, Hash und Farbvariante aus einer bereits geprüften Proxy-URL. */
+    private function iconParameters(string $url): array
+    {
+        if (preg_match('~/icon/([a-z0-9-]{1,50})/([a-f0-9]{64})/(black|white)$~D', $url, $matches)) return [$matches[1], $matches[2], $matches[3]];
+        throw new RuntimeException('Ungültige Profil-Icon-Datei.', 502);
     }
 
     /** Stellt sicher, dass die Auswahl nicht über die lokale Fallback-Konfiguration angeboten wird. */
@@ -292,8 +363,17 @@ class MashaFeedlyEffectClient
                 if ($ca !== '' && !is_file($ca)) throw new RuntimeException('Ungültige TLS-Konfiguration.', 503);
                 $response = $this->http->request('GET', $url, ['headers' => $headers, 'allow_redirects' => false, 'http_errors' => false,
                     'timeout' => 5, 'connect_timeout' => 2, 'verify' => $ca ?: true, 'stream' => true]);
-                $status = $response->getStatusCode(); $body = $response->getBody()->read(8 * 1024 * 1024 + 1); $mime = $response->getHeaderLine('Content-Type');
-                $response->getBody()->close();
+                $status = $response->getStatusCode();
+                $mime = $response->getHeaderLine('Content-Type');
+                $stream = $response->getBody();
+                $body = '';
+                $maximumSize = 8 * 1024 * 1024;
+                while (!$stream->eof() && strlen($body) <= $maximumSize) {
+                    $chunk = $stream->read(min(65536, $maximumSize + 1 - strlen($body)));
+                    if ($chunk === '') break;
+                    $body .= $chunk;
+                }
+                $stream->close();
             }
             if ($status === 401 || $status === 403) throw new RuntimeException('Der Effekt-Anbieter lehnt den API-Schlüssel ab. Prüfe MASHA_FEEDLY_EFFECTS_API_KEY.', 502);
             if ($status === 404) throw new RuntimeException('Der Effekt-Anbieter wurde erreicht, aber der API-Endpunkt fehlt. Prüfe MASHA_FEEDLY_EFFECTS_BASE_URL.', 502);
