@@ -9,6 +9,7 @@ use SilverStripe\Control\Director;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\SecurityToken;
 use SilverStripe\ORM\ArrayList;
+use SilverStripe\View\ArrayData;
 use SilverStripe\View\Requirements;
 use SilverStripe\Core\Manifest\ModuleResourceLoader;
 use SilverStripe\i18n\i18n;
@@ -108,11 +109,11 @@ class MashaFeedlyWidgetExtension extends Extension
         $profileThemeOptions = [];
         if ($canPersonalize) {
             foreach (\KW\MashaFeedly\Service\MashaFeedlyEffectClient::themeOptions((string)($currentMember ? $currentMember->MashaFeedlyTheme : null)) as $themeID => $themeTitle) {
-                $profileThemeOptions[] = [
+                $profileThemeOptions[] = ArrayData::create([
                     'ID' => $themeID,
                     'Title' => $themeTitle,
                     'Selected' => (string)($currentMember ? $currentMember->MashaFeedlyTheme : null) === (string)$themeID,
-                ];
+                ]);
             }
         }
         $emailTestSucceeded = $canPersonalize && MashaFeedlyConfigExtension::emailTestSucceeded();
@@ -152,7 +153,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'MiteStopURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'stopMiteTimer'),
             'ProfileURL' => CMSProfileController::singleton()->Link() . '#Root_MashaFeedly',
             'ProfilePreferencesURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'saveProfilePreferences'),
-            'ProfileThemeOptions' => $profileThemeOptions,
+            'ProfileThemeOptions' => ArrayList::create($profileThemeOptions),
             'ProfileDisableSoundEffects' => (bool)($currentMember ? $currentMember->MashaFeedlyDisableSoundEffects : null),
             'ProfileTheme' => (string)(($currentMember ? $currentMember->MashaFeedlyTheme : null) ?? ''),
             'ProfileAddress' => (string)(($currentMember ? $currentMember->MashaFeedlyAddress : null) ?? ''),

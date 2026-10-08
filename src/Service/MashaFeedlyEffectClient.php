@@ -21,18 +21,18 @@ class MashaFeedlyEffectClient
      */
     public static function themeOptions(?string $preserve = null): array
     {
-        $options = [
+        $defaultOptions = [
             'playful' => i18n::_t('KW\\MashaFeedly\\Translations.CONFIG_THEME_PLAYFUL', 'Verspielt'),
             'serious' => i18n::_t('KW\\MashaFeedly\\Translations.CONFIG_THEME_SERIOUS', 'Sachlich'),
         ];
+        $options = $defaultOptions;
         try {
             $client = new self();
-            $options = [];
-            foreach ($client->catalogue()['categories'] as $category) $options[$category['id']] = $category['name'];
-            if (!$options) $options = [
-                'playful' => i18n::_t('KW\\MashaFeedly\\Translations.CONFIG_THEME_PLAYFUL', 'Verspielt'),
-                'serious' => i18n::_t('KW\\MashaFeedly\\Translations.CONFIG_THEME_SERIOUS', 'Sachlich'),
-            ];
+            $catalogueOptions = [];
+            foreach ($client->catalogue()['categories'] as $category) {
+                $catalogueOptions[$category['id']] = $category['name'];
+            }
+            $options = array_merge($defaultOptions, $catalogueOptions);
         } catch (\Throwable $ignoredError) {
             // Profile und Konfiguration bleiben bei einem fehlenden Anbieter weiter bearbeitbar.
             $options = [
