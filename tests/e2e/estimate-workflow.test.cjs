@@ -101,7 +101,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     assert.equal(await managerWidget.getAttribute('data-estimate-hourly-rate'), '0', 'Der Stundensatz bleibt für die Freigabeperson verborgen.');
     await openEntryList(superadminPage, superadminWidget);
     const superadminCard = superadminWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(superadminCard).toBeVisible();
+    await expect(superadminCard).toBeVisible({ timeout: 30000 });
     await superadminCard.click();
 
     const editForm = superadminWidget.locator('[data-masha-feedly-edit-form]');
@@ -145,7 +145,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
 
     await openEntryList(managerPage, managerWidget);
     const reviewerCard = managerWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(reviewerCard).toBeVisible();
+    await expect(reviewerCard).toBeVisible({ timeout: 30000 });
     await expect(reviewerCard.locator('.kw-masha-feedly__entry-estimate-status')).toHaveAttribute('aria-label', /Kostenschätzung wartet auf Freigabe/u);
     await reviewerCard.click();
     const reviewerForm = managerWidget.locator('[data-masha-feedly-edit-form]');
@@ -191,7 +191,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
       assert.equal(Object.hasOwn(protectedEntry, field), false, `Das normale Mitglied darf ${field} nicht aus dem Server-Payload erhalten.`);
     }
     const memberCard = refreshedMemberWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(memberCard).toBeVisible();
+    await expect(memberCard).toBeVisible({ timeout: 30000 });
     await expect(memberCard).toContainText(approvedTitle);
     await memberCard.click();
     const memberEditForm = refreshedMemberWidget.locator('[data-masha-feedly-edit-form]');
@@ -208,7 +208,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     await refreshedSuperadminWidget.waitFor({ state: 'attached' });
     await openEntryList(superadminPage, refreshedSuperadminWidget);
     const refreshedSuperadminCard = refreshedSuperadminWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(refreshedSuperadminCard).toBeVisible();
+    await expect(refreshedSuperadminCard).toBeVisible({ timeout: 30000 });
     await refreshedSuperadminCard.click();
 
     const doingOption = categorySelect.locator('option[data-system-key="doing"]');

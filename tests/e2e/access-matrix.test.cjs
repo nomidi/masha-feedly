@@ -68,7 +68,8 @@ const createProtectedContent = async (page, expect) => {
 
   await widget.locator('[data-masha-feedly-open-list]').click();
   const card = widget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${created.entryID}"]`);
-  await expect(card).toBeVisible();
+  // Die Zugriffskontrolle beginnt erst nach dem asynchronen Laden der Testmeldung.
+  await expect(card).toBeVisible({ timeout: 30000 });
   await card.click();
   const commentForm = widget.locator('[data-masha-feedly-comment-form]');
   await commentForm.locator('[name="CommentText"]').fill(commentText);

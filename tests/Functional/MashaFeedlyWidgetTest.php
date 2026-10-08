@@ -35,6 +35,8 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->logInWithPermission('CMS_ACCESS');
         $member = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $member);
+        $member->Locale = 'de_DE';
+        $member->write();
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
         $config->write();
@@ -47,7 +49,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('MashaFeedlyIconImage', $body, 'Freigegebene Mitglieder können ihr Profilbild/Icon hochladen.');
         $this->assertStringContainsString('MashaFeedlyColor', $body, 'Freigegebene Mitglieder können eine Avatarfarbe wählen.');
         $this->assertStringContainsString('name="MashaFeedlyTheme"', $body, 'Freigegebene Mitglieder können ihr persönliches Theme einstellen.');
-        $this->assertStringContainsString('Einstellung der Website übernehmen', $body);
+        $this->assertStringContainsString('Ohne eigene Auswahl gilt die Einstellung der Website.', $body);
         $this->assertStringContainsString('masha-feedly-color-palette__grid', $body, 'Die Farbauswahl wird auf der Profilseite gerendert.');
     }
 
@@ -203,17 +205,17 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('data-onboarding-enabled="1"', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-onboarding-welcome', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('Das Erscheinungsbild kannst du später in deinen Masha:Feedly-Profileinstellungen ändern.', $this->widgetMarkup($allowedResponse->getBody()));
-        $this->assertMatchesRegularExpression('/Theme einstellen[^<]*<\/a>/', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertMatchesRegularExpression('/Profileinstellungen öffnen[^<]*<\/a>/', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertMatchesRegularExpression('/data-masha-feedly-onboarding-welcome[\s\S]*?data-masha-feedly-profile-link href="[^"]*myprofile[^"]*#Root_MashaFeedly/i', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-onboarding-thanks', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertMatchesRegularExpression('/data-masha-feedly-profile-link href="[^"]*myprofile[^\"]*#Root_MashaFeedly/i', $this->widgetMarkup($allowedResponse->getBody()));
-        $this->assertStringContainsString('Erfolgsmeldung mit einer kurzen Danke-Animation.', $widgetMarkup);
+        $this->assertStringContainsString('Deine erste Meldung ist gespeichert.', $widgetMarkup);
         $this->assertStringContainsString('data-masha-feedly-profile-preferences', $widgetMarkup);
         $this->assertStringContainsString('name="MashaFeedlyTheme"', $widgetMarkup);
         $this->assertStringContainsString('name="MashaFeedlyAddress"', $widgetMarkup);
         $this->assertStringContainsString('name="MashaFeedlyColor"', $widgetMarkup);
         $this->assertStringContainsString('Auswahl speichern', $widgetMarkup);
-        $this->assertStringContainsString('Theme einstellen →', $widgetMarkup);
+        $this->assertStringContainsString('Profileinstellungen öffnen →', $widgetMarkup);
         $this->assertStringContainsString('kw-masha-feedly__onboarding-logo', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-tour-start', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-tour-cancel', $this->widgetMarkup($allowedResponse->getBody()));
@@ -226,7 +228,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('Schritt 4 von 8: Klicke in das große Feld „Beschreibung“. Schreib dort kurz hinein, was falsch ist', $allowedResponse->getBody());
         $this->assertStringContainsString('Schritt 5 von 8: Super, du hast eine Meldung erstellt! Klicke jetzt auf das Blatt-Symbol mit der Zahl.', $allowedResponse->getBody());
         $this->assertStringContainsString('Schritt 6 von 8: Deine neue Meldung ist bunt umrandet. Klicke genau auf diese Meldung, um sie zu öffnen.', $allowedResponse->getBody());
-        $this->assertStringContainsString('Schritt 7 von 8: Schreibe im geöffneten Eintrag einen kurzen Kommentar und sende ihn ab.', $allowedResponse->getBody());
+        $this->assertStringContainsString('Schritt 7 von 8: Schreibe in der geöffneten Meldung einen kurzen Kommentar und sende ihn ab.', $allowedResponse->getBody());
         $this->assertStringContainsString('Schritt 8 von 8: Oben kannst du Status und Priorität ändern. Darunter kannst du verantwortliche Personen auswählen.', $allowedResponse->getBody());
         $allowedMember->MashaFeedlyOnboardingCompleted = true;
         $allowedMember->MashaFeedlyShowOnboarding = true;
@@ -236,7 +238,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $allowedMember->MashaFeedlyShowOnboarding = false;
         $allowedMember->MashaFeedlyOnboardingCompleted = false;
         $allowedMember->write();
-        $this->assertStringContainsString('<span aria-hidden="true">+</span>', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertMatchesRegularExpression('/class="kw-masha-feedly__add"[^>]*>[\s\S]*?<svg viewBox="0 0 24 24"/', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringNotContainsString('Bug oder Hinweis melden', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-entry-form', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-edit-environment', $allowedResponse->getBody());
@@ -381,12 +383,14 @@ class MashaFeedlyWidgetTest extends FunctionalTest
 
         $admin = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $admin);
-        $this->assertTrue(MashaFeedlyAdmin::singleton()->canView($admin), 'Admins behalten die CMS-Konfiguration zur Vergabe von Freigaben.');
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['operator@example.test']);
+        $this->assertFalse(MashaFeedlyAdmin::singleton()->canView($admin), 'Nicht freigegebene Admins sehen auch die CMS-Konfiguration nicht.');
         $admin->MashaFeedlyOnboardingCompleted = true;
         $admin->write();
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$allowedMember->ID, (int)$admin->ID]);
         $config->write();
 
+        $this->assertTrue(MashaFeedlyAdmin::singleton()->canView($admin), 'Ausdrücklich freigegebene Admins dürfen den CMS-Bereich öffnen.');
         $allowedResponse = $this->get('/masha-feedly-widget-test');
         $this->assertSame(200, $allowedResponse->getStatusCode());
         $markup = $this->widgetMarkup($allowedResponse->getBody());

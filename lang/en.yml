@@ -650,6 +650,7 @@ en:
     TOUR_WELCOME_EYEBROW: 'YOUR FIRST STEP'
     TOUR_WELCOME_TITLE: 'Welcome to Masha:Feedly'
     TOUR_MOBILE_NOTICE: 'The tour needs a larger screen, such as a laptop or desktop computer. You can still report problems on your phone: open Masha:Feedly at the bottom right and tap the plus button. Choose OK to take the tour later on a computer. Cancel tour ends it permanently.'
+    TOUR_MOBILE_NOTICE_SIE: 'The tour needs a larger screen, such as a laptop or desktop computer. You can still report problems on your phone: open Masha:Feedly at the bottom right and tap the plus button. Choose OK to take the tour later on a computer. Cancel tour ends it permanently.'
     TOUR_MOBILE_CLOSE: 'OK'
     TOUR_MOBILE_CANCEL: 'Cancel tour'
     TOUR_WELCOME_TEXT: 'Report issues without writing an email first: With Masha:Feedly, select the affected spot directly on the website and describe what needs to change. Attach images or files when helpful.'

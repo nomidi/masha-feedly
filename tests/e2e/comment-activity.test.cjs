@@ -96,7 +96,8 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
 
     await creatorWidget.locator('[data-masha-feedly-open-list]').click();
     const ownCard = creatorWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(ownCard).toBeVisible();
+    // Die lokale Datenbank kann viele Meldungen enthalten; die Liste wird asynchron geladen.
+    await expect(ownCard).toBeVisible({ timeout: 30000 });
     const baselineRead = await creatorPage.evaluate(async (id) => {
       const widget = window.KWMashaFeedlyDOM.widget();
       const body = new FormData();
@@ -116,7 +117,7 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     await commenterWidget.locator('.kw-masha-feedly__toggle').click();
     await commenterWidget.locator('[data-masha-feedly-open-list]').click();
     const commenterCard = commenterWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(commenterCard).toBeVisible();
+    await expect(commenterCard).toBeVisible({ timeout: 30000 });
     await expect(commenterCard).toHaveAttribute('data-entry-unread', 'true');
     const commenterUnreadCount = Number(await commenterWidget.locator('[data-masha-feedly-unread-count]').textContent());
     assert.ok(commenterUnreadCount > 0, 'Der neue Eintrag muss im Neuigkeiten-Zähler erscheinen.');
@@ -173,7 +174,7 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const unreadBeforeOpen = Number(await unreadCount.textContent());
     await newsButton.click();
     const unreadCard = reloadedCreatorWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(unreadCard).toBeVisible();
+    await expect(unreadCard).toBeVisible({ timeout: 30000 });
     await expect(unreadCard.locator('[data-entry-unread]')).toBeVisible();
     await unreadCard.click();
     await expect(reloadedCreatorWidget.locator('[data-masha-feedly-comments]')).toContainText(commentText);

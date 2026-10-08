@@ -105,7 +105,7 @@ class LanguageFileParityTest extends SapphireTest
         foreach (['de', 'en'] as $language) {
             $catalogue = Yaml::parseFile($directory . $language . '.yml')[$language]['KW\\MashaFeedly\\Translations'];
             foreach ([
-                'TOUR_WELCOME_EYEBROW', 'TOUR_WELCOME_TEXT', 'TOUR_WELCOME_WORKFLOW', 'TOUR_THEME_SETTINGS',
+                'TOUR_MOBILE_NOTICE', 'TOUR_WELCOME_EYEBROW', 'TOUR_WELCOME_TEXT', 'TOUR_WELCOME_WORKFLOW', 'TOUR_THEME_SETTINGS',
                 'TOUR_STEP_ICON', 'TOUR_STEP_PLUS', 'TOUR_STEP_TARGET', 'TOUR_STEP_FORM',
                 'TOUR_STEP_VIEW_ENTRIES', 'TOUR_STEP_OPEN_ENTRY', 'TOUR_STEP_COMMENT_ENTRY',
                 'TOUR_STEP_MANAGE_ENTRY', 'TOUR_BLOCKED_ICON', 'TOUR_BLOCKED_PLUS',

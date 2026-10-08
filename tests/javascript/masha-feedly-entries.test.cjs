@@ -288,7 +288,7 @@ test('Dialoge sind modal beschriftet, fokussierbar und Statusfelder live angekü
   assert.match(widgetTemplate, /data-masha-feedly-edit-heading tabindex="-1"/);
   assert.match(widgetTemplate, /data-masha-feedly-edit-priority role="img" aria-label="Priorität"/);
   assert.equal((widgetTemplate.match(/role="status" aria-live="polite" aria-atomic="true"/g) || []).length >= 3, true);
-  assert.match(scss, /:focus-visible,[\s\S]*outline: 3px solid #a91c62/);
+  assert.match(scss, /:focus-visible,[\s\S]*outline: 3px solid \$masha-color-a91c62/);
 });
 
 test('sortiert innerhalb des Status nach Priorität und bei gleicher Priorität nach Datum', () => {
@@ -437,11 +437,11 @@ test('zeigt Reaktionen kompakt und öffnet die sechs Optionen erst auf Klick', a
   assert.equal(picker.children[0].attributes['aria-pressed'], 'true');
   picker.children[2].listeners.click();
   assert.equal(reactedTo, '😂', 'Eine Auswahl wird zum Speichervorgang übergeben und ersetzt die bisherige eigene Reaktion.');
-  assert.match(scss, /\.kw-masha-feedly__comment-reactions\s*\{\s*position: relative;/);
-  assert.match(scss, /\.kw-masha-feedly__comment-reaction-picker\s*\{\s*position: absolute; z-index: 8; bottom: calc\(100% \+ 6px\); left: 0;/);
+  assert.match(scss, /&-reactions\s*\{\s*position: relative;/);
+  assert.match(scss, /&-reaction-picker\s*\{\s*position: absolute; z-index: 8; bottom: calc\(100% \+ 6px\); left: 0;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__comment-reaction-picker\{position:absolute;z-index:8;bottom:calc\(100% \+ 6px\);left:0;/);
-  assert.match(scss, /comment-reaction-picker-toggle\s*\{[^}]*place-items:\s*center/);
-  assert.match(scss, /comment-reaction-picker-face\s*\{[^}]*line-height:\s*1[^}]*transform:\s*translateY\(-1px\)/);
+  assert.match(scss, /&-reaction-picker-toggle\s*\{[^}]*place-items:\s*center/);
+  assert.match(scss, /&-reaction-picker-face\s*\{[^}]*line-height:\s*1[^}]*transform:\s*translateY\(-1px\)/);
 });
 
 test('führt eine Eintragskarte zur Originalseite und übergibt die Eintragskennung', () => {
@@ -841,7 +841,7 @@ test('färbt das Website-Symbol in Prioritätsfarbe und zeigt es immer als Fehle
   assert.match(scss, /@keyframes kw-masha-feedly-marker-in \{ from \{ opacity: 0; \} to \{ opacity: 1; \} \}/);
   assert.match(scss, /\.kw-masha-feedly__page-marker:focus-visible\s*\{[^}]*outline-color: var\(--masha-feedly-priority-color/);
   assert.match(scss, /\.kw-masha-feedly__page-marker:focus-visible\s*\{[^}]*box-shadow: 0 0 0 6px color-mix\(in srgb, var\(--masha-feedly-priority-color/);
-  assert.match(scss, /:focus-visible:not\(\.kw-masha-feedly__page-marker\)\s*\{[^}]*outline-color: #334155/);
+  assert.match(scss, /:focus-visible:not\(\.kw-masha-feedly__page-marker\)\s*\{[^}]*outline-color: \$masha-color-334155/);
   assert.match(compiledStyles, /\.kw-masha-feedly\[data-theme=serious\] :focus-visible:not\(\.kw-masha-feedly__page-marker\)\{outline-color:#334155/);
   assert.match(compiledStyles, /\.kw-masha-feedly__page-marker:focus-visible\{outline-color:var\(--masha-feedly-priority-color/);
 });
@@ -852,7 +852,7 @@ test('ausgeliefertes JavaScript entspricht der getesteten Quelldatei', () => {
 
 test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widget-Stilen aus', () => {
   assert.match(widgetTemplate, /saved-view-select[\s\S]*?<details class="kw-masha-feedly__saved-views-details">[\s\S]*?SAVED_VIEW_DETAILS[\s\S]*?data-masha-feedly-saved-views/);
-  assert.match(scss, /\.kw-masha-feedly__comment-form textarea \{ font-size: 18px; line-height: 1\.5; \}/);
+  assert.match(scss, /&__comment-form textarea \{ font-size: 18px; line-height: 1\.5; \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__comment-form textarea\{font-size:18px;line-height:1\.5\}/);
   assert.match(scss, /\.kw-masha-feedly__toggle\s*\{\s*right: 0;\s*bottom: 28px;[\s\S]*?width: var\(--kw-feedly-panel-width, 64px\);\s*max-width: 100vw;\s*margin-right: 0;\s*height: 64px;[\s\S]*?border-radius: 16px 0 0 16px;/);
   assert.match(scss, /\.kw-masha-feedly__toggle:hover,[\s\S]*?\.kw-masha-feedly__toggle:focus-visible\s*\{\s*animation: kw-masha-feedly-toggle-sway 460ms ease-in-out; transform-origin: right center;/);
@@ -866,7 +866,7 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__attachment-field\s*\{ position: relative; display: grid; grid-template-columns: 49\.6px/);
   assert.match(scss, /\.kw-masha-feedly__entry-attachments img\s*\{ display: block; max-width: 100%;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__entry-attachments img\{display:block;max-width:100%/);
-  assert.match(scss, /\.kw-masha-feedly__entry-description a, \.kw-masha-feedly__entry-card p a, \.kw-masha-feedly__comment p a\s*\{ color: #9e1c60; text-decoration: underline;/);
+  assert.match(scss, /\.kw-masha-feedly__entry-description a, \.kw-masha-feedly__entry-card p a, \.kw-masha-feedly__comment p a\s*\{ color: \$masha-color-9e1c60; text-decoration: underline;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__entry-description a,\.kw-masha-feedly__entry-card p a,\.kw-masha-feedly__comment p a\{color:#9e1c60/);
   assert.match(scss, /\.kw-masha-feedly__entry-description\s*\{[^}]*font-size:\s*calc\(24px \* var\(--masha-font-scale, 1\)\)/s);
   assert.match(scss, /kw-masha-feedly-fan-from-under/);
@@ -877,13 +877,13 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__rainbow \{ position: relative; display: grid; place-items: center;/);
   assert.match(scss, /kw-masha-feedly__rainbow-copy\[hidden\]/);
   assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button \{[^}]*border-radius: 14px;/);
-  assert.match(scss, /\.kw-masha-feedly__rainbow \{[^}]*background: linear-gradient\(145deg, #fff 18%, #fff8fc 68%, #f5fbff\)/);
+  assert.match(scss, /\.kw-masha-feedly__rainbow \{[^}]*background: linear-gradient\(145deg, \$masha-color-fff 18%, \$masha-color-fff8fc 68%, \$masha-color-f5fbff\)/);
   assert.match(scss, /\.kw-masha-feedly__rainbow-icon \{ display: block; width: 38px; height: 38px;/);
   assert.match(scss, /\.kw-masha-feedly__help-button \{ font-size: 36px; \}/);
   assert.match(scss, /\.kw-masha-feedly__column \{ gap: 8px; \}/);
   assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button:hover,[\s\S]*?\.kw-masha-feedly__action-icon-button:focus-visible,[\s\S]*?\.kw-masha-feedly__action-icon-button\[aria-expanded="true"\] \{ z-index: 7; transform: translateY\(-3px\);/);
-  assert.match(scss, /\.kw-masha-feedly__assignee-choice:hover \.kw-masha-feedly__assignee-avatar \{ outline: 3px solid #e8a4c5; outline-offset: 2px; transform: translateY\(-3px\) scale\(1\.16\); box-shadow:/);
-  assert.match(scss, /\.kw-masha-feedly__assignee-choice:hover input:checked \+ \.kw-masha-feedly__assignee-avatar \{ outline-color: #e6007e; box-shadow: 0 0 0 3px #e6007e/);
+  assert.match(scss, /\.kw-masha-feedly__assignee-choice:hover \.kw-masha-feedly__assignee-avatar \{ outline: 3px solid \$masha-color-e8a4c5; outline-offset: 2px; transform: translateY\(-3px\) scale\(1\.16\); box-shadow:/);
+  assert.match(scss, /\.kw-masha-feedly__assignee-choice:hover input:checked \+ \.kw-masha-feedly__assignee-avatar \{ outline-color: \$masha-color-e6007e; box-shadow: 0 0 0 3px \$masha-color-e6007e/);
   assert.match(scss, /prefers-reduced-motion: reduce\) \{ \.kw-masha-feedly__assignee-avatar \{ transition: none;/);
   assert.match(scss, /\.kw-masha-feedly__help-button:hover,[\s\S]*?\.kw-masha-feedly__help-button:focus-visible \{ z-index: 7; transform: translateY\(-3px\);/);
   assert.match(scss, /\.kw-masha-feedly__rainbow-copy \{ position: absolute; z-index: 3;/);
@@ -901,7 +901,7 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__entry-environment-details > summary \{ overflow-wrap: anywhere; \}/);
   assert.match(scss, /\.kw-masha-feedly__entries-dialog > \.kw-masha-feedly__dialog-header,[\s\S]*?\.kw-masha-feedly__entries-list \{ padding-right: 160px; \}/);
   assert.match(scss, /\.kw-masha-feedly__entries-modal \{ width: 528px; \}/);
-  assert.match(scss, /@media \(max-width: 76rem\) \{[\s\S]*?\.kw-masha-feedly__entries-list \{ padding-right: 112px; \}/);
+  assert.match(scss, /@media \(max-width: \$masha-breakpoint-wide\) \{[\s\S]*?\.kw-masha-feedly__entries-list \{ padding-right: 112px; \}/);
   assert.match(scss, /\.kw-masha-feedly__entries-modal \{ width: calc\(33vw \+ 48px\); \}/);
   assert.match(scss, /\.kw-masha-feedly__actions\s*\{ flex-direction: column; align-items: center; gap: 16px;/);
   assert.match(scss, /\.kw-masha-feedly__add\s*\{ display: flex; width: 100%; min-height: 112px; height: 112px; flex: 0 0 112px; box-sizing: border-box; align-items: center; justify-content: center;/);
@@ -912,8 +912,8 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__closed-button\s*\{ display: flex; width: 100%; min-height: 72px;/);
   assert.match(scss, /\.kw-masha-feedly__edit-modal,[\s\S]*?data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ width: min\(688px, calc\(100vw - 576px\)\); \}/);
   assert.match(scss, /\.kw-masha-feedly__edit-dialog > \.kw-masha-feedly__dialog-header,[\s\S]*?\.kw-masha-feedly__edit-dialog > form \{ padding-right: 256px; \}/);
-  assert.match(scss, /@media \(max-width: 76rem\) \{[\s\S]*?padding-right: clamp\(96px, 9vw, 128px\); \}/);
-  assert.match(scss, /@media \(max-width: 40rem\) \{[\s\S]*?padding-right: 20px; \}/);
+  assert.match(scss, /@media \(max-width: \$masha-breakpoint-wide\) \{[\s\S]*?padding-right: clamp\(96px, 9vw, 128px\); \}/);
+  assert.match(scss, /@media \(max-width: \$masha-breakpoint-mobile\) \{[\s\S]*?padding-right: 20px; \}/);
   assert.match(scss, /data-success-visible="true"\]\[data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ width: min\(688px, calc\(100vw - 688px\)\); \}/);
   assert.match(scss, /\.kw-masha-feedly\[data-edit-open="true"\] \.kw-masha-feedly__entries-modal \{ visibility: hidden; \}/);
   assert.match(scss, /\.kw-masha-feedly__add > svg \{ width: 60px; height: 60px; \}/);
@@ -948,42 +948,42 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /--kw-feedly-panel-width:\s*clamp\(240px, 18vw, 272px\)/);
   assert.match(scss, /--kw-feedly-list-width:\s*clamp\(320px, 30vw, 480px\)/);
   assert.match(scss, /--kw-feedly-edit-width:\s*clamp\(360px, 34vw, 560px\)/);
-  assert.match(scss, /@media \(max-width: 40rem\) \{[\s\S]*?--kw-feedly-panel-width: min\(82vw, 272px\); --kw-feedly-list-width: 100vw; --kw-feedly-edit-width: 100vw;/);
+  assert.match(scss, /@media \(max-width: \$masha-breakpoint-mobile\) \{[\s\S]*?--kw-feedly-panel-width: min\(82vw, 272px\); --kw-feedly-list-width: 100vw; --kw-feedly-edit-width: 100vw;/);
   assert.match(scss, /--kw-feedly-panel-width:\s*clamp\(200px, 15vw, 224px\)/);
   assert.match(scss, /__actions > \.kw-masha-feedly__add \{ min-height: 72px; height: 72px;/);
   assert.match(scss, /__actions > \.kw-masha-feedly__news-button,[\s\S]*?min-height: 56px; height: 56px;/);
   assert.match(scss, /--kw-feedly-panel-width:\s*clamp\(64px, 4\.5vw, 76px\)/);
   assert.match(scss, /__actions > \.kw-masha-feedly__add,[\s\S]*?width: 56px; min-width: 56px; min-height: 56px; height: 56px;/);
-  assert.match(scss, /__count-button strong \{ position: absolute; top: -5px; right: -5px; display: grid; min-width: 20px; width: auto; height: 20px;[\s\S]*?border-radius: 999px; background: #39882d;/);
+  assert.match(scss, /__count-button strong \{ position: absolute; top: -5px; right: -5px; display: grid; min-width: 20px; width: auto; height: 20px;[\s\S]*?border-radius: 999px; background: \$masha-color-39882d;/);
   assert.match(scss, /\.kw-masha-feedly__entries-toolbar,[\s\S]*?padding-right:\s*32px;/);
   assert.match(scss, /\.kw-masha-feedly__edit-dialog > form,[\s\S]*?padding-right:\s*40px;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__entries-toolbar\{display:grid/);
   assert.match(compiledStyles, /\.kw-masha-feedly__edit-dialog>form,[\s\S]*?padding-right:\s*40px/);
-  assert.match(scss, /\.kw-masha-feedly__comment-edited\s*\{ display: inline-block;/);
+  assert.match(scss, /&-edited\s*\{ display: inline-block;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__comment-edited\{display:inline-block/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-shade\s*\{ position: fixed; z-index: 9999;/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-shade\s*\{ position: fixed; z-index: 9999;/);
   assert.match(scss, /\.kw-masha-feedly__help-modal \{ z-index: 10020; \}/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-modal \{ z-index: 10020; \}/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-tip \{ position: fixed; z-index: 10021;/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-modal \{ z-index: 10020; \}/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-tip \{ position: fixed; z-index: 10021;/);
   assert.match(scss, /\.kw-masha-feedly\s*\{[\s\S]*?z-index: 2147483000;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__help-modal\{z-index:10020\}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-modal\{z-index:10020\}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-tip\{position:fixed;z-index:10021/);
   assert.match(compiledStyles, /\.kw-masha-feedly\{[^}]*z-index:2147483000/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-tip\.is-feedback\s*\{ border-color: #d51b43;/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-tip\.is-feedback\s*\{ border-color: \$masha-color-d51b43;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-shade\{position:fixed;z-index:9999/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-tip\.is-feedback\{border-color:#d51b43/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-logo \{ display: block; width: 52px;/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-logo \{ display: block; width: 52px;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-logo\{display:block;width:52px/);
   assert.match(widgetTemplate, /kw-masha-feedly__onboarding-welcome-header[\s\S]*?kw-masha-feedly__onboarding-logo--welcome/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-welcome-header \{ align-items: center;/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-welcome-header \{ align-items: center;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-welcome-header\{align-items:center;justify-content:flex-start;gap:12px\}/);
   assert.match(germanTranslations, /TOUR_WELCOME_TEXT: .*ohne erst eine E-Mail zu schreiben/);
   assert.match(germanTranslations, /TOUR_WELCOME_WORKFLOW: .*Verantwortliche.*kommentieren.*erledigt/);
   assert.match(widgetTemplate, /Translations\.TOUR_WELCOME_WORKFLOW/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-logo--welcome \{ width: clamp\(72px, 5vw, 84px\); height: clamp\(72px, 5vw, 84px\); \}/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-logo--welcome \{ width: clamp\(72px, 5vw, 84px\); height: clamp\(72px, 5vw, 84px\); \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-logo--welcome\{width:clamp\(72px,5vw,84px\);height:clamp\(72px,5vw,84px\)\}/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-modal a\.kw-masha-feedly__submit \{ display: inline-flex;/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-modal a\.kw-masha-feedly__submit \{ display: inline-flex;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-modal a\.kw-masha-feedly__submit\{display:inline-flex/);
 });
 
@@ -1012,7 +1012,7 @@ test('zeigt den gestalteten Upload in Erstellung und Bearbeitung mit dem Upload-
 
 test('liefert den Feedback-Button mit Wartetext, zugänglichem Label und passendem Symbol aus', () => {
   assert.match(widgetTemplate, /data-masha-feedly-open-feedback/);
-  assert.match(widgetTemplate, /data-masha-feedly-open-page-list aria-label="[^"]*"><svg class="kw-masha-feedly__page-icon" aria-hidden="true" viewBox="0 0 512 512" focusable="false"><path d="m446\.605 124\.392-/);
+  assert.match(widgetTemplate, /data-masha-feedly-open-page-list[^\n]*? aria-label="[^"]*"><svg class="kw-masha-feedly__page-icon" aria-hidden="true" viewBox="0 0 512 512" focusable="false"><path d="m446\.605 124\.392-/);
   assert.match(widgetTemplate, /class="kw-masha-feedly__feedback-button kw-masha-feedly__action-icon-button"[^\n]*hidden/);
   assert.match(widgetTemplate, /data-masha-feedly-feedback-count/);
   assert.match(widgetTemplate, /viewBox="0 0 512 512" aria-hidden="true" focusable="false"><path d="M117\.333 149\.333H352/);
@@ -1061,7 +1061,7 @@ test('zeigt das Prioritätssymbol im Kopf des geöffneten Eintrags an', () => {
   assert.match(scss, /\.kw-masha-feedly__edit-header-actions \{ display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-left: auto; \}/);
   assert.match(scss, /\.kw-masha-feedly__dialog-header \{[^}]*align-items: center;/);
   assert.match(scss, /\.kw-masha-feedly__dialog-header \{ padding: 23\.2px 30\.4px; \}/);
-  assert.match(scss, /\.kw-masha-feedly__close:hover \{ border-color: #e6007e; background: #e6007e; color: #fff; box-shadow:/);
+  assert.match(scss, /\.kw-masha-feedly__close:hover \{ border-color: \$masha-color-e6007e; background: \$masha-color-e6007e; color: \$masha-color-fff; box-shadow:/);
   assert.doesNotMatch(scss, /\.kw-masha-feedly__close:hover \{ transform: rotate\(90deg\)/);
   assert.match(scss, /\.kw-masha-feedly__close \{[^}]*place-items: center; padding: 0;/);
   assert.match(scss, /\.kw-masha-feedly__dialog-header \.kw-masha-feedly__close \{[^}]*padding: 0;/);
@@ -1924,10 +1924,10 @@ test('zeigt den Neustart der Einführung unten in der Hilfe als gestalteten Butt
   assert.match(widgetTemplate, /class="kw-masha-feedly__secondary kw-masha-feedly__help-restart-button" data-masha-feedly-restart-onboarding/);
   assert.match(widgetTemplate, /<\/div>\s*<div class="kw-masha-feedly__help-restart">[\s\S]*?data-masha-feedly-restart-onboarding[\s\S]*?data-masha-feedly-restart-status/);
   assert.match(scss, /\.kw-masha-feedly__help-restart-button:focus-visible/);
-  assert.match(scss, /\.kw-masha-feedly__help-modal > \.kw-masha-feedly__dialog \{ display: grid; grid-template-rows: auto minmax\(0, 1fr\) auto;/);
+  assert.match(scss, /&__help-modal > \.kw-masha-feedly__dialog \{ display: flex; flex-direction: column;[^}]*max-height: calc\(100dvh - 40px\); min-height: 0; overflow: hidden;/);
   assert.match(scss, /\.kw-masha-feedly__help-restart \{ margin: 0; padding: 14px/);
   assert.match(compiledStyles, /\.kw-masha-feedly__help-restart-button:focus-visible/);
-  assert.match(compiledStyles, /\.kw-masha-feedly__help-modal>\.kw-masha-feedly__dialog\{display:grid;grid-template-rows:auto minmax\(0, 1fr\) auto/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__help-modal>\.kw-masha-feedly__dialog\{display:flex;flex-direction:column;[^}]*max-height:calc\(100dvh - 40px\);min-height:0;overflow:hidden/);
 });
 
 test('erklärt Einträge in einfacher Sprache mit einem Markierungsbeispiel', () => {
