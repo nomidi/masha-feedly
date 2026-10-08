@@ -73,7 +73,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertStringContainsString('Projekt Wolke', (string)$mailer->messages[0]->findPlainPart()->getBody());
             $this->assertStringContainsString('Impressum:', (string)$mailer->messages[0]->findPlainPart()->getBody());
             $this->assertStringContainsString('E-Mail-Einstellungen ändern:', (string)$mailer->messages[0]->findPlainPart()->getBody());
-            $this->assertStringContainsString('automatische E-Mail, weil du solche Benachrichtigungen aktiviert hast', (string)$mailer->messages[0]->findPlainPart()->getBody());
+            $this->assertStringContainsString('Du erhältst diese automatische E-Mail, weil du solche Benachrichtigungen aktiviert hast.', (string)$mailer->messages[0]->findPlainPart()->getBody());
             $this->assertStringContainsString('Kontakt: example@example.test · Kennung: TEST-123', (string)$mailer->messages[0]->findPlainPart()->getBody());
             $this->assertSame(1, substr_count((string)$mailer->messages[0]->findPlainPart()->getBody(), 'Kennung:'));
         } finally {

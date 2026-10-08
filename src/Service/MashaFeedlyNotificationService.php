@@ -43,7 +43,7 @@ class MashaFeedlyNotificationService
             )),
             'EmailProfileURL' => $profileURL,
             'EmailImprintURL' => 'https://www.kooperative-web.de/impressum',
-            'EmailOptOutText' => i18n::_t(
+            'EmailFooterOptOutText' => i18n::_t(
                 $isFormal ? 'KW\\MashaFeedly\\Translations.EMAIL_FOOTER_OPT_OUT_SIE' : 'KW\\MashaFeedly\\Translations.EMAIL_FOOTER_OPT_OUT_DU',
                 $isFormal
                     ? 'Möchten Sie keine Statusmeldungen per E-Mail mehr erhalten? Passen Sie Ihre Auswahl in Ihrem Profil an.'

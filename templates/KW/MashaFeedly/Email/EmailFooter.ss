@@ -2,6 +2,6 @@
     <tr><td style="padding:12px 14px;border-left:3px solid #e6007e;background:#faf8fc">
         <p style="margin:0 0 8px;font-weight:600;color:#51485a"><% loop $EmailFooterLines %>$Text.XML<br><% end_loop %></p>
         <p style="margin:0 0 6px"><a href="$EmailImprintURL.XML" style="color:#7150b5;text-decoration:underline"><%t KW\MashaFeedly\Translations.EMAIL_FOOTER_IMPRINT "Impressum" %></a></p>
-        <p style="margin:0">$EmailOptOutText.XML<br><a href="$EmailProfileURL.XML" style="color:#7150b5;text-decoration:underline"><%t KW\MashaFeedly\Translations.EMAIL_FOOTER_PROFILE_LINK "E-Mail-Einstellungen ändern" %></a></p>
+        <p style="margin:0">$EmailFooterOptOutText.XML<br><a href="$EmailProfileURL.XML" style="color:#7150b5;text-decoration:underline"><%t KW\MashaFeedly\Translations.EMAIL_FOOTER_PROFILE_LINK "E-Mail-Einstellungen ändern" %></a></p>
     </td></tr>
 </table>
