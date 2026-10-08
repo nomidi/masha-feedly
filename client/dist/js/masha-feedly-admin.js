@@ -21,7 +21,7 @@
     const selectedTheme = themeField?.value || 'playful';
     document.querySelectorAll('[data-masha-feedly-animation-preview-card]').forEach((card) => {
       const categories = (card.dataset.mashaFeedlyCategories || '').split(',').filter(Boolean);
-      card.hidden = categories.length > 0 && !categories.includes(selectedTheme);
+      card.hidden = (categories.length > 0 && !categories.includes(selectedTheme));
     });
   };
 
@@ -124,6 +124,7 @@
           card.className = 'masha-feedly-animation-preview';
           card.setAttribute('data-masha-feedly-animation-preview-card', '');
           card.dataset.mashaFeedlyCategories = effect.categories.join(',');
+          card.dataset.hasSound = effect.hasSound ? '1' : '0';
           const title = document.createElement('strong'); title.textContent = effect.name;
           const button = document.createElement('button'); button.type = 'button';
           button.dataset.mashaFeedlyAnimationPreview = effect.id;
@@ -150,7 +151,10 @@
   document.addEventListener('kw-masha-feedly:opened', loadEffectPreviews);
 
   document.addEventListener('change', (event) => {
-    if (event.target?.matches?.('select[name="MashaFeedlyTheme"]')) applyAnimationTheme();
+    if ((event.target?.matches?.('select[name="MashaFeedlyTheme"]') || event.target?.matches?.('input[name="MashaFeedlyDisableSoundEffects"]'))) {
+      window.KWMashaFeedlyEffects?.cancelActive();
+      applyAnimationTheme();
+    }
     if (event.target?.matches?.('input[name="MashaFeedlyMiteEnabled"][type="checkbox"]')) applyMiteConfiguration();
   }, true);
   if (document.readyState === 'loading') {

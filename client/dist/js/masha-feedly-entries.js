@@ -231,6 +231,9 @@ window.KWMashaFeedlyEntries = (() => {
     assignedMemberIDs: (entry.assignedMemberIDs || []).map(Number),
     context: t('ENTRY_CONTEXT_STATUS', { status: entry.categoryTitle || t('ENTRY_WITHOUT_CATEGORY') }),
     description: entry.content || t('ENTRY_NO_DESCRIPTION'),
+    stepsToReproduce: entry.stepsToReproduce || '',
+    expectedResult: entry.expectedResult || '',
+    actualResult: entry.actualResult || '',
     assignees: entry.assignees || [],
   });
 
@@ -660,6 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const editContext = widget.querySelector('[data-masha-feedly-edit-context]');
   const editRelations = widget.querySelector('[data-masha-feedly-edit-relations]');
   const editDescription = widget.querySelector('[data-masha-feedly-edit-description]');
+  const editDiagnostics = widget.querySelector('[data-masha-feedly-edit-diagnostics]');
   const editAttachments = widget.querySelector('[data-masha-feedly-edit-attachments]');
   const editEnvironment = widget.querySelector('[data-masha-feedly-edit-environment]');
   const editEnvironmentDetails = widget.querySelector('[data-masha-feedly-edit-environment-details]');
@@ -962,6 +966,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (commentForm?.elements.EntryID) commentForm.elements.EntryID.value = String(editable.id);
     editForm.elements.CategoryID.value = String(editable.categoryID);
     editForm.elements.PriorityID.value = String(editable.priorityID);
+    ['StepsToReproduce', 'ExpectedResult', 'ActualResult'].forEach((name) => {
+      const key = { StepsToReproduce: 'stepsToReproduce', ExpectedResult: 'expectedResult', ActualResult: 'actualResult' }[name];
+      if (editForm.elements[name]) editForm.elements[name].value = editable[key] || '';
+    });
+    if (editDiagnostics) {
+      const hasDiagnostics = Boolean(editable.stepsToReproduce || editable.expectedResult || editable.actualResult);
+      editDiagnostics.hidden = !hasDiagnostics;
+      editDiagnostics.open = hasDiagnostics;
+      [editForm.elements.StepsToReproduce, editForm.elements.ExpectedResult, editForm.elements.ActualResult].forEach((field) => {
+        if (field) field.disabled = false;
+      });
+    }
     if (editForm.elements.DueDate) editForm.elements.DueDate.value = editable.dueDate;
     renderEstimate(entry);
     editHeading.textContent = t('ENTRY_NUMBER', { id: editable.id });
@@ -985,7 +1001,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .map((candidate) => {
           const option = document.createElement('option');
           option.value = String(candidate.id);
-          option.textContent = `#${candidate.id} · ${candidate.title || candidate.content || 'Eintrag'}`;
+          option.textContent = `#${candidate.id} · ${candidate.title || candidate.content || 'Meldung'}`;
           option.dataset.search = `${candidate.title || ''} ${candidate.content || ''} ${candidate.categoryTitle || ''}`.toLocaleLowerCase('de');
           option.selected = linkedIDs.has(Number(candidate.id));
           return option;
@@ -1040,7 +1056,7 @@ document.addEventListener('DOMContentLoaded', () => {
         relatedEntries.replaceChildren(...window.KWMashaFeedlyEntries.relatedEntryOptions(relationCandidates, activeEntry).map((candidate) => {
           const option = document.createElement('option');
           option.value = String(candidate.id);
-          option.textContent = `#${candidate.id} · ${candidate.title || candidate.content || 'Eintrag'}`;
+          option.textContent = `#${candidate.id} · ${candidate.title || candidate.content || 'Meldung'}`;
           option.dataset.search = `${candidate.title || ''} ${candidate.content || ''} ${candidate.categoryTitle || ''}`.toLocaleLowerCase('de');
           option.selected = selectedIDs.has(Number(candidate.id)) || (activeEntry.relations || []).some((relation) => relation.direction !== 'incoming' && Number(relation.id) === Number(candidate.id));
           return option;
@@ -1811,6 +1827,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activeEntry && Object.hasOwn(result, 'dueDate')) {
         activeEntry.dueDate = result.dueDate || '';
         if (editForm.elements.DueDate) editForm.elements.DueDate.value = activeEntry.dueDate;
+      }
+      if (activeEntry) {
+        activeEntry.stepsToReproduce = editForm.elements.StepsToReproduce?.value || '';
+        activeEntry.expectedResult = editForm.elements.ExpectedResult?.value || '';
+        activeEntry.actualResult = editForm.elements.ActualResult?.value || '';
+        if (editDiagnostics) editDiagnostics.hidden = !Boolean(activeEntry.stepsToReproduce || activeEntry.expectedResult || activeEntry.actualResult);
       }
       if (activeEntry && Object.hasOwn(result, 'estimateAmount')) {
         activeEntry = {

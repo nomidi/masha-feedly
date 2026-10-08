@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const welcomeDialog = welcome?.querySelector('[role="dialog"]');
   const start = widget.querySelector('[data-masha-feedly-tour-start]');
   const skip = widget.querySelector('[data-masha-feedly-tour-skip]');
+  const mobileClose = widget.querySelector('[data-masha-feedly-tour-mobile-close]');
   const restart = widget.querySelector('[data-masha-feedly-restart-onboarding]');
   const restartStatus = widget.querySelector('[data-masha-feedly-restart-status]');
   const tip = widget.querySelector('[data-masha-feedly-onboarding-tip]');
@@ -15,7 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const tipText = widget.querySelector('[data-masha-feedly-onboarding-text]');
   const selectionMessage = widget.querySelector('[data-masha-feedly-selection-message]');
   const cancelSelectionButton = widget.querySelector('[data-masha-feedly-cancel-selection]');
-  const t = (key, values = {}) => window.KWMashaFeedlyTranslate(key, values);
+  const t = (key, values = {}) => window.KWMashaFeedlyTranslate(
+    widget.dataset.address === 'sie' && window.KWMashaFeedlyTranslations?.[`${key}_SIE`] ? `${key}_SIE` : key,
+    values,
+  );
   const shade = document.createElement('div');
   shade.className = 'kw-masha-feedly__onboarding-shade';
   shade.hidden = true;
@@ -33,6 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Schritt neu aufnehmen, könnten bereits gesperrte Felder dauerhaft
   // deaktiviert bleiben, wenn der nächste Schritt dieselben Felder freigibt.
   const originalControlStates = new Map();
+
+  widget.querySelectorAll('[data-masha-feedly-address-copy]').forEach((element) => {
+    element.textContent = t(element.dataset.mashaFeedlyAddressCopy);
+  });
 
   const matches = (element, selector) => element?.closest?.(selector)
     || (element?.matches?.(selector) ? element : null);
@@ -105,6 +113,40 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
+  /** Liest den SCSS-Breakpoint am Widget, auch wenn Dialoge gerade ausgeblendet sind. */
+  const isCompactViewport = () => {
+    return window.getComputedStyle?.(widget)?.getPropertyValue('--masha-mobile-layout').trim() === '1';
+  };
+  let compactViewport = isCompactViewport();
+
+  /** Schließt Fenster nur beim Wechsel der Variante; normale Größenänderungen behalten die Ansicht. */
+  const adaptTourToViewport = () => {
+    const compact = isCompactViewport();
+    if (compact === compactViewport) return;
+    compactViewport = compact;
+    const restartTour = !finished;
+    // Bereichsauswahl und Tour-Sperren lösen, ohne einen Abschluss an den Server zu melden.
+    step = 'welcome';
+    window.clearTimeout(feedbackTimer);
+    restoreControls();
+    cancelSelectionButton?.click();
+    widget.querySelector('.kw-masha-feedly__panel .kw-masha-feedly__close')?.click();
+    ['[data-masha-feedly-modal]', '[data-masha-feedly-entries-modal]', '[data-masha-feedly-edit-modal]', '[data-masha-feedly-help-modal]', '[data-masha-feedly-avatar-icon-dialog]']
+      .forEach((selector) => { const modal = widget.querySelector(selector); if (modal) modal.hidden = true; });
+    tip.hidden = true;
+    thanks.hidden = true;
+    shade.hidden = true;
+    spotlights.forEach((element) => element.classList?.remove('is-onboarding-target'));
+    spotlights = [];
+    window.KWMashaFeedlyEffects?.cancelActive();
+    if (restartTour) beginTour();
+    else {
+      welcome.hidden = true;
+      widget.querySelector('.kw-masha-feedly__toggle')?.focus?.();
+    }
+  };
+  window.addEventListener?.('resize', adaptTourToViewport);
+
   const beginTour = () => {
     finished = false;
     step = 'welcome';
@@ -116,7 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     spotlights.forEach((element) => element.classList?.remove('is-onboarding-target'));
     restoreControls();
     spotlights = [];
-    widget.querySelector('[data-masha-feedly-tour-start]')?.focus?.();
+    (mobileClose && mobileClose.getClientRects?.().length ? mobileClose : start)?.focus?.();
   };
 
   const complete = (showThanks = false, deferred = false) => {
@@ -145,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const preferencesForm = widget.querySelector('[data-masha-feedly-profile-preferences]');
+  preferencesForm?.querySelector('input[name="MashaFeedlyDisableSoundEffects"]')?.addEventListener('change', () => window.KWMashaFeedlyEffects?.cancelActive());
   const emailMaster = preferencesForm?.querySelector('[data-masha-feedly-email-master]');
   const updateEmailOptionsState = () => preferencesForm?.querySelectorAll('[data-masha-feedly-email-option]')
     .forEach((option) => { option.disabled = !emailMaster?.checked; });
@@ -211,6 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(result.message || t('TOUR_PREFERENCES_ERROR'));
       }
       if (result.theme) widget.dataset.theme = result.theme;
+      if (typeof result.disableSoundEffects === 'boolean') widget.dataset.disableSoundEffects = result.disableSoundEffects ? '1' : '0';
       status.textContent = result.message || t('TOUR_PREFERENCES_SAVED');
     } catch (error) {
       status.textContent = error instanceof Error && error.message !== 'Failed to fetch'
@@ -327,7 +371,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }, true);
 
   welcome.hidden = widget.dataset.onboardingEnabled !== '1';
-  if (!welcome.hidden) widget.querySelector('[data-masha-feedly-tour-start]')?.focus?.();
+  if (!welcome.hidden) (mobileClose && mobileClose.getClientRects?.().length ? mobileClose : start)?.focus?.();
   start?.addEventListener('click', () => {
     // Neustart aus der Hilfe kann bei geöffnetem Feedly-Fenster erfolgen.
     // Für Schritt 1 muss das Symbol wieder als klares Ziel sichtbar sein.
@@ -365,6 +409,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   skip?.addEventListener('click', () => complete(false, true));
   widget.querySelector('[data-masha-feedly-tour-end]')?.addEventListener('click', () => complete());
+  // OK verschiebt die Einführung; Abbrechen beendet sie dauerhaft.
+  mobileClose?.addEventListener('click', () => complete(false, true));
   widget.querySelector('[data-masha-feedly-tour-cancel]')?.addEventListener('click', () => complete());
   widget.querySelector('[data-masha-feedly-thanks-close]')?.addEventListener('click', () => {
     thanks.hidden = true;

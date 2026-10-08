@@ -25,7 +25,7 @@ function renderWidget(frameElement = null, captureEvents = false) {
     ['.kw-masha-feedly__panel', { set hidden(value) { this.isHidden = value; } }],
     ['.kw-masha-feedly__close', { addEventListener() {} }],
   ]);
-  const triggerAttributes = new Map([['aria-label', 'Offene Fehler auf der gesamten Website ansehen'], ['aria-describedby', 'vorhandene-hilfe']]);
+  const triggerAttributes = new Map([['aria-label', 'Offene Meldungen auf der gesamten Website ansehen'], ['aria-describedby', 'vorhandene-hilfe']]);
   const trigger = {
     closest(selector) { return selector.includes('kw-masha-feedly__count-button') ? this : null; },
     contains() { return false; },
@@ -124,7 +124,7 @@ test('blendet einen vollständig im Viewport platzierten Tooltip ein und stellt 
   state.dispatch('pointerover', { target: state.trigger });
 
   assert.ok(state.tooltip);
-  assert.equal(state.tooltip.textContent, 'Offene Fehler auf der gesamten Website ansehen');
+  assert.equal(state.tooltip.textContent, 'Offene Meldungen auf der gesamten Website ansehen');
   assert.equal(state.tooltip['aria-hidden'], 'false');
   assert.ok(state.classes.has('is-left'));
   assert.ok(state.classes.has('is-visible'));

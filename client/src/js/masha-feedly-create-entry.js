@@ -80,11 +80,152 @@ document.addEventListener('DOMContentLoaded', () => {
   const toastMessage = widget.querySelector('[data-masha-feedly-save-message]');
   const contentField = form?.querySelector('[name="Content"]');
   const createCategory = form?.querySelector('[data-masha-feedly-create-category]');
+  const diagnosticsSection = form?.querySelector('[data-masha-feedly-diagnostics]');
+  const diagnosticsFields = ['StepsToReproduce', 'ExpectedResult', 'ActualResult'].map((name) => form?.elements[name]).filter(Boolean);
   const estimateSection = form?.querySelector('[data-masha-feedly-create-estimate]');
   const estimateDuration = form?.elements.EstimatedCostDuration;
   const estimateNote = form?.elements.EstimatedCostNote;
   const estimatePrice = estimateSection?.querySelector('[data-masha-feedly-estimate-price]');
+  const screenshotButton = form?.querySelector('[data-masha-feedly-screenshot-capture]');
+  const screenshotStatus = form?.querySelector('[data-masha-feedly-screenshot-status]');
+  const screenshotPreview = form?.querySelector('[data-masha-feedly-screenshot-preview]');
+  const screenshotImage = form?.querySelector('[data-masha-feedly-screenshot-image]');
+  const screenshotCropper = form?.querySelector('[data-masha-feedly-screenshot-cropper]');
+  const screenshotCrop = form?.querySelector('[data-masha-feedly-screenshot-crop]');
+  const screenshotApplyCrop = form?.querySelector('[data-masha-feedly-screenshot-apply]');
+  const screenshotRemove = form?.querySelector('[data-masha-feedly-screenshot-remove]');
+  let screenshotFile = null;
+  let screenshotPreviewURL = '';
+  let screenshotSourceURL = '';
+  let screenshotSelection = null;
   const t = (key, values = {}) => window.KWMashaFeedlyTranslate(key, values);
+  const clearScreenshot = () => {
+    screenshotFile = null;
+    if (screenshotPreviewURL) URL.revokeObjectURL(screenshotPreviewURL);
+    if (screenshotSourceURL) URL.revokeObjectURL(screenshotSourceURL);
+    screenshotPreviewURL = '';
+    screenshotSourceURL = '';
+    screenshotSelection = null;
+    if (screenshotImage) screenshotImage.src = '';
+    if (screenshotCrop) screenshotCrop.hidden = true;
+    if (screenshotApplyCrop) screenshotApplyCrop.disabled = true;
+    if (screenshotPreview) screenshotPreview.hidden = true;
+    if (screenshotStatus) screenshotStatus.textContent = '';
+  };
+  screenshotButton?.addEventListener('click', async () => {
+    if (!window.navigator.mediaDevices?.getDisplayMedia) {
+      screenshotStatus.textContent = t('SCREENSHOT_UNSUPPORTED');
+      return;
+    }
+    screenshotButton.disabled = true;
+    screenshotStatus.textContent = t('SCREENSHOT_PERMISSION');
+    const screenshotHost = document.querySelector('[data-masha-feedly-host]');
+    const previousHostHidden = screenshotHost?.hidden;
+    const screenshotSurface = window.KWMashaFeedlyDOM?.root?.().querySelector('[data-masha-feedly-surface]');
+    const previousSurfaceHidden = screenshotSurface?.hidden;
+    const previousWidgetHidden = widget.hidden;
+    if (screenshotHost) screenshotHost.hidden = true;
+    if (screenshotSurface) screenshotSurface.hidden = true;
+    else if (!screenshotHost) widget.hidden = true;
+    let stream;
+    try {
+      // Vor dem nativen Fensterauswahldialog muss der Browser die ausgeblendete Oberfläche rendern.
+      await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+      stream = await window.navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      await video.play();
+      await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      if (!canvas.width || !canvas.height) throw new Error('Für den Screenshot wurde kein Bild geliefert.');
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      const blob = await new Promise((resolve, reject) => canvas.toBlob((image) => image ? resolve(image) : reject(new Error('Der Screenshot konnte nicht erstellt werden.')), 'image/png'));
+      if (screenshotSourceURL) URL.revokeObjectURL(screenshotSourceURL);
+      screenshotSourceURL = URL.createObjectURL(blob);
+      screenshotImage.src = screenshotSourceURL;
+      screenshotFile = null;
+      screenshotSelection = null;
+      screenshotCrop.hidden = true;
+      screenshotApplyCrop.disabled = true;
+      screenshotPreview.hidden = false;
+      screenshotStatus.textContent = '';
+    } catch (error) {
+      screenshotStatus.textContent = error.name === 'NotAllowedError' ? t('SCREENSHOT_CANCELLED') : (error.message || t('SCREENSHOT_FAILED'));
+    } finally {
+      stream?.getTracks().forEach((track) => track.stop());
+      if (screenshotSurface) screenshotSurface.hidden = previousSurfaceHidden;
+      if (screenshotHost) screenshotHost.hidden = previousHostHidden;
+      else if (!screenshotSurface) widget.hidden = previousWidgetHidden;
+      screenshotButton.disabled = false;
+    }
+  });
+  screenshotCropper?.addEventListener('pointerdown', (event) => {
+    if (screenshotFile || !screenshotImage.naturalWidth || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    event.preventDefault();
+    const bounds = screenshotImage.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    const x = Math.max(0, Math.min(bounds.width, event.clientX - bounds.left));
+    const y = Math.max(0, Math.min(bounds.height, event.clientY - bounds.top));
+    if (!screenshotSelection || screenshotSelection.complete) {
+      screenshotSelection = { startX: x, startY: y, endX: x, endY: y, bounds, complete: false };
+      screenshotCrop.hidden = false;
+      screenshotApplyCrop.disabled = true;
+      return;
+    }
+    screenshotSelection.endX = x;
+    screenshotSelection.endY = y;
+    screenshotSelection.complete = true;
+    screenshotSelection.bounds = bounds;
+    screenshotApplyCrop.disabled = Math.abs(x - screenshotSelection.startX) < 12 || Math.abs(y - screenshotSelection.startY) < 12;
+    updateScreenshotCropFrame();
+  });
+  const updateScreenshotCropFrame = () => {
+    if (!screenshotSelection) return;
+    const { bounds, startX, startY, endX, endY } = screenshotSelection;
+    screenshotCrop.hidden = false;
+    screenshotCrop.style.left = `${Math.min(startX, endX) / bounds.width * 100}%`;
+    screenshotCrop.style.top = `${Math.min(startY, endY) / bounds.height * 100}%`;
+    screenshotCrop.style.width = `${Math.abs(endX - startX) / bounds.width * 100}%`;
+    screenshotCrop.style.height = `${Math.abs(endY - startY) / bounds.height * 100}%`;
+  };
+  screenshotCropper?.addEventListener('pointermove', (event) => {
+    if (!screenshotSelection || screenshotSelection.complete) return;
+    const bounds = screenshotImage.getBoundingClientRect();
+    const endX = Math.max(0, Math.min(bounds.width, event.clientX - bounds.left));
+    const endY = Math.max(0, Math.min(bounds.height, event.clientY - bounds.top));
+    screenshotSelection.endX = endX;
+    screenshotSelection.endY = endY;
+    screenshotSelection.bounds = bounds;
+    updateScreenshotCropFrame();
+  });
+  screenshotApplyCrop?.addEventListener('click', async () => {
+    if (!screenshotSelection || !screenshotImage.naturalWidth) return;
+    const { bounds, startX, startY, endX, endY } = screenshotSelection;
+    const scaleX = screenshotImage.naturalWidth / bounds.width;
+    const scaleY = screenshotImage.naturalHeight / bounds.height;
+    const left = Math.round(Math.min(startX, endX) * scaleX);
+    const top = Math.round(Math.min(startY, endY) * scaleY);
+    const width = Math.round(Math.abs(endX - startX) * scaleX);
+    const height = Math.round(Math.abs(endY - startY) * scaleY);
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(screenshotImage, left, top, width, height, 0, 0, width, height);
+    const blob = await new Promise((resolve, reject) => canvas.toBlob((image) => image ? resolve(image) : reject(new Error('Der Ausschnitt konnte nicht erstellt werden.')), 'image/png'));
+    screenshotFile = new File([blob], 'seiten-ausschnitt.png', { type: 'image/png' });
+    if (screenshotPreviewURL) URL.revokeObjectURL(screenshotPreviewURL);
+    screenshotPreviewURL = URL.createObjectURL(blob);
+    screenshotImage.src = screenshotPreviewURL;
+    if (screenshotSourceURL) URL.revokeObjectURL(screenshotSourceURL);
+    screenshotSourceURL = '';
+    screenshotCrop.hidden = true;
+    screenshotApplyCrop.disabled = true;
+    screenshotSelection = null;
+    screenshotStatus.textContent = t('SCREENSHOT_READY');
+  });
+  screenshotRemove?.addEventListener('click', clearScreenshot);
   const calculatePreview = (text) => {
     const match = String(text).trim().match(/^([0-9]+(?:[.,][0-9]+)?)(?:\s*(?:-|–|bis)\s*([0-9]+(?:[.,][0-9]+)?))?\s*(stunden?|std\.?|h|minuten?|min)$/i);
     if (!match) return '';
@@ -106,10 +247,19 @@ document.addEventListener('DOMContentLoaded', () => {
     [estimateDuration, estimateNote].forEach((field) => { if (field) field.disabled = !show; });
     if (estimatePrice) estimatePrice.textContent = show ? (calculatePreview(estimateDuration?.value || '') || (Number(widget.dataset.estimateHourlyRate) > 0 ? t('ESTIMATE_PRICE_HINT') : t('ESTIMATE_RATE_REQUIRED'))) : '';
   };
+  const updateDiagnostics = () => {
+    if (!diagnosticsSection) return;
+    const text = String(contentField?.value || '').toLocaleLowerCase('de');
+    const hasErrorSignal = /\b(fehler|fehlermeldung|bug|defekt|problem|funktioniert nicht|geht nicht|klappt nicht|störung|error|issue|broken|doesn.t work|not working)\b/i.test(text);
+    if (hasErrorSignal) diagnosticsSection.open = true;
+    diagnosticsFields.forEach((field) => { field.disabled = false; });
+  };
   createCategory?.addEventListener('change', updateCreateEstimate);
+  contentField?.addEventListener('input', updateDiagnostics);
   estimateDuration?.addEventListener('input', updateCreateEstimate);
-  form?.addEventListener('reset', () => setTimeout(updateCreateEstimate, 0));
+  form?.addEventListener('reset', () => setTimeout(() => { updateCreateEstimate(); updateDiagnostics(); }, 0));
   updateCreateEstimate();
+  updateDiagnostics();
   let selecting = false;
   let highlighted = null;
   const getElementSelector = window.KWMashaFeedlyEnvironment.getElementSelector;
@@ -258,6 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
     submit.disabled = true;
     status.textContent = t('CREATE_SAVING');
     const data = new FormData(form);
+    if (screenshotFile) data.append('Attachments[]', screenshotFile);
     data.set('SecurityID', form.dataset.securityId);
     let saveConfirmed = false;
     try {
@@ -288,6 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         detail: { entryID: Number(result.entryID) },
       }));
       form.reset();
+      clearScreenshot();
       setTimeout(() => { modal.hidden = true; toggleButton?.focus?.(); }, 500);
       setTimeout(() => { toast.hidden = true; }, 6000);
     } catch (error) {

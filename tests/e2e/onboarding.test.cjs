@@ -208,9 +208,21 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
         await selectedIcon.click();
         await expect(avatarPreview.locator('img')).toHaveAttribute('src', new RegExp(`/icon/${selectedIconID}/[^/]+/${expectedIconVariant}$`));
         await expect.poll(() => avatarPreview.locator('img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+        await expect(avatarPreview.locator('img')).toHaveCSS('padding', '12px');
+        const liveIconSize = await avatarPreview.locator('img').boundingBox();
+        assert.ok(liveIconSize.width <= 48 && liveIconSize.height <= 48, 'Ein neu gewähltes Symbol muss in der kompakten Vorschau bleiben.');
         await expect(preferences.locator('[name="MashaFeedlyAvatarIcon"]')).toHaveValue(selectedIconID);
       }
     }
+
+    const soundChoice = preferences.locator('[name="MashaFeedlyDisableSoundEffects"]');
+    await expect(soundChoice).toBeVisible();
+    const originalSoundChoice = await soundChoice.isChecked();
+    await soundChoice.check();
+    assert.equal(await page.evaluate(() => window.KWMashaFeedlyEffects.soundDisabled()), true);
+    await soundChoice.uncheck();
+    assert.equal(await page.evaluate(() => window.KWMashaFeedlyEffects.soundDisabled()), false);
+    await soundChoice.setChecked(originalSoundChoice);
 
     const profileResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/saveProfilePreferences'));
@@ -225,12 +237,13 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     }
     assert.equal(profileResponse.ok(), true, `Profileinstellungen speichern: ${profileResult.message || profileResponse.status()}`);
     assert.equal(profileResult.success, true, 'Der Server muss die Profileinstellungen bestätigen.');
+    assert.equal(profileResult.disableSoundEffects, originalSoundChoice);
     assert.equal(profileResult.theme, nextTheme || currentTheme || 'playful');
     if (nextColor) assert.equal(await colorField.inputValue(), nextColor.color);
     await expect(preferences.locator('[data-masha-feedly-profile-preferences-status]')).toContainText('gespeichert');
     await expect(widget.locator('[data-masha-feedly-thanks-close]')).toBeVisible();
     const profileLink = widget.locator('[data-masha-feedly-onboarding-thanks] [data-masha-feedly-profile-link]');
-    await expect(profileLink).toContainText('Theme einstellen');
+    await expect(profileLink).toContainText('Profileinstellungen öffnen');
     await profileLink.click();
     await page.waitForURL((url) => /myprofile\/?$/.test(url.pathname) && url.hash === '#Root_MashaFeedly');
     await expect(page).toHaveURL(/myprofile\/?#Root_MashaFeedly$/);
@@ -252,6 +265,9 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
       const profileIconVariant = await profileForm.locator('[data-masha-feedly-avatar-icons]').getAttribute('data-icon-color');
       await profileIconChoice.click();
       await expect(profilePreview.locator('img')).toHaveAttribute('src', new RegExp(`/icon/${profileIconID}/[^/]+/${profileIconVariant}$`));
+      await expect(profilePreview.locator('img')).toHaveCSS('padding', '12px');
+      const profileIconSize = await profilePreview.locator('img').boundingBox();
+      assert.ok(profileIconSize.width <= 76 && profileIconSize.height <= 76, 'Die Live-Vorschau im Profil darf das Symbol nicht vergrößern.');
       await expect(profileForm.locator('[name="MashaFeedlyAvatarIcon"]')).toHaveValue(profileIconID);
     }
 
@@ -260,3 +276,124 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     await browser.close();
   }
 });
+
+/** Prüft dieselben mobilen Abläufe in Chromium, Firefox und der Safari-Engine WebKit. */
+for (const browserName of ['chromium', 'firefox', 'webkit']) {
+  test(`mobile Startansicht (${browserName}) zeigt Feedly-Lasche, Seitenpanel, Hilfe und beide Onboarding-Auswege`, {
+    skip: missingConfig.length ? `E2E-Konfiguration fehlt: ${missingConfig.join(', ')}` : false,
+  }, async () => {
+    const playwright = require('@playwright/test');
+    const { expect } = playwright;
+    const browser = await playwright[browserName].launch({ headless: true });
+    const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 390, height: 844 } });
+    const page = await context.newPage();
+    try {
+      // Die Einführung wird nur im Browser aktiviert; das echte Benutzerprofil bleibt erhalten.
+      await page.addInitScript(() => {
+        window.mobileTourRequests = [];
+
+        const originalFetch = window.fetch.bind(window);
+        window.fetch = (input, init) => {
+          if (String(input).includes('restartOnboarding')) return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
+          if (String(input).includes('completeOnboarding')) {
+            window.mobileTourRequests.push(Object.fromEntries(init.body.entries()));
+            return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
+          }
+          return originalFetch(input, init);
+        };
+      });
+      await page.goto(new URL('/Security/login', config.baseURL).href);
+      await page.locator('input[type="email"], input[name$="Email"], input[id$="Email"]').first().fill(config.onboardingEmail);
+      await page.locator('input[type="password"]').first().fill(config.onboardingPassword);
+      await page.locator('button[type="submit"], input[type="submit"]').first().click();
+      await page.goto(config.baseURL);
+      const widget = page.locator('[data-kw-masha-feedly]');
+      const welcome = widget.locator('[data-masha-feedly-onboarding-welcome]');
+      const openTour = async (width, height) => {
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await widget.locator('.kw-masha-feedly__toggle').click();
+        await widget.locator('[data-masha-feedly-open-help]').click();
+        await widget.locator('[data-masha-feedly-restart-onboarding]').click();
+        await expect(welcome).toBeVisible();
+        await page.setViewportSize({ width, height });
+      };
+      await openTour(390, 844);
+      await expect(welcome).toBeVisible();
+      await expect(welcome.locator('.kw-masha-feedly__onboarding-mobile-notice')).toContainText('größeren Bildschirm');
+      await expect(welcome.locator('[data-masha-feedly-tour-start]')).toBeHidden();
+      await expect(welcome.locator('[data-masha-feedly-tour-skip]')).toBeHidden();
+      await expect(welcome.locator('button:visible')).toHaveCount(2);
+      await expect(welcome.locator('[data-masha-feedly-tour-end]')).toHaveText('Einführung abbrechen', { useInnerText: true });
+      await expect(welcome.locator('[data-masha-feedly-tour-mobile-close]')).toHaveText('OK');
+      await welcome.locator('[data-masha-feedly-tour-mobile-close]').click();
+      await expect(welcome).toBeHidden();
+      assert.equal((await page.evaluate(() => window.mobileTourRequests))[0].Deferred, '1');
+
+      const toggle = widget.locator('.kw-masha-feedly__toggle');
+      await expect(toggle.locator('img')).toBeVisible();
+      const toggleBox = await toggle.boundingBox();
+      assert.ok(toggleBox.y > 700, 'Feedly-Lasche sitzt unten, nicht in der Bildschirmmitte.');
+      assert.equal(Math.round(toggleBox.x + toggleBox.width), 390);
+      const panel = widget.locator('.kw-masha-feedly__panel');
+      if (await panel.isVisible()) await panel.locator('.kw-masha-feedly__close').click();
+      await toggle.click();
+      await expect(panel).toBeVisible();
+      const panelBox = await panel.boundingBox();
+      assert.equal(Math.round(panelBox.y), 0);
+      assert.equal(Math.round(panelBox.height), 844);
+      assert.equal(Math.round(panelBox.x + panelBox.width), 390);
+      assert.ok(panelBox.width < 100, 'Das erste Panel bleibt dieselbe schmale Seitenleiste.');
+      const content = panel.locator('.kw-masha-feedly__content');
+      await expect(content.locator('button:visible')).toHaveCount(2);
+      await expect(content.locator('[data-masha-feedly-start-selection]')).toBeVisible();
+      await content.locator('[data-masha-feedly-open-help]').click();
+      await expect(widget.locator('.kw-masha-feedly__help-mobile')).toBeVisible();
+      await expect(widget.locator('.kw-masha-feedly__help-mobile')).toContainText('unten rechts');
+      await expect(widget.locator('.kw-masha-feedly__help-mobile')).toContainText('Alle Werkzeuge');
+      await expect(widget.locator('.kw-masha-feedly__help-mobile')).toContainText('Laptop oder Desktop-Computer');
+      await expect(widget.locator('.kw-masha-feedly__help-content')).toBeHidden();
+      // Kleine Hoch- und Querformatfenster müssen bis zum letzten Hinweis scrollen können.
+      for (const viewport of [{ width: 320, height: 400 }, { width: 390, height: 280 }]) {
+        await page.setViewportSize(viewport);
+        const mobileHelp = widget.locator('.kw-masha-feedly__help-mobile');
+        const helpHeader = widget.locator('[data-masha-feedly-help-modal] .kw-masha-feedly__dialog-header');
+        const beforeScroll = await helpHeader.boundingBox();
+        const scrollState = await mobileHelp.evaluate((element) => {
+          element.scrollTop = element.scrollHeight;
+          return { scrollTop: element.scrollTop, clientHeight: element.clientHeight, scrollHeight: element.scrollHeight };
+        });
+        assert.ok(scrollState.clientHeight > 0 && scrollState.scrollHeight > scrollState.clientHeight);
+        assert.ok(scrollState.scrollTop > 0, 'Der Hilfetext lässt sich bis zum Ende scrollen.');
+        const afterScroll = await helpHeader.boundingBox();
+        assert.equal(afterScroll.y, beforeScroll.y, 'Der Kopf bleibt beim Scrollen stehen.');
+        const closeBox = await widget.locator('[data-masha-feedly-close-help]').boundingBox();
+        assert.ok(closeBox.y >= 0 && closeBox.y + closeBox.height <= viewport.height, 'Schließen bleibt im Fenster erreichbar.');
+      }
+      await widget.locator('[data-masha-feedly-close-help]').click();
+      await page.setViewportSize({ width: 390, height: 844 });
+      await content.locator('[data-masha-feedly-start-selection]').click();
+      await page.locator('[role="main"]').first().click();
+      const form = widget.locator('[data-masha-feedly-entry-form]');
+      await expect(form).toBeVisible();
+      const hintSize = await form.locator('.kw-masha-feedly__screenshot small').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+      assert.ok(hintSize >= 16, 'Screenshot-Hinweis bleibt mindestens 16 px groß.');
+
+      await page.reload();
+      await openTour(390, 844);
+      await expect(welcome).toBeVisible();
+      await welcome.locator('[data-masha-feedly-tour-end]').click();
+      await expect(welcome).toBeHidden();
+      assert.equal((await page.evaluate(() => window.mobileTourRequests))[0].Deferred, undefined);
+
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.reload();
+      await openTour(1280, 900);
+      await expect(welcome.locator('[data-masha-feedly-tour-start]')).toBeVisible();
+      await expect(welcome.locator('[data-masha-feedly-tour-mobile-close]')).toBeHidden();
+      await expect(welcome.locator('.kw-masha-feedly__onboarding-mobile-notice')).toBeHidden();
+    } finally {
+      await context.close();
+      await browser.close();
+    }
+  });
+}

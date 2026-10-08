@@ -18,71 +18,71 @@ const messages = {
   ENV_OPERATING_SYSTEM: 'Betriebssystem', ENV_BROWSER: 'Browser', ENV_SELECTED_AREA: 'Ausgewählter Bereich',
   ENV_ELEMENT_TEXT: 'Text im Bereich', ENV_RESOLUTION: 'Bildschirmauflösung', ENV_BROWSER_WINDOW: 'Browserfenster',
   ENV_COLOR_DEPTH: 'Farbtiefe', ENV_USER_AGENT: 'Browserkennung', ASSIGNEES_ARIA: 'Verantwortliche',
-  MEMBER_FALLBACK: 'Mitglied', ENTRY_MARKER_ARIA: 'Eintrag {number}: {title}', ENTRY_MARKER_TITLE: '{category} · {title}',
+  MEMBER_FALLBACK: 'Mitglied', ENTRY_MARKER_ARIA: 'Meldung {number}: {title}', ENTRY_MARKER_TITLE: '{category} · {title}',
   HISTORY_STATUS_CHANGE: 'Status: {oldValue} → {newValue}', HISTORY_ASSIGNEES_CHANGE: 'Zuständigkeit: {oldValue} → {newValue}',
   HISTORY_RELATIONS_CHANGE: 'Verknüpfungen: {oldValue} → {newValue}', HISTORY_NO_RELATIONS: 'Keine Verknüpfungen',
   HISTORY_REPORTED_BY: 'Meldeperson: {oldValue} → {newValue}',
-  HISTORY_CREATED: 'Eintrag erstellt: {title}', HISTORY_COMMENT: 'Kommentar: {text}',
+  HISTORY_CREATED: 'Meldung erstellt: {title}', HISTORY_COMMENT: 'Kommentar: {text}',
   HISTORY_ATTACHMENT: 'Datei hochgeladen: {text}',
   HISTORY_COMMENT_EDITED: 'Kommentar bearbeitet: {oldValue} → {newValue}',
   HISTORY_COMMENT_DELETED: 'Kommentar gelöscht: {text}',
   HISTORY_COMMENT_REACTION: 'Reaktion auf Kommentar geändert: {oldValue} → {newValue}', HISTORY_NO_REACTION: 'Keine Reaktion',
   HISTORY_NOBODY: 'Niemand', HISTORY_META: '{actor} · {when}', HISTORY_PRIORITY_CHANGE: 'Priorität: {oldValue} → {newValue}',
   HISTORY_DUE_DATE_CHANGE: 'Fälligkeit: {oldValue} → {newValue}', NO_DUE_DATE: 'Kein Termin', ENTRY_DUE_DATE: 'Fällig am {date}',
-  ENTRY_NUMBER: 'Eintrag #{id}', ENTRY_REPORTED_BY: 'Gemeldet von {author}', ENTRY_CREATED_UNKNOWN: 'Unbekannt', CATEGORY_ALL: 'Alle Kategorien', LIST_COUNT_MINE_DU: 'für dich',
+  ENTRY_NUMBER: 'Meldung #{id}', ENTRY_REPORTED_BY: 'Gemeldet von {author}', ENTRY_CREATED_UNKNOWN: 'Unbekannt', CATEGORY_ALL: 'Alle Kategorien', LIST_COUNT_MINE_DU: 'für dich',
   LIST_COUNT_MINE_SIE: 'für Sie', LIST_COUNT_ALL: 'insgesamt', LIST_COUNT_PAGE: 'auf dieser Seite',
   LIST_COUNT_UNREAD: 'mit neuen Aktivitäten', NEWS_BUTTON_DU: 'Neu seit deinem letzten Besuch',
   NEWS_BUTTON_SIE: 'Neu seit Ihrem letzten Besuch', NEWS_EMPTY: 'Alles ist auf dem neuesten Stand.',
   LIST_COUNT_OPEN: 'offen', LIST_COUNT_CLOSED: 'abgeschlossen', LIST_COUNT_FEEDBACK: 'warten auf Feedback',
   OPEN_ALL_LABEL: 'Gesamte Website', OPEN_PAGE_LABEL: 'Aktuelle Seite',
-  FILTER_OPEN: 'Offene Einträge', FILTER_CLOSED: 'Abgeschlossene Einträge',
+  FILTER_OPEN: 'Offene Meldungen', FILTER_CLOSED: 'Abgeschlossene Meldungen',
   FILTER_ALL_PRIORITIES: 'Alle Prioritäten', SAVED_VIEW_NONE: 'Ansicht auswählen …',
   SAVED_VIEW_SAVED: 'Ansicht gespeichert.', SAVED_VIEW_DELETED: 'Ansicht gelöscht.',
   SAVED_VIEW_ERROR: 'Ansicht konnte nicht gespeichert werden.', SAVED_VIEW_DELETE_ERROR: 'Ansicht konnte nicht gelöscht werden.',
-  ENTRY_SINGULAR: 'Eintrag', ENTRY_PLURAL: 'Einträge', EMPTY_MINE_DU: 'Du hast noch keine Einträge.',
-  EMPTY_MINE_SIE: 'Sie haben noch keine Einträge.', EMPTY_ALL: 'Es gibt noch keine Einträge.',
-  EMPTY_PAGE: 'Auf dieser Seite gibt es noch keine Einträge.', ENTRY_WITHOUT_TITLE: 'Eintrag ohne Titel',
-  EMPTY_OPEN: 'Es gibt keine offenen Einträge.', EMPTY_CLOSED: 'Es gibt keine behobenen Einträge.',
-  ENTRY_OPEN_ARIA: 'Eintrag öffnen: {title}', ENTRY_CONTEXT_AREA: 'Bereich: {text}', ENTRY_PAGE_LINK: 'Zur Seite wechseln',
+  ENTRY_SINGULAR: 'Meldung', ENTRY_PLURAL: 'Meldungen', EMPTY_MINE_DU: 'Du hast noch keine Meldungen.',
+  EMPTY_MINE_SIE: 'Sie haben noch keine Meldungen.', EMPTY_ALL: 'Es gibt noch keine Meldungen.',
+  EMPTY_PAGE: 'Auf dieser Seite gibt es noch keine Meldungen.', ENTRY_WITHOUT_TITLE: 'Meldung ohne Titel',
+  EMPTY_OPEN: 'Es gibt keine offenen Meldungen.', EMPTY_CLOSED: 'Es gibt keine behobenen Einträge.',
+  ENTRY_OPEN_ARIA: 'Meldung öffnen: {title}', ENTRY_CONTEXT_AREA: 'Bereich: {text}', ENTRY_PAGE_LINK: 'Zur Seite wechseln',
   ENTRY_SHARE_ARIA: 'Link zu {title} teilen', ENTRY_SHARE_DONE: 'Direktlink wurde geteilt oder kopiert',
   ENTRY_SHARE_ERROR: 'Link konnte nicht geteilt werden',
-  ENTRY_RELATIONS_ARIA: 'Verknüpfte Einträge', RELATION_RELATED: 'Thematisch verwandt',
+  ENTRY_RELATIONS_ARIA: 'Verknüpfte Meldungen', RELATION_RELATED: 'Thematisch verwandt',
   RELATION_RELATED_TO: 'Thematisch verwandt mit', RELATION_BLOCKED_BY: 'Blockiert durch',
-  RELATION_BLOCKS: 'Blockiert', RELATION_DUPLICATE_OF: 'Duplikat von', RELATION_HAS_DUPLICATE: 'Hat Duplikat',
+  RELATION_BLOCKS: 'Blockiert', RELATION_DUPLICATE_OF: 'Bereits in einer anderen Meldung beschrieben', RELATION_HAS_DUPLICATE: 'Hat Duplikat',
   ENTRY_PRIORITY_ARIA: 'Priorität: {priority}', PRIORITY_FALLBACK: 'Keine Priorität',
-  LIST_LOADING: 'Einträge werden geladen …', LIST_LOAD_ERROR: 'Einträge konnten nicht geladen werden.',
-  RAINBOW_EMPTY_BOARD_TITLE: 'Bugfrei – oder noch nichts eingetragen!',
+  LIST_LOADING: 'Meldungen werden geladen …', LIST_LOAD_ERROR: 'Meldungen konnten nicht geladen werden.',
+  RAINBOW_EMPTY_BOARD_TITLE: 'Noch keine offenen Meldungen',
   RAINBOW_EMPTY_BOARD_MESSAGE: 'Hier wurde noch nichts erfasst. Wir feiern vorsichtshalber trotzdem.',
-  RAINBOW_BOARD_TITLE: 'Alles im grünen Bereich!', RAINBOW_BOARD_MESSAGE: 'Alle Einträge sind erledigt oder archiviert. Stark!',
+  RAINBOW_BOARD_TITLE: 'Alles im grünen Bereich!', RAINBOW_BOARD_MESSAGE: 'Alle Meldungen sind erledigt oder archiviert. Stark!',
   RAINBOW_PAGE_TITLE: 'Auf dieser Seite keine Fehler',
   RAINBOW_PAGE_MESSAGE: 'Alle Meldungen auf dieser Seite sind erledigt oder archiviert. Stark!',
   RAINBOW_EMPTY_PAGE_MESSAGE: 'Hier wurde noch nichts eingetragen – vielleicht ist die Seite schon perfekt.',
-  SUCCESS_EMPTY_BOARD_TITLE: 'Noch keine Einträge',
-  SUCCESS_EMPTY_BOARD_MESSAGE: 'Für Masha:Feedly liegen noch keine Einträge vor.',
-  SUCCESS_BOARD_TITLE: 'Keine offenen Einträge', SUCCESS_BOARD_MESSAGE: 'Alle Einträge sind abgeschlossen oder archiviert.',
-  SUCCESS_PAGE_TITLE: 'Keine offenen Einträge auf dieser Seite',
-  SUCCESS_PAGE_MESSAGE: 'Auf dieser Seite gibt es derzeit keine offenen Einträge.',
-  SUCCESS_EMPTY_PAGE_MESSAGE: 'Für diese Seite wurden noch keine Einträge erfasst.',
-  EDIT_SAVING: 'Änderungen werden gespeichert …', EDIT_SAVE_ERROR: 'Änderungen konnten nicht gespeichert werden.',
-  EDIT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderungen gespeichert wurden, ist unklar. Bitte lade die Eintragsliste neu, bevor du es erneut versuchst.',
-  SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Eintragsliste neu.',
+  SUCCESS_EMPTY_BOARD_TITLE: 'Noch keine Meldungen',
+  SUCCESS_EMPTY_BOARD_MESSAGE: 'Für Masha:Feedly liegen noch keine Meldungen vor.',
+  SUCCESS_BOARD_TITLE: 'Keine offenen Meldungen', SUCCESS_BOARD_MESSAGE: 'Alle Meldungen sind abgeschlossen oder archiviert.',
+  SUCCESS_PAGE_TITLE: 'Keine offenen Meldungen auf dieser Seite',
+  SUCCESS_PAGE_MESSAGE: 'Auf dieser Seite gibt es derzeit keine offenen Meldungen.',
+  SUCCESS_EMPTY_PAGE_MESSAGE: 'Für diese Seite wurden noch keine Meldungen erfasst.',
+  EDIT_SAVING: 'Änderungen werden gespeichert …', EDIT_SAVE_ERROR: 'Änderungen konnten nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.',
+  EDIT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderungen gespeichert wurden, ist unklar. Bitte lade die Meldungsliste neu, bevor du es erneut versuchst.',
+  SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Meldungsliste neu.',
   COMMENT_SAVING: 'Kommentar wird gesendet …',
   COMMENT_SAVED: 'Kommentar gesendet.',
   COMMENT_SAVE_ERROR: 'Kommentar konnte nicht gesendet werden.',
   COMMENT_UPDATE_ERROR: 'Kommentar konnte nicht gespeichert werden.',
   COMMENT_DELETE_ERROR: 'Kommentar konnte nicht gelöscht werden.',
-  COMMENT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderung gespeichert wurde, ist unklar. Bitte öffne den Eintrag neu, bevor du es erneut versuchst.',
-  COMMENT_SAVED_DISPLAY_ERROR: 'Die Änderung wurde gespeichert, aber die Anzeige konnte nicht aktualisiert werden. Bitte öffne den Eintrag neu, bevor du es erneut versuchst.',
+  COMMENT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderung gespeichert wurde, ist unklar. Bitte öffne die Meldung neu, bevor du es erneut versuchst.',
+  COMMENT_SAVED_DISPLAY_ERROR: 'Die Änderung wurde gespeichert, aber die Anzeige konnte nicht aktualisiert werden. Bitte öffne die Meldung neu, bevor du es erneut versuchst.',
   UNREAD_ACTIVITY: 'Neue Aktivität',
   NEWS_TITLE: 'Neuigkeiten',
-  NEWS_SUMMARY: 'Einträge: {entries} · Kommentare: {comments}',
-  OPEN_FEEDBACK_ENTRIES: 'Einträge anzeigen, bei denen Feedback aussteht',
-  OPEN_CLOSED_ENTRIES: 'Abgeschlossene Einträge ansehen',
+  NEWS_SUMMARY: 'Meldungen: {entries} · Kommentare: {comments}',
+  OPEN_FEEDBACK_ENTRIES: 'Meldungen anzeigen, bei denen Feedback aussteht',
+  OPEN_CLOSED_ENTRIES: 'Abgeschlossene Meldungen ansehen',
   FILTERS_TITLE: 'Filter', FILTERS_NONE: 'Keine aktiv', FILTERS_ACTIVE: '{count} aktiv',
   FILTER_REMOVE: 'Filter entfernen: {label}', FILTERS_CLEAR: 'Alle Filter zurücksetzen',
-  FILTER_MODE: 'Ansicht', FILTER_OPEN: 'Offene Einträge', FILTER_PAGE_OPEN: 'Offene Fehler hier',
+  FILTER_MODE: 'Ansicht', FILTER_OPEN: 'Offene Meldungen', FILTER_PAGE_OPEN: 'Offene Meldungen hier',
   SORTING_TITLE: 'Sortierung', SORT_DUE: 'Fälligkeit', SORT_CREATED: 'Erstellt am', SORT_PRIORITY: 'Priorität', SORT_ASSIGNEE: 'Zuständigkeit', SORT_ACTIVITY: 'Letzte Aktivität', SORT_ASCENDING: 'aufsteigend', SORT_DESCENDING: 'absteigend',
-  FILTER_FEEDBACK: 'Wartet auf Feedback', FILTER_CLOSED: 'Abgeschlossene Einträge', FILTER_ALL: 'Alle Einträge',
+  FILTER_FEEDBACK: 'Wartet auf Feedback', FILTER_CLOSED: 'Abgeschlossene Meldungen', FILTER_ALL: 'Alle Meldungen',
   FILTER_PAGE: 'Alle Einträge auf dieser Seite', FILTER_MINE: 'Für mich', FILTER_UNREAD: 'Neuigkeiten',
   FILTER_CATEGORY: 'Kategorie', FILTER_PRIORITY: 'Priorität',
   COMMENT_REACTIONS: 'Reaktionen auf diesen Kommentar', COMMENT_REACTION_LIKE: 'Gefällt mir',
@@ -110,8 +110,8 @@ const sharedEffects = { playOnDone(_document, simulatedWindow, _image, theme) {
 } };
 const entriesUI = window.KWMashaFeedlyEntries;
 test('beschriftet den Zähler als Zahl abgeschlossener Einträge und nennt die Zielübersicht', () => {
-  assert.match(germanTranslations, /OPEN_CLOSED_ENTRIES: 'Abgeschlossene Einträge ansehen'/);
-  assert.match(germanTranslations, /CLOSED_ENTRIES_BUTTON: 'abgeschlossene Einträge'/);
+  assert.match(germanTranslations, /OPEN_CLOSED_ENTRIES: 'Abgeschlossene Meldungen ansehen'/);
+  assert.match(germanTranslations, /CLOSED_ENTRIES_BUTTON: 'abgeschlossene Meldungen'/);
   assert.match(widgetTemplate, /data-masha-feedly-open-closed[^>]*aria-label="<%t KW\\MashaFeedly\\Translations\.OPEN_CLOSED_ENTRIES/);
   assert.match(widgetTemplate, /data-masha-feedly-closed-count>[^<]*<\/strong><span class="kw-masha-feedly__sr-only"><%t KW\\MashaFeedly\\Translations\.CLOSED_ENTRIES_BUTTON/);
 });
@@ -331,9 +331,9 @@ test('zeigt an Eintragskarten ein verständliches Icon mit Beziehungstyp und ver
     { id: 45, title: 'Suche ist langsam', type: 'related' },
     { id: 47, title: 'Suchfeld springt', type: 'related_to', direction: 'incoming' },
   ], documentRef);
-  assert.equal(container['aria-label'], 'Verknüpfte Einträge');
+  assert.equal(container['aria-label'], 'Verknüpfte Meldungen');
   assert.equal(container.children.length, 6);
-  assert.equal(container.children[0].children[1].textContent, 'Duplikat von · #42 Login speichert nicht');
+  assert.equal(container.children[0].children[1].textContent, 'Bereits in einer anderen Meldung beschrieben · #42 Login speichert nicht');
   assert.equal(container.children[0].dataset.relationKind, 'duplicate');
   assert.doesNotMatch(container.children[0].children[1].textContent, /RELATION_DUPLICATE_OF/);
   assert.match(container.children[0].children[0].innerHTML, /<svg viewBox="0 0 24 24"/);
@@ -584,12 +584,18 @@ test('bereitet die Bugbeschreibung nur zum Lesen sowie Status und Avatar-Zustän
     assignees: [{ name: 'Ada Beispiel', initials: 'EM', color: '#E95DAB', imageURL: '' }],
     assignedMemberIDs: ['12'],
     content: 'Der Originaltext darf nicht im Bearbeitungsformular landen.',
+    stepsToReproduce: '1. Kontakt öffnen',
+    expectedResult: 'Bestätigung erscheint.',
+    actualResult: 'Ladeanzeige bleibt stehen.',
   });
   assert.equal(editable.id, 71);
   assert.equal(editable.categoryID, 3);
   assert.deepEqual(Array.from(editable.assignedMemberIDs), [12]);
   assert.equal(editable.context, 'Status: Doing');
   assert.equal(editable.description, 'Der Originaltext darf nicht im Bearbeitungsformular landen.');
+  assert.equal(editable.stepsToReproduce, '1. Kontakt öffnen');
+  assert.equal(editable.expectedResult, 'Bestätigung erscheint.');
+  assert.equal(editable.actualResult, 'Ladeanzeige bleibt stehen.');
   assert.equal('content' in editable, false);
   assert.equal(editable.assignees[0].initials, 'EM');
 });
@@ -657,7 +663,7 @@ test('rendert den Verlauf mit Status, Zuständigkeit, handelnder Person und Zeit
     { type: 'relations', oldValue: '', newValue: 'Duplikat von #18 Suchfehler', actor: 'Erika Muster', created: '2026-10-02 09:32:00' },
   ], document);
   assert.equal(container.children.length, 8);
-  assert.match(container.children[0].children[0].textContent, /Eintrag erstellt: Suchfehler/);
+  assert.match(container.children[0].children[0].textContent, /Meldung erstellt: Suchfehler/);
   assert.match(container.children[1].children[0].textContent, /Datei hochgeladen: screenshot\.png/);
   assert.match(container.children[2].children[0].textContent, /Kommentar: Keine Ergebnisse\./);
   assert.match(container.children[3].children[0].textContent, /Kommentar bearbeitet: Keine Ergebnisse\. → Die Suche ist leer\./);
@@ -910,8 +916,9 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /@media \(max-width: 40rem\) \{[\s\S]*?padding-right: 20px; \}/);
   assert.match(scss, /data-success-visible="true"\]\[data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ width: min\(688px, calc\(100vw - 688px\)\); \}/);
   assert.match(scss, /\.kw-masha-feedly\[data-edit-open="true"\] \.kw-masha-feedly__entries-modal \{ visibility: hidden; \}/);
-  assert.match(scss, /\.kw-masha-feedly__add > span:first-child\s*\{ display: block; margin: 0; font-size: calc\(88px \* var\(--masha-font-scale, 1\)\); font-weight: 400; line-height: 1; transform: translateY\(-4px\);/);
-  assert.match(scss, /\.kw-masha-feedly__actions > \.kw-masha-feedly__add > span:first-child \{ font-size: 40px; transform: translateY\(1px\); \}/);
+  assert.match(scss, /\.kw-masha-feedly__add > svg \{ width: 60px; height: 60px; \}/);
+  assert.match(scss, /\.kw-masha-feedly__actions > \.kw-masha-feedly__add > svg \{ width: 28px; height: 28px; \}/);
+  assert.match(widgetTemplate, /<button class="kw-masha-feedly__add"[\s\S]*?<svg viewBox="0 0 24 24"/);
   assert.match(scss, /\.kw-masha-feedly__help-button\s*\{ display: grid; width: 52px; min-width: 52px; height: 52px; min-height: 52px; flex: 0 0 52px; aspect-ratio: 1; margin-top: 32px; padding: 0; place-items: center;/);
   assert.match(scss, /\.kw-masha-feedly__entries-modal\s*\{ right: 256px;/);
   assert.match(scss, /data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ right: 560px;/);
@@ -986,7 +993,7 @@ test('liefert beide auswählbaren Erscheinungsbilder mit sachlicher Gestaltung a
   assert.match(compiledStyles, /\.kw-masha-feedly\[data-theme=serious\]/);
   assert.match(germanTranslations, /CONFIG_THEME_PLAYFUL: 'Verspielt/);
   assert.match(germanTranslations, /CONFIG_THEME_SERIOUS: 'Seriös/);
-  assert.match(germanTranslations, /SUCCESS_EMPTY_BOARD_TITLE: 'Noch keine Einträge'/);
+  assert.match(germanTranslations, /SUCCESS_EMPTY_BOARD_TITLE: 'Noch keine Meldungen'/);
 });
 
 test('zeigt den gestalteten Upload in Erstellung und Bearbeitung mit dem Upload-Symbol', () => {
@@ -1490,7 +1497,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
 }
 
 test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedback-Warteschlange', async () => {
-  assert.ok(widgetTemplate.indexOf('data-masha-feedly-open-feedback') < widgetTemplate.indexOf('data-masha-feedly-open-closed'), 'Der Button für abgeschlossene Einträge steht nach dem Feedback-Button.');
+  assert.ok(widgetTemplate.indexOf('data-masha-feedly-open-feedback') < widgetTemplate.indexOf('data-masha-feedly-open-closed'), 'Der Button für abgeschlossene Meldungen steht nach dem Feedback-Button.');
   assert.ok(widgetTemplate.indexOf('data-masha-feedly-open-closed') < widgetTemplate.indexOf('</div>', widgetTemplate.indexOf('data-masha-feedly-open-closed')), 'Der Button bleibt in der Aktionsgruppe des ersten Panels.');
   const env = createWidgetEnvironment();
   await env.listeners['kw-masha-feedly:opened']();
@@ -1499,8 +1506,8 @@ test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedbac
   assert.equal(env.openPageListButton.dataset.label, 'Aktuelle Seite');
   assert.equal(env.feedbackButton.hidden, false);
   assert.equal(env.feedbackCountDisplay.textContent, '1');
-  assert.equal(env.feedbackButton.attributes['data-tooltip'], 'Einträge anzeigen, bei denen Feedback aussteht · 1');
-  assert.equal(env.openClosedButton.attributes['data-tooltip'], 'Abgeschlossene Einträge ansehen · 0');
+  assert.equal(env.feedbackButton.attributes['data-tooltip'], 'Meldungen anzeigen, bei denen Feedback aussteht · 1');
+  assert.equal(env.openClosedButton.attributes['data-tooltip'], 'Abgeschlossene Meldungen ansehen · 0');
   assert.equal(env.feedbackButton.attributes.title, undefined);
   assert.equal(env.openClosedButton.attributes.title, undefined);
 
@@ -1523,9 +1530,9 @@ test('zeigt Neuigkeiten im ersten Panel und öffnet die Liste ungelesener Eintr�
   assert.equal(env.unreadCountDisplay.textContent, '3');
   assert.equal(env.openNewsButton.hidden, false);
   assert.equal(env.openNewsButton.attributes['data-has-news'], 'true');
-  assert.equal(env.newsSummary.textContent, 'Einträge: 1 · Kommentare: 2');
-  assert.equal(env.openNewsButton.attributes['aria-label'], 'Neuigkeiten · Einträge: 1 · Kommentare: 2');
-  assert.equal(env.openNewsButton.attributes['data-tooltip'], 'Neuigkeiten · Einträge: 1 · Kommentare: 2');
+  assert.equal(env.newsSummary.textContent, 'Meldungen: 1 · Kommentare: 2');
+  assert.equal(env.openNewsButton.attributes['aria-label'], 'Neuigkeiten · Meldungen: 1 · Kommentare: 2');
+  assert.equal(env.openNewsButton.attributes['data-tooltip'], 'Neuigkeiten · Meldungen: 1 · Kommentare: 2');
 
   await env.openNewsButton.listeners.click();
   assert.equal(env.requests.at(-1).searchParams.get('mode'), 'unread');
@@ -1894,9 +1901,9 @@ test('übernimmt bei einer 403-Antwort weder Kommentar noch Verlauf', async () =
   const previousCommentCount = env.commentCount.textContent;
   const previousHistoryCount = env.editHistory.children.length;
   env.commentForm.elements.CommentText.value = 'Unberechtigter Kommentar';
-  env.postResponses.push({ ok: false, json: async () => ({ success: false, message: 'Keine Berechtigung.' }) });
+  env.postResponses.push({ ok: false, json: async () => ({ success: false, message: 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.' }) });
   await env.commentForm.listeners.submit({ preventDefault() {} });
-  assert.equal(env.commentStatus.textContent, 'Keine Berechtigung.');
+  assert.equal(env.commentStatus.textContent, 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.');
   assert.equal(env.commentCount.textContent, previousCommentCount);
   assert.equal(env.editHistory.children.length, previousHistoryCount);
   assert.equal(env.commentForm.submitButton.disabled, false);
@@ -1985,7 +1992,7 @@ test('zeigt den Seitenerfolg nur ohne offene Fehler und unterscheidet den global
   env.setOpenEntryCount(0);
   env.setTotalEntriesCount(0);
   await env.listeners['kw-masha-feedly:opened']();
-  assert.match(env.rainbowTitle.textContent, /noch nichts eingetragen/);
+  assert.equal(env.rainbowTitle.textContent, 'Noch keine offenen Meldungen');
   assert.match(env.rainbowMessage.textContent, /vorsichtshalber trotzdem/);
 });
 
@@ -2030,13 +2037,13 @@ test('zeigt abgeschlossene Kategorie-Einträge in der Liste, aber nicht als Fehl
   assert.equal(env.listContainer.children[0].textContent, 'Done');
 });
 
-test('zeigt offene und abgeschlossene Einträge in der Übersicht getrennt an', async () => {
+test('zeigt offene und abgeschlossene Meldungen in der Übersicht getrennt an', async () => {
   const openEnv = createWidgetEnvironment();
   await openEnv.listeners['kw-masha-feedly:opened']();
-  assert.equal(openEnv.openClosedButton.hidden, true, 'Ohne abgeschlossene Einträge bleibt der Button verborgen.');
+  assert.equal(openEnv.openClosedButton.hidden, true, 'Ohne abgeschlossene Meldungen bleibt der Button verborgen.');
   await openEnv.openListButton.listeners.click();
   assert.equal(openEnv.requests[1].searchParams.get('mode'), 'open');
-  assert.equal(openEnv.listCount.textContent, '1 Eintrag offen');
+  assert.equal(openEnv.listCount.textContent, '1 Meldung offen');
 
   const closedEnv = createWidgetEnvironment();
   closedEnv.setEntryClosed(true);
@@ -2051,10 +2058,10 @@ test('zeigt offene und abgeschlossene Einträge in der Übersicht getrennt an', 
   assert.equal(closedEnv.closedCountDisplay.textContent, '3');
   await closedEnv.openListButton.listeners.click();
   assert.equal(closedEnv.requests[1].searchParams.get('mode'), 'open');
-  assert.equal(closedEnv.listCount.textContent, '0 Einträge offen');
+  assert.equal(closedEnv.listCount.textContent, '0 Meldungen offen');
   await closedEnv.openClosedButton.listeners.click();
   assert.equal(closedEnv.requests[2].searchParams.get('mode'), 'closed');
-  assert.equal(closedEnv.listCount.textContent, '1 Eintrag abgeschlossen');
+  assert.equal(closedEnv.listCount.textContent, '1 Meldung abgeschlossen');
   assert.ok(closedEnv.listContainer.children.some((child) => child.className === 'kw-masha-feedly__entry-card'));
 
   closedEnv.setTotalEntriesCount(2);
@@ -2107,7 +2114,7 @@ test('öffnet den Eintrag aus der Kartenliste und springt zum gespeicherten Seit
   assert.equal(cardPriority.dataset.iconType, 'warning');
   assert.match(cardPriority.innerHTML, /viewBox="0 0 24 24"/);
   assert.equal(env.editForm.assigneeFields[0].checked, true);
-  assert.equal(env.editHeading.textContent, 'Eintrag #71');
+  assert.equal(env.editHeading.textContent, 'Meldung #71');
   assert.equal(env.editContext.textContent, 'Status: Backlog');
   assert.equal(env.editDescription.textContent, 'Der Inhalt ist verschoben.');
   assert.ok(env.editEnvironment.children.some((field) => field.textContent === 'Mac OS 10.15.7'));
@@ -2234,7 +2241,7 @@ test('übernimmt den vom Server erzwungenen Feedback-Status statt Done vorzutäu
   env.editForm.elements.CategoryID.value = '4';
   env.postResponses.push({ ok: true, json: async () => ({
     success: true,
-    message: 'Der Eintrag wartet jetzt auf die Freigabe durch die erstellende Person.',
+    message: 'Die Meldung wartet jetzt auf die Freigabe durch die erstellende Person.',
     categoryID: 6,
     categoryTitle: 'Rückmeldung',
     categoryIsClosed: false,
@@ -2244,7 +2251,7 @@ test('übernimmt den vom Server erzwungenen Feedback-Status statt Done vorzutäu
 
   assert.equal(env.editForm.elements.CategoryID.value, '6');
   assert.equal(env.editContext.textContent, 'Status: Rückmeldung');
-  assert.equal(env.editStatus.textContent, 'Der Eintrag wartet jetzt auf die Freigabe durch die erstellende Person.');
+  assert.equal(env.editStatus.textContent, 'Die Meldung wartet jetzt auf die Freigabe durch die erstellende Person.');
   assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__confetti'), false);
   assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__unicorn-runner'), false);
 });
@@ -2388,8 +2395,8 @@ test('zeigt im seriösen Theme sachliche Erfolgstexte', async () => {
   env.setOpenEntryCount(0);
   env.setTotalEntriesCount(0);
   await env.listeners['kw-masha-feedly:opened']();
-  assert.equal(env.rainbowTitle.textContent, 'Noch keine Einträge');
-  assert.equal(env.rainbowMessage.textContent, 'Für Masha:Feedly liegen noch keine Einträge vor.');
+  assert.equal(env.rainbowTitle.textContent, 'Noch keine Meldungen');
+  assert.equal(env.rainbowMessage.textContent, 'Für Masha:Feedly liegen noch keine Meldungen vor.');
 });
 
 test('spielt im seriösen Theme nach bestätigtem Abschluss einen ruhigen Effekt', async () => {
@@ -2445,7 +2452,7 @@ test('lässt den Dialog offen und zeigt den Fehler, wenn das Speichern fehlschl�
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   env.listContainer.listeners.click({ target: card, preventDefault() {} });
-  env.postResponses.push({ ok: false, json: async () => ({ success: false, message: 'Änderungen konnten nicht gespeichert werden.' }) });
+  env.postResponses.push({ ok: false, json: async () => ({ success: false, message: 'Änderungen konnten nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.' }) });
   await env.editForm.listeners.submit({ preventDefault() {} });
   assert.equal(env.editModal.hidden, false);
   assert.match(env.editStatus.textContent, /konnten nicht gespeichert werden/);

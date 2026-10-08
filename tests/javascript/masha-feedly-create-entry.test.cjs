@@ -8,6 +8,35 @@ const vm = require('node:vm');
 const sourceFile = path.resolve(__dirname, '../../client/src/js/masha-feedly-create-entry.js');
 const source = fs.readFileSync(sourceFile, 'utf8');
 const compiledSource = fs.readFileSync(path.resolve(__dirname, '../../client/dist/js/masha-feedly-create-entry.js'), 'utf8');
+const widgetTemplate = fs.readFileSync(path.resolve(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
+
+test('Screenshot-Aktion fragt Browserfreigabe ab und hängt das Bild optional an den bestehenden Upload', () => {
+  for (const script of [source, compiledSource]) {
+    assert.match(script, /data-masha-feedly-screenshot-capture/);
+    assert.match(script, /mediaDevices\?\.getDisplayMedia/);
+    assert.match(script, /data\.append\('Attachments\[\]'\s*,\s*screenshotFile\)/);
+    assert.match(script, /screenshotSurface\.hidden = true/);
+    assert.match(script, /screenshotSurface\.hidden = previousSurfaceHidden/);
+    assert.match(script, /screenshotHost\.hidden = true/);
+    assert.match(script, /screenshotHost\.hidden = previousHostHidden/);
+    assert.match(script, /requestAnimationFrame\(\(\) => window\.requestAnimationFrame\(resolve\)\)/);
+    assert.ok(script.indexOf('screenshotSurface.hidden = true') < script.indexOf('await new Promise((resolve) => window.requestAnimationFrame'));
+    assert.ok(script.indexOf('await new Promise((resolve) => window.requestAnimationFrame') < script.indexOf('getDisplayMedia({ video: true, audio: false })'));
+    assert.match(script, /data-masha-feedly-screenshot-remove/);
+    assert.match(script, /data-masha-feedly-screenshot-cropper/);
+    assert.match(script, /data-masha-feedly-screenshot-apply/);
+    assert.match(script, /drawImage\(screenshotImage, left, top, width, height, 0, 0, width, height\)/);
+    assert.match(script, /seiten-ausschnitt\.png/);
+    assert.match(script, /screenshotSelection\.complete = true/);
+    assert.match(script, /if \(!screenshotSelection \|\| screenshotSelection\.complete\)/);
+    assert.match(script, /stream\?\.getTracks\(\)\.forEach\(\(track\) => track\.stop\(\)\)/);
+    assert.match(script, /revokeObjectURL/);
+  }
+  assert.match(widgetTemplate, /Screenshot hinzufügen/);
+  assert.match(widgetTemplate, /Screenshot entfernen/);
+  assert.match(widgetTemplate, /Ausschnitt übernehmen/);
+  assert.match(widgetTemplate, /Klicke ein zweites Mal auf die gegenüberliegende Ecke/);
+});
 
 /** Simuliert die für Auswahl und Dialog benötigten DOM-Klassen. */
 class TestClassList {
@@ -42,7 +71,10 @@ class TestElement {
     this.value = '';
     this.disabled = false;
   }
-  addEventListener(name, callback) { this.listeners[name] = callback; }
+  addEventListener(name, callback) {
+    const previous = this.listeners[name];
+    this.listeners[name] = previous ? (...args) => { previous(...args); callback(...args); } : callback;
+  }
   setAttribute(name, value) { this.attributes[name] = value; }
   closest(selector) { return selector === 'body *' ? this : null; }
   append(...elements) { elements.forEach((element) => { element.parentElement = this; this.children.push(element); }); }
@@ -91,9 +123,13 @@ function createEnvironment(fetchImplementation = async () => ({
   const estimatePrice = new TestElement('output');
   const estimateSection = new TestElement('section'); estimateSection.hidden = true;
   estimateSection.fields = { '[data-masha-feedly-estimate-price]': estimatePrice };
+  const diagnostics = new TestElement('details');
+  const diagnosticsSteps = new TestElement('textarea'); diagnosticsSteps.name = 'StepsToReproduce';
+  const diagnosticsExpected = new TestElement('textarea'); diagnosticsExpected.name = 'ExpectedResult';
+  const diagnosticsActual = new TestElement('textarea'); diagnosticsActual.name = 'ActualResult';
   const form = new TestElement('form', { id: 'kw-masha-feedly-create-form', dataset: { createUrl: '/__masha-feedly/createEntry', similarUrl: '/__masha-feedly/findSimilarEntries', securityId: 'csrf-token' } });
   // Native HTMLFormElement.elements is present even when the optional estimate fields are absent.
-  form.elements = { EstimatedCostDuration: estimateDuration, EstimatedCostNote: estimateNote };
+  form.elements = { EstimatedCostDuration: estimateDuration, EstimatedCostNote: estimateNote, StepsToReproduce: diagnosticsSteps, ExpectedResult: diagnosticsExpected, ActualResult: diagnosticsActual };
   const similarSection = new TestElement('section'); similarSection.hidden = true;
   const similarResults = new TestElement('div');
   form.fields = {
@@ -104,6 +140,7 @@ function createEnvironment(fetchImplementation = async () => ({
     '[name="Content"]': content,
     '[data-masha-feedly-create-category]': createCategory,
     '[data-masha-feedly-create-estimate]': estimateSection,
+    '[data-masha-feedly-diagnostics]': diagnostics,
     '[data-masha-feedly-similar]': similarSection,
     '[data-masha-feedly-similar-results]': similarResults,
   };
@@ -162,11 +199,11 @@ function createEnvironment(fetchImplementation = async () => ({
     UNKNOWN_BROWSER: 'Unbekannter Browser',
     ENTRY_SELECTED_CONTEXT: 'Ausgewählter Bereich: „{text}“',
     ENTRY_CONTEXT_EMPTY: 'Bereich auf der Seite ausgewählt.',
-    CREATE_SAVING: 'Eintrag wird gespeichert …',
-    CREATE_SAVE_ERROR: 'Der Eintrag konnte nicht gespeichert werden.',
-    SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Eintragsliste neu.',
-    CREATE_ENTRY_FALLBACK: 'Neuer Eintrag',
-    SIMILAR_ENTRY_NO_TITLE: 'Eintrag ohne Titel', SIMILAR_SCORE: '{score}% ähnlich', SIMILAR_OPEN_ENTRY: 'Eintrag ansehen',
+    CREATE_SAVING: 'Meldung wird gespeichert …',
+    CREATE_SAVE_ERROR: 'Die Meldung konnte nicht gespeichert werden.',
+    SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Meldungsliste neu.',
+    CREATE_ENTRY_FALLBACK: 'Neue Meldung',
+    SIMILAR_ENTRY_NO_TITLE: 'Meldung ohne Titel', SIMILAR_SCORE: '{score}% ähnlich', SIMILAR_OPEN_ENTRY: 'Meldung ansehen',
     CLOSE_WIDGET: 'Masha:Feedly schließen',
   };
   const contextObject = {
@@ -195,8 +232,26 @@ function createEnvironment(fetchImplementation = async () => ({
   };
   vm.runInNewContext(source, contextObject);
   documentListeners.DOMContentLoaded();
-  return { widget, startButton, banner, modal, context, status, toast, toastMessage, dismissToast, panel, toggle, form, content, date, pageURL, selector, selectedText, submit, column, body, documentListeners, dispatchedEvents, calls, formData, similarSection, similarResults, createCategory, estimateSection, estimateDuration, estimateNote, estimatePrice, window: contextObject.window };
+  return { widget, startButton, banner, modal, context, status, toast, toastMessage, dismissToast, panel, toggle, form, content, date, pageURL, selector, selectedText, submit, column, body, documentListeners, dispatchedEvents, calls, formData, similarSection, similarResults, createCategory, estimateSection, estimateDuration, estimateNote, estimatePrice, diagnostics, diagnosticsSteps, diagnosticsExpected, diagnosticsActual, window: contextObject.window };
 }
+
+test('optionale Fehlerdetails öffnen sich bei Fehlerbegriffen automatisch und bleiben manuell verfügbar', () => {
+  const env = createEnvironment();
+  assert.equal(env.diagnostics.open, undefined, 'Das Details-Element startet geschlossen.');
+  assert.equal(env.diagnosticsSteps.disabled, false);
+  assert.equal(env.diagnosticsExpected.disabled, false);
+  assert.equal(env.diagnosticsActual.disabled, false);
+  env.content.value = 'Beim Speichern erscheint ein Fehler.';
+  env.content.listeners.input();
+  assert.equal(env.diagnostics.open, true);
+  env.diagnostics.open = false;
+  env.content.value = 'The bug appears when saving.';
+  env.content.listeners.input();
+  assert.equal(env.diagnostics.open, true);
+  assert.doesNotMatch(widgetTemplate, /name="EntryKind"/);
+  assert.match(widgetTemplate, /name="StepsToReproduce"[^>]*maxlength="10000"/);
+  assert.doesNotMatch(widgetTemplate, /name="StepsToReproduce"[^>]*required/);
+});
 
 test('Kostenschätzungsformular erscheint nur für Berechtigte bei der Kategorie „Wartet auf Freigabe“', () => {
   const env = createEnvironment();
@@ -387,7 +442,7 @@ test('meldet bestätigtes Erstellen auch bei einem Fehler in der Erfolgsanzeige 
 
   await env.form.listeners.submit({ preventDefault() {} });
 
-  assert.equal(env.status.textContent, 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Eintragsliste neu.');
+  assert.equal(env.status.textContent, 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Meldungsliste neu.');
   assert.equal(env.submit.disabled, false);
   assert.equal(env.calls.fetch[0], '/__masha-feedly/createEntry');
 });
@@ -404,12 +459,12 @@ test('stellt im Erfassungsformular ein optionales Fälligkeitsdatum bereit', () 
 test('zeigt den Serverfehler an und lässt das Formular erneut absenden', async () => {
   const env = createEnvironment(async () => ({
     ok: false,
-    json: async () => ({ success: false, message: 'Keine Berechtigung.' }),
+    json: async () => ({ success: false, message: 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.' }),
   }));
   env.startButton.listeners.click();
   env.documentListeners.click({ target: new TestElement('main', { id: 'main' }), preventDefault() {}, stopPropagation() {} });
   await env.form.listeners.submit({ preventDefault() {} });
-  assert.equal(env.status.textContent, 'Keine Berechtigung.');
+  assert.equal(env.status.textContent, 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.');
   assert.equal(env.toast.hidden, true);
   assert.equal(env.submit.disabled, false);
   assert.equal(env.column.children.length, 0);
@@ -441,7 +496,7 @@ test('zeigt bei einem Netzwerkfehler keinen Erfolgshinweis und gibt die Schaltfl
 
 test('blendet Ähnlichkeitsvorschläge beim Erstellen vorerst aus', () => {
   const env = createEnvironment();
-  assert.equal(env.content.listeners.input, undefined);
+  assert.equal(typeof env.content.listeners.input, 'function', 'Die Beschreibung erkennt Fehlerbegriffe automatisch.');
   assert.doesNotMatch(source, /data-masha-feedly-similar|data-similar-url/);
   const widgetTemplate = fs.readFileSync(path.resolve(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
   assert.doesNotMatch(widgetTemplate, /data-masha-feedly-similar|data-similar-url|kw-masha-feedly__similar/);
