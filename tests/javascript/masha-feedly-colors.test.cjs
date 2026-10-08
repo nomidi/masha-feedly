@@ -55,6 +55,14 @@ test('ignoriert Klicks außerhalb der Farbfelder', () => {
   assert.equal(colorField.events.length, 0);
 });
 
+test('ignoriert Farbänderungen, wenn die Profilpalette schreibgeschützt ist', () => {
+  const { listeners, colorField, option } = createColorEnvironment();
+  option.disabled = true;
+  listeners.click({ target: { closest: () => option } });
+  assert.equal(colorField.value, '');
+  assert.equal(colorField.events.length, 0);
+});
+
 test('ändert bei gleichnamigen CMS- und Widget-Feldern nur die Farbe des zugehörigen Formulars', () => {
   const state = createColorEnvironment();
   state.listeners.click({ target: { closest: () => state.option } });

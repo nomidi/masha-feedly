@@ -246,14 +246,16 @@ test('speichert den Klickpunkt relativ zum ausgewählten Seitenelement', () => {
   const target = new TestElement('main', { id: 'content' });
   target.getBoundingClientRect = () => ({ left: 100, top: 50, width: 200, height: 100 });
   env.startButton.listeners.click();
-  env.documentListeners.click({
+  const selectionClick = {
     target,
     clientX: 150,
     clientY: 125,
     preventDefault() {},
     stopPropagation() {},
-  });
+  };
+  env.documentListeners.click(selectionClick);
 
+  assert.equal(selectionClick.mashaFeedlyTargetSelectionHandled, true, 'der Tour-Schutz erkennt genau den Klick, der das Formular öffnet');
   assert.equal(env.form.fields['[name="ElementPositionX"]'].value, '0.25000');
   assert.equal(env.form.fields['[name="ElementPositionY"]'].value, '0.75000');
 });

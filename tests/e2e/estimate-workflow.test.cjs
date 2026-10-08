@@ -25,6 +25,15 @@ const config = {
 };
 const missingConfig = Object.entries(config).filter(([, value]) => !value).map(([name]) => name);
 
+/** Schließt die optionale Begrüßung, falls das Testkonto sie nach einem Neuladen erneut zeigt. */
+const dismissWelcome = async (page) => {
+  const welcome = page.locator('[data-masha-feedly-onboarding-welcome]');
+  if (await welcome.isVisible()) {
+    await welcome.locator('[data-masha-feedly-tour-skip]').click();
+    await welcome.waitFor({ state: 'hidden' });
+  }
+};
+
 /** Meldet ein Mitglied an und wartet darauf, dass das Feedly-Widget bereit ist. */
 const signIn = async (page, email, password) => {
   await page.goto(new URL('/Security/login', config.baseURL).toString());
@@ -34,10 +43,12 @@ const signIn = async (page, email, password) => {
   await page.goto(config.baseURL);
   const widget = page.locator('[data-kw-masha-feedly]');
   await widget.waitFor({ state: 'attached' });
+  await dismissWelcome(page);
   return widget;
 };
 
 const openEntryList = async (page, widget) => {
+  await dismissWelcome(page);
   const toggle = widget.locator('.kw-masha-feedly__toggle');
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
   await widget.locator('[data-masha-feedly-open-page-list]').click();

@@ -150,3 +150,10 @@ test('kapselt Widget und Overlays gemeinsam und löst retargetete Ereignisse auf
   state.dispatch('pointerover', { target: state.host, composedPath: () => [state.trigger, state.root, state.host] });
   assert.ok(state.tooltip);
 });
+
+test('Avatarfarben zeigen den Hover-Effekt nur bei änderbaren Farbfeldern', () => {
+  assert.match(hoverStyles[0], /&:hover:not\(:disabled\)/);
+  assert.match(hoverStyles[0], /&:disabled:hover \{ transform: none !important;/);
+  assert.match(hoverStyles[1], /masha-feedly-color-palette__item:hover:not\(:disabled\)/);
+  assert.match(hoverStyles[1], /masha-feedly-color-palette__item:disabled:hover\{transform:none !important/);
+});

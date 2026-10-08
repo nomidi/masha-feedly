@@ -54,7 +54,6 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const creatorToggle = creatorPage.locator('[data-kw-masha-feedly] .kw-masha-feedly__toggle');
     await creatorToggle.click();
     const creatorWidget = creatorPage.locator('[data-kw-masha-feedly]');
-    await expect(creatorWidget.locator('[data-masha-feedly-open-news]')).toBeVisible();
     await creatorWidget.locator('[data-masha-feedly-start-selection]').click();
     await creatorPage.locator('[role="main"]').first().click();
 

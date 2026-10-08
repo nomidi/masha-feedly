@@ -101,7 +101,7 @@ class MashaFeedlyWidgetExtension extends Extension
             )
             : '';
         $avatarIconPickerAvailable = str_contains($avatarIconPickerHTML, 'data-masha-feedly-avatar-icons');
-        if ($avatarIconPickerAvailable) {
+        if ($canPersonalize) {
             Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-avatar-icons.js');
         }
         $profileThemeOptions = [];
@@ -111,6 +111,25 @@ class MashaFeedlyWidgetExtension extends Extension
                     'ID' => $themeID,
                     'Title' => $themeTitle,
                     'Selected' => (string)$currentMember?->MashaFeedlyTheme === (string)$themeID,
+                ];
+            }
+        }
+        $emailTestSucceeded = $canPersonalize && MashaFeedlyConfigExtension::emailTestSucceeded();
+        $profileEmailOptions = [];
+        if ($emailTestSucceeded) {
+            foreach ([
+                'MashaFeedlyNotifyNewEntries' => ['PROFILE_NOTIFY_NEW_ENTRIES', 'Bei neuen Meldungen benachrichtigen', 'PROFILE_NOTIFY_NEW_ENTRIES_DESCRIPTION', 'Erhalte eine E-Mail, wenn eine neue Meldung erstellt wird.'],
+                'MashaFeedlyNotifyEntryUpdates' => ['PROFILE_NOTIFY_ENTRY_UPDATES', 'Bei Änderungen benachrichtigen', 'PROFILE_NOTIFY_ENTRY_UPDATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn sich eine Meldung ändert.'],
+                'MashaFeedlyNotifyOwnEntryChanges' => ['PROFILE_NOTIFY_OWN_CHANGES', 'Auch bei eigenen Meldungen benachrichtigen', 'PROFILE_NOTIFY_OWN_CHANGES_DESCRIPTION', 'Erhalte auch E-Mails für Meldungen, die du selbst erstellst oder änderst.'],
+                'MashaFeedlyNotifyComments' => ['PROFILE_NOTIFY_COMMENTS', 'Bei Kommentaren benachrichtigen', 'PROFILE_NOTIFY_COMMENTS_DESCRIPTION', 'Erhalte eine E-Mail, wenn jemand bei einer deiner Meldungen kommentiert.'],
+                'MashaFeedlyNotifyDueDateReminders' => ['PROFILE_NOTIFY_DUE_DATE_REMINDERS', 'An Fälligkeitstermine erinnern', 'PROFILE_NOTIFY_DUE_DATE_REMINDERS_DESCRIPTION', 'Erhalte am Fälligkeitstag eine Erinnerung für deine Meldungen.'],
+                'MashaFeedlyNotifyCostEstimates' => ['PROFILE_NOTIFY_COST_ESTIMATES', 'Bei Kostenschätzungen benachrichtigen', 'PROFILE_NOTIFY_COST_ESTIMATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn eine Kostenschätzung zur Freigabe bereitsteht.'],
+            ] as $name => [$labelKey, $labelFallback, $descriptionKey, $descriptionFallback]) {
+                $profileEmailOptions[] = [
+                    'Name' => $name,
+                    'Title' => i18n::_t('KW\\MashaFeedly\\Translations.' . $labelKey, $labelFallback),
+                    'Description' => i18n::_t('KW\\MashaFeedly\\Translations.' . $descriptionKey, $descriptionFallback),
+                    'Checked' => (bool)$currentMember?->{$name},
                 ];
             }
         }
@@ -133,8 +152,13 @@ class MashaFeedlyWidgetExtension extends Extension
             'ProfilePreferencesURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'saveProfilePreferences'),
             'ProfileThemeOptions' => $profileThemeOptions,
             'ProfileTheme' => (string)($currentMember?->MashaFeedlyTheme ?? ''),
+            'ProfileAddress' => (string)($currentMember?->MashaFeedlyAddress ?? ''),
             'ProfileColor' => (string)($currentMember?->MashaFeedlyColor ?? ''),
             'ProfileAvatarIcon' => (string)($currentMember?->MashaFeedlyAvatarIcon ?? ''),
+            'ProfileAvatarPreviewHTML' => $canPersonalize ? $currentMember->renderAvatarPreview() : '',
+            'ProfileEmailNotifications' => (bool)($currentMember?->MashaFeedlyEmailNotifications ?? false),
+            'ProfileEmailTestSucceeded' => $emailTestSucceeded,
+            'ProfileEmailOptions' => $profileEmailOptions,
             'AvatarColorPaletteHTML' => $canPersonalize
                 ? MashaFeedlyMemberExtension::renderColorPalette('MashaFeedlyColor', (string)$currentMember?->MashaFeedlyColor)
                 : '',
@@ -147,7 +171,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'Categories' => $categories,
             'Priorities' => $priorities,
             'Members' => $members,
-            'Address' => MashaFeedlyConfigExtension::address(),
+            'Address' => MashaFeedlyMemberExtension::addressFor($currentMember),
             'FontSize' => MashaFeedlyConfigExtension::fontSize(),
             'Theme' => MashaFeedlyMemberExtension::themeFor(Security::getCurrentUser()),
             'CanManageEstimate' => $canManageEstimate,
@@ -355,25 +379,43 @@ class MashaFeedlyWidgetExtension extends Extension
             'TOUR_WELCOME_TEXT' => 'Wenn dir ein Fehler auffällt, kannst du ihn direkt auf der Website melden. Die kurze Einführung zeigt dir, wie es geht.',
             'TOUR_START' => 'Einführung starten',
             'TOUR_SKIP' => 'Später',
-            'TOUR_STEP_PLUS' => 'Schritt 2 von 8: Das Fenster ist offen. Klicke jetzt auf das pinke Plus. Damit startest du eine neue Fehlermeldung.',
-            'TOUR_STEP_ICON' => 'Schritt 1 von 8: Klicke auf das runde Masha:Feedly-Symbol ganz unten rechts. Damit öffnest du das Feedly-Fenster.',
-            'TOUR_STEP_TARGET' => 'Schritt 3 von 8: Bewege den Mauszeiger über den betroffenen Inhalt und klicke genau auf die Stelle, an der der Fehler auftritt. Mit „Einführung abbrechen“ kannst du jederzeit aufhören.',
-            'TOUR_STEP_FORM' => 'Schritt 4 von 8: Beschreibe im Textfeld, was nicht stimmt. Prüfe bei Bedarf Kategorie, Datum und zuständige Personen. Klicke dann auf „Eintrag speichern“.',
-            'TOUR_STEP_VIEW_ENTRIES' => 'Schritt 5 von 8: Der Eintrag ist gespeichert. Klicke auf die kleine Zahl beim Standort-Symbol im Feedly-Fenster. So öffnest du die Meldungen dieser Seite.',
-            'TOUR_STEP_OPEN_ENTRY' => 'Schritt 6 von 8: In der Liste siehst du die Einträge der Seite. Klicke auf die gerade erstellte Meldung, um ihre Details zu öffnen.',
-            'TOUR_STEP_COMMENT_ENTRY' => 'Schritt 7 von 8: Hier findest du Kommentare, Browserdetails und den Verlauf. Schreibe einen kurzen Kommentar und sende ihn ab. Die anderen Aktionen bleiben bis zum nächsten Schritt gesperrt.',
-            'TOUR_STEP_MANAGE_ENTRY' => 'Schritt 8 von 8: Ändere Status oder Priorität und markiere zuständige Personen. Unter „Zusammenhänge“ kannst du Einträge verknüpfen. Speichere deine Änderungen, dann bist du fertig.',
-            'TOUR_BLOCKED_ICON' => 'Schon auf Entdeckungstour? Masha wartet unten rechts auf den Klick aufs Symbol. Die Website läuft dir nicht weg.',
+            'TOUR_STEP_PLUS' => 'Schritt 2 von 8: Im Masha:Feedly-Menü findest du ein großes pinkes Plus. Klicke darauf. Damit startest du eine neue Meldung zu einem Fehler oder Änderungswunsch.',
+            'TOUR_STEP_ICON' => 'Schritt 1 von 8: Klicke auf das Masha:Feedly-Logo am rechten Seitenrand. So öffnest du das Masha:Feedly-Bedienfeld mit den Meldungszählern und Aktionen.',
+            'TOUR_STEP_TARGET' => 'Schritt 3 von 8: Klicke auf den betroffenen Bereich der Website. Mit „Einführung beenden“ kannst du die Auswahl jederzeit abbrechen.',
+            'TOUR_STEP_FORM' => 'Schritt 4 von 8: Klicke in das große Feld „Beschreibung“. Schreib dort kurz hinein, was falsch ist oder was du dir wünschst. Klicke danach auf „Eintrag speichern“.',
+            'TOUR_STEP_VIEW_ENTRIES' => 'Schritt 5 von 8: Super, du hast eine Meldung erstellt! Klicke jetzt auf das Blatt-Symbol mit der Zahl. Damit siehst du offene Meldungen nur auf dieser Seite. Der Globus darüber zeigt Meldungen von der ganzen Website – den klickst du jetzt nicht an.',
+            'TOUR_STEP_OPEN_ENTRY' => 'Schritt 6 von 8: Deine neue Meldung ist bunt umrandet. Klicke genau auf diese Meldung, um sie zu öffnen.',
+            'TOUR_STEP_COMMENT_ENTRY' => 'Schritt 7 von 8: Schreibe im geöffneten Eintrag einen kurzen Kommentar und sende ihn ab. Die Bearbeitungsaktionen werden im nächsten Schritt freigegeben.',
+            'TOUR_STEP_MANAGE_ENTRY' => 'Schritt 8 von 8: Oben kannst du Status und Priorität ändern. Darunter kannst du verantwortliche Personen auswählen. Klicke danach unbedingt auf „Änderungen speichern“, sonst werden deine Änderungen nicht übernommen.',
+            'TOUR_BLOCKED_ICON' => 'Schon auf Entdeckungstour? Klicke zuerst auf das Masha:Feedly-Logo am rechten Seitenrand. Danach geht es weiter.',
             'TOUR_BLOCKED_PLUS' => 'Das Plus ist heute der Star. Bitte erst darauf klicken, bevor du die Seite auf eigene Faust erkundest.',
-            'TOUR_BLOCKED_TARGET' => 'Diese Schaltfläche ist gerade nicht dran. Wähle den betroffenen Bereich oder brich die Einführung ab.',
+            'TOUR_BLOCKED_TARGET' => 'Diese Schaltfläche ist gerade nicht dran. Wähle den betroffenen Bereich oder beende die Einführung.',
             'TOUR_BLOCKED_FORM' => 'Die Website muss kurz warten: erst den Fehler beschreiben und speichern. Der Kaffee läuft nicht weg.',
             'TOUR_BLOCKED_ENTRIES' => 'Noch kein Freigang: erst den gerade gespeicherten Eintrag über die Seitenzahl ansehen.',
             'TOUR_BLOCKED_ENTRY' => 'Der Eintrag versteckt sich in der Liste. Klick ihn an, dann darfst du weiterstöbern.',
             'TOUR_BLOCKED_COMMENT' => 'Erst ein kurzer Kommentar, dann darfst du Status und Zuständigkeit ändern. Der Rest wartet kurz.',
-            'TOUR_BLOCKED_MANAGE' => 'Fast fertig! Status oder Zuständigkeit speichern – oder die Einführung abbrechen. Der Rest wartet kurz.',
-            'TOUR_CANCEL' => 'Einführung abbrechen',
+            'TOUR_BLOCKED_MANAGE' => 'Fast fertig! Status oder Zuständigkeit speichern – oder die Einführung beenden. Der Rest wartet kurz.',
+            'TOUR_CANCEL' => 'Einführung beenden',
             'TOUR_THANKS_TITLE' => 'Danke fürs Mitmachen!',
-            'TOUR_THANKS_TEXT' => 'Du hast deine erste Meldung erstellt und gelernt, wie du Einträge ansiehst und bearbeitest. Jetzt kannst du Masha noch persönlich gestalten.',
+            'TOUR_THANKS_TEXT' => 'Super, du hast deine erste Meldung erstellt! Du weißt jetzt, wie du Meldungen auf der Seite findest, öffnest, kommentierst und änderst. Wenn ein Fehler behoben oder eine neue Funktion fertig ist, bekommst du eine Erfolgsmeldung mit einer kurzen Danke-Animation. Hier kannst du auswählen, wie diese Erfolgsmeldung aussehen soll. Außerdem kannst du dein Profil gestalten, deine E-Mail-Erinnerungen einstellen und festlegen, ob Masha:Feedly dich mit Du oder Sie anspricht.',
+            'PROFILE_ADDRESS' => 'Anrede im Modul',
+            'PROFILE_ADDRESS_DEFAULT' => 'Website-Vorgabe',
+            'PROFILE_ADDRESS_DESCRIPTION' => 'Lege fest, ob Masha:Feedly dich mit Du oder Sie anspricht. Ohne Auswahl gilt die Vorgabe der Website.',
+            'TOUR_THANKS_EFFECTS_LABEL' => 'Danke-Animation auswählen',
+            'TOUR_THANKS_EFFECTS_SUMMARY' => 'Wähle eine Kategorie und sieh dir Beispiele an.',
+            'TOUR_THANKS_EFFECTS_HELP' => 'Wenn du eine Meldung als erledigt markierst und speicherst, erscheint eine kurze Animation. Aus deiner gewählten Kategorie wird zufällig ein gerade aktiver Effekt ausgesucht. Saisonale Effekte gibt es nur in ihrem eingestellten Zeitraum. Ist gerade kein passender Effekt verfügbar, erscheint das ruhige Häkchen.',
+            'TOUR_THANKS_EXAMPLES_LABEL' => 'Beispiele ansehen',
+            'TOUR_THANKS_EXAMPLE_BUTTON' => 'Beispiel ansehen',
+            'TOUR_THANKS_EXAMPLE_STARTED' => 'Die Vorschau wurde gestartet.',
+            'TOUR_THANKS_EXAMPLE_FALLBACK' => 'Für diese Kategorie ist gerade kein Effekt aktiv. Hier siehst du das ruhige Häkchen.',
+            'TOUR_THANKS_EXAMPLE_UNAVAILABLE' => 'Die Vorschau ist gerade nicht verfügbar.',
+            'TOUR_THANKS_COLOR_LABEL' => 'Farbe deines Profilsymbols',
+            'TOUR_THANKS_ICON_TITLE' => 'Profilsymbol',
+            'TOUR_THANKS_ICON_HELP' => 'Wähle ein Symbol für dein Profil. Deine Farbe und dein Symbol erscheinen später neben deinen Meldungen und Kommentaren.',
+            'TOUR_THANKS_PREVIEW_TITLE' => 'Deine Profilvorschau',
+            'TOUR_THANKS_PREVIEW_HELP' => 'Hier siehst du dein Symbol und deine Farbe so, wie sie neben deinen Meldungen und Kommentaren erscheinen.',
+            'TOUR_THANKS_EMAIL_HELP' => 'Ein Häkchen bedeutet: Du bekommst diese E-Mail. Du kannst jede Auswahl jederzeit ändern.',
+            'TOUR_THANKS_EMAIL_MASTER_HELP' => 'Schalte diese Option aus, wenn du gar keine E-Mails von Masha:Feedly erhalten möchtest.',
             'TOUR_PROFILE_LINK' => 'Weitere Profileinstellungen',
             'TOUR_ICON_CHOICES' => 'Eigenes Icon wählen',
             'TOUR_SAVE_PREFERENCES' => 'Auswahl speichern',
@@ -384,7 +426,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'RETRO_SUCCESS_TITLE' => 'Erfolgreich erledigt!',
             'RETRO_SUCCESS_MESSAGE' => 'Der Eintrag wurde abgeschlossen.',
             'RETRO_SUCCESS_BUTTON' => 'OK',
-            'TOUR_SELECTION_TARGET' => 'Klicke auf den betroffenen Bereich der Website. Mit „Abbrechen“ kannst du die Auswahl beenden.',
+            'TOUR_SELECTION_TARGET' => 'Klicke auf den betroffenen Bereich der Website. Mit „Einführung beenden“ kannst du die Auswahl abbrechen.',
             'HISTORY_EYEBROW' => 'ÄNDERUNGEN',
             'HISTORY_TITLE' => 'Verlauf',
             'HISTORY_CREATED' => 'Eintrag erstellt: {title}',
@@ -446,7 +488,7 @@ class MashaFeedlyWidgetExtension extends Extension
         foreach ($translationDefaults as $key => $default) {
             $translations[$key] = i18n::_t('KW\\MashaFeedly\\Translations.' . $key, $default);
         }
-        $translations['FORMAL_ADDRESS'] = MashaFeedlyConfigExtension::address();
+        $translations['FORMAL_ADDRESS'] = MashaFeedlyMemberExtension::addressFor($currentMember);
         Requirements::customScript(
             'window.KWMashaFeedlyWidgetStylesheet = ' . json_encode((string)ModuleResourceLoader::resourceURL('kooperativeweb/masha-feedly:client/dist/css/masha-feedly.css')) . ';'
                 . 'window.KWMashaFeedlyTranslations = ' . json_encode($translations, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) . ';'

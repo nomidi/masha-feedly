@@ -1011,7 +1011,9 @@ document.addEventListener('DOMContentLoaded', () => {
     editReturnFocus = trigger;
     editHeading?.focus?.();
     widget.setAttribute('data-edit-open', 'true');
-    document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-entry-opened'));
+    document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-entry-opened', {
+      detail: { entryID: Number(entry.id) },
+    }));
     const target = window.KWMashaFeedlyEntries.resolveTarget(entry, document);
     target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
@@ -1584,6 +1586,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderMarkers(data.entries || []);
       }
       renderList(data);
+      document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-list-rendered'));
       if (requestedEntryID && mode === 'page') {
         const requestedEntry = (data.entries || []).find((entry) => Number(entry.id) === Number(requestedEntryID));
         if (requestedEntry) {

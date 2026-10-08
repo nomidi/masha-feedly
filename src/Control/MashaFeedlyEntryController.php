@@ -254,7 +254,7 @@ class MashaFeedlyEntryController extends Controller
         return $this->respond(['success' => false, 'message' => 'Bitte verwende GET oder POST.'], 405);
     }
 
-    /** Markiert die abbrechbare Ersteinführung für das aktuelle Mitglied als erledigt. */
+    /** Erledigt die Einführung oder merkt sie bei „Später“ für den nächsten Besuch vor. */
     public function completeOnboarding(HTTPRequest $request): HTTPResponse
     {
         $member = Security::getCurrentUser();
@@ -267,8 +267,9 @@ class MashaFeedlyEntryController extends Controller
         if (!SecurityToken::inst()->checkRequest($request)) {
             return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen.')], 400);
         }
-        $member->MashaFeedlyOnboardingCompleted = true;
-        $member->MashaFeedlyShowOnboarding = false;
+        $deferred = $request->postVar('Deferred') === '1';
+        $member->MashaFeedlyOnboardingCompleted = !$deferred;
+        $member->MashaFeedlyShowOnboarding = $deferred;
         $member->write();
         return $this->respond(['success' => true]);
     }
@@ -319,8 +320,19 @@ class MashaFeedlyEntryController extends Controller
         if ($theme !== '' && !preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $theme)) {
             return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_INVALID_THEME', 'Diese Effekt-Kategorie ist ungültig.')], 400);
         }
+        $address = strtolower(trim((string)$request->postVar('MashaFeedlyAddress')));
+        if (array_key_exists('MashaFeedlyAddress', $request->postVars()) && $address !== '' && !in_array($address, ['du', 'sie'], true)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_INVALID_ADDRESS', 'Diese Anrede ist ungültig.')], 400);
+        }
 
         $postVars = $request->postVars();
+        $emailSettingsSubmitted = !empty($postVars['EmailSettingsSubmitted']);
+        if ($emailSettingsSubmitted && !MashaFeedlyConfigExtension::emailTestSucceeded()) {
+            return $this->respond([
+                'success' => false,
+                'message' => $this->translate('PROFILE_EMAIL_TEST_REQUIRED', 'E-Mail-Einstellungen sind gesperrt. Ein Masha:Feedly-Administrator muss zuerst unter Masha:Feedly → Konfiguration eine Test-E-Mail erfolgreich versenden.'),
+            ], 400);
+        }
         $iconID = null;
         if (array_key_exists('MashaFeedlyAvatarIcon', $postVars)) {
             $iconID = trim((string)$postVars['MashaFeedlyAvatarIcon']);
@@ -344,8 +356,25 @@ class MashaFeedlyEntryController extends Controller
         $previousIconID = (string)$member->MashaFeedlyAvatarIcon;
         $member->MashaFeedlyColor = $color === '' ? '' : MashaFeedlyMemberExtension::normalizeColor($color);
         $member->MashaFeedlyTheme = $theme;
+        if (array_key_exists('MashaFeedlyAddress', $postVars)) {
+            $member->MashaFeedlyAddress = $address;
+        }
         if ($iconID !== null) {
             $member->MashaFeedlyAvatarIcon = $iconID;
+        }
+        if ($emailSettingsSubmitted) {
+            $emailPreferences = [
+                'MashaFeedlyEmailNotifications',
+                'MashaFeedlyNotifyNewEntries',
+                'MashaFeedlyNotifyEntryUpdates',
+                'MashaFeedlyNotifyOwnEntryChanges',
+                'MashaFeedlyNotifyComments',
+                'MashaFeedlyNotifyDueDateReminders',
+                'MashaFeedlyNotifyCostEstimates',
+            ];
+            foreach ($emailPreferences as $preference) {
+                $member->{$preference} = !empty($postVars[$preference]);
+            }
         }
         $member->write();
         if ($previousIconID !== '' && $previousIconID !== (string)$member->MashaFeedlyAvatarIcon
@@ -367,10 +396,10 @@ class MashaFeedlyEntryController extends Controller
             return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'SEND_POST_SIE' : 'SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SEND_POST_SIE' : 'SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'SESSION_EXPIRED_UPDATE_SIE' : 'SESSION_EXPIRED_UPDATE_DU', 'Deine Sitzung ist abgelaufen.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SESSION_EXPIRED_UPDATE_SIE' : 'SESSION_EXPIRED_UPDATE_DU', 'Deine Sitzung ist abgelaufen.')], 400);
         }
         $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
         if (!$entry) {
@@ -384,7 +413,7 @@ class MashaFeedlyEntryController extends Controller
         }
         $category = MashaFeedlyCategory::get()->byID((int)$request->postVar('CategoryID'));
         if (!$category) {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'INVALID_STATUS_SIE' : 'INVALID_STATUS_DU', 'Bitte wähle einen gültigen Status.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'INVALID_STATUS_SIE' : 'INVALID_STATUS_DU', 'Bitte wähle einen gültigen Status.')], 400);
         }
         $targetRole = (string)$category->SystemKey;
         $previousCategoryKey = (string)$entry->Category()->SystemKey;
@@ -791,18 +820,18 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'CREATE_FORBIDDEN_SIE' : 'CREATE_FORBIDDEN_DU', 'Du darfst keine Masha-Feedly-Einträge erstellen.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'CREATE_FORBIDDEN_SIE' : 'CREATE_FORBIDDEN_DU', 'Du darfst keine Masha-Feedly-Einträge erstellen.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'SEND_POST_SIE' : 'SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SEND_POST_SIE' : 'SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'SESSION_EXPIRED_CREATE_SIE' : 'SESSION_EXPIRED_CREATE_DU', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und versuche es erneut.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SESSION_EXPIRED_CREATE_SIE' : 'SESSION_EXPIRED_CREATE_DU', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und versuche es erneut.')], 400);
         }
 
         $content = trim((string)$request->postVar('Content'));
         if ($content === '') {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'CONTENT_REQUIRED_SIE' : 'CONTENT_REQUIRED_DU', 'Bitte beschreibe den Eintrag.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'CONTENT_REQUIRED_SIE' : 'CONTENT_REQUIRED_DU', 'Bitte beschreibe den Eintrag.')], 400);
         }
 
         $uploads = $_FILES['Attachments'] ?? [];
@@ -893,7 +922,7 @@ class MashaFeedlyEntryController extends Controller
 
         return $this->respond([
             'success' => true,
-            'message' => $this->translate(MashaFeedlyConfigExtension::address() === 'sie' ? 'ENTRY_SAVE_SUCCESS_SIE' : 'ENTRY_SAVE_SUCCESS_DU', 'Dein Eintrag wurde gespeichert.'),
+            'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'ENTRY_SAVE_SUCCESS_SIE' : 'ENTRY_SAVE_SUCCESS_DU', 'Dein Eintrag wurde gespeichert.'),
             'title' => $entry->Title,
             'entryID' => (int)$entry->ID,
             'dueDate' => (string)$entry->DueDate,

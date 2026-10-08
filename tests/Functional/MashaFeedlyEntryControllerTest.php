@@ -1990,6 +1990,10 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->logInAs($allowed);
         $allowed->MashaFeedlyShowOnboarding = true;
         $allowed->write();
+        $deferred = $this->post('/__masha-feedly/completeOnboarding', ['SecurityID' => SecurityToken::getSecurityID(), 'Deferred' => '1']);
+        $this->assertSame(200, $deferred->getStatusCode());
+        $this->assertFalse((bool)Member::get()->byID((int)$allowed->ID)->MashaFeedlyOnboardingCompleted);
+        $this->assertTrue((bool)Member::get()->byID((int)$allowed->ID)->MashaFeedlyShowOnboarding);
         $completed = $this->post('/__masha-feedly/completeOnboarding', ['SecurityID' => SecurityToken::getSecurityID()]);
         $this->assertSame(200, $completed->getStatusCode());
         $this->assertTrue((bool)Member::get()->byID((int)$allowed->ID)->MashaFeedlyOnboardingCompleted);
@@ -2048,6 +2052,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             'SecurityID' => SecurityToken::getSecurityID(),
             'MashaFeedlyTheme' => 'serious',
             'MashaFeedlyColor' => '#F4D06F',
+            'MashaFeedlyAddress' => 'sie',
         ]);
 
         $this->assertSame(200, $saved->getStatusCode());
@@ -2057,6 +2062,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $reloaded = Member::get()->byID((int)$allowed->ID);
         $this->assertSame('serious', (string)$reloaded->MashaFeedlyTheme);
         $this->assertSame('#F4D06F', (string)$reloaded->MashaFeedlyColor);
+        $this->assertSame('sie', (string)$reloaded->MashaFeedlyAddress);
         $this->assertSame('existing-icon', (string)$reloaded->MashaFeedlyAvatarIcon, 'Ein ausgelassenes optionales Icon darf nicht zurückgesetzt werden.');
     }
 
@@ -2081,6 +2087,69 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $reloaded = Member::get()->byID((int)$allowed->ID);
         $this->assertSame('playful', (string)$reloaded->MashaFeedlyTheme);
         $this->assertSame('#F6B7A9', (string)$reloaded->MashaFeedlyColor);
+    }
+
+    /** Ungültige persönliche Anreden werden abgewiesen, ohne Profilwerte zu ändern. */
+    public function testProfilePreferencesRejectInvalidAddress(): void
+    {
+        $allowed = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($allowed);
+        $allowed->MashaFeedlyAddress = 'du';
+        $allowed->MashaFeedlyTheme = 'serious';
+        $allowed->write();
+        $this->logInAs($allowed);
+
+        $response = $this->post('/__masha-feedly/saveProfilePreferences', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'MashaFeedlyTheme' => 'playful',
+            'MashaFeedlyColor' => '#F6B7A9',
+            'MashaFeedlyAddress' => 'casual',
+        ]);
+
+        $this->assertSame(400, $response->getStatusCode());
+        $reloaded = Member::get()->byID((int)$allowed->ID);
+        $this->assertSame('du', (string)$reloaded->MashaFeedlyAddress);
+        $this->assertSame('serious', (string)$reloaded->MashaFeedlyTheme);
+    }
+
+    /** E-Mail-Auswahlen werden nur nach erfolgreichem Website-Test gespeichert. */
+    public function testOnboardingProfilePreferencesSaveEmailChoicesOnlyAfterEmailTest(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($member);
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
+        $member->MashaFeedlyEmailNotifications = true;
+        $member->MashaFeedlyNotifyComments = true;
+        $member->write();
+        $config->MashaFeedlyEmailTestSucceeded = false;
+        $config->write();
+        $this->logInAs($member);
+
+        $locked = $this->post('/__masha-feedly/saveProfilePreferences', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EmailSettingsSubmitted' => '1',
+            'MashaFeedlyEmailNotifications' => '0',
+        ]);
+        $this->assertSame(400, $locked->getStatusCode());
+        $this->assertTrue((bool)Member::get()->byID((int)$member->ID)->MashaFeedlyEmailNotifications);
+
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
+        $saved = $this->post('/__masha-feedly/saveProfilePreferences', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EmailSettingsSubmitted' => '1',
+            'MashaFeedlyEmailNotifications' => '1',
+            'MashaFeedlyNotifyNewEntries' => '1',
+            'MashaFeedlyNotifyComments' => '0',
+        ]);
+        $this->assertSame(200, $saved->getStatusCode());
+        $reloaded = Member::get()->byID((int)$member->ID);
+        $this->assertTrue((bool)$reloaded->MashaFeedlyEmailNotifications);
+        $this->assertTrue((bool)$reloaded->MashaFeedlyNotifyNewEntries);
+        $this->assertFalse((bool)$reloaded->MashaFeedlyNotifyComments);
+        $this->assertFalse((bool)$reloaded->MashaFeedlyNotifyOwnEntryChanges, 'Nicht markierte Auswahlfelder werden als ausgeschaltet gespeichert.');
     }
 
     /** Filteransichten bleiben im Profil des Mitglieds und sind über die geschützten Endpunkte verwaltbar. */

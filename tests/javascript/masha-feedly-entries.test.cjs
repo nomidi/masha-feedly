@@ -821,6 +821,8 @@ test('lässt nur den aktuell ausgewählten Eintrag pulsiert markieren und setzt 
 });
 
 test('färbt das Website-Symbol in Prioritätsfarbe und zeigt es immer als Fehler-Marker', () => {
+  assert.match(scss, /\.kw-masha-feedly\[data-list-open="true"\],[\s\S]*?\.kw-masha-feedly\[data-edit-open="true"\] \{ z-index: 10010; \}/);
+  assert.match(compiledStyles, /\.kw-masha-feedly\[data-list-open=true\],\.kw-masha-feedly\[data-edit-open=true\]\{z-index:10010\}/);
   assert.match(scss, /\.kw-masha-feedly__page-marker-icon\s*\{[^}]*fill: currentColor/);
   assert.match(scss, /\.kw-masha-feedly__page-marker\s*\{[^}]*color: var\(--masha-feedly-priority-color/);
   assert.match(scss, /\.kw-masha-feedly__page-marker\.is-active \.kw-masha-feedly__page-marker-icon,[\s\S]*?\.kw-masha-feedly__page-marker:hover \.kw-masha-feedly__page-marker-icon\s*\{[^}]*animation: kw-masha-feedly-marker-selected/);
@@ -953,6 +955,14 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__comment-edited\s*\{ display: inline-block;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__comment-edited\{display:inline-block/);
   assert.match(scss, /\.kw-masha-feedly__onboarding-shade\s*\{ position: fixed; z-index: 9999;/);
+  assert.match(scss, /\.kw-masha-feedly__help-modal \{ z-index: 10020; \}/);
+  assert.match(scss, /\.kw-masha-feedly__onboarding-modal \{ z-index: 10020; \}/);
+  assert.match(scss, /\.kw-masha-feedly__onboarding-tip \{ position: fixed; z-index: 10021;/);
+  assert.match(scss, /\.kw-masha-feedly\s*\{[\s\S]*?z-index: 2147483000;/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__help-modal\{z-index:10020\}/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-modal\{z-index:10020\}/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-tip\{position:fixed;z-index:10021/);
+  assert.match(compiledStyles, /\.kw-masha-feedly\{[^}]*z-index:2147483000/);
   assert.match(scss, /\.kw-masha-feedly__onboarding-tip\.is-feedback\s*\{ border-color: #d51b43;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-shade\{position:fixed;z-index:9999/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-tip\.is-feedback\{border-color:#d51b43/);
@@ -960,6 +970,10 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-logo\{display:block;width:52px/);
   assert.match(widgetTemplate, /kw-masha-feedly__onboarding-welcome-header[\s\S]*?kw-masha-feedly__onboarding-logo--welcome/);
   assert.match(scss, /\.kw-masha-feedly__onboarding-welcome-header \{ align-items: center;/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-welcome-header\{align-items:center;justify-content:flex-start;gap:12px\}/);
+  assert.match(germanTranslations, /TOUR_WELCOME_TEXT: .*ohne erst eine E-Mail zu schreiben/);
+  assert.match(germanTranslations, /TOUR_WELCOME_WORKFLOW: .*Verantwortliche.*kommentieren.*erledigt/);
+  assert.match(widgetTemplate, /Translations\.TOUR_WELCOME_WORKFLOW/);
   assert.match(scss, /\.kw-masha-feedly__onboarding-logo--welcome \{ width: clamp\(72px, 5vw, 84px\); height: clamp\(72px, 5vw, 84px\); \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-logo--welcome\{width:clamp\(72px,5vw,84px\);height:clamp\(72px,5vw,84px\)\}/);
   assert.match(scss, /\.kw-masha-feedly__onboarding-modal a\.kw-masha-feedly__submit \{ display: inline-flex;/);
@@ -997,8 +1011,8 @@ test('liefert den Feedback-Button mit Wartetext, zugänglichem Label und passend
   assert.match(widgetTemplate, /viewBox="0 0 512 512" aria-hidden="true" focusable="false"><path d="M117\.333 149\.333H352/);
   assert.match(widgetTemplate, /value="feedback"/);
   assert.match(widgetTemplate, /value="page-open"/);
-  assert.match(widgetTemplate, /Der Globus zeigt offene Fehler auf der gesamten Website/);
-  assert.match(widgetTemplate, /Das Seitensymbol zeigt offene Fehler auf der Seite/);
+  assert.match(widgetTemplate, /HELP_ALL_TITLE/);
+  assert.match(widgetTemplate, /HELP_PAGE_TITLE/);
   assert.match(scss, /\.kw-masha-feedly__count-button::after \{ content: attr\(data-label\);/);
   assert.match(scss, /\.kw-masha-feedly__feedback-button\[hidden\] \{ display: none !important; \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__feedback-button\[hidden\]\{display:none !important\}/);
@@ -1895,6 +1909,48 @@ test('öffnet und schließt die kontextuelle Hilfe', async () => {
   assert.equal(env.helpModal.hidden, false);
   env.closeHelpButton.listeners.click();
   assert.equal(env.helpModal.hidden, true);
+});
+
+test('zeigt den Neustart der Einführung unten in der Hilfe als gestalteten Button', () => {
+  assert.match(germanTranslations, /HELP_RESTART_DU: .*Einführung noch einmal machen.*Klicke auf den Button/);
+  assert.match(germanTranslations, /HELP_RESTART_SIE: .*Einführung noch einmal machen.*Klicken Sie auf den Button/);
+  assert.match(widgetTemplate, /class="kw-masha-feedly__secondary kw-masha-feedly__help-restart-button" data-masha-feedly-restart-onboarding/);
+  assert.match(widgetTemplate, /<\/div>\s*<div class="kw-masha-feedly__help-restart">[\s\S]*?data-masha-feedly-restart-onboarding[\s\S]*?data-masha-feedly-restart-status/);
+  assert.match(scss, /\.kw-masha-feedly__help-restart-button:focus-visible/);
+  assert.match(scss, /\.kw-masha-feedly__help-modal > \.kw-masha-feedly__dialog \{ display: grid; grid-template-rows: auto minmax\(0, 1fr\) auto;/);
+  assert.match(scss, /\.kw-masha-feedly__help-restart \{ margin: 0; padding: 14px/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__help-restart-button:focus-visible/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__help-modal>\.kw-masha-feedly__dialog\{display:grid;grid-template-rows:auto minmax\(0, 1fr\) auto/);
+});
+
+test('erklärt Einträge in einfacher Sprache mit einem Markierungsbeispiel', () => {
+  assert.match(germanTranslations, /HELP_CREATE_DU: .*Klicke auf \+ und danach auf die Stelle/);
+  assert.match(germanTranslations, /HELP_EDIT_DU: .*nummerierte Markierung zeigt.*Klicke auf die Markierung.*ändern und speichern/);
+  assert.match(germanTranslations, /HELP_MARKER_EXAMPLE_TEXT: .*sitzt an der gemeldeten Stelle.*Klicke darauf/);
+  assert.match(widgetTemplate, /kw-masha-feedly__help-marker-example[\s\S]*?class="kw-masha-feedly__page-marker-icon" viewBox="0 0 612\.001 612\.001"[\s\S]*?HELP_MARKER_EXAMPLE_TEXT/);
+  assert.doesNotMatch(widgetTemplate.match(/kw-masha-feedly__help-marker-example"[\s\S]*?kw-masha-feedly__help-marker-example-arrow/)?.[0] || '', /<strong>\d+<\/strong>/);
+  assert.match(scss, /\.kw-masha-feedly__help-marker-example \{ display: flex;/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__help-marker-example\{display:flex/);
+});
+
+test('Hilfe zeigt echte Widget-Symbole mit einfachen Erklärungen', () => {
+  for (const icon of ['--add', '--news']) {
+    assert.match(widgetTemplate, new RegExp(`kw-masha-feedly__help-action-icon${icon}`));
+  }
+  assert.match(widgetTemplate, /kw-masha-feedly__help-actions[\s\S]*?viewBox="0 0 512 512"[\s\S]*?HELP_ALL_TITLE/);
+  assert.match(widgetTemplate, /viewBox="0 0 177800 177800"[\s\S]*?HELP_NEWS_TITLE/);
+  assert.match(widgetTemplate, /viewBox="0 0 512 512"[\s\S]*?HELP_FEEDBACK_TITLE/);
+  assert.match(germanTranslations, /HELP_ADD_TEXT_DU: .*Klicke auf \+.*Stelle/);
+  assert.match(germanTranslations, /HELP_ALL_TEXT_DU: .*ganzen Website/);
+  assert.match(germanTranslations, /HELP_PAGE_TEXT: .*nur offene Meldungen auf der Seite/);
+  assert.match(germanTranslations, /HELP_NEWS_TEXT: .*neue Meldungen und Kommentare/);
+  assert.match(germanTranslations, /HELP_FEEDBACK_TEXT: .*Rückmeldung wartet/);
+  assert.match(scss, /\.kw-masha-feedly__help-actions \{ display: grid;/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__help-actions\{display:grid/);
+  assert.match(scss, /\.kw-masha-feedly__help-action strong \{[^}]*font-size: calc\(16px/);
+  assert.match(scss, /\.kw-masha-feedly__help-action small \{[^}]*font-size: calc\(14px/);
+  assert.match(scss, /\.kw-masha-feedly__help-action-icon--add \{ width: 60px; height: 60px; flex-basis: 60px; border-radius: 18\.4px;/);
+  assert.match(scss, /\.kw-masha-feedly__add \{ display: grid; width: 60px; height: 60px; place-items: center; padding: 0; border: 0; border-radius: 18\.4px;/);
 });
 
 test('öffnet den Seitenzähler direkt in der gefilterten Seitenübersicht', async () => {

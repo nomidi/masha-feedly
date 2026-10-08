@@ -41,6 +41,7 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     // Das Testkonto muss in den Masha:Feedly-Einstellungen freigeschaltet sein.
     // Ein noch offener Erststartdialog wird geschlossen, bevor der Hilfeneustart getestet wird.
     const firstWelcome = widget.locator('[data-masha-feedly-onboarding-welcome]');
+    await expect(firstWelcome.locator('[data-masha-feedly-profile-link]')).toHaveCount(0);
     if (await firstWelcome.isVisible()) await widget.locator('[data-masha-feedly-tour-skip]').click();
     const toggle = widget.locator('.kw-masha-feedly__toggle');
     if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
@@ -106,7 +107,16 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     await expect(editForm.locator('[name="DueDate"]')).toBeEnabled();
     const feedback = statusSelect.locator('option').filter({ hasText: /^Feedback$/ }).first();
     await statusSelect.selectOption(await feedback.getAttribute('value'));
+    const assigneeChoice = editForm.locator('.kw-masha-feedly__assignee-choice').first();
+    const assigneeName = assigneeChoice.locator('.kw-masha-feedly__assignee-name');
+    await assigneeChoice.hover();
+    await expect(assigneeName).toHaveCSS('clip-path', 'none');
+    await expect(assigneeName).toHaveCSS('font-size', '12px');
+    await expect(assigneeName).toHaveCSS('color', 'rgb(255, 255, 255)');
     const assignee = editForm.locator('[name="AssignedMemberIDs[]"]').first();
+    await assignee.focus();
+    await page.mouse.move(0, 0);
+    await expect(assigneeName).toHaveCSS('clip-path', 'none');
     if (!(await assignee.isChecked())) await assignee.locator('xpath=..').click();
     await expect(assignee).toBeChecked();
     const updateResponsePromise = page.waitForResponse((response) =>
@@ -120,6 +130,35 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     await expect(widget.locator('[data-masha-feedly-onboarding-thanks]')).toContainText('Danke fürs Mitmachen');
     const preferences = widget.locator('[data-masha-feedly-profile-preferences]');
     await expect(preferences).toBeVisible();
+    const preferenceSectionHeights = await preferences.locator('details').evaluateAll((sections) => sections.map((section) => ({
+      name: section.querySelector('summary')?.textContent.trim(),
+      sectionHeight: section.getBoundingClientRect().height,
+      summaryHeight: section.querySelector('summary')?.getBoundingClientRect().height || 0,
+    })));
+    for (const section of preferenceSectionHeights) {
+      assert.ok(section.sectionHeight > section.summaryHeight + 2, `Der geöffnete Einstellungsbereich „${section.name}“ muss seinen Inhalt vollständig anzeigen.`);
+    }
+    const preferenceLayout = await preferences.evaluate((form) => {
+      const sections = [...form.children].filter((element) => element.matches('section, details, label'));
+      return {
+        sections: sections.map((section) => ({
+          name: section.querySelector('h3, summary')?.textContent.trim() || section.textContent.trim(),
+          top: section.getBoundingClientRect().top,
+          bottom: section.getBoundingClientRect().bottom,
+        })),
+        addressHeight: form.querySelector('[name="MashaFeedlyAddress"]').getBoundingClientRect().height,
+        addressWidth: form.querySelector('[name="MashaFeedlyAddress"]').getBoundingClientRect().width,
+      };
+    });
+    for (let index = 1; index < preferenceLayout.sections.length; index += 1) {
+      const previous = preferenceLayout.sections[index - 1];
+      const current = preferenceLayout.sections[index];
+      assert.ok(current.top >= previous.bottom + 8, `„${current.name}“ darf den vorherigen Einstellungsbereich nicht überlagern.`);
+    }
+    assert.ok(preferenceLayout.addressHeight <= 44, 'Die Anrede-Auswahl muss im Abschlussdialog kompakt bleiben.');
+    assert.ok(preferenceLayout.addressWidth <= 190, 'Die Anrede-Auswahl darf nicht die gesamte Formularbreite einnehmen.');
+    const avatarPreview = preferences.locator('[data-masha-feedly-avatar-preview]');
+    await expect(avatarPreview).toBeVisible();
     const themeSelect = preferences.locator('[name="MashaFeedlyTheme"]');
     const currentTheme = await themeSelect.inputValue();
     const availableThemes = await themeSelect.locator('option').evaluateAll((options) => options.map((option) => option.value));
@@ -130,13 +169,24 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     const colorField = preferences.locator('[name="MashaFeedlyColor"]');
     const currentColor = await colorField.inputValue();
     const colorDetails = preferences.locator('[data-masha-feedly-onboarding-colors]');
-    await expect(colorDetails).not.toHaveAttribute('open', '');
-    await colorDetails.locator('summary').click();
     await expect(colorDetails).toHaveAttribute('open', '');
     const colorChoices = await preferences.locator('[data-masha-feedly-color-option]').evaluateAll((options) => options.map((option, index) => ({ color: option.dataset.color, index })));
     assert.equal(colorChoices.filter(choice => choice.color).length, 18, 'Der Abschlussdialog muss auch beim Neustart die vollständige Farbpalette enthalten.');
-    const nextColor = colorChoices.find((choice) => choice.color === '#35A98F');
-    if (nextColor) await preferences.locator('[data-masha-feedly-color-option]').nth(nextColor.index).click();
+    const nextColor = colorChoices.find((choice) => choice.color && choice.color !== currentColor);
+    if (nextColor) {
+      const colorOption = preferences.locator('[data-masha-feedly-color-option]').nth(nextColor.index);
+      await colorOption.evaluate((element) => element.click());
+    }
+    if (nextColor) {
+      const channels = nextColor.color.match(/[\da-f]{2}/gi).map((channel) => Number.parseInt(channel, 16));
+      await expect(avatarPreview).toHaveCSS('background-color', `rgb(${channels.join(', ')})`);
+      await expect(preferences.locator('[data-masha-feedly-color-preview]')).toHaveCSS('background-color', `rgb(${channels.join(', ')})`);
+    }
+    const emailMaster = preferences.locator('[data-masha-feedly-email-master]');
+    if (await emailMaster.count()) {
+      await expect(emailMaster).toBeEnabled();
+      await expect(preferences.locator('[data-masha-feedly-email-option]')).toHaveCount(6);
+    }
     const iconResponse = await context.request.get(new URL('/__masha-feedly-effects/icons', config.baseURL).href);
     if (iconResponse.ok()) {
       const iconCatalogue = await iconResponse.json();
@@ -146,15 +196,25 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
         await expect(preferences.locator('[data-masha-feedly-avatar-icon-dialog]')).toBeVisible();
         const icon = preferences.locator('[data-masha-feedly-avatar-icons] [role="tabpanel"]:visible img').first();
         await expect.poll(() => icon.evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
-        await expect(icon).toHaveAttribute('src', /\/white$/);
-        await expect(icon).toHaveCSS('background-color', 'rgb(53, 169, 143)');
-        await preferences.locator('button[data-masha-feedly-avatar-icon-close]').click();
+        const channels = colorField.inputValue().then((value) => value.match(/[\da-f]{2}/gi).map((channel) => Number.parseInt(channel, 16)));
+        const [red, green, blue] = await channels;
+        const expectedIconVariant = ['#35A98F', '#69B85A'].includes((await colorField.inputValue()).toUpperCase())
+          || 0.2126 * red / 255 + 0.7152 * green / 255 + 0.0722 * blue / 255 <= 0.52
+          ? 'white' : 'black';
+        await expect(icon).toHaveAttribute('src', new RegExp(`/${expectedIconVariant}$`));
+        await expect(preferences.locator('[data-masha-feedly-avatar-icons]')).toHaveCSS('--masha-avatar-color', await colorField.inputValue());
+        const selectedIcon = preferences.locator('[data-masha-feedly-avatar-icon-choice][aria-pressed="false"]').first();
+        const selectedIconID = await selectedIcon.getAttribute('data-icon-id');
+        await selectedIcon.click();
+        await expect(avatarPreview.locator('img')).toHaveAttribute('src', new RegExp(`/icon/${selectedIconID}/[^/]+/${expectedIconVariant}$`));
+        await expect.poll(() => avatarPreview.locator('img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+        await expect(preferences.locator('[name="MashaFeedlyAvatarIcon"]')).toHaveValue(selectedIconID);
       }
     }
 
     const profileResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/saveProfilePreferences'));
-    await preferences.locator('[type="submit"]').click();
+    await widget.locator('[data-masha-feedly-onboarding-save]').click();
     const profileResponse = await profileResponsePromise;
     const profileBody = await profileResponse.text();
     let profileResult;
@@ -169,6 +229,32 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     if (nextColor) assert.equal(await colorField.inputValue(), nextColor.color);
     await expect(preferences.locator('[data-masha-feedly-profile-preferences-status]')).toContainText('gespeichert');
     await expect(widget.locator('[data-masha-feedly-thanks-close]')).toBeVisible();
+    const profileLink = widget.locator('[data-masha-feedly-onboarding-thanks] [data-masha-feedly-profile-link]');
+    await expect(profileLink).toContainText('Theme einstellen');
+    await profileLink.click();
+    await page.waitForURL((url) => /myprofile\/?$/.test(url.pathname) && url.hash === '#Root_MashaFeedly');
+    await expect(page).toHaveURL(/myprofile\/?#Root_MashaFeedly$/);
+    const profileForm = page.locator('form').filter({ has: page.locator('[name="MashaFeedlyColor"]') }).first();
+    const profilePreview = profileForm.locator('[data-masha-feedly-avatar-preview]');
+    await expect(profilePreview).toBeVisible();
+    const profileColorOption = profileForm.locator('[data-masha-feedly-color-option][data-color]:not([data-color=""])').first();
+    const profileNextColor = await profileColorOption.getAttribute('data-color');
+    if (await profileColorOption.isEnabled()) {
+      await profileColorOption.click();
+      const profileColorChannels = profileNextColor.match(/[\da-f]{2}/gi).map((channel) => Number.parseInt(channel, 16));
+      await expect(profilePreview).toHaveCSS('background-color', `rgb(${profileColorChannels.join(', ')})`);
+    }
+    const profileIconOpen = profileForm.locator('[data-masha-feedly-avatar-icon-open]');
+    if (await profileIconOpen.count() && await profileIconOpen.isEnabled()) {
+      await profileIconOpen.click();
+      const profileIconChoice = profileForm.locator('[data-masha-feedly-avatar-icon-choice][aria-pressed="false"]').first();
+      const profileIconID = await profileIconChoice.getAttribute('data-icon-id');
+      const profileIconVariant = await profileForm.locator('[data-masha-feedly-avatar-icons]').getAttribute('data-icon-color');
+      await profileIconChoice.click();
+      await expect(profilePreview.locator('img')).toHaveAttribute('src', new RegExp(`/icon/${profileIconID}/[^/]+/${profileIconVariant}$`));
+      await expect(profileForm.locator('[name="MashaFeedlyAvatarIcon"]')).toHaveValue(profileIconID);
+    }
+
   } finally {
     await context.close();
     await browser.close();

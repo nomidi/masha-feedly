@@ -4,6 +4,7 @@ namespace KW\MashaFeedly\Tests\Unit\Extension;
 
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use KW\MashaFeedly\Extension\MashaFeedlyMemberExtension;
+use KW\MashaFeedly\Forms\MashaFeedlyInteractiveLiteralField;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Service\MashaFeedlyAttachmentService;
@@ -81,6 +82,9 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertArrayHasKey('serious', $themeOptions);
         $this->assertNotSame('', trim((string)$themeOptions['playful']));
         $this->assertNotSame('', trim((string)$themeOptions['serious']));
+        $addressField = $appearanceGroup->getChildren()->dataFieldByName('MashaFeedlyAddress');
+        $this->assertInstanceOf(DropdownField::class, $addressField);
+        $this->assertSame('Website-Vorgabe', $addressField->getEmptyString());
         $this->assertNull($mainTab->Fields()->dataFieldByName('MashaFeedlyOnboardingCompleted'));
         $profileGroup = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyProfileSettings');
         $this->assertInstanceOf(\SilverStripe\Forms\CompositeField::class, $profileGroup);
@@ -103,7 +107,11 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertStringContainsString('masha-feedly-color-palette__swatch', MashaFeedlyMemberExtension::renderColorPalette());
         $this->assertStringContainsString('Automatisch vergeben', MashaFeedlyMemberExtension::renderColorPalette());
         $this->assertStringContainsString('data-color=""', MashaFeedlyMemberExtension::renderColorPalette());
-        $this->assertStringContainsString('bestimme, worüber dich Masha:Feedly per E-Mail informiert', $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyPreferencesIntro')->getContent());
+        $intro = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyPreferencesIntro')->getContent();
+        foreach (['Profilbild', 'Masha-Symbol (sofern verfügbar)', 'Avatarfarbe', 'Effekt-Kategorie', 'E-Mail-Benachrichtigungen', 'Einführung bei Bedarf erneut'] as $capability) {
+            $this->assertStringContainsString($capability, $intro);
+        }
+        $this->assertStringNotContainsString('Kostenschätzungen freigeben', $intro);
         $emailGroup = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyEmailSettings');
         $this->assertInstanceOf(\SilverStripe\Forms\CompositeField::class, $emailGroup);
         $this->assertSame('E-Mail-Benachrichtigungen', $emailGroup->Title());
@@ -146,6 +154,34 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertStringContainsString('selbst erstellst oder änderst', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyOwnEntryChanges')->getDescription());
         $this->assertStringContainsString('oder den du erstellt hast', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyComments')->getDescription());
         $this->assertStringContainsString('Status, Beschreibung, Zuständigkeit', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyEntryUpdates')->getDescription());
+    }
+
+    /** Prüft, dass eigene Icon- und Farbschaltflächen bei der Sudo-Schreibsperre stillgelegt werden. */
+    public function testInteractiveProfileFieldsBecomeReadonlyWithSudoMode(): void
+    {
+        $palette = MashaFeedlyInteractiveLiteralField::create(
+            'Palette',
+            MashaFeedlyMemberExtension::renderColorPalette()
+        );
+        $readonlyPalette = $palette->performReadonlyTransformation();
+        $paletteHTML = $readonlyPalette->getContent();
+
+        $this->assertTrue($readonlyPalette->isReadonly());
+        $this->assertStringContainsString('disabled aria-disabled="true"', $paletteHTML);
+
+        $iconPicker = MashaFeedlyInteractiveLiteralField::create(
+            'IconPicker',
+            '<div data-masha-feedly-avatar-icons><button type="button">Symbol auswählen</button></div>'
+        );
+        $readonlyIconPicker = $iconPicker->performReadonlyTransformation();
+        $iconHTML = $readonlyIconPicker->getContent();
+
+        $this->assertTrue($readonlyIconPicker->isReadonly());
+        $this->assertStringContainsString('inert aria-disabled="true"', $iconHTML);
+        $this->assertStringContainsString('disabled aria-disabled="true"', $iconHTML);
+
+        $readonlyUpload = UploadField::create('Avatar')->performReadonlyTransformation();
+        $this->assertTrue($readonlyUpload->isReadonly());
     }
 
     /** Sperrt Profilfelder und Änderungen, bis ein Testversand erfolgreich war. */
@@ -196,6 +232,12 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->logInAs($otherMember);
         $fields = $otherMember->getCMSFields();
 
+        $mashaFeedlyTab = $fields->findTab('Root.MashaFeedly');
+        $this->assertNotNull($mashaFeedlyTab);
+        $accessNotice = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyAccessNotice');
+        $this->assertInstanceOf(\SilverStripe\Forms\LiteralField::class, $accessNotice);
+        $this->assertStringContainsString('noch nicht freigeschaltet', $accessNotice->getContent());
+        $this->assertStringContainsString('nur für freigeschaltete Mitglieder', $accessNotice->getContent());
         $this->assertNull($fields->dataFieldByName('MashaFeedlyEmailNotifications'));
         $this->assertNull($fields->dataFieldByName('MashaFeedlyNotifyNewEntries'));
         $this->assertNull($fields->dataFieldByName('MashaFeedlyNotifyEntryUpdates'));
@@ -217,6 +259,8 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertTrue((bool)$member->MashaFeedlyNotifyEntryUpdates);
         $this->assertFalse((bool)$member->MashaFeedlyNotifyOwnEntryChanges);
         $this->assertTrue((bool)$member->MashaFeedlyNotifyComments);
+        $this->assertTrue((bool)$member->MashaFeedlyNotifyDueDateReminders);
+        $this->assertTrue((bool)$member->MashaFeedlyNotifyCostEstimates);
     }
 
     /** Das persönliche Theme überschreibt die Website-Vorgabe; ungültige Werte fallen sicher zurück. */
@@ -242,6 +286,23 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $firstMember->MashaFeedlyTheme = 'not a valid id!';
         $firstMember->write();
         $this->assertSame('playful', MashaFeedlyMemberExtension::themeFor(Member::get()->byID($firstMember->ID)));
+    }
+
+    /** Persönliche Anrede überschreibt die Website-Vorgabe nur bei einer Auswahl. */
+    public function testPersonalAddressUsesWebsiteDefaultAndAllowsIndependentChoices(): void
+    {
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAddress = 'sie';
+        $config->write();
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->assertSame('sie', MashaFeedlyMemberExtension::addressFor($member));
+
+        $member->MashaFeedlyAddress = 'du';
+        $member->write();
+        $this->assertSame('du', MashaFeedlyMemberExtension::addressFor(Member::get()->byID($member->ID)));
+        $member->MashaFeedlyAddress = 'xxx';
+        $member->write();
+        $this->assertSame('sie', MashaFeedlyMemberExtension::addressFor(Member::get()->byID($member->ID)));
     }
 
     /** Die Icon-Auswahl erfordert explizite Anbieter-URL und Schlüssel; Avatar-Farben wählen eine Kontrastvariante. */

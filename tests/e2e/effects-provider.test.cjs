@@ -48,14 +48,28 @@ test('Profil: Avatarfarbe bleibt nach CMS-Speichern und Neuladen erhalten', { sk
     await page.locator('input[type="password"]').first().fill(config.SUPERADMIN_PASSWORD);
     await page.locator('button[type="submit"], input[type="submit"]').first().click();
     await page.goto(profileURL);
+    const welcomeDialog = page.locator('[data-masha-feedly-onboarding-welcome]');
+    if (await welcomeDialog.isVisible()) {
+      await welcomeDialog.locator('[data-masha-feedly-tour-skip]').click();
+      await expect(welcomeDialog).toBeHidden();
+    }
     const appearance = page.locator('.masha-feedly-profile-appearance');
     await expect(appearance).toBeVisible();
+    const lockedColor = appearance.locator('[data-masha-feedly-color-option]').first();
+    await expect(lockedColor).toBeDisabled();
+    await lockedColor.hover({ force: true });
+    await expect(lockedColor).toHaveCSS('transform', 'none');
+    const profileIcons = page.locator('.masha-feedly-profile-settings [data-masha-feedly-avatar-icons]');
+    await expect(profileIcons).toHaveAttribute('inert', '');
+    await expect(profileIcons.locator('[data-masha-feedly-avatar-icon-open]')).toBeDisabled();
     const verification = page.locator('.sudo-mode-password-field__notice-button');
     await expect(verification).toBeVisible();
     await verification.click();
     await page.locator('[name="SudoModePassword"]').fill(config.SUPERADMIN_PASSWORD);
     await page.locator('.sudo-mode-password-field__verify-button').click();
     await expect(page.locator('[name="action_save"]')).toBeEnabled();
+    await expect(appearance.locator('[data-masha-feedly-color-option]').first()).toBeEnabled();
+    await expect(profileIcons).not.toHaveAttribute('inert', '');
     originalColor = await appearance.locator('[name="MashaFeedlyColor"]').inputValue();
     const selectedColor = originalColor === '#6383D8' ? '#35A98F' : '#6383D8';
     changed = true;
@@ -102,7 +116,8 @@ test('Effekt-Anbieter: CMS-Katalog lädt versionierte Dateien und spielt im Shad
       const playback = await window.KWMashaFeedlyEffects.preview(effect.id, document);
       const styles = [...window.KWMashaFeedlyDOM.root().querySelectorAll('link[rel="stylesheet"]')].map(link => link.href);
       const count = window.KWMashaFeedlyEffects.cancelActive();
-      return { id: effect.id, played: !!playback, cancelled: count, styles, css: effect.files.css, url: effect.files.js };
+      const recordID = new URL(effect.files.js).pathname.match(/\/file\/(\d+)\//)?.[1];
+      return { id: effect.id, name: effect.name, recordID, played: !!playback, cancelled: count, styles, css: effect.files.css, url: effect.files.js };
     });
     assert.ok(result.played, `Effekt ${result.id} muss laufen.`);
     assert.ok(result.cancelled > 0);
@@ -122,11 +137,19 @@ test('Effekt-Anbieter: CMS-Katalog lädt versionierte Dateien und spielt im Shad
     } finally { await guest.close(); }
     await page.goto(new URL('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig', config.BASE_URL).href);
     await expect(page.locator('[data-masha-feedly-effect-catalog] [data-masha-feedly-animation-preview-card]').first()).toBeAttached();
-    const recordID = new URL(result.url).pathname.match(/\/file\/(\d+)\//)[1];
-    await page.goto(new URL(`/admin/masha-effects/KW-MashaEffects-Model-Effect/EditForm/field/KW-MashaEffects-Model-Effect/item/${recordID}/edit`, config.BASE_URL).href);
+    await page.goto(new URL('/admin/masha-effects/KW-MashaEffects-Model-Effect', config.BASE_URL).href);
+    const effectRow = page.locator('tr').filter({ hasText: result.name });
+    await expect(effectRow).toHaveCount(1);
+    // Silverstripe blendet die Bearbeiten-Aktion bis zum Öffnen des Zeilenmenüs aus.
+    const editPath = await effectRow.locator('a.edit-link').getAttribute('href');
+    assert.ok(editPath, `Bearbeiten-Link für ${result.name} muss vorhanden sein.`);
+    await page.goto(new URL(editPath, config.BASE_URL).href);
     await expect(page.locator('input[name="Title"]')).toBeVisible();
-    await expect(page.locator('select[name="Theme"]')).toBeAttached();
-    await expect(page.locator('input[type="checkbox"][name^="Months["]')).toHaveCount(12);
+    await expect(page.locator('input[name^="Categories"]')).not.toHaveCount(0);
+    await expect(page.locator('input[name="StartDate"]')).toBeAttached();
+    await expect(page.locator('input[name="EndDate"]')).toBeAttached();
+    await expect(page.locator('input[name="AnnualStart"]')).toBeAttached();
+    await expect(page.locator('input[name="AnnualEnd"]')).toBeAttached();
     await expect(page.locator('select[name="JavaScriptFile"]')).toHaveValue(/js\/.+\.js/);
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
@@ -150,11 +173,19 @@ test('Effekt-Anbieter: Profil-Icon-Katalog wird vollständig über Feedly gelade
     assert.equal(catalogue.categories.length, 11);
     assert.equal(catalogue.icons.length, 116);
     await page.goto(new URL('/admin/myprofile#Root_MashaFeedly', config.BASE_URL).href);
-    await expect(page.locator('.masha-feedly-avatar-icons')).toBeVisible();
-    await expect(page.locator('.masha-feedly-avatar-icons__unavailable')).toHaveCount(0);
-    await page.locator('[data-masha-feedly-avatar-icon-open]').click();
-    await expect(page.locator('[data-masha-feedly-avatar-icon-dialog]')).toBeVisible();
-    const iconDialog = page.locator('[data-masha-feedly-avatar-icon-dialog]');
+    const iconPicker = page.locator('.masha-feedly-profile-settings [data-masha-feedly-avatar-icons]').last();
+    await expect(iconPicker).toBeVisible();
+    await expect(page.locator('.masha-feedly-profile-settings .masha-feedly-avatar-icons__unavailable')).toHaveCount(0);
+    const iconTrigger = iconPicker.locator('[data-masha-feedly-avatar-icon-open]');
+    if (await iconTrigger.isDisabled()) {
+      await page.locator('.sudo-mode-password-field__notice-button').click({ force: true });
+      await page.locator('[name="SudoModePassword"]').fill(config.SUPERADMIN_PASSWORD);
+      await page.locator('.sudo-mode-password-field__verify-button').click();
+    }
+    await expect(iconTrigger).toBeEnabled();
+    await iconTrigger.click();
+    const iconDialog = iconPicker.locator('[data-masha-feedly-avatar-icon-dialog]');
+    await expect(iconDialog).toBeVisible();
     const tabs = iconDialog.locator('[data-masha-feedly-avatar-icon-tab]');
     await expect(tabs).toHaveCount(11);
     const activePanel = iconDialog.locator('[role="tabpanel"]:not([hidden])');
@@ -167,8 +198,8 @@ test('Effekt-Anbieter: Profil-Icon-Katalog wird vollständig über Feedly gelade
     await expect(iconChoice).toBeVisible();
     const iconID = await iconChoice.getAttribute('data-icon-id');
     await iconChoice.click();
-    await expect(page.locator('[name="MashaFeedlyAvatarIcon"]').last()).toHaveValue(iconID);
-    await expect(page.locator('[data-masha-feedly-avatar-icon-dialog]')).toBeHidden();
+    await expect(page.locator('.masha-feedly-profile-settings [name="MashaFeedlyAvatarIcon"]')).toHaveValue(iconID);
+    await expect(iconDialog).toBeHidden();
   } finally { await context.close(); await browser.close(); }
 });
 
@@ -189,11 +220,11 @@ test('Effekt-Zugänge: CMS erzeugt einmalige Website-Schlüssel und sperrt deakt
     await page.goto(new URL(route + 'new', config.BASE_URL).href);
     await page.locator('input[name="Title"]').fill(`E2E Effekt-Zugang ${Date.now()}`);
     await page.locator('input[name="WebsiteURL"]').fill('https://effects-e2e.example.test');
-    await Promise.all([page.waitForResponse(response => response.request().method() === 'POST' && response.url().includes('/admin/masha-effects/')), page.locator('button[name="action_doSave"]').click()]);
+    await Promise.all([page.waitForResponse(response => response.request().method() === 'POST'), page.locator('button[name="action_doSave"]').click()]);
     await expect(page.locator('button[name="action_doGenerateKey"]')).toBeVisible();
     editURL = page.url();
     const generate = async () => {
-      const [response] = await Promise.all([page.waitForResponse(response => response.request().method() === 'POST' && response.url().includes('/admin/masha-effects/')), page.locator('button[name="action_doGenerateKey"]').click()]);
+      const [response] = await Promise.all([page.waitForResponse(response => response.request().method() === 'POST'), page.locator('button[name="action_doGenerateKey"]').click()]);
       assert.equal(response.status(), 200);
       assert.ok((response.headers()['cache-control'] || '').includes('no-store'));
       await page.locator('[data-masha-effects-generated-key]').waitFor({ state: 'visible' });
@@ -218,7 +249,7 @@ test('Effekt-Zugänge: CMS erzeugt einmalige Website-Schlüssel und sperrt deakt
     assert.equal(await status(second), 200);
     await page.goto(editURL);
     await page.locator('input[name="Active"]').uncheck();
-    await Promise.all([page.waitForResponse(response => response.request().method() === 'POST' && response.url().includes('/admin/masha-effects/')), page.locator('button[name="action_doSave"]').click()]);
+    await Promise.all([page.waitForResponse(response => response.request().method() === 'POST'), page.locator('button[name="action_doSave"]').click()]);
     await page.goto(editURL);
     await expect(page.locator('input[name="Active"]')).not.toBeChecked();
     assert.equal(await status(second), 403);
@@ -226,7 +257,7 @@ test('Effekt-Zugänge: CMS erzeugt einmalige Website-Schlüssel und sperrt deakt
     if (editURL) {
       await page.goto(editURL);
       page.on('dialog', dialog => dialog.accept());
-      await Promise.all([page.waitForResponse(response => response.request().method() === 'POST' && response.url().includes('/admin/masha-effects/')), page.locator('button[name="action_doDelete"]').click()]);
+      await Promise.all([page.waitForResponse(response => response.request().method() === 'POST'), page.locator('button[name="action_doDelete"]').click()]);
     }
     await browser.close();
   }

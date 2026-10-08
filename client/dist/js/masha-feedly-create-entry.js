@@ -226,6 +226,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const elementPosition = window.KWMashaFeedlyEnvironment.elementPosition(element, event.clientX, event.clientY);
     stopSelection();
     if (element && element !== document.body) {
+      // Kennzeichnet den einen Seitenklick, der gerade den Tour-Schritt wechselt.
+      event.mashaFeedlyTargetSelectionHandled = true;
       showEntryDialog(element, {
         elementPosition,
       });
@@ -282,7 +284,9 @@ document.addEventListener('DOMContentLoaded', () => {
       toggle.setAttribute('aria-label', t('CLOSE_WIDGET'));
       document.dispatchEvent(new CustomEvent('kw-masha-feedly:opened'));
       document.dispatchEvent(new CustomEvent('kw-masha-feedly:refresh'));
-      document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-entry-saved'));
+      document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-entry-saved', {
+        detail: { entryID: Number(result.entryID) },
+      }));
       form.reset();
       setTimeout(() => { modal.hidden = true; toggleButton?.focus?.(); }, 500);
       setTimeout(() => { toast.hidden = true; }, 6000);

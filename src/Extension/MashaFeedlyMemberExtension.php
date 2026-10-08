@@ -19,6 +19,7 @@ use SilverStripe\Security\InheritedPermissions;
 use KW\MashaFeedly\Service\MashaFeedlyFolderService;
 use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
+use KW\MashaFeedly\Forms\MashaFeedlyInteractiveLiteralField;
 use SilverStripe\i18n\i18n;
 use SilverStripe\View\Requirements;
 
@@ -37,6 +38,7 @@ use SilverStripe\View\Requirements;
  * @property string $MashaFeedlyAvatarIcon Kennung eines ausgewählten Anbieter-Icons.
  * @property string $MashaFeedlyColor Individuelle Avatarfarbe im Masha-Feedly-Board.
  * @property string $MashaFeedlyTheme Persönliches Masha-Feedly-Theme oder leere Website-Vorgabe.
+ * @property string $MashaFeedlyAddress Persönliche Anrede (du/sie) oder leere Website-Vorgabe.
  * @package MashaFeedly
  * @author Kooperative Web
  * @license MIT
@@ -56,6 +58,7 @@ class MashaFeedlyMemberExtension extends Extension
         'MashaFeedlyColor' => 'Varchar(7)',
         'MashaFeedlyAvatarIcon' => 'Varchar(50)',
         'MashaFeedlyTheme' => 'Varchar(80)',
+        'MashaFeedlyAddress' => 'Varchar(3)',
         'MashaFeedlyOnboardingCompleted' => 'Boolean',
         'MashaFeedlyShowOnboarding' => 'Boolean',
     ];
@@ -144,6 +147,13 @@ class MashaFeedlyMemberExtension extends Extension
         return preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $theme)
             ? $theme
             : MashaFeedlyConfigExtension::theme();
+    }
+
+    /** Liefert die persönliche Anrede oder verwendet die Website-Vorgabe. */
+    public static function addressFor(?Member $member): string
+    {
+        $address = strtolower(trim((string)($member?->MashaFeedlyAddress ?? '')));
+        return in_array($address, ['du', 'sie'], true) ? $address : MashaFeedlyConfigExtension::address();
     }
 
     /** Wählt aus der Palette die bisher am seltensten vergebene Farbe. */
@@ -308,6 +318,7 @@ class MashaFeedlyMemberExtension extends Extension
             'MashaFeedlyAvatarIcon',
             'MashaFeedlyColor',
             'MashaFeedlyTheme',
+            'MashaFeedlyAddress',
             'MashaFeedlyProfileAppearance',
             'MashaFeedlyOnboardingSettings',
             'MashaFeedlyEstimateSettings',
@@ -316,9 +327,7 @@ class MashaFeedlyMemberExtension extends Extension
         $currentUser = Security::getCurrentUser();
         $emailTestSucceeded = MashaFeedlyConfigExtension::emailTestSucceeded();
         $isEstimateManager = MashaFeedlyEntry::canManageReporter($currentUser);
-        if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($currentUser) && !$isEstimateManager) {
-            return;
-        }
+        $isAllowedMember = MashaFeedlyConfigExtension::isExplicitlyAllowed($currentUser);
 
         $estimateSettings = $isEstimateManager
             ? CompositeField::create(CheckboxField::create(
@@ -330,7 +339,19 @@ class MashaFeedlyMemberExtension extends Extension
                 ->addExtraClass('masha-feedly-profile-settings masha-feedly-estimate-settings')
             : null;
 
-        if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($currentUser)) {
+        if (!$isAllowedMember) {
+            Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly.css');
+            $fields->addFieldToTab(
+                'Root.MashaFeedly',
+                LiteralField::create(
+                    'MashaFeedlyAccessNotice',
+                    '<aside class="masha-feedly-profile-access-notice"><strong>'
+                    . self::translate('PROFILE_ACCESS_TITLE', 'Masha:Feedly ist noch nicht freigeschaltet')
+                    . '</strong><p>'
+                    . self::translate('PROFILE_ACCESS_REQUIRED', 'Diese Profileinstellungen und das Masha:Feedly-Widget sind nur für freigeschaltete Mitglieder verfügbar. Bitte wende dich an die zuständige Administration, wenn du Zugriff benötigst.')
+                    . '</p></aside>'
+                )
+            );
             if ($estimateSettings) {
                 $fields->addFieldToTab('Root.MashaFeedly', $estimateSettings);
             }
@@ -393,14 +414,14 @@ class MashaFeedlyMemberExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-avatar-icons.js');
         if ($avatarIconPicker !== '') {
             $avatarFields[] = CompositeField::create(
-                LiteralField::create('MashaFeedlyAvatarIconChoices', $avatarIconPicker),
+                MashaFeedlyInteractiveLiteralField::create('MashaFeedlyAvatarIconChoices', $avatarIconPicker),
                 HiddenField::create('MashaFeedlyAvatarIcon', null, (string)$this->owner->MashaFeedlyAvatarIcon)
                     ->setAttribute('data-masha-feedly-avatar-icon-value', 'true')
             )->setName('MashaFeedlyAvatarIconSelection')->setTitle(self::translate('PROFILE_ICON_SELECTION', 'Oder ein eigenes Masha-Icon wählen'));
             Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-avatar-icons.js');
         }
         $avatarColor = CompositeField::create(
-            LiteralField::create('MashaFeedlyColorPalette', self::renderColorPalette(
+            MashaFeedlyInteractiveLiteralField::create('MashaFeedlyColorPalette', self::renderColorPalette(
                 'MashaFeedlyColor', self::normalizeColor((string)$this->owner->MashaFeedlyColor)
             )),
             HiddenField::create('MashaFeedlyColor', null, self::normalizeColor((string)$this->owner->MashaFeedlyColor) ?? '')
@@ -408,17 +429,35 @@ class MashaFeedlyMemberExtension extends Extension
 
         $appearanceSettings = CompositeField::create(
             $avatarColor,
+            DropdownField::create('MashaFeedlyAddress', self::translate('PROFILE_ADDRESS', 'Anrede im Modul'), [
+                'du' => self::translate('CONFIG_ADDRESS_DU', 'Du'),
+                'sie' => self::translate('CONFIG_ADDRESS_SIE', 'Sie'),
+            ])
+                ->setValue((string)$this->owner->MashaFeedlyAddress)
+                ->setEmptyString(self::translate('PROFILE_ADDRESS_DEFAULT', 'Website-Vorgabe'))
+                ->setDescription(self::translate('PROFILE_ADDRESS_DESCRIPTION', 'Lege fest, ob Masha:Feedly dich mit Du oder Sie anspricht. Ohne Auswahl gilt die Vorgabe der Website.')),
             DropdownField::create('MashaFeedlyTheme', self::translate('PROFILE_THEME', 'Effekt-Kategorie'), MashaFeedlyEffectClient::themeOptions((string)$this->owner->MashaFeedlyTheme))
                 ->setValue((string)$this->owner->MashaFeedlyTheme)
                 ->setEmptyString(self::translate('PROFILE_THEME_DEFAULT', 'Website-Vorgabe'))
                 ->setDescription(self::translate('PROFILE_THEME_DESCRIPTION', 'Wähle dein persönliches Erscheinungsbild. Bei Website-Vorgabe gilt das Theme aus Masha:Feedly → Konfiguration; neue Installationen verwenden Verspielt.'))
         )->setName('MashaFeedlyProfileAppearance')->setTitle(self::translate('PROFILE_APPEARANCE', 'Darstellung'))->addExtraClass('masha-feedly-profile-settings masha-feedly-profile-appearance');
 
+        $profileIntro = self::translate(
+            'PROFILE_INTRO',
+            'Lege Profilbild oder Masha-Symbol (sofern verfügbar), Avatarfarbe, Effekt-Kategorie und persönliche Anrede fest. Verwalte deine E-Mail-Benachrichtigungen und starte die Einführung bei Bedarf erneut.'
+        );
+        if ($isEstimateManager) {
+            $profileIntro .= ' ' . self::translate(
+                'PROFILE_INTRO_ESTIMATE_MANAGER',
+                'Außerdem kannst du festlegen, wer Kostenschätzungen freigeben darf.'
+            );
+        }
+
         $fields->addFieldsToTab('Root.MashaFeedly', [
             LiteralField::create(
                 'MashaFeedlyPreferencesIntro',
                 '<div class="masha-feedly-profile-intro"><img src="' . $logoURL . '" alt="" width="44" height="44">'
-                . '<div><h2>' . self::translate('PROFILE_TITLE', 'Masha:Feedly') . '</h2><p>' . self::translate('PROFILE_INTRO', 'Verwalte dein Profil und bestimme, worüber dich Masha:Feedly per E-Mail informiert.') . '</p></div></div>'
+                . '<div><h2>' . self::translate('PROFILE_TITLE', 'Masha:Feedly') . '</h2><p>' . $profileIntro . '</p></div></div>'
             ),
             CompositeField::create(...$avatarFields)->setName('MashaFeedlyProfileSettings')->setTitle(self::translate('PROFILE_AVATAR', 'Profil und Avatar'))->addExtraClass('masha-feedly-profile-settings'),
             $appearanceSettings,

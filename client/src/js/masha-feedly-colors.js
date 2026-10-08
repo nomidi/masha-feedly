@@ -11,7 +11,7 @@ const mashaFeedlyColorFieldFor = (option) => {
 
 document.addEventListener('click', (event) => {
   const option = mashaFeedlyColorTarget(event).closest('[data-masha-feedly-color-option]');
-  if (!option) return;
+  if (!option || option.disabled || option.closest('[inert]')) return;
 
   const colorField = mashaFeedlyColorFieldFor(option);
   if (!colorField) return;

@@ -148,7 +148,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('data-masha-feedly-feedback-count', $allowedResponse->getBody());
         $this->assertStringContainsString('Offene Fehler auf der gesamten Website ansehen', $allowedResponse->getBody());
         $this->assertStringContainsString('Offene Fehler auf dieser Seite ansehen', $allowedResponse->getBody());
-        $this->assertStringContainsString('Der Globus zeigt offene Fehler auf der gesamten Website', $allowedResponse->getBody());
+        $this->assertStringContainsString('Zeigt alle offenen Meldungen auf der ganzen Website.', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-open-closed', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-open-closed data-has-closed="false" hidden aria-label=', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertLessThan(strpos($this->widgetMarkup($allowedResponse->getBody()), 'data-masha-feedly-open-closed'), strpos($this->widgetMarkup($allowedResponse->getBody()), 'data-masha-feedly-open-feedback'));
@@ -207,22 +207,27 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertMatchesRegularExpression('/data-masha-feedly-onboarding-welcome[\s\S]*?data-masha-feedly-profile-link href="[^"]*myprofile[^"]*#Root_MashaFeedly/i', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-onboarding-thanks', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertMatchesRegularExpression('/data-masha-feedly-profile-link href="[^"]*myprofile[^\"]*#Root_MashaFeedly/i', $this->widgetMarkup($allowedResponse->getBody()));
-        $this->assertStringContainsString('Jetzt kannst du Masha noch persönlich gestalten.', $widgetMarkup);
+        $this->assertStringContainsString('Erfolgsmeldung mit einer kurzen Danke-Animation.', $widgetMarkup);
         $this->assertStringContainsString('data-masha-feedly-profile-preferences', $widgetMarkup);
         $this->assertStringContainsString('name="MashaFeedlyTheme"', $widgetMarkup);
+        $this->assertStringContainsString('name="MashaFeedlyAddress"', $widgetMarkup);
         $this->assertStringContainsString('name="MashaFeedlyColor"', $widgetMarkup);
         $this->assertStringContainsString('Auswahl speichern', $widgetMarkup);
-        $this->assertStringContainsString('Weitere Profileinstellungen', $widgetMarkup);
+        $this->assertStringContainsString('Theme einstellen →', $widgetMarkup);
         $this->assertStringContainsString('kw-masha-feedly__onboarding-logo', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-tour-start', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-tour-cancel', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-onboarding-escape-hint', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('Tipp: Esc beendet die Einführung jederzeit.', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('masha-feedly-onboarding.js', $allowedResponse->getBody());
-        $this->assertStringContainsString('Schritt 1 von 8: Klicke auf das runde Masha:Feedly-Symbol ganz unten rechts', $allowedResponse->getBody());
-        $this->assertStringContainsString('Schritt 2 von 8: Das Fenster ist offen. Klicke jetzt auf das pinke Plus', $allowedResponse->getBody());
-        $this->assertStringContainsString('Schritt 7 von 8: Hier findest du Kommentare', $allowedResponse->getBody());
-        $this->assertStringContainsString('Schritt 8 von 8: Ändere Status oder Priorität und markiere zuständige Personen.', $allowedResponse->getBody());
+        $this->assertStringContainsString('Schritt 1 von 8: Klicke auf das Masha:Feedly-Logo am rechten Seitenrand. So öffnest du das Masha:Feedly-Bedienfeld mit den Meldungszählern und Aktionen.', $allowedResponse->getBody());
+        $this->assertStringContainsString('Schritt 2 von 8: Im Masha:Feedly-Menü findest du ein großes pinkes Plus. Klicke darauf.', $allowedResponse->getBody());
+        $this->assertStringContainsString('Schritt 3 von 8: Klicke auf den betroffenen Bereich der Website. Mit „Einführung beenden“ kannst du die Auswahl jederzeit abbrechen.', $allowedResponse->getBody());
+        $this->assertStringContainsString('Schritt 4 von 8: Klicke in das große Feld „Beschreibung“. Schreib dort kurz hinein, was falsch ist', $allowedResponse->getBody());
+        $this->assertStringContainsString('Schritt 5 von 8: Super, du hast eine Meldung erstellt! Klicke jetzt auf das Blatt-Symbol mit der Zahl.', $allowedResponse->getBody());
+        $this->assertStringContainsString('Schritt 6 von 8: Deine neue Meldung ist bunt umrandet. Klicke genau auf diese Meldung, um sie zu öffnen.', $allowedResponse->getBody());
+        $this->assertStringContainsString('Schritt 7 von 8: Schreibe im geöffneten Eintrag einen kurzen Kommentar und sende ihn ab.', $allowedResponse->getBody());
+        $this->assertStringContainsString('Schritt 8 von 8: Oben kannst du Status und Priorität ändern. Darunter kannst du verantwortliche Personen auswählen.', $allowedResponse->getBody());
         $allowedMember->MashaFeedlyOnboardingCompleted = true;
         $allowedMember->MashaFeedlyShowOnboarding = true;
         $allowedMember->write();
@@ -263,7 +268,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('data-address="sie"', $formalMarkup);
         $this->assertStringContainsString('Was ist Ihnen aufgefallen?', $formalMarkup);
         $this->assertStringContainsString('Bitte wählen Sie den betroffenen Bereich auf der Seite aus.', $formalMarkup);
-        $this->assertStringContainsString('beschreiben Sie den Fehler oder Hinweis', $formalMarkup);
+        $this->assertStringContainsString('Beschreiben Sie kurz, was falsch ist oder was Sie sich wünschen', $formalMarkup);
         $this->assertStringNotContainsString('Was ist dir aufgefallen?', $formalMarkup);
 
         $this->logOut();
@@ -282,6 +287,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $firstMember = $this->objFromFixture(Member::class, 'allowed');
         $secondMember = $this->objFromFixture(Member::class, 'notAllowed');
         $firstMember->MashaFeedlyTheme = 'serious';
+        $firstMember->MashaFeedlyAddress = 'sie';
         $firstMember->write();
         $secondMember->MashaFeedlyTheme = '';
         $secondMember->write();
@@ -294,6 +300,8 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $firstResponse = $this->get('/masha-feedly-widget-test');
         $this->assertSame(200, $firstResponse->getStatusCode());
         $this->assertStringContainsString('data-theme="serious"', $this->widgetMarkup($firstResponse->getBody()));
+        $this->assertStringContainsString('data-address="sie"', $this->widgetMarkup($firstResponse->getBody()));
+        $this->assertStringContainsString('name="MashaFeedlyAddress"', $this->widgetMarkup($firstResponse->getBody()));
 
         $this->logInAs($secondMember);
         $secondResponse = $this->get('/masha-feedly-widget-test');

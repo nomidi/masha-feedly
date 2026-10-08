@@ -17,14 +17,25 @@
     if (!preview) return;
     const color = scope.querySelector('[name="MashaFeedlyColor"]')?.value || '#F4D06F';
     const iconID = scope.querySelector('[name="MashaFeedlyAvatarIcon"]')?.value ?? preview.dataset.iconId;
-    const url = iconID ? `${preview.dataset.avatarBase}${encodeURIComponent(iconID)}/${iconColorFor(color)}` : preview.dataset.uploadUrl;
+    const avatarBase = preview.dataset.avatarBase?.replace(/\/$/, '');
+    const variant = iconColorFor(color);
+    const choice = [...scope.querySelectorAll('[data-masha-feedly-avatar-icon-choice]')]
+      .find((button) => button.dataset.iconId === iconID);
+    // Ungespeicherte Symbole sind noch nicht im lokalen Avatar-Speicher vorhanden.
+    const catalogueURL = choice?.dataset[`icon${variant[0].toUpperCase()}${variant.slice(1)}`];
+    const url = iconID && avatarBase
+      ? catalogueURL || `${avatarBase}/${encodeURIComponent(iconID)}/${variant}`
+      : preview.dataset.uploadUrl;
+    preview.dataset.iconId = iconID || '';
     preview.style.backgroundColor = color;
     preview.replaceChildren();
     if (url) {
       const image = document.createElement('img');
       image.src = url;
       image.alt = '';
-      image.addEventListener('error', () => { preview.textContent = preview.dataset.initials; }, { once: true });
+      image.addEventListener('error', () => {
+        if (image.parentNode === preview) preview.textContent = preview.dataset.initials;
+      }, { once: true });
       preview.append(image);
     } else preview.textContent = preview.dataset.initials;
   }
@@ -71,7 +82,7 @@
     const open = target.closest('[data-masha-feedly-avatar-icon-open]');
     const close = target.closest('[data-masha-feedly-avatar-icon-close]');
     const root = target.closest(rootSelector);
-    if (!root) return;
+    if (!root || root.inert) return;
     const dialog = root.querySelector('[data-masha-feedly-avatar-icon-dialog]');
     if (open && dialog) {
       // Das Widget kann erst nach DOMContentLoaded eingebaut werden; beim Öffnen wird die aktive Kategorie sicher geladen.
