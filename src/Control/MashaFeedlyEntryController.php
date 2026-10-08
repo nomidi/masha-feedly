@@ -67,7 +67,7 @@ class MashaFeedlyEntryController extends Controller
             if ($entryID > 0) {
                 $entry = MashaFeedlyEntry::get()->byID($entryID);
                 if (!$entry) {
-                    return $this->respond(['success' => false, 'message' => 'Eintrag nicht gefunden.'], 404);
+                    return $this->respond(['success' => false, 'message' => 'Die Meldung wurde nicht gefunden. Öffne die Meldungsliste erneut.'], 404);
                 }
                 $id = $miteService->start($entry, (int)$request->postVar('ProjectID'), (int)$request->postVar('ServiceID'), (int)$request->postVar('ConfirmedTimerID'));
             } else {
@@ -103,17 +103,17 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Die Aktion konnte nicht ausgeführt werden. Öffne die Meldung erneut und versuche es noch einmal.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
         $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
         if (!$entry) {
-            return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Der Eintrag wurde nicht gefunden.')], 404);
+            return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Die Meldung wurde nicht gefunden.')], 404);
         }
         MashaFeedlyEntryRead::markAsSeen($entry, $member);
         $activityCounts = MashaFeedlyEntryRead::unreadActivityCounts($member);
@@ -129,7 +129,7 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
         return $this->respond(['success' => true, 'views' => $this->memberSavedViews($member)]);
     }
@@ -139,13 +139,13 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Die Aktion konnte nicht ausgeführt werden. Öffne die Meldung erneut und versuche es noch einmal.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
         $title = trim((string)$request->postVar('Title'));
         $mode = (string)$request->postVar('Mode');
@@ -189,13 +189,13 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Die Aktion konnte nicht ausgeführt werden. Öffne die Meldung erneut und versuche es noch einmal.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
         $viewID = trim((string)$request->postVar('ViewID'));
         $savedView = MashaFeedlySavedView::get()->filter([
@@ -236,14 +236,14 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
         if ($request->isGET()) {
             return $this->respond(['success' => true, 'views' => $this->memberSavedViews($member)]);
         }
         if ($request->isPOST()) {
             if (!SecurityToken::inst()->checkRequest($request)) {
-                return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_DU', 'Deine Sitzung ist abgelaufen.')], 400);
+                return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_DU', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
             }
             return match (strtolower(trim((string)$request->postVar('ViewAction')))) {
                 'save' => $this->saveView($request),
@@ -259,13 +259,13 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Die Aktion konnte nicht ausgeführt werden. Öffne die Meldung erneut und versuche es noch einmal.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
         $deferred = $request->postVar('Deferred') === '1';
         $member->MashaFeedlyOnboardingCompleted = !$deferred;
@@ -279,13 +279,13 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Die Aktion konnte nicht ausgeführt werden. Öffne die Meldung erneut und versuche es noch einmal.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
         $member->MashaFeedlyOnboardingCompleted = false;
         $member->MashaFeedlyShowOnboarding = true;
@@ -303,22 +303,22 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::isExplicitlyAllowed($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Die Aktion konnte nicht ausgeführt werden. Öffne die Meldung erneut und versuche es noch einmal.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
 
         $color = trim((string)$request->postVar('MashaFeedlyColor'));
         if ($color !== '' && MashaFeedlyMemberExtension::normalizeColor($color) === null) {
-            return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_INVALID_COLOR', 'Diese Avatarfarbe ist nicht verfügbar.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_INVALID_COLOR', 'Diese Profilfarbe ist nicht verfügbar.')], 400);
         }
         $theme = strtolower(trim((string)$request->postVar('MashaFeedlyTheme')));
         if ($theme !== '' && !preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $theme)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_INVALID_THEME', 'Diese Effekt-Kategorie ist ungültig.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_INVALID_THEME', 'Diese Danke-Animation ist ungültig.')], 400);
         }
         $address = strtolower(trim((string)$request->postVar('MashaFeedlyAddress')));
         if (array_key_exists('MashaFeedlyAddress', $request->postVars()) && $address !== '' && !in_array($address, ['du', 'sie'], true)) {
@@ -356,6 +356,9 @@ class MashaFeedlyEntryController extends Controller
         $previousIconID = (string)$member->MashaFeedlyAvatarIcon;
         $member->MashaFeedlyColor = $color === '' ? '' : MashaFeedlyMemberExtension::normalizeColor($color);
         $member->MashaFeedlyTheme = $theme;
+        if (!empty($postVars['SoundSettingsSubmitted'])) {
+            $member->MashaFeedlyDisableSoundEffects = !empty($postVars['MashaFeedlyDisableSoundEffects']);
+        }
         if (array_key_exists('MashaFeedlyAddress', $postVars)) {
             $member->MashaFeedlyAddress = $address;
         }
@@ -384,6 +387,7 @@ class MashaFeedlyEntryController extends Controller
         return $this->respond([
             'success' => true,
             'theme' => MashaFeedlyMemberExtension::themeFor($member),
+            'disableSoundEffects' => (bool)$member->MashaFeedlyDisableSoundEffects,
             'message' => $this->translate('PROFILE_PREFERENCES_SAVED', 'Deine Auswahl wurde gespeichert.'),
         ]);
     }
@@ -393,17 +397,17 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SEND_POST_SIE' : 'SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SEND_POST_SIE' : 'SEND_POST_DU', 'Die Aktion konnte nicht ausgeführt werden. Öffne die Meldung erneut und versuche es noch einmal.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SESSION_EXPIRED_UPDATE_SIE' : 'SESSION_EXPIRED_UPDATE_DU', 'Deine Sitzung ist abgelaufen.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SESSION_EXPIRED_UPDATE_SIE' : 'SESSION_EXPIRED_UPDATE_DU', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
         $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
         if (!$entry) {
-            return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Der Eintrag wurde nicht gefunden.')], 404);
+            return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Die Meldung wurde nicht gefunden.')], 404);
         }
         MashaFeedlyCategory::ensureDefaultCategories();
         MashaFeedlyPriority::ensureDefaultPriorities();
@@ -436,7 +440,7 @@ class MashaFeedlyEntryController extends Controller
         ) {
             return $this->respond(['success' => false, 'message' => $this->translate(
                 'ESTIMATE_APPROVAL_REQUIRED',
-                'Dieser Eintrag wartet auf die Freigabe der Kostenschätzung. Er kann nur in „Kostenschätzung freigegeben“ verschoben werden.'
+                'Diese Meldung wartet auf die Freigabe der Kostenschätzung. Wähle den Status „Kostenschätzung freigegeben“, wenn du die Schätzung geprüft hast.'
             )], 409);
         }
         if ($targetRole === 'estimate_approved'
@@ -457,7 +461,7 @@ class MashaFeedlyEntryController extends Controller
             if (!$feedbackCategory) {
                 return $this->respond(['success' => false, 'message' => $this->translate(
                     'FEEDBACK_CATEGORY_MISSING',
-                    'Der Eintrag kann nicht zur Bestätigung übergeben werden, weil die Kategorie „Feedback“ fehlt.'
+                    'Die Meldung kann noch nicht zur Freigabe übergeben werden. Die Person, die Masha:Feedly betreut, muss zuerst den Status „Feedback“ einrichten.'
                 )], 409);
             }
             $category = $feedbackCategory;
@@ -516,6 +520,9 @@ class MashaFeedlyEntryController extends Controller
         $newAssigneeIDs = array_values(array_intersect($assignedIDs, $allowedIDs));
         $entry->CategoryID = (int)$category->ID;
         $entry->PriorityID = (int)$priority->ID;
+        if ($request->postVar('StepsToReproduce') !== null) $entry->StepsToReproduce = $this->postedText($request, 'StepsToReproduce', 10000);
+        if ($request->postVar('ExpectedResult') !== null) $entry->ExpectedResult = $this->postedText($request, 'ExpectedResult', 5000);
+        if ($request->postVar('ActualResult') !== null) $entry->ActualResult = $this->postedText($request, 'ActualResult', 5000);
         $entry->AssignedMembers()->setByIDList($newAssigneeIDs);
         $entry->write();
         $oldRelations = $this->relationsSignature($entry);
@@ -580,7 +587,7 @@ class MashaFeedlyEntryController extends Controller
             );
         }
         $message = $sentToFeedback
-            ? $this->translate('EDIT_WAITING_FOR_CREATOR', 'Der Eintrag wartet jetzt auf die Freigabe durch die erstellende Person.')
+            ? $this->translate('EDIT_WAITING_FOR_CREATOR', 'Die Meldung wartet jetzt auf die Freigabe durch die erstellende Person.')
             : $this->translate('EDIT_SAVE_SUCCESS', 'Status, Priorität, Zuständigkeiten und Anhänge wurden gespeichert.');
         if ($closedDuplicateCount > 0) {
             $duplicateMessage = $closedDuplicateCount === 1
@@ -632,13 +639,13 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Die Aktion konnte nicht ausgeführt werden. Öffne die Meldung erneut und versuche es noch einmal.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
         $content = mb_substr(trim(strip_tags((string)$request->postVar('Content'))), 0, 500);
         $pageURL = $this->safePageURL((string)$request->postVar('PageURL'));
@@ -684,7 +691,7 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
 
         MashaFeedlyCategory::ensureDefaultCategories();
@@ -820,10 +827,10 @@ class MashaFeedlyEntryController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'CREATE_FORBIDDEN_SIE' : 'CREATE_FORBIDDEN_DU', 'Du darfst keine Masha-Feedly-Einträge erstellen.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'CREATE_FORBIDDEN_SIE' : 'CREATE_FORBIDDEN_DU', 'Du darfst keine Masha-Feedly-Meldungen erstellen.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SEND_POST_SIE' : 'SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SEND_POST_SIE' : 'SEND_POST_DU', 'Die Aktion konnte nicht ausgeführt werden. Öffne die Meldung erneut und versuche es noch einmal.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
             return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SESSION_EXPIRED_CREATE_SIE' : 'SESSION_EXPIRED_CREATE_DU', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und versuche es erneut.')], 400);
@@ -831,7 +838,7 @@ class MashaFeedlyEntryController extends Controller
 
         $content = trim((string)$request->postVar('Content'));
         if ($content === '') {
-            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'CONTENT_REQUIRED_SIE' : 'CONTENT_REQUIRED_DU', 'Bitte beschreibe den Eintrag.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'CONTENT_REQUIRED_SIE' : 'CONTENT_REQUIRED_DU', 'Bitte beschreibe die Meldung.')], 400);
         }
 
         $uploads = $_FILES['Attachments'] ?? [];
@@ -868,6 +875,9 @@ class MashaFeedlyEntryController extends Controller
         }
         $entry = MashaFeedlyEntry::create();
         $entry->Content = nl2br(htmlspecialchars($content, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+        $entry->StepsToReproduce = $this->postedText($request, 'StepsToReproduce', 10000);
+        $entry->ExpectedResult = $this->postedText($request, 'ExpectedResult', 5000);
+        $entry->ActualResult = $this->postedText($request, 'ActualResult', 5000);
         $entry->CategoryID = (int)$category->ID;
         $postedPriorityID = (int)$request->postVar('PriorityID');
         $priority = $postedPriorityID ? MashaFeedlyPriority::get()->byID($postedPriorityID) : MashaFeedlyPriority::defaultPriority();
@@ -910,19 +920,21 @@ class MashaFeedlyEntryController extends Controller
             }
         }
 
+        $entry->deferNewEntryNotification();
         $entry->write();
         $attachments = MashaFeedlyAttachmentService::attachUploads($uploads, $entry);
         $this->recordAttachmentHistory($entry, $attachments, $member);
         $assignedIDs = MashaFeedlyConfigExtension::normalizeMemberIDs((array)$request->postVar('AssignedMemberIDs'));
         $allowedIDs = MashaFeedlyConfigExtension::memberIDs();
         $entry->AssignedMembers()->setByIDList(array_values(array_intersect($assignedIDs, $allowedIDs)));
+        MashaFeedlyNotificationService::notifyNewEntry($entry);
         if ((string)$category->SystemKey === 'estimate_pending') {
             MashaFeedlyNotificationService::notifyCostEstimateRequested($entry);
         }
 
         return $this->respond([
             'success' => true,
-            'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'ENTRY_SAVE_SUCCESS_SIE' : 'ENTRY_SAVE_SUCCESS_DU', 'Dein Eintrag wurde gespeichert.'),
+            'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'ENTRY_SAVE_SUCCESS_SIE' : 'ENTRY_SAVE_SUCCESS_DU', 'Deine Meldung wurde gespeichert.'),
             'title' => $entry->Title,
             'entryID' => (int)$entry->ID,
             'dueDate' => (string)$entry->DueDate,
@@ -1119,7 +1131,7 @@ class MashaFeedlyEntryController extends Controller
         return implode('; ', array_map(static function (array $relation): string {
             $type = [
                 'blocked_by' => 'Blockiert durch',
-                'duplicate_of' => 'Duplikat von',
+                'duplicate_of' => 'Bereits in einer anderen Meldung beschrieben',
                 'related' => 'Thematisch verwandt mit',
             ][$relation['type']] ?? 'Verknüpft mit';
             return $type . ' #' . $relation['id'] . ' ' . $relation['title'];
@@ -1174,6 +1186,9 @@ class MashaFeedlyEntryController extends Controller
             'id' => (int)$entry->ID,
             'title' => (string)$entry->Title,
             'content' => trim(html_entity_decode(strip_tags((string)$entry->Content), ENT_QUOTES | ENT_HTML5, 'UTF-8')),
+            'stepsToReproduce' => (string)$entry->StepsToReproduce,
+            'expectedResult' => (string)$entry->ExpectedResult,
+            'actualResult' => (string)$entry->ActualResult,
             'entryDate' => (string)$entry->EntryDate,
             'dueDate' => (string)$entry->DueDate,
             'pageURL' => (string)$entry->PageURL,

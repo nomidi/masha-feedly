@@ -37,6 +37,7 @@ use SilverStripe\View\Requirements;
  * @property Image $MashaFeedlyIconImage Geschütztes Masha-Feedly-Profilbild.
  * @property string $MashaFeedlyAvatarIcon Kennung eines ausgewählten Anbieter-Icons.
  * @property string $MashaFeedlyColor Individuelle Avatarfarbe im Masha-Feedly-Board.
+ * @property bool $MashaFeedlyDisableSoundEffects Animationen ohne Ton abspielen.
  * @property string $MashaFeedlyTheme Persönliches Masha-Feedly-Theme oder leere Website-Vorgabe.
  * @property string $MashaFeedlyAddress Persönliche Anrede (du/sie) oder leere Website-Vorgabe.
  * @package MashaFeedly
@@ -58,6 +59,7 @@ class MashaFeedlyMemberExtension extends Extension
         'MashaFeedlyColor' => 'Varchar(7)',
         'MashaFeedlyAvatarIcon' => 'Varchar(50)',
         'MashaFeedlyTheme' => 'Varchar(80)',
+        'MashaFeedlyDisableSoundEffects' => 'Boolean',
         'MashaFeedlyAddress' => 'Varchar(3)',
         'MashaFeedlyOnboardingCompleted' => 'Boolean',
         'MashaFeedlyShowOnboarding' => 'Boolean',
@@ -127,7 +129,7 @@ class MashaFeedlyMemberExtension extends Extension
                 . '</button>';
         }
 
-        return '<div class="masha-feedly-color-palette" role="group" aria-label="' . htmlspecialchars(self::translate('COLOR_PALETTE_ARIA', 'Verfügbare Avatarfarben'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">'
+        return '<div class="masha-feedly-color-palette" role="group" aria-label="' . htmlspecialchars(self::translate('COLOR_PALETTE_ARIA', 'Verfügbare Profilfarben'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">'
             . '<span class="masha-feedly-color-palette__heading">' . htmlspecialchars(self::translate('COLOR_PALETTE_TITLE', 'Verfügbare Farben'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</span>'
             . '<div class="masha-feedly-color-palette__grid">' . $items . '</div>'
             . '</div>';
@@ -318,6 +320,7 @@ class MashaFeedlyMemberExtension extends Extension
             'MashaFeedlyAvatarIcon',
             'MashaFeedlyColor',
             'MashaFeedlyTheme',
+            'MashaFeedlyDisableSoundEffects',
             'MashaFeedlyAddress',
             'MashaFeedlyProfileAppearance',
             'MashaFeedlyOnboardingSettings',
@@ -340,18 +343,6 @@ class MashaFeedlyMemberExtension extends Extension
             : null;
 
         if (!$isAllowedMember) {
-            Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly.css');
-            $fields->addFieldToTab(
-                'Root.MashaFeedly',
-                LiteralField::create(
-                    'MashaFeedlyAccessNotice',
-                    '<aside class="masha-feedly-profile-access-notice"><strong>'
-                    . self::translate('PROFILE_ACCESS_TITLE', 'Masha:Feedly ist noch nicht freigeschaltet')
-                    . '</strong><p>'
-                    . self::translate('PROFILE_ACCESS_REQUIRED', 'Diese Profileinstellungen und das Masha:Feedly-Widget sind nur für freigeschaltete Mitglieder verfügbar. Bitte wende dich an die zuständige Administration, wenn du Zugriff benötigst.')
-                    . '</p></aside>'
-                )
-            );
             if ($estimateSettings) {
                 $fields->addFieldToTab('Root.MashaFeedly', $estimateSettings);
             }
@@ -373,28 +364,28 @@ class MashaFeedlyMemberExtension extends Extension
         );
         $newEntries = CheckboxField::create(
             'MashaFeedlyNotifyNewEntries',
-            self::translate('PROFILE_NOTIFY_NEW_ENTRIES', 'Bei neuen Einträgen benachrichtigen')
-        )->setDescription(self::translate('PROFILE_NOTIFY_NEW_ENTRIES_DESCRIPTION', 'Erhalte eine E-Mail, wenn eine neue Meldung erstellt wird. Für deine eigenen Meldungen gilt zusätzlich die separate Option für eigene Einträge und Änderungen.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+            self::translate('PROFILE_NOTIFY_NEW_ENTRIES', 'Bei neuen Meldungen benachrichtigen')
+        )->setDescription(self::translate('PROFILE_NOTIFY_NEW_ENTRIES_DESCRIPTION', 'Erhalte eine E-Mail, wenn eine neue Meldung erstellt wird. Für deine eigenen Meldungen gilt zusätzlich die separate Option für eigene Meldungen und Änderungen.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $ownEntryUpdates = CheckboxField::create(
             'MashaFeedlyNotifyOwnEntryChanges',
-            self::translate('PROFILE_NOTIFY_OWN_CHANGES', 'Auch bei eigenen Einträgen und Änderungen benachrichtigen')
+            self::translate('PROFILE_NOTIFY_OWN_CHANGES', 'Auch bei eigenen Meldungen und Änderungen benachrichtigen')
         )->setDescription(self::translate('PROFILE_NOTIFY_OWN_CHANGES_DESCRIPTION', 'Diese Option ist standardmäßig ausgeschaltet. Schalte sie ein, wenn du E-Mails auch für Meldungen erhalten möchtest, die du selbst erstellst oder änderst.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $comments = CheckboxField::create(
             'MashaFeedlyNotifyComments',
             self::translate('PROFILE_NOTIFY_COMMENTS', 'Bei neuen Kommentaren benachrichtigen')
-        )->setDescription(self::translate('PROFILE_NOTIFY_COMMENTS_DESCRIPTION', 'Erhalte eine E-Mail, wenn jemand bei einem Eintrag kommentiert, für den du zuständig bist oder den du erstellt hast.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        )->setDescription(self::translate('PROFILE_NOTIFY_COMMENTS_DESCRIPTION', 'Erhalte eine E-Mail, wenn jemand bei einer Meldung kommentiert, für die du zuständig bist oder die du erstellt hast.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $dueDateReminders = CheckboxField::create(
             'MashaFeedlyNotifyDueDateReminders',
             self::translate('PROFILE_NOTIFY_DUE_DATE_REMINDERS', 'An Fälligkeitstermine erinnern')
-        )->setDescription(self::translate('PROFILE_NOTIFY_DUE_DATE_REMINDERS_DESCRIPTION', 'Erhalte am Fälligkeitstag eine einmalige Erinnerung für Einträge, denen du zugewiesen bist oder die du erstellt hast.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        )->setDescription(self::translate('PROFILE_NOTIFY_DUE_DATE_REMINDERS_DESCRIPTION', 'Erhalte am Fälligkeitstag eine einmalige Erinnerung für Meldungen, denen du zugewiesen bist oder die du erstellt hast.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $costEstimates = CheckboxField::create(
             'MashaFeedlyNotifyCostEstimates',
             self::translate('PROFILE_NOTIFY_COST_ESTIMATES', 'Bei angefragten Kostenschätzungen benachrichtigen')
         )->setDescription(self::translate('PROFILE_NOTIFY_COST_ESTIMATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn eine Kostenschätzung zur Freigabe bereitsteht.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $entryUpdates = CheckboxField::create(
             'MashaFeedlyNotifyEntryUpdates',
-            self::translate('PROFILE_NOTIFY_ENTRY_UPDATES', 'Bei Änderungen an Einträgen benachrichtigen')
-        )->setDescription(self::translate('PROFILE_NOTIFY_ENTRY_UPDATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn sich Status, Beschreibung, Zuständigkeit oder andere Eintragsdetails ändern. Für eigene Änderungen gilt zusätzlich die separate Option für eigene Einträge.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+            self::translate('PROFILE_NOTIFY_ENTRY_UPDATES', 'Bei Änderungen an Meldungen benachrichtigen')
+        )->setDescription(self::translate('PROFILE_NOTIFY_ENTRY_UPDATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn sich Status, Beschreibung, Zuständigkeit oder andere Meldungsdetails ändern. Für eigene Änderungen gilt zusätzlich die separate Option für eigene Meldungen.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
 
         if (!$emailTestSucceeded) {
             foreach ([$newEntries, $entryUpdates, $ownEntryUpdates, $comments, $dueDateReminders, $costEstimates] as $field) {
@@ -425,26 +416,29 @@ class MashaFeedlyMemberExtension extends Extension
                 'MashaFeedlyColor', self::normalizeColor((string)$this->owner->MashaFeedlyColor)
             )),
             HiddenField::create('MashaFeedlyColor', null, self::normalizeColor((string)$this->owner->MashaFeedlyColor) ?? '')
-        )->setName('MashaFeedlyAvatarColor')->setTitle(self::translate('PROFILE_COLOR', 'Avatarfarbe'));
+        )->setName('MashaFeedlyAvatarColor')->setTitle(self::translate('PROFILE_COLOR', 'Profilfarbe'));
 
         $appearanceSettings = CompositeField::create(
             $avatarColor,
-            DropdownField::create('MashaFeedlyAddress', self::translate('PROFILE_ADDRESS', 'Anrede im Modul'), [
+            DropdownField::create('MashaFeedlyAddress', self::translate('PROFILE_ADDRESS', 'Wie möchtest du angesprochen werden?'), [
                 'du' => self::translate('CONFIG_ADDRESS_DU', 'Du'),
                 'sie' => self::translate('CONFIG_ADDRESS_SIE', 'Sie'),
             ])
                 ->setValue((string)$this->owner->MashaFeedlyAddress)
-                ->setEmptyString(self::translate('PROFILE_ADDRESS_DEFAULT', 'Website-Vorgabe'))
-                ->setDescription(self::translate('PROFILE_ADDRESS_DESCRIPTION', 'Lege fest, ob Masha:Feedly dich mit Du oder Sie anspricht. Ohne Auswahl gilt die Vorgabe der Website.')),
-            DropdownField::create('MashaFeedlyTheme', self::translate('PROFILE_THEME', 'Effekt-Kategorie'), MashaFeedlyEffectClient::themeOptions((string)$this->owner->MashaFeedlyTheme))
+                ->setEmptyString(self::translate('PROFILE_ADDRESS_DEFAULT', 'Einstellung der Website übernehmen'))
+                ->setDescription(self::translate('PROFILE_ADDRESS_DESCRIPTION', 'Wähle Du oder Sie. Ohne eigene Auswahl gilt die Einstellung der Website.')),
+            DropdownField::create('MashaFeedlyTheme', self::translate('PROFILE_THEME', 'Danke-Animation'), MashaFeedlyEffectClient::themeOptions((string)$this->owner->MashaFeedlyTheme))
                 ->setValue((string)$this->owner->MashaFeedlyTheme)
-                ->setEmptyString(self::translate('PROFILE_THEME_DEFAULT', 'Website-Vorgabe'))
-                ->setDescription(self::translate('PROFILE_THEME_DESCRIPTION', 'Wähle dein persönliches Erscheinungsbild. Bei Website-Vorgabe gilt das Theme aus Masha:Feedly → Konfiguration; neue Installationen verwenden Verspielt.'))
+                ->setEmptyString(self::translate('PROFILE_THEME_DEFAULT', 'Einstellung der Website übernehmen'))
+                ->setDescription(self::translate('PROFILE_THEME_DESCRIPTION', 'Wähle dein persönliches Erscheinungsbild. Bei Website-Vorgabe gilt das Theme aus Masha:Feedly → Konfiguration; neue Installationen verwenden Verspielt.')),
+            CheckboxField::create('MashaFeedlyDisableSoundEffects', self::translate('PROFILE_DISABLE_SOUND', 'Animationen ohne Ton abspielen'))
+                ->setValue((bool)$this->owner->MashaFeedlyDisableSoundEffects)
+                ->setDescription(self::translate('PROFILE_DISABLE_SOUND_HELP', 'Alle Animationen bleiben verfügbar. Musik und andere Töne werden nicht abgespielt.'))
         )->setName('MashaFeedlyProfileAppearance')->setTitle(self::translate('PROFILE_APPEARANCE', 'Darstellung'))->addExtraClass('masha-feedly-profile-settings masha-feedly-profile-appearance');
 
         $profileIntro = self::translate(
             'PROFILE_INTRO',
-            'Lege Profilbild oder Masha-Symbol (sofern verfügbar), Avatarfarbe, Effekt-Kategorie und persönliche Anrede fest. Verwalte deine E-Mail-Benachrichtigungen und starte die Einführung bei Bedarf erneut.'
+            'Wähle dein Profilbild oder Symbol und deine Profilfarbe. Stelle deine Danke-Animation, deine Anrede und deine E-Mail-Benachrichtigungen ein. Hier kannst du auch die Einführung erneut starten.'
         );
         if ($isEstimateManager) {
             $profileIntro .= ' ' . self::translate(
@@ -529,7 +523,7 @@ class MashaFeedlyMemberExtension extends Extension
             . htmlspecialchars(self::translate('PROFILE_ICON_CHOOSER', 'Profil-Symbol auswählen'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
             . '</h2></div><button type="button" data-masha-feedly-avatar-icon-close aria-label="'
             . htmlspecialchars(self::translate('CLOSE', 'Schließen'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">×</button></header><div class="masha-feedly-avatar-icons__content"><p>'
-            . htmlspecialchars(self::translate('PROFILE_ICON_CHOICES_DESCRIPTION', 'Wähle ein Symbol. Seine Farbe passt sich automatisch an deine Avatarfarbe an.'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            . htmlspecialchars(self::translate('PROFILE_ICON_CHOICES_DESCRIPTION', 'Wähle ein Symbol. Seine Farbe passt sich automatisch an deine Profilfarbe an.'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
             . '</p><button type="button" class="masha-feedly-avatar-icons__clear" data-masha-feedly-avatar-icon-clear aria-pressed="' . ($selectedID === '' ? 'true' : 'false') . '">'
             . htmlspecialchars(self::translate('PROFILE_ICON_CLEAR', 'Kein Symbol verwenden'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</button><nav class="masha-feedly-avatar-icons__tabs" role="tablist" aria-label="'
             . htmlspecialchars(self::translate('PROFILE_ICON_CATEGORIES', 'Icon-Kategorien'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">';

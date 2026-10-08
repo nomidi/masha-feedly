@@ -47,7 +47,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('MashaFeedlyIconImage', $body, 'Freigegebene Mitglieder können ihr Profilbild/Icon hochladen.');
         $this->assertStringContainsString('MashaFeedlyColor', $body, 'Freigegebene Mitglieder können eine Avatarfarbe wählen.');
         $this->assertStringContainsString('name="MashaFeedlyTheme"', $body, 'Freigegebene Mitglieder können ihr persönliches Theme einstellen.');
-        $this->assertStringContainsString('Website-Vorgabe', $body);
+        $this->assertStringContainsString('Einstellung der Website übernehmen', $body);
         $this->assertStringContainsString('masha-feedly-color-palette__grid', $body, 'Die Farbauswahl wird auf der Profilseite gerendert.');
     }
 
@@ -96,14 +96,14 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('window.KWMashaFeedlyWidgetMarkup', $allowedResponse->getBody());
         $this->assertStringContainsString('"HISTORY_COMMENT":"Kommentar: {text}"', $allowedResponse->getBody());
         $this->assertStringContainsString('"HISTORY_META":"{actor} · {when}"', $allowedResponse->getBody());
-        $this->assertStringContainsString('"HISTORY_CREATED":"Eintrag erstellt: {title}"', $allowedResponse->getBody());
+        $this->assertStringContainsString('"HISTORY_CREATED":"Meldung erstellt: {title}"', $allowedResponse->getBody());
         $this->assertStringContainsString('"ENTRY_REPORTED_BY":"Gemeldet von {author}"', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-entry-created-avatar', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-sort-details', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-sort-option="due"', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('Sortierung', $this->widgetMarkup($allowedResponse->getBody()));
-        $this->assertStringContainsString('"SIMILAR_OPEN_ENTRY":"Eintrag ansehen"', $allowedResponse->getBody());
-        $this->assertStringContainsString('"RELATION_DUPLICATE_OF":"Duplikat von"', $allowedResponse->getBody());
+        $this->assertStringContainsString('"SIMILAR_OPEN_ENTRY":"Meldung ansehen"', $allowedResponse->getBody());
+        $this->assertStringContainsString('"RELATION_DUPLICATE_OF":"Bereits in einer anderen Meldung beschrieben"', $allowedResponse->getBody());
         $this->assertStringContainsString('"RELATION_BLOCKED_BY":"Blockiert durch"', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-open-help', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-help-modal', $allowedResponse->getBody());
@@ -146,19 +146,19 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('viewBox="0 0 24 24"', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('value="page-open"', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-feedback-count', $allowedResponse->getBody());
-        $this->assertStringContainsString('Offene Fehler auf der gesamten Website ansehen', $allowedResponse->getBody());
-        $this->assertStringContainsString('Offene Fehler auf dieser Seite ansehen', $allowedResponse->getBody());
+        $this->assertStringContainsString('Offene Meldungen auf der gesamten Website ansehen', $allowedResponse->getBody());
+        $this->assertStringContainsString('Offene Meldungen auf dieser Seite ansehen', $allowedResponse->getBody());
         $this->assertStringContainsString('Zeigt alle offenen Meldungen auf der ganzen Website.', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-open-closed', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-open-closed data-has-closed="false" hidden aria-label=', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertLessThan(strpos($this->widgetMarkup($allowedResponse->getBody()), 'data-masha-feedly-open-closed'), strpos($this->widgetMarkup($allowedResponse->getBody()), 'data-masha-feedly-open-feedback'));
-        $this->assertStringContainsString('aria-label="Abgeschlossene Einträge ansehen"', $this->widgetMarkup($allowedResponse->getBody()));
-        $this->assertStringContainsString('<span class="kw-masha-feedly__sr-only">abgeschlossene Einträge</span>', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertStringContainsString('aria-label="Abgeschlossene Meldungen ansehen"', $this->widgetMarkup($allowedResponse->getBody()));
+        $this->assertStringContainsString('<span class="kw-masha-feedly__sr-only">abgeschlossene Meldungen</span>', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertMatchesRegularExpression('/data-masha-feedly-open-news[^>]*aria-label="Neu seit deinem letzten Besuch"/', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('viewBox="0 0 177800 177800"', $this->widgetMarkup($allowedResponse->getBody()));
         $widgetMarkup = $this->widgetMarkup($allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-open-feedback data-tooltip=', $widgetMarkup);
-        $this->assertStringContainsString('data-masha-feedly-open-closed data-has-closed="false" hidden aria-label="Abgeschlossene Einträge ansehen" data-tooltip=', $widgetMarkup);
+        $this->assertStringContainsString('data-masha-feedly-open-closed data-has-closed="false" hidden aria-label="Abgeschlossene Meldungen ansehen" data-tooltip=', $widgetMarkup);
         $this->assertDoesNotMatchRegularExpression('/data-masha-feedly-open-(?:news|feedback|closed)[^>]*\stitle=/', $widgetMarkup);
         $this->assertStringContainsString('data-masha-feedly-closed-count', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-list-mode', $allowedResponse->getBody());

@@ -26,18 +26,18 @@ class MashaFeedlyCommentController extends Controller
     {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Keine Berechtigung.')], 403);
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
         if (!$request->isPOST()) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Bitte sende das Formular per POST.')], 405);
+            return $this->respond(['success' => false, 'message' => $this->translate('SEND_POST_DU', 'Die Aktion konnte nicht ausgeführt werden. Öffne die Meldung erneut und versuche es noch einmal.')], 405);
         }
         if (!SecurityToken::inst()->checkRequest($request)) {
-            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen.')], 400);
+            return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
 
         $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
         if (!$entry) {
-            return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Der Eintrag wurde nicht gefunden.')], 404);
+            return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Die Meldung wurde nicht gefunden.')], 404);
         }
         $action = strtolower(trim((string)$request->postVar('CommentAction')));
         if (in_array($action, ['edit', 'delete'], true)) {

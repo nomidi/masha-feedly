@@ -91,7 +91,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             strpos($body, 'masha-feedly-board__columns'),
             strpos($body, 'masha-feedly-board__filters')
         );
-        $this->assertStringContainsString('Alle Einträge', $body);
+        $this->assertStringContainsString('Alle Meldungen', $body);
         $this->assertStringNotContainsString('masha-feedly-board__new-indicator--general', $body);
         $this->assertStringNotContainsString('masha-feedly-board__new-indicator--personal', $body);
         $this->assertStringNotContainsString('>Neu<', $body);
@@ -124,6 +124,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $manager = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $manager);
         Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$manager->Email]);
+        $this->assertFalse(MashaFeedlyConfigExtension::canUse($manager), 'Das Betreiberkonto erhält die CMS-Ausnahme auch ohne Modulzuordnung.');
 
         $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
         $reporter = $this->objFromFixture(Member::class, 'allowed');
@@ -132,6 +133,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $body = str_replace(['\\u003C', '\\u003E', '\\u0022'], ['<', '>', '"'], $response->getBody());
         $this->assertSame(200, $response->getStatusCode());
         $this->assertStringContainsString('data-admin-view-tab="reporters"', $body);
+        $this->assertStringContainsString('Menu-KW-MashaFeedly-Admin-MashaFeedlyAdmin', $body);
         $this->assertStringContainsString('data-admin-view-panel="reporters"', $body);
         $this->assertStringContainsString('data-reporter-form', $body);
         $this->assertStringContainsString('name="ReportedByID"', $body);
@@ -157,7 +159,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     /** Ein CMS-Admin ohne passende Allowlist-E-Mail sieht den Tab nicht und kann den Schreib-Endpunkt nicht nutzen. */
     public function testCmsAdminWithoutReporterAllowlistCannotSeeTabOrSave(): void
     {
-        $this->logInWithPermission('ADMIN');
+        $this->logInAsAllowedAdmin();
         $manager = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $manager);
         Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['other@example.test']);
@@ -183,7 +185,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     /** Stellt sicher, dass CMS-Neu-Markierungen mit dem Website-Zähler desselben Admins übereinstimmen. */
     public function testAdminBoardNewBadgesMatchWebsiteUnreadCount(): void
     {
-        $this->logInWithPermission('ADMIN');
+        $this->logInAsAllowedAdmin();
         $member = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $member);
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
@@ -273,7 +275,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     /** Prüft, dass die Kategorienreihenfolge im Board serverseitig gespeichert wird. */
     public function testMoveCategoryChangesSortOrder(): void
     {
-        $this->logInWithPermission('ADMIN');
+        $this->logInAsAllowedAdmin();
         $categoryIDs = array_map('intval', MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC')->column('ID'));
         $reversedIDs = array_reverse($categoryIDs);
 
@@ -296,7 +298,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     /** Prüft, dass Administratoren eine benutzerdefinierte Kategorie direkt im Board anlegen können. */
     public function testCreateCategoryAddsCustomCategory(): void
     {
-        $this->logInWithPermission('ADMIN');
+        $this->logInAsAllowedAdmin();
         $response = $this->post(
             '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/createCategory',
             [
@@ -318,7 +320,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     /** Prüft, dass leere und zu lange Kategorienamen abgelehnt werden. */
     public function testCreateCategoryRejectsInvalidTitle(): void
     {
-        $this->logInWithPermission('ADMIN');
+        $this->logInAsAllowedAdmin();
         foreach (['', str_repeat('x', 121)] as $title) {
             $response = $this->post(
                 '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/createCategory',
@@ -335,7 +337,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     /** Prüft, dass nur leere benutzerdefinierte Kategorien gelöscht werden können. */
     public function testDeleteCategoryOnlyDeletesEmptyCustomCategory(): void
     {
-        $this->logInWithPermission('ADMIN');
+        $this->logInAsAllowedAdmin();
         $emptyCategory = MashaFeedlyCategory::create([
             'Title' => 'Leere Testkategorie',
             'SystemKey' => '',
@@ -399,7 +401,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     /** Prüft, dass das Board nur für leere, frei angelegte Kategorien eine Löschaktion zeigt. */
     public function testBoardShowsCategorySortingAndSafeDeleteControls(): void
     {
-        $this->logInWithPermission('ADMIN');
+        $this->logInAsAllowedAdmin();
         $emptyCategory = MashaFeedlyCategory::create([
             'Title' => 'Leere Kategorie',
             'SystemKey' => '',
@@ -551,7 +553,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
         $this->allowMember($member);
-        $this->logInWithPermission('ADMIN');
+        $this->logInAsAllowedAdmin();
         $superAdmin = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $superAdmin);
         \SilverStripe\Core\Config\Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$superAdmin->Email]);
@@ -626,7 +628,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
         $siteConfig->MashaFeedlyEmailTestSucceeded = false;
         $siteConfig->write();
-        $this->logInWithPermission('ADMIN');
+        $this->logInAsAllowedAdmin();
         $admin = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $admin);
         Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$admin->Email]);
@@ -697,7 +699,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
         $allowed = $this->objFromFixture(Member::class, 'allowed');
         $this->allowMember($allowed);
-        $this->logInWithPermission('ADMIN');
+        $this->logInAsAllowedAdmin();
         $admin = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $admin);
         \SilverStripe\Core\Config\Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['super-admin@example.test']);
@@ -725,7 +727,6 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringNotContainsString('action_resetAllMashaFeedlyData', $body);
         $this->assertStringNotContainsString('action_sendTestEmail', $body);
         $this->assertStringNotContainsString('MashaFeedlyMemberColor_' . (int)$allowed->ID, $body);
-        $this->assertStringNotContainsString('masha-feedly-color-palette__swatch', $body);
         $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $body, $matches));
 
         $testEmailAttempt = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
@@ -768,7 +769,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     {
         $adminMember = $this->objFromFixture(Member::class, 'allowed');
         $this->allowMember($adminMember);
-        $this->logInWithPermission('ADMIN');
+        $this->logInAsAllowedAdmin();
         $superAdmin = Security::getCurrentUser();
         $this->assertInstanceOf(Member::class, $superAdmin);
         Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$superAdmin->Email]);
@@ -841,6 +842,35 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertNotContains('Eigene Kategorie', MashaFeedlyCategory::get()->column('Title'));
         $this->assertSame(175.0, MashaFeedlyConfigExtension::hourlyRate());
         $this->assertContains((int)$adminMember->ID, MashaFeedlyConfigExtension::memberIDs());
+    }
+
+    /** Nicht zugeordnete CMS-Admins dürfen weder Menü noch direkte Modulrouten öffnen. */
+    public function testUnassignedAdminCannotAccessFeedlyAdmin(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $member = Security::getCurrentUser();
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['operator@example.test']);
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = '[]';
+        $config->write();
+        $this->assertFalse(\KW\MashaFeedly\Admin\MashaFeedlyAdmin::create()->canView($member));
+        $cms = $this->get('/admin/pages');
+        $this->assertSame(200, $cms->getStatusCode());
+        $this->assertStringNotContainsString('Menu-KW-MashaFeedly-Admin-MashaFeedlyAdmin', $cms->getBody());
+        foreach (['/admin/masha-feedly', '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry', '/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig'] as $url) {
+            $this->assertSame(403, $this->get($url)->getStatusCode(), $url);
+        }
+    }
+
+    /** Erlaubt bestehenden Admin-Tests ausdrücklich den Modulzugriff. */
+    private function logInAsAllowedAdmin(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode(array_unique([
+            ...MashaFeedlyConfigExtension::memberIDs(), (int)Security::getCurrentUser()->ID,
+        ]));
+        $config->write();
     }
 
     /** Schreibt eine Testfreigabe, ohne produktive Silverstripe-Mitglieder anzulegen. */

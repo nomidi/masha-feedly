@@ -339,6 +339,26 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $member = $this->objFromFixture(Member::class, 'allowed');
         $blockedMember = $this->objFromFixture(Member::class, 'notAllowed');
         $this->allowMember($member);
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->Title = 'Projekt Zuständigkeitstest';
+        $config->write();
+        $member->MashaFeedlyEmailNotifications = true;
+        $member->MashaFeedlyNotifyNewEntries = true;
+        $member->MashaFeedlyNotifyOwnEntryChanges = true;
+        $member->write();
+        $this->assertContains((int)$member->ID, MashaFeedlyConfigExtension::memberIDs());
+        $this->assertTrue((bool)$member->MashaFeedlyEmailNotifications);
+        $this->assertTrue((bool)$member->MashaFeedlyNotifyNewEntries);
+        $this->assertTrue((bool)$member->MashaFeedlyNotifyOwnEntryChanges);
+        $mailer = new class implements MailerInterface {
+            /** @var RawMessage[] Gespeicherte Testnachrichten. */
+            public array $messages = [];
+            public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
+        };
+        $injector = Injector::inst();
+        $originalMailer = $injector->get(MailerInterface::class);
+        $injector->registerService($mailer, MailerInterface::class);
         MashaFeedlyCategory::ensureDefaultCategories();
         $category = MashaFeedlyCategory::defaultCategory();
         $this->logInAs($member);
@@ -346,6 +366,9 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $response = $this->post('/__masha-feedly/createEntry', [
             'SecurityID' => SecurityToken::getSecurityID(),
             'Content' => 'Der Button ist abgeschnitten 😅. https://example.test/ablauf',
+            'StepsToReproduce' => "1. Kontaktseite öffnen\n2. Formular absenden",
+            'ExpectedResult' => 'Das Formular wird bestätigt.',
+            'ActualResult' => 'Der Ladeindikator läuft weiter.',
             'CategoryID' => (int)$category->ID,
             'EntryDate' => '2026-10-01T10:30',
             'DueDate' => '2026-10-10',
@@ -364,6 +387,11 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         ]);
 
         $this->assertSame(200, $response->getStatusCode());
+        $this->assertCount(1, $mailer->messages);
+        $mailBody = (string)$mailer->messages[0]->getTextBody();
+        $this->assertStringContainsString('Verantwortlich: ' . $member->getName(), $mailBody);
+        $this->assertStringNotContainsString('Noch niemand zugeordnet', $mailBody);
+        $injector->registerService($originalMailer, MailerInterface::class);
         $data = json_decode($response->getBody(), true);
         $this->assertTrue($data['success']);
         $this->assertSame('2026-10-10', $data['dueDate']);
@@ -371,6 +399,13 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $entry = MashaFeedlyEntry::get()->byID((int)$data['entryID']);
         $this->assertNotNull($entry);
         $this->assertSame('Der Button ist abgeschnitten 😅. https://example.test/ablauf', strip_tags((string)$entry->Content));
+        $this->assertSame("1. Kontaktseite öffnen\n2. Formular absenden", (string)$entry->StepsToReproduce);
+        $this->assertSame('Das Formular wird bestätigt.', (string)$entry->ExpectedResult);
+        $this->assertSame('Der Ladeindikator läuft weiter.', (string)$entry->ActualResult);
+        $cmsFields = $entry->getCMSFields();
+        $this->assertNotNull($cmsFields->dataFieldByName('StepsToReproduce'));
+        $this->assertNotNull($cmsFields->dataFieldByName('ExpectedResult'));
+        $this->assertNotNull($cmsFields->dataFieldByName('ActualResult'));
         $this->assertSame('https://example.test/kontakt', (string)$entry->PageURL);
         $this->assertSame('main > button.primary', (string)$entry->ElementSelector);
         $this->assertSame('Absenden', (string)$entry->ElementText);
@@ -400,14 +435,24 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNotEmpty($listedEntry['loggedAt']);
         $this->assertSame([], $listedEntry['attachments']);
         $this->assertSame('2026-10-10', $listedEntry['dueDate']);
+        $this->assertSame("1. Kontaktseite öffnen\n2. Formular absenden", $listedEntry['stepsToReproduce']);
+        $this->assertSame('Das Formular wird bestätigt.', $listedEntry['expectedResult']);
+        $this->assertSame('Der Ladeindikator läuft weiter.', $listedEntry['actualResult']);
 
         $updated = $this->post('/__masha-feedly/updateEntry', [
             'SecurityID' => SecurityToken::getSecurityID(),
             'EntryID' => (int)$entry->ID,
             'CategoryID' => (int)$category->ID,
             'DueDate' => '2026-10-12',
+            'StepsToReproduce' => '1. Erneut absenden',
+            'ExpectedResult' => 'Bestätigung erscheint.',
+            'ActualResult' => 'Fehlermeldung erscheint.',
         ]);
         $this->assertSame(200, $updated->getStatusCode());
+        $reloaded = MashaFeedlyEntry::get()->byID((int)$entry->ID);
+        $this->assertSame('1. Erneut absenden', (string)$reloaded->StepsToReproduce);
+        $this->assertSame('Bestätigung erscheint.', (string)$reloaded->ExpectedResult);
+        $this->assertSame('Fehlermeldung erscheint.', (string)$reloaded->ActualResult);
         $history = MashaFeedlyEntryHistory::get()->filter(['EntryID' => (int)$entry->ID, 'ChangeType' => 'due_date'])->first();
         $this->assertNotNull($history);
         $this->assertSame('2026-10-10', (string)$history->OldValue);
@@ -1331,7 +1376,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame('closed', $closedData['mode']);
         $this->assertSame($updatedData['totalCount'], $closedData['totalCount']);
         $this->assertNotEmpty($closedData['entries']);
-        $this->assertNotContains(false, array_column($closedData['entries'], 'isClosed'), 'Der Filter für abgeschlossene Einträge darf keine offenen Einträge ausliefern.');
+        $this->assertNotContains(false, array_column($closedData['entries'], 'isClosed'), 'Der Filter für abgeschlossene Meldungen darf keine offenen Einträge ausliefern.');
         $this->assertSame([], array_intersect(array_column($openData['entries'], 'id'), array_column($closedData['entries'], 'id')));
     }
 
@@ -1430,7 +1475,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame('Rückmeldung', $data['categoryTitle']);
         $this->assertFalse($data['categoryIsClosed']);
         $this->assertFalse($data['celebrateCompletion']);
-        $this->assertSame('Der Eintrag wartet jetzt auf die Freigabe durch die erstellende Person.', $data['message']);
+        $this->assertSame('Die Meldung wartet jetzt auf die Freigabe durch die erstellende Person.', $data['message']);
         $entry = MashaFeedlyEntry::get()->byID((int)$entry->ID);
         $this->assertSame((int)$feedback->ID, (int)$entry->CategoryID);
         $statusChange = MashaFeedlyEntryHistory::get()->filter([
@@ -2314,7 +2359,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         ], $data['relations']);
         $history = MashaFeedlyEntryHistory::get()->filter(['EntryID' => (int)$entry->ID, 'ChangeType' => 'relations'])->first();
         $this->assertNotNull($history);
-        $this->assertStringContainsString('Duplikat von', (string)$history->NewValue);
+        $this->assertStringContainsString('Bereits in einer anderen Meldung beschrieben', (string)$history->NewValue);
         $this->assertStringContainsString('#' . (int)$samePage->ID, (string)$history->NewValue);
         $this->assertStringContainsString('#' . (int)$otherPage->ID, (string)$history->NewValue);
 
@@ -2586,5 +2631,23 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->MashaFeedlyAllowedMemberIDs = json_encode($ids);
         $config->write();
+    }
+    /** Speichert die Tonwahl und erhält sie bei älteren Formularen ohne Ton-Einstellungen. */
+    public function testSoundPreferenceCanBeSavedAndReenabled(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($member);
+        $this->logInAs($member);
+        $base = ['SecurityID' => SecurityToken::getSecurityID(), 'MashaFeedlyTheme' => '', 'MashaFeedlyColor' => ''];
+        $saved = $this->post('/__masha-feedly/saveProfilePreferences', $base + ['SoundSettingsSubmitted' => '1', 'MashaFeedlyDisableSoundEffects' => '1']);
+        $this->assertSame(200, $saved->getStatusCode());
+        $this->assertTrue(json_decode($saved->getBody(), true)['disableSoundEffects']);
+        $this->assertTrue((bool)Member::get()->byID($member->ID)->MashaFeedlyDisableSoundEffects);
+        $fields = Member::get()->byID($member->ID)->getCMSFields();
+        $this->assertInstanceOf(\SilverStripe\Forms\CheckboxField::class, $fields->dataFieldByName('MashaFeedlyDisableSoundEffects'));
+        $this->post('/__masha-feedly/saveProfilePreferences', $base);
+        $this->assertTrue((bool)Member::get()->byID($member->ID)->MashaFeedlyDisableSoundEffects);
+        $this->post('/__masha-feedly/saveProfilePreferences', $base + ['SoundSettingsSubmitted' => '1']);
+        $this->assertFalse((bool)Member::get()->byID($member->ID)->MashaFeedlyDisableSoundEffects);
     }
 }

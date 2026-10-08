@@ -7,6 +7,7 @@ use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\SiteConfig\SiteConfig;
 use SilverStripe\ORM\DB;
+use SilverStripe\Core\Environment;
 use SilverStripe\ORM\Connect\DatabaseException;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
 use KW\MashaFeedly\Model\MashaFeedlyMiteTrigger;
@@ -19,6 +20,7 @@ use KW\MashaFeedly\Model\MashaFeedlyMiteTrigger;
  * @property string $MashaFeedlyAllowedMemberIDs JSON-Liste freigegebener Mitglieds-IDs.
  * @property bool $MashaFeedlyClosedCategoriesMigrated Kennzeichnet die einmalige Übernahme abgeschlossener Kategorien.
  * @property bool $MashaFeedlyEmailTestSucceeded Kennzeichnet einen erfolgreichen globalen E-Mail-Test.
+ * @property string $MashaFeedlyEmailFooter Inhalt des zentralen E-Mail-Footers.
  * @property int $MashaFeedlyMiteProjectID Standardprojekt für den persönlichen Mite-Timer.
  * @property bool $MashaFeedlyMiteEnabled Aktiviert die Mite-Timerfunktion für diese Website.
  * @method \SilverStripe\ORM\HasManyList<MashaFeedlyMiteTrigger> MashaFeedlyMiteTriggers() Auslösende Statuskategorien.
@@ -45,6 +47,7 @@ class MashaFeedlyConfigExtension extends Extension
         'MashaFeedlyDueDateReminderLastRunDate' => 'Date',
         'MashaFeedlyClosedCategoriesMigrated' => 'Boolean',
         'MashaFeedlyEmailTestSucceeded' => 'Boolean',
+        'MashaFeedlyEmailFooter' => 'Text',
     ];
 
     private static $defaults = [
@@ -61,7 +64,62 @@ class MashaFeedlyConfigExtension extends Extension
     /** Die Mite-Zuordnung wird ausschließlich im geschützten Modulreiter gepflegt. */
     public function updateCMSFields(\SilverStripe\Forms\FieldList $fields): void
     {
-        $fields->removeByName(['MashaFeedlyMiteProjectID', 'MashaFeedlyMiteEnabled', 'MashaFeedlyMiteTriggers']);
+        $fields->removeByName([
+            'MashaFeedlyMiteProjectID',
+            'MashaFeedlyMiteEnabled',
+            'MashaFeedlyMiteTriggers',
+            'MashaFeedlyEmailFooter',
+        ]);
+    }
+
+    /** Ergänzt den E-Mail-Footer bei dev/build, solange noch kein eigener Text gespeichert wurde. */
+    public function requireDefaultRecords(): void
+    {
+        if (!DB::get_schema()->hasField('SiteConfig', 'MashaFeedlyEmailFooter')) {
+            return;
+        }
+        $config = self::currentSiteConfig();
+        if (trim((string)$config->MashaFeedlyEmailFooter) !== '') {
+            return;
+        }
+        $footer = self::defaultEmailFooter();
+        if ($footer === '') {
+            return;
+        }
+        $config->MashaFeedlyEmailFooter = $footer;
+        $config->write();
+    }
+
+    /** Liest den optionalen Footer aus der Serverumgebung und decodiert Zeilenumbrüche. */
+    public static function defaultEmailFooter(): string
+    {
+        $footer = trim((string)Environment::getEnv('MASHA_FEEDLY_EMAIL_FOOTER'));
+        if ($footer === '') {
+            return '';
+        }
+
+        // Mehrzeilige Werte lassen sich in der .env mit den Zeichenfolgen \n hinterlegen.
+        return trim(str_replace(['\\r\\n', '\\n', '\\r'], "\n", $footer));
+    }
+
+    /** Liefert den gespeicherten Footer oder den Wert aus der Serverumgebung. */
+    public static function emailFooter(): string
+    {
+        $value = trim((string)self::currentSiteConfig()->MashaFeedlyEmailFooter);
+        if ($value === '') {
+            return self::defaultEmailFooter();
+        }
+
+        // Hashes erkennen ausschließlich zwei früher automatisch vorbelegte Footer, ohne ihre Kontaktdaten im Code abzulegen.
+        if (in_array(hash('sha256', $value), [
+            'd1e84d1fde95ac985c5754bb96b97caf2ea362038032fd0256768acda7da0532',
+            '7bb52ee474caa560366e5c463ceffc9a633e1ad7ac5f6c991313937e6a0ba73b',
+        ], true)) {
+            return self::defaultEmailFooter();
+        }
+
+        // Entfernt eine früher doppelt gespeicherte Wirtschafts-ID aus frei bearbeiteten Footertexten.
+        return trim((string)preg_replace('/\s*·\s*Wirtschafts-ID:\s*[^\s·]+/u', '', $value));
     }
 
     /** Prüft den zentralen Aktiv-Schalter; neue Installationen sind zunächst deaktiviert. */
@@ -174,6 +232,12 @@ class MashaFeedlyConfigExtension extends Extension
     public static function canUse(?Member $member): bool
     {
         if (!$member || !$member->isInDB()) {
+            return false;
+        }
+
+        // dev/build initialisiert Controller, bevor neue SiteConfig-Spalten angelegt sind.
+        // In diesem kurzen Zeitraum darf keine ORM-Abfrage alle SiteConfig-Felder auswählen.
+        if (!DB::get_schema()->hasField('SiteConfig', 'MashaFeedlyEmailFooter')) {
             return false;
         }
 

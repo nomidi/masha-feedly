@@ -75,7 +75,7 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertSame('Darstellung', $appearanceGroup->Title());
         $themeField = $appearanceGroup->getChildren()->dataFieldByName('MashaFeedlyTheme');
         $this->assertInstanceOf(DropdownField::class, $themeField);
-        $this->assertSame('Website-Vorgabe', $themeField->getEmptyString());
+        $this->assertSame('Einstellung der Website übernehmen', $themeField->getEmptyString());
         // Die Namen werden im Anbieter-CMS gepflegt; das Profil muss beide auswählbaren Kategorien anbieten.
         $themeOptions = $themeField->getSource();
         $this->assertArrayHasKey('playful', $themeOptions);
@@ -84,7 +84,7 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertNotSame('', trim((string)$themeOptions['serious']));
         $addressField = $appearanceGroup->getChildren()->dataFieldByName('MashaFeedlyAddress');
         $this->assertInstanceOf(DropdownField::class, $addressField);
-        $this->assertSame('Website-Vorgabe', $addressField->getEmptyString());
+        $this->assertSame('Einstellung der Website übernehmen', $addressField->getEmptyString());
         $this->assertNull($mainTab->Fields()->dataFieldByName('MashaFeedlyOnboardingCompleted'));
         $profileGroup = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyProfileSettings');
         $this->assertInstanceOf(\SilverStripe\Forms\CompositeField::class, $profileGroup);
@@ -108,7 +108,7 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertStringContainsString('Automatisch vergeben', MashaFeedlyMemberExtension::renderColorPalette());
         $this->assertStringContainsString('data-color=""', MashaFeedlyMemberExtension::renderColorPalette());
         $intro = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyPreferencesIntro')->getContent();
-        foreach (['Profilbild', 'Masha-Symbol (sofern verfügbar)', 'Avatarfarbe', 'Effekt-Kategorie', 'E-Mail-Benachrichtigungen', 'Einführung bei Bedarf erneut'] as $capability) {
+        foreach (['Profilbild oder Symbol', 'Profilfarbe', 'Danke-Animation', 'E-Mail-Benachrichtigungen', 'Einführung erneut starten'] as $capability) {
             $this->assertStringContainsString($capability, $intro);
         }
         $this->assertStringNotContainsString('Kostenschätzungen freigeben', $intro);
@@ -152,7 +152,7 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         );
         $this->assertStringContainsString('Erhalte eine E-Mail', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyNewEntries')->getDescription());
         $this->assertStringContainsString('selbst erstellst oder änderst', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyOwnEntryChanges')->getDescription());
-        $this->assertStringContainsString('oder den du erstellt hast', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyComments')->getDescription());
+        $this->assertStringContainsString('oder die du erstellt hast', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyComments')->getDescription());
         $this->assertStringContainsString('Status, Beschreibung, Zuständigkeit', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyEntryUpdates')->getDescription());
     }
 
@@ -233,11 +233,7 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $fields = $otherMember->getCMSFields();
 
         $mashaFeedlyTab = $fields->findTab('Root.MashaFeedly');
-        $this->assertNotNull($mashaFeedlyTab);
-        $accessNotice = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyAccessNotice');
-        $this->assertInstanceOf(\SilverStripe\Forms\LiteralField::class, $accessNotice);
-        $this->assertStringContainsString('noch nicht freigeschaltet', $accessNotice->getContent());
-        $this->assertStringContainsString('nur für freigeschaltete Mitglieder', $accessNotice->getContent());
+        $this->assertNull($mashaFeedlyTab);
         $this->assertNull($fields->dataFieldByName('MashaFeedlyEmailNotifications'));
         $this->assertNull($fields->dataFieldByName('MashaFeedlyNotifyNewEntries'));
         $this->assertNull($fields->dataFieldByName('MashaFeedlyNotifyEntryUpdates'));
@@ -247,6 +243,22 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->assertNull($fields->dataFieldByName('MashaFeedlyOnboardingCompleted'));
         $this->assertNull($fields->dataFieldByName('MashaFeedlyIconImage'));
         $this->assertNull($fields->dataFieldByName('MashaFeedlyColor'));
+    }
+
+    /** Auch CMS-Adminrechte erzeugen ohne Modulfreigabe keinen Profilreiter. */
+    public function testUnassignedAdminDoesNotSeeFeedlyProfileTab(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $member = \SilverStripe\Security\Security::getCurrentUser();
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['operator@example.test']);
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = '[]';
+        $config->write();
+
+        $fields = $member->getCMSFields();
+        $this->assertNull($fields->findTab('Root.MashaFeedly'));
+        $this->assertNull($fields->dataFieldByName('MashaFeedlyColor'));
+        $this->assertNull($fields->dataFieldByName('MashaFeedlyAvatarIcon'));
     }
 
     /** Prüft, dass E-Mails zu eigenen Einträgen standardmäßig ausgeschaltet sind. */
