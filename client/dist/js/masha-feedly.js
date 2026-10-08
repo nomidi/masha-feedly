@@ -56,6 +56,14 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   surface.append(widget);
   root.append(stylesheet, surface);
+  root.addEventListener('error', (event) => {
+    const image = event.target;
+    if (!(image instanceof HTMLImageElement)) return;
+    const avatar = image.closest('.kw-masha-feedly__assignee-avatar');
+    if (!avatar) return;
+    avatar.replaceChildren();
+    avatar.textContent = avatar.dataset.avatarInitials || '?';
+  }, true);
   document.body.append(host);
 
   const hoverHintSelector = [

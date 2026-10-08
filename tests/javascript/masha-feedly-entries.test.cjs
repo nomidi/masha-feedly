@@ -138,6 +138,11 @@ test('zeigt Urheber und lokalen Erstellungszeitpunkt direkt am geöffneten Eintr
   assert.match(compiledStyles, /\.kw-masha-feedly__entry-created\{[^}]*border-radius:999px;[^}]*background:linear-gradient/);
   assert.match(scss, /\.kw-masha-feedly__entry-created-avatar img \{ width: 100%; height: 100%; object-fit: cover; \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__entry-created-avatar img\{width:100%;height:100%;object-fit:cover\}/);
+  // Ein Hintergrundbild würde die vom Profil gesetzte Hintergrundfarbe überdecken.
+  const creatorAvatarStyle = compiledStyles.match(/\.kw-masha-feedly__entry-created-avatar\{([^}]*)\}/)[1];
+  assert.doesNotMatch(creatorAvatarStyle, /gradient|background-image/);
+  assert.match(scss, /\.kw-masha-feedly__entry-created-avatar img\[src\*="\/__masha-feedly-effects\/avatar\/"\] \{ padding: 5px; object-fit: contain; \}/);
+  assert.match(scss, /\.kw-masha-feedly__assignee-avatar img\[src\*="\/__masha-feedly-effects\/avatar\/"\] \{ padding: 5px; object-fit: contain; \}/);
 });
 
 test('zeigt die konfigurierte Meldeperson statt des technischen Erstellers und rendert deren Änderung im Verlauf', () => {
@@ -162,9 +167,9 @@ test('zeigt die konfigurierte Meldeperson statt des technischen Erstellers und r
   assert.equal(rows[0].children[0].text, 'Meldeperson: CMS Betreiber → Historische Meldung von Ada');
 });
 
-test('zeigt beim Ersteller dasselbe Profilbild wie bei Zuständigkeiten und nutzt Initialen als Fallback', () => {
+test('zeigt beim Ersteller das Profilbild, nutzt Initialen bei Ladefehlern und zeigt Zuständigkeits-Icons', () => {
   const images = [];
-  const fakeDocument = { createElement: () => { const image = {}; images.push(image); return image; } };
+  const fakeDocument = { createElement: () => { const image = { addEventListener(name, callback) { this[name] = callback; } }; images.push(image); return image; } };
   const avatar = {
     style: {},
     children: [],
@@ -179,6 +184,9 @@ test('zeigt beim Ersteller dasselbe Profilbild wie bei Zuständigkeiten und nutz
   assert.equal(images[0].loading, 'lazy');
   assert.equal(avatar.style.backgroundColor, '#123456');
   assert.equal(avatar.children[0], images[0]);
+  images[0].error();
+  assert.equal(avatar.textContent, 'EM');
+  assert.equal(avatar.children.length, 0);
 
   entriesUI.renderEntryCreatorAvatar(avatar, {
     author: 'Erika Muster', initials: 'EM', color: '#654321', imageURL: '',
@@ -620,7 +628,7 @@ test('zeichnet Mitglieder als farbige Initialen oder Profilbilder ohne Zuweisung
     setAttribute(name, value) { this[name] = value; },
     append(child) { this.children.push(child); },
   };
-  const document = { createElement(tagName) { return { tagName, style: {}, children: [], append(child) { this.children.push(child); }, setAttribute(name, value) { this[name] = value; } }; } };
+  const document = { createElement(tagName) { return { tagName, style: {}, children: [], append(child) { this.children.push(child); }, replaceChildren() { this.children = []; }, addEventListener(name, callback) { this[name] = callback; }, setAttribute(name, value) { this[name] = value; } }; } };
   entriesUI.renderAssignees(container, [
     { name: 'Erika Muster', initials: 'EM', color: '#E95DAB' },
     { name: 'Max Beispiel', initials: 'MB', color: '#91B8E8', imageURL: '/protected/avatar.jpg' },
@@ -629,6 +637,8 @@ test('zeichnet Mitglieder als farbige Initialen oder Profilbilder ohne Zuweisung
   assert.equal(container.children[0].textContent, 'EM');
   assert.equal(container.children[0].style.backgroundColor, '#E95DAB');
   assert.equal(container.children[1].children[0].src, '/protected/avatar.jpg');
+  container.children[1].children[0].error();
+  assert.equal(container.children[1].textContent, 'MB');
 });
 
 test('rendert den Verlauf mit Status, Zuständigkeit, handelnder Person und Zeitpunkt als Text', () => {
@@ -1412,7 +1422,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
       assignedMemberIDs: entryAssigneeList.map((member) => member.id),
       history: [{ type: 'created', oldValue: '', newValue: entryTitleValue, actor: 'Erika Muster', created: '2026-10-01T10:00:00Z' }],
       comments: [
-        { id: 1, author: 'Erika Muster', text: 'Erster Kommentar https://example.test/kommentar', created: '2026-10-01 10:30:00', canManage: true, edited: true },
+        { id: 1, author: 'Erika Muster', authorInitials: 'EM', authorColor: '#F4D06F', authorImageURL: '/__masha-feedly-effects/avatar/person/black', text: 'Erster Kommentar https://example.test/kommentar', created: '2026-10-01 10:30:00', canManage: true, edited: true },
         { id: 2, author: 'Max Beispiel', text: '<script>zweiter</script><img src=x onerror=alert(2)> <svg onload=alert(3)> javascript:alert(4)', created: '2026-10-01 10:35:00', canManage: true },
       ],
     }],
@@ -1658,6 +1668,11 @@ test('zeigt Kommentare als abwechselnde sichere Sprechblasen und sendet neue Kom
   assert.deepEqual(env.commentList.children.map((item) => item.className), [
     'kw-masha-feedly__comment is-left', 'kw-masha-feedly__comment is-right',
   ]);
+  const authorRow = env.commentList.children[0].children[0];
+  assert.equal(authorRow.className, 'kw-masha-feedly__comment-author');
+  assert.equal(authorRow.children[0].className, 'kw-masha-feedly__comment-avatar');
+  assert.equal(authorRow.children[0].children[0].src, '/__masha-feedly-effects/avatar/person/black');
+  assert.equal(authorRow.children[0].style.backgroundColor, '#F4D06F');
   assert.equal(env.commentList.children[1].children[1].textContent, '<script>zweiter</script><img src=x onerror=alert(2)> <svg onload=alert(3)> javascript:alert(4)');
   assert.equal(env.commentCount.textContent, '2');
   assert.equal(env.commentList.children[0].children[1].children.find((node) => node.tagName === 'a').href, 'https://example.test/kommentar');
@@ -1670,7 +1685,7 @@ test('zeigt Kommentare als abwechselnde sichere Sprechblasen und sendet neue Kom
   const editor = env.commentList.children[0].children[1];
   assert.deepEqual(editor.children[3].children.map((button) => button.textContent), ['Abbrechen', 'Änderungen speichern']);
   editor.children[2].value = 'Kommentar aktualisiert';
-  env.postResponses.push({ ok: true, json: async () => ({ success: true, comment: { id: 1, author: 'Erika Muster', text: 'Kommentar aktualisiert', created: '2026-10-01 10:30:00', canManage: true, edited: true }, history: [{ type: 'comment_edited', oldValue: 'Erster Kommentar', newValue: 'Kommentar aktualisiert', actor: 'Erika Muster', created: '2026-10-01T10:30:00Z' }] }) });
+  env.postResponses.push({ ok: true, json: async () => ({ success: true, comment: { id: 1, author: 'Erika Muster', authorInitials: 'EM', authorColor: '#F4D06F', authorImageURL: '/__masha-feedly-effects/avatar/person/black', text: 'Kommentar aktualisiert', created: '2026-10-01 10:30:00', canManage: true, edited: true }, history: [{ type: 'comment_edited', oldValue: 'Erster Kommentar', newValue: 'Kommentar aktualisiert', actor: 'Erika Muster', created: '2026-10-01T10:30:00Z' }] }) });
   await editor.listeners.submit({ preventDefault() {} });
   assert.equal(env.postCalls[0].url.pathname, '/__masha-feedly-comment');
   assert.equal(env.postCalls[0].options.body.values.CommentAction, 'edit');
@@ -1678,12 +1693,13 @@ test('zeigt Kommentare als abwechselnde sichere Sprechblasen und sendet neue Kom
   assert.equal(env.postCalls[0].options.body.values.CommentID, '1');
   assert.equal(env.postCalls[0].options.body.values.CommentText, 'Kommentar aktualisiert');
   assert.equal(env.commentList.children[0].children[1].textContent, 'Kommentar aktualisiert');
+  assert.equal(env.commentList.children[0].children[0].children[0].children[0].src, '/__masha-feedly-effects/avatar/person/black');
   assert.match(env.editHistory.children[0].children[0].textContent, /Kommentar bearbeitet: Erster Kommentar → Kommentar aktualisiert/);
   assert.equal(env.commentList.children[0].children[2].children[0].className, 'kw-masha-feedly__comment-edited');
   assert.equal(env.commentList.children[0].children[2].children[0].textContent, 'bearbeitet');
 
   env.commentForm.elements.CommentText.value = 'Noch ein Hinweis';
-  env.postResponses.push({ ok: true, json: async () => ({ success: true, comment: { id: 3, author: 'Erika Muster', text: 'Noch ein Hinweis', created: '2026-10-01 10:40:00' }, history: [{ type: 'comment', oldValue: '', newValue: 'Noch ein Hinweis', actor: 'Erika Muster', created: '2026-10-01T10:40:00Z' }] }) });
+  env.postResponses.push({ ok: true, json: async () => ({ success: true, comment: { id: 3, author: 'Erika Muster', authorInitials: 'EM', authorColor: '#F4D06F', authorImageURL: '/__masha-feedly-effects/avatar/person/black', text: 'Noch ein Hinweis', created: '2026-10-01 10:40:00' }, history: [{ type: 'comment', oldValue: '', newValue: 'Noch ein Hinweis', actor: 'Erika Muster', created: '2026-10-01T10:40:00Z' }] }) });
   await env.commentForm.listeners.submit({ preventDefault() {} });
   assert.equal(env.postCalls[1].url.pathname, '/__masha-feedly-comment');
   assert.equal(env.postCalls[1].options.body.values.SecurityID, 'test-token');

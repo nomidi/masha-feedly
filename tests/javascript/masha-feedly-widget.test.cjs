@@ -51,7 +51,7 @@ function renderWidget(frameElement = null, captureEvents = false) {
     contains(element) { return element === trigger; },
   };
   const surface = { append(element) { appendedElements.push(element); }, setAttribute() {} };
-  const root = { append() {}, querySelector(selector) {
+  const root = { append() {}, addEventListener() {}, querySelector(selector) {
     return selector === '[data-kw-masha-feedly]' ? widget : surface;
   } };
   const host = { setAttribute() {}, attachShadow(options) { assert.equal(options.mode, 'open'); this.shadowRoot = root; return root; } };

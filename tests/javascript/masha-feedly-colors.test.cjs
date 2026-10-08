@@ -18,21 +18,24 @@ function createColorEnvironment(fieldName = 'MashaFeedlyColor') {
     events: [],
     dispatchEvent(event) { this.events.push(event); },
   };
+  const otherColorField = { name: fieldName, value: '#F4D06F' };
+  const preview = { style: {} };
+  const form = { querySelectorAll: () => [colorField], querySelector: () => preview };
   const option = {
     dataset: { fieldName, color: '#E95DAB' },
     attributes: {},
     classList: { toggle(name, enabled) { this[name] = enabled; } },
-    closest(selector) { return selector === '.masha-feedly-color-palette' ? palette : null; },
+    closest(selector) { return selector === '.masha-feedly-color-palette' ? palette : selector === 'form' ? form : null; },
     setAttribute(name, value) { this.attributes[name] = value; },
   };
   paletteOptions.push(option);
   const document = {
     addEventListener(name, callback) { listeners[name] = callback; },
-    querySelectorAll: () => [colorField],
+    querySelectorAll: (selector) => selector === '[data-masha-feedly-color-option]' ? paletteOptions : [otherColorField, colorField],
   };
   const Event = class { constructor(type, options) { this.type = type; this.bubbles = options.bubbles; } };
-  vm.runInNewContext(source, { document, Event });
-  return { listeners, colorField, option };
+  vm.runInNewContext(source, { document, Event, window: {} });
+  return { listeners, colorField, otherColorField, option, preview };
 }
 
 test('übernimmt die angeklickte Farbe im passenden Auswahlfeld', () => {
@@ -50,4 +53,14 @@ test('ignoriert Klicks außerhalb der Farbfelder', () => {
   listeners.click({ target: { closest: () => null } });
   assert.equal(colorField.value, '');
   assert.equal(colorField.events.length, 0);
+});
+
+test('ändert bei gleichnamigen CMS- und Widget-Feldern nur die Farbe des zugehörigen Formulars', () => {
+  const state = createColorEnvironment();
+  state.listeners.click({ target: { closest: () => state.option } });
+  assert.equal(state.colorField.value, '#E95DAB');
+  assert.equal(state.otherColorField.value, '#F4D06F');
+  state.listeners.DOMContentLoaded();
+  assert.equal(state.option.attributes['aria-pressed'], 'true');
+  assert.equal(state.preview.style.backgroundColor, '#E95DAB');
 });

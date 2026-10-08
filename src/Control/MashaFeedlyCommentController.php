@@ -65,15 +65,7 @@ class MashaFeedlyCommentController extends Controller
 
         return $this->respond([
             'success' => true,
-            'comment' => [
-                'id' => (int)$comment->ID,
-                'author' => (string)$comment->AuthorName,
-                'text' => (string)$comment->CommentText,
-                'created' => (string)$comment->Created,
-                'edited' => false,
-                'canManage' => true,
-                'reactions' => MashaFeedlyCommentReaction::summaryForComment($comment, $member),
-            ],
+            'comment' => $this->commentPayload($comment, $member),
             'history' => MashaFeedlyEntryHistory::dataForEntry($entry),
         ]);
     }
@@ -168,15 +160,27 @@ class MashaFeedlyCommentController extends Controller
             MashaFeedlyEntryHistory::record($entry, 'comment_edited', $oldText, $text, $member, (int)$comment->ID);
             MashaFeedlyEntryRead::markAsSeen($entry, $member);
         }
-        return $this->respond(['success' => true, 'comment' => [
+        return $this->respond(['success' => true, 'comment' => $this->commentPayload($comment, $member), 'history' => $entry ? MashaFeedlyEntryHistory::dataForEntry($entry) : []]);
+    }
+
+    /** Bereitet Kommentar und Profilbild für die sichere Widget-Ausgabe vor. */
+    private function commentPayload(MashaFeedlyComment $comment, Member $viewer): array
+    {
+        $author = $comment->AuthorMemberID ? Member::get()->byID((int)$comment->AuthorMemberID) : null;
+        $createdAt = strtotime((string)$comment->Created);
+        $editedAt = strtotime((string)$comment->LastEdited);
+        return [
             'id' => (int)$comment->ID,
             'author' => (string)$comment->AuthorName,
+            'authorInitials' => $author ? (string)$author->getMashaFeedlyInitials() : '',
+            'authorColor' => $author ? (string)$author->getMashaFeedlyDisplayColor() : '',
+            'authorImageURL' => $author ? (string)$author->getMashaFeedlyAvatarURL() : '',
             'text' => (string)$comment->CommentText,
             'created' => (string)$comment->Created,
-            'edited' => true,
-            'canManage' => true,
-            'reactions' => MashaFeedlyCommentReaction::summaryForComment($comment, $member),
-        ], 'history' => $entry ? MashaFeedlyEntryHistory::dataForEntry($entry) : []]);
+            'edited' => (bool)$comment->WasEdited || ($createdAt !== false && $editedAt !== false && $editedAt > $createdAt),
+            'canManage' => Permission::checkMember($viewer, 'ADMIN') || (int)$comment->AuthorMemberID === (int)$viewer->ID,
+            'reactions' => MashaFeedlyCommentReaction::summaryForComment($comment, $viewer),
+        ];
     }
 
     private function translate(string $key, string $fallback): string

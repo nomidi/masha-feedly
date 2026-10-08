@@ -175,6 +175,10 @@ class MashaFeedlyMemberExtension extends Extension
     /** Aktiviert die Einführung erneut, wenn das Profil die Wiederholung anfordert. */
     protected function onBeforeWrite(): void
     {
+        // Eine automatische Farbe wird einmal gespeichert und bleibt bei späteren Profiländerungen stabil.
+        $colors = array_keys(self::colorOptions());
+        $this->owner->MashaFeedlyColor = self::normalizeColor((string)$this->owner->MashaFeedlyColor)
+            ?? $colors[random_int(0, count($colors) - 1)];
         if (!MashaFeedlyConfigExtension::emailTestSucceeded()) {
             $notificationFields = [
                 'MashaFeedlyEmailNotifications',
@@ -205,6 +209,15 @@ class MashaFeedlyMemberExtension extends Extension
     protected function onAfterWrite(): void
     {
         $this->protectMashaFeedlyIconImage();
+        $iconID = trim((string)$this->owner->MashaFeedlyAvatarIcon);
+        if ($iconID !== '' && $this->owner->isChanged('MashaFeedlyAvatarIcon')
+            && MashaFeedlyConfigExtension::isExplicitlyAllowed($this->owner)) {
+            try {
+                (new MashaFeedlyEffectClient())->storeSelectedAvatarIcon($iconID);
+            } catch (\Throwable) {
+                // Das Profil bleibt speicherbar; der geschützte Avatar-Endpunkt versucht den Import bei Bedarf erneut.
+            }
+        }
     }
 
     /** Synchronisiert die Dateirechte des Profilbilds mit der aktuellen Masha-Feedly-Freigabe. */
@@ -241,25 +254,37 @@ class MashaFeedlyMemberExtension extends Extension
     {
         $iconID = (string)$this->owner->MashaFeedlyAvatarIcon;
         if ($iconID !== '') {
-            try {
-                foreach ((new MashaFeedlyEffectClient())->avatarIcons()['icons'] as $icon) {
-                    if ($icon['id'] === $iconID) {
-                        $color = self::iconColorForAvatarColor($this->getMashaFeedlyDisplayColor());
-                        return $icon['files'][$color];
-                    }
-                }
-            } catch (\Throwable) {
-                // Ein nicht erreichbarer Anbieter lässt vorhandene Profilbilder weiter funktionieren.
-            }
+            $color = self::iconColorForAvatarColor($this->getMashaFeedlyDisplayColor());
+            return \SilverStripe\Control\Director::absoluteURL('__masha-feedly-effects/avatar/' . rawurlencode($iconID) . '/' . $color);
         }
         $image = $this->owner->MashaFeedlyIconImage();
         return $image instanceof Image && $image->exists() ? (string)$image->getURL() : '';
+    }
+
+    /** Zeigt den tatsächlich verwendeten Avatar auch ohne erreichbaren Icon-Katalog im Profil an. @return string Geschützte Avatarvorschau. */
+    public function renderAvatarPreview(): string
+    {
+        $escape = static fn(string $value): string => htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $url = $this->getMashaFeedlyAvatarURL();
+        $image = $this->owner->MashaFeedlyIconImage();
+        $uploadURL = $image instanceof Image && $image->exists() ? (string)$image->getURL() : '';
+        return '<div class="masha-feedly-profile-avatar-preview" data-masha-feedly-avatar-preview'
+            . ' data-avatar-base="' . $escape(\SilverStripe\Control\Director::absoluteURL('__masha-feedly-effects/avatar/')) . '"'
+            . ' data-icon-id="' . $escape((string)$this->owner->MashaFeedlyAvatarIcon) . '"'
+            . ' data-upload-url="' . $escape($uploadURL) . '" data-initials="' . $escape($this->getMashaFeedlyInitials()) . '"'
+            . ' style="background-color:' . $escape($this->getMashaFeedlyDisplayColor()) . '"'
+            . ' aria-label="' . $escape(self::translate('PROFILE_IMAGE', 'Dein Masha:Feedly-Avatar')) . '">'
+            . ($url !== '' ? '<img src="' . $escape($url) . '" alt="">' : $escape($this->getMashaFeedlyInitials())) . '</div>';
     }
 
     /** Wählt für die gewählte Avatarfarbe eine kontrastreiche Icon-Farbe. @param string $color Hex-Farbwert. @return string Schwarz oder Weiß. */
     public static function iconColorForAvatarColor(string $color): string
     {
         $color = self::normalizeColor($color) ?? (string)array_key_first(self::colorOptions());
+        // Diese Grüntöne verwenden bewusst die helle Variante, passend zur gewünschten Avatar-Gestaltung.
+        if (in_array($color, ['#35A98F', '#69B85A'], true)) {
+            return 'white';
+        }
         $channels = array_map(static fn(string $channel): float => hexdec($channel) / 255, str_split(substr($color, 1), 2));
         $luminance = 0.2126 * $channels[0] + 0.7152 * $channels[1] + 0.0722 * $channels[2];
         return $luminance > 0.52 ? 'black' : 'white';
@@ -357,6 +382,7 @@ class MashaFeedlyMemberExtension extends Extension
         }
 
         $avatarFields = [
+            LiteralField::create('MashaFeedlyAvatarPreview', $this->renderAvatarPreview()),
             UploadField::create('MashaFeedlyIconImage', self::translate('PROFILE_IMAGE', 'Dein Masha:Feedly-Avatar'))
                 ->setFolderName('masha-feedly/masha-feedly-profile-images')
                 ->setAllowedFileCategories('image/supported')
@@ -364,6 +390,7 @@ class MashaFeedlyMemberExtension extends Extension
                 ->setAttachEnabled(false)
                 ->setDescription(self::translate('PROFILE_IMAGE_DESCRIPTION', 'Das Bild ist geschützt und nur für freigegebene Masha-Feedly-Benutzer sichtbar. Ohne Bild werden deine Initialen angezeigt.')),
         ];
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-avatar-icons.js');
         if ($avatarIconPicker !== '') {
             $avatarFields[] = CompositeField::create(
                 LiteralField::create('MashaFeedlyAvatarIconChoices', $avatarIconPicker),
@@ -453,31 +480,53 @@ class MashaFeedlyMemberExtension extends Extension
         }
         if (!$catalogue['icons']) return '';
         $iconColor = self::iconColorForAvatarColor($color ?? '');
-        $html = '<div class="masha-feedly-avatar-icons" data-masha-feedly-avatar-icons><p>'
+        $html = '<div class="masha-feedly-avatar-icons" data-masha-feedly-avatar-icons>'
+            . '<button type="button" class="masha-feedly-avatar-icons__open" data-masha-feedly-avatar-icon-open aria-haspopup="dialog">'
+            . htmlspecialchars(self::translate('PROFILE_ICON_OPEN', 'Symbol auswählen'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</button>'
+            . '<div class="masha-feedly-avatar-icons__dialog" data-masha-feedly-avatar-icon-dialog hidden><div class="masha-feedly-avatar-icons__backdrop" data-masha-feedly-avatar-icon-close></div>'
+            . '<section class="masha-feedly-avatar-icons__panel" role="dialog" aria-modal="true" aria-label="'
+            . htmlspecialchars(self::translate('PROFILE_ICON_CHOOSER', 'Profil-Symbol auswählen'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            . '"><header class="masha-feedly-avatar-icons__header"><div><span>MASHA:FEEDLY</span><h2>'
+            . htmlspecialchars(self::translate('PROFILE_ICON_CHOOSER', 'Profil-Symbol auswählen'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            . '</h2></div><button type="button" data-masha-feedly-avatar-icon-close aria-label="'
+            . htmlspecialchars(self::translate('CLOSE', 'Schließen'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">×</button></header><div class="masha-feedly-avatar-icons__content"><p>'
             . htmlspecialchars(self::translate('PROFILE_ICON_CHOICES_DESCRIPTION', 'Wähle ein Symbol. Seine Farbe passt sich automatisch an deine Avatarfarbe an.'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
             . '</p><button type="button" class="masha-feedly-avatar-icons__clear" data-masha-feedly-avatar-icon-clear aria-pressed="' . ($selectedID === '' ? 'true' : 'false') . '">'
-            . htmlspecialchars(self::translate('PROFILE_ICON_CLEAR', 'Kein Symbol verwenden'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</button><nav aria-label="'
+            . htmlspecialchars(self::translate('PROFILE_ICON_CLEAR', 'Kein Symbol verwenden'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</button><nav class="masha-feedly-avatar-icons__tabs" role="tablist" aria-label="'
             . htmlspecialchars(self::translate('PROFILE_ICON_CATEGORIES', 'Icon-Kategorien'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">';
+        $selectedCategory = '';
+        foreach ($catalogue['icons'] as $icon) {
+            if ($selectedID !== '' && $icon['id'] === $selectedID) {
+                $selectedCategory = $icon['category'];
+                break;
+            }
+        }
+        if ($selectedCategory === '' && isset($catalogue['categories'][0]['id'])) {
+            $selectedCategory = $catalogue['categories'][0]['id'];
+        }
         foreach ($catalogue['categories'] as $index => $category) {
             $categoryID = htmlspecialchars($category['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $categoryName = htmlspecialchars($category['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-            $html .= '<a href="#masha-feedly-icons-' . $categoryID . '">' . $categoryName . '</a>';
+            $active = $category['id'] === $selectedCategory;
+            $html .= '<button type="button" role="tab" id="masha-feedly-icon-tab-' . $categoryID . '" aria-controls="masha-feedly-icons-' . $categoryID . '" aria-selected="' . ($active ? 'true' : 'false') . '" tabindex="' . ($active ? '0' : '-1') . '" data-masha-feedly-avatar-icon-tab="' . $categoryID . '">' . $categoryName . '</button>';
         }
         $html .= '</nav>';
         foreach ($catalogue['categories'] as $index => $category) {
             $categoryID = htmlspecialchars($category['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
             $categoryName = htmlspecialchars($category['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-            $html .= '<section id="masha-feedly-icons-' . $categoryID . '"><h3>' . $categoryName . '</h3><div class="masha-feedly-avatar-icons__grid">';
+            $active = $category['id'] === $selectedCategory;
+            $html .= '<section id="masha-feedly-icons-' . $categoryID . '" class="masha-feedly-avatar-icons__category" role="tabpanel" aria-labelledby="masha-feedly-icon-tab-' . $categoryID . '"' . ($active ? '' : ' hidden') . '><h3>' . $categoryName . '</h3><div class="masha-feedly-avatar-icons__grid">';
             foreach ($catalogue['icons'] as $icon) {
                 if ($icon['category'] !== $category['id']) continue;
                 $id = htmlspecialchars($icon['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                 $name = htmlspecialchars($icon['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
                 $pressed = $selectedID === $icon['id'];
-                $html .= '<button type="button" class="masha-feedly-avatar-icons__choice' . ($pressed ? ' is-selected' : '') . '" data-masha-feedly-avatar-icon-choice data-icon-id="' . $id . '" data-icon-black="' . htmlspecialchars($icon['files']['black'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" data-icon-white="' . htmlspecialchars($icon['files']['white'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" aria-pressed="' . ($pressed ? 'true' : 'false') . '" aria-label="' . $name . '"><img src="' . htmlspecialchars($icon['files'][$iconColor], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" alt="" loading="lazy"><span>' . $name . '</span></button>';
+                $imageURL = htmlspecialchars($icon['files'][$iconColor], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $html .= '<button type="button" class="masha-feedly-avatar-icons__choice' . ($pressed ? ' is-selected' : '') . '" data-masha-feedly-avatar-icon-choice data-icon-id="' . $id . '" data-icon-black="' . htmlspecialchars($icon['files']['black'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" data-icon-white="' . htmlspecialchars($icon['files']['white'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '" aria-pressed="' . ($pressed ? 'true' : 'false') . '" aria-label="' . $name . '"><img' . ($active ? ' src="' . $imageURL . '"' : '') . ' data-icon-src="' . $imageURL . '" alt="" loading="lazy"><span>' . $name . '</span></button>';
             }
             $html .= '</div></section>';
         }
-        return $html . '</div>';
+        return $html . '</div></section></div></div>';
     }
     /** Liefert eine lokalisierte Modulbeschriftung mit deutschem Ersatztext. */
     private static function translate(string $key, string $fallback): string

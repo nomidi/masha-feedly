@@ -784,7 +784,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                 $imageURL = $this->memberProfileImageURL($assignee);
                 $html .= '<label class="kw-masha-feedly__assignee-choice" title="' . $this->escapeBoardValue($name) . '">'
                     . '<input type="checkbox" name="AssignedMemberIDs[]" value="' . (int)$assignee->ID . '">'
-                    . '<span class="kw-masha-feedly__assignee-avatar" style="background-color: '
+                    . '<span class="kw-masha-feedly__assignee-avatar" data-avatar-initials="' . $this->escapeBoardValue((string)$assignee->getMashaFeedlyInitials()) . '" style="background-color: '
                     . $this->escapeBoardValue((string)$assignee->getMashaFeedlyDisplayColor()) . '" aria-label="' . $this->escapeBoardValue($name) . '">'
                     . ($imageURL !== '' ? '<img src="' . $this->escapeBoardValue($imageURL) . '" alt="" loading="lazy">' : $this->escapeBoardValue((string)$assignee->getMashaFeedlyInitials()))
                     . '</span><span class="kw-masha-feedly__assignee-name">' . $this->escapeBoardValue($name) . '</span></label>';
@@ -1120,10 +1120,8 @@ class MashaFeedlyAdmin extends ModelAdmin
     /** Liefert das Profilbild eines Mitglieds, falls ein passendes Bildfeld vorhanden ist. */
     private function memberProfileImageURL(Member $member): string
     {
-        if (method_exists($member, 'getMashaFeedlyAvatarURL')) {
-            $avatarURL = (string)$member->getMashaFeedlyAvatarURL();
-            if ($avatarURL !== '') return $avatarURL;
-        }
+        $avatarURL = (string)$member->getMashaFeedlyAvatarURL();
+        if ($avatarURL !== '') return $avatarURL;
         foreach (['MashaFeedlyIconImage', 'ProfileImage', 'Photo', 'Portrait'] as $relationName) {
             if (!$member->hasMethod($relationName)) {
                 continue;
@@ -1185,7 +1183,6 @@ class MashaFeedlyAdmin extends ModelAdmin
         }
         $siteConfig->write();
 
-        $usedColors = [];
         foreach ($memberIDs as $authorizedMemberID) {
             $authorizedMember = Member::get()->byID($authorizedMemberID);
             if (!$authorizedMember) {
@@ -1198,12 +1195,11 @@ class MashaFeedlyAdmin extends ModelAdmin
                     ? (string)$data[$colorField]
                     : (string)$authorizedMember->MashaFeedlyColor;
                 $color = MashaFeedlyMemberExtension::normalizeColor($colorValue)
-                    ?? MashaFeedlyMemberExtension::nextAvailableColor($usedColors);
+                    ?? '';
                 $authorizedMember->MashaFeedlyColor = $color;
 
                 $authorizedMember->write();
                 $authorizedMember->protectMashaFeedlyIconImage();
-                $usedColors[] = $color;
             }
         }
 

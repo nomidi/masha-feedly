@@ -1206,6 +1206,9 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
         $this->allowMember($member);
+        $member->MashaFeedlyAvatarIcon = 'person';
+        $member->MashaFeedlyColor = '#F4D06F';
+        $member->write();
         MashaFeedlyCategory::ensureDefaultCategories();
         MashaFeedlyPriority::ensureDefaultPriorities();
         $category = MashaFeedlyCategory::defaultCategory();
@@ -1268,6 +1271,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame($member->getName(), $pageData['entries'][0]['assignees'][0]['name']);
         $this->assertSame('EM', $pageData['entries'][0]['assignees'][0]['initials']);
         $this->assertNotEmpty($pageData['entries'][0]['assignees'][0]['color']);
+        $this->assertStringContainsString('/__masha-feedly-effects/avatar/person/black', $pageData['entries'][0]['assignees'][0]['imageURL']);
 
         $mineResponse = $this->get('/__masha-feedly/listEntries?mode=mine&PageURL=' . rawurlencode('https://example.test/kontakt/?campaign=mailing#formular'));
         $mineData = json_decode($mineResponse->getBody(), true);
@@ -1715,6 +1719,12 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             $member->MashaFeedlyEmailNotifications = false;
             $member->write();
         }
+        $commenter->MashaFeedlyAvatarIcon = 'person';
+        $commenter->MashaFeedlyColor = '#F4D06F';
+        $commenter->write();
+        $creator->MashaFeedlyAvatarIcon = 'person';
+        $creator->MashaFeedlyColor = '#F4D06F';
+        $creator->write();
         $this->allowMember($creator, $commenter);
         MashaFeedlyCategory::ensureDefaultCategories();
         $category = MashaFeedlyCategory::defaultCategory();
@@ -1737,15 +1747,28 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             'CommentText' => 'User 1 hat einen Kommentar ergänzt.',
         ]);
         $this->assertSame(200, $commentResponse->getStatusCode());
+        $postedComment = json_decode($commentResponse->getBody(), true)['comment'];
+        $this->assertStringContainsString('/__masha-feedly-effects/avatar/person/black', $postedComment['authorImageURL']);
         $this->assertNotContains($entryID, MashaFeedlyEntryRead::unreadEntryIDs($commenter), 'Die kommentierende Person soll den eigenen Kommentar nicht als ungelesen sehen.');
 
         $this->logInAs($creator);
         $list = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $entryData = array_values(array_filter($list['entries'], static fn(array $item): bool => (int)$item['id'] === $entryID))[0];
         $this->assertTrue($entryData['isUnread'], 'Der Ersteller muss die neue Kommentaraktivität trotz fehlender Zuständigkeit sehen.');
+        $this->assertStringContainsString('/__masha-feedly-effects/avatar/person/black', $entryData['createdByImageURL']);
+        $this->assertSame('#F4D06F', $entryData['createdByColor']);
         $this->assertSame('User 1 hat einen Kommentar ergänzt.', $entryData['comments'][0]['text']);
+        $this->assertNotSame('', $entryData['comments'][0]['authorInitials']);
+        $this->assertStringContainsString('/__masha-feedly-effects/avatar/person/black', $entryData['comments'][0]['authorImageURL']);
         $news = json_decode($this->get('/__masha-feedly/listEntries?mode=unread')->getBody(), true);
         $this->assertContains($entryID, array_map(static fn(array $item): int => (int)$item['id'], $news['entries']));
+        // Auch ältere Einträge zeigen die aktuelle Profilfarbe und die dazu passende lokale Icon-Variante.
+        $creator->MashaFeedlyColor = '#C05CC8';
+        $creator->write();
+        $updatedList = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $updatedEntry = array_values(array_filter($updatedList['entries'], static fn(array $item): bool => (int)$item['id'] === $entryID))[0];
+        $this->assertSame('#C05CC8', $updatedEntry['createdByColor']);
+        $this->assertStringContainsString('/__masha-feedly-effects/avatar/person/white', $updatedEntry['createdByImageURL']);
     }
 
     /** Prüft, dass der Lese-Endpunkt unberechtigte und fremde Requests konsequent blockiert. */

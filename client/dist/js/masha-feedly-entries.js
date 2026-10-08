@@ -267,6 +267,10 @@ window.KWMashaFeedlyEntries = (() => {
       image.src = creator.imageURL;
       image.alt = '';
       image.loading = 'lazy';
+      image.addEventListener('error', () => {
+        container.replaceChildren();
+        container.textContent = creator.initials || '?';
+      }, { once: true });
       container.append(image);
     } else {
       container.textContent = creator.initials || '?';
@@ -320,6 +324,10 @@ window.KWMashaFeedlyEntries = (() => {
         image.src = member.imageURL;
         image.alt = '';
         image.loading = 'lazy';
+        image.addEventListener('error', () => {
+          avatar.replaceChildren();
+          avatar.textContent = member.initials || '?';
+        }, { once: true });
         avatar.append(image);
       } else {
         avatar.textContent = member.initials || '?';
@@ -1051,8 +1059,30 @@ document.addEventListener('DOMContentLoaded', () => {
     comments.forEach((comment, index) => {
       const bubble = document.createElement('article');
       bubble.className = `kw-masha-feedly__comment${index % 2 ? ' is-right' : ' is-left'}`;
+      const authorRow = document.createElement('div');
+      authorRow.className = 'kw-masha-feedly__comment-author';
       const author = document.createElement('strong');
       author.textContent = comment.author || t('MEMBER_FALLBACK');
+      if (comment.authorImageURL) {
+        const avatar = document.createElement('span');
+        avatar.className = 'kw-masha-feedly__comment-avatar';
+        avatar.style.backgroundColor = comment.authorColor || '#d9b6cd';
+        avatar.setAttribute('aria-hidden', 'true');
+        const image = document.createElement('img');
+        image.src = comment.authorImageURL;
+        image.alt = '';
+        image.loading = 'lazy';
+        avatar.append(image);
+        authorRow.append(avatar);
+      } else if (comment.authorInitials) {
+        const avatar = document.createElement('span');
+        avatar.className = 'kw-masha-feedly__comment-avatar';
+        avatar.style.backgroundColor = comment.authorColor || '#d9b6cd';
+        avatar.textContent = comment.authorInitials;
+        avatar.setAttribute('aria-hidden', 'true');
+        authorRow.append(avatar);
+      }
+      authorRow.append(author);
       const body = document.createElement('p');
       window.KWMashaFeedlyEntries.renderLinks(body, comment.text || '', document);
       const date = document.createElement('time');
@@ -1092,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
           button.disabled = false;
         }
       });
-      bubble.append(author, body, date, reactions);
+      bubble.append(authorRow, body, date, reactions);
       if (comment.canManage) {
         const actions = document.createElement('div');
         actions.className = 'kw-masha-feedly__comment-actions';

@@ -333,15 +333,25 @@ class MashaFeedlyEntryController extends Controller
                 if (!in_array($iconID, array_column($icons, 'id'), true)) {
                     return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_INVALID_ICON', 'Dieses Icon ist nicht verfügbar.')], 400);
                 }
+                try {
+                    Injector::inst()->get(MashaFeedlyEffectClient::class)->storeSelectedAvatarIcon($iconID);
+                } catch (\Throwable) {
+                    return $this->respond(['success' => false, 'message' => $this->translate('PROFILE_PREFERENCES_ICON_UNAVAILABLE', 'Das gewählte Symbol konnte nicht lokal gespeichert werden. Bitte versuche es erneut.')], 503);
+                }
             }
         }
 
+        $previousIconID = (string)$member->MashaFeedlyAvatarIcon;
         $member->MashaFeedlyColor = $color === '' ? '' : MashaFeedlyMemberExtension::normalizeColor($color);
         $member->MashaFeedlyTheme = $theme;
         if ($iconID !== null) {
             $member->MashaFeedlyAvatarIcon = $iconID;
         }
         $member->write();
+        if ($previousIconID !== '' && $previousIconID !== (string)$member->MashaFeedlyAvatarIcon
+            && !Member::get()->filter('MashaFeedlyAvatarIcon', $previousIconID)->exists()) {
+            Injector::inst()->get(MashaFeedlyEffectClient::class)->removeStoredAvatarIcon($previousIconID);
+        }
         return $this->respond([
             'success' => true,
             'theme' => MashaFeedlyMemberExtension::themeFor($member),
@@ -1117,8 +1127,8 @@ class MashaFeedlyEntryController extends Controller
         $creator = $entry->creatorMemberID() > 0 ? Member::get()->byID($entry->creatorMemberID()) : null;
         $reporter = $entry->reportedByMember();
         $reportedBy = $entry->reportedByName() ?: (string)($creationEvent['actor'] ?? '');
-        $reporterImageURL = $reporter && method_exists($reporter, 'getMashaFeedlyAvatarURL') ? $reporter->getMashaFeedlyAvatarURL() : '';
-        $creatorImageURL = $creator && method_exists($creator, 'getMashaFeedlyAvatarURL') ? $creator->getMashaFeedlyAvatarURL() : '';
+        $reporterImageURL = $reporter ? (string)$reporter->getMashaFeedlyAvatarURL() : '';
+        $creatorImageURL = $creator ? (string)$creator->getMashaFeedlyAvatarURL() : '';
         $assignees = [];
         $assigneeIDs = [];
         foreach ($entry->AssignedMembers() as $assignee) {
@@ -1127,7 +1137,7 @@ class MashaFeedlyEntryController extends Controller
                 'name' => (string)$assignee->getName(),
                 'initials' => (string)$assignee->getMashaFeedlyInitials(),
                 'color' => (string)$assignee->getMashaFeedlyDisplayColor(),
-                'imageURL' => method_exists($assignee, 'getMashaFeedlyAvatarURL') ? $assignee->getMashaFeedlyAvatarURL() : '',
+                'imageURL' => (string)$assignee->getMashaFeedlyAvatarURL(),
             ];
             $assigneeIDs[] = (int)$assignee->ID;
         }
@@ -1213,11 +1223,15 @@ class MashaFeedlyEntryController extends Controller
 
     private function commentData(MashaFeedlyComment $comment, Member $currentMember): array
     {
+        $authorMember = $comment->AuthorMemberID ? Member::get()->byID((int)$comment->AuthorMemberID) : null;
         $createdAt = strtotime((string)$comment->Created);
         $editedAt = strtotime((string)$comment->LastEdited);
         return [
             'id' => (int)$comment->ID,
             'author' => (string)$comment->AuthorName,
+            'authorInitials' => $authorMember ? (string)$authorMember->getMashaFeedlyInitials() : '',
+            'authorColor' => $authorMember ? (string)$authorMember->getMashaFeedlyDisplayColor() : '',
+            'authorImageURL' => $authorMember ? (string)$authorMember->getMashaFeedlyAvatarURL() : '',
             'text' => (string)$comment->CommentText,
             'created' => (string)$comment->Created,
             'edited' => (bool)$comment->WasEdited || ($createdAt !== false && $editedAt !== false && $editedAt > $createdAt),

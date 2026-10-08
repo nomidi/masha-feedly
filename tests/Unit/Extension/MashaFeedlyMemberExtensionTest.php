@@ -75,8 +75,12 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $themeField = $appearanceGroup->getChildren()->dataFieldByName('MashaFeedlyTheme');
         $this->assertInstanceOf(DropdownField::class, $themeField);
         $this->assertSame('Website-Vorgabe', $themeField->getEmptyString());
-        $this->assertSame('Verspielt – mit Konfetti und Einhorn', $themeField->getSource()['playful']);
-        $this->assertSame('Seriös – sachliche Farben und ruhige Effekte', $themeField->getSource()['serious']);
+        // Die Namen werden im Anbieter-CMS gepflegt; das Profil muss beide auswählbaren Kategorien anbieten.
+        $themeOptions = $themeField->getSource();
+        $this->assertArrayHasKey('playful', $themeOptions);
+        $this->assertArrayHasKey('serious', $themeOptions);
+        $this->assertNotSame('', trim((string)$themeOptions['playful']));
+        $this->assertNotSame('', trim((string)$themeOptions['serious']));
         $this->assertNull($mainTab->Fields()->dataFieldByName('MashaFeedlyOnboardingCompleted'));
         $profileGroup = $mashaFeedlyTab->Fields()->fieldByName('MashaFeedlyProfileSettings');
         $this->assertInstanceOf(\SilverStripe\Forms\CompositeField::class, $profileGroup);
@@ -258,11 +262,48 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
             $this->assertNull($profile->getChildren()->fieldByName('MashaFeedlyAvatarIconSelection'));
             $this->assertSame('black', MashaFeedlyMemberExtension::iconColorForAvatarColor('#F4D06F'));
             $this->assertSame('white', MashaFeedlyMemberExtension::iconColorForAvatarColor('#C05CC8'));
+            $this->assertSame('white', MashaFeedlyMemberExtension::iconColorForAvatarColor('#35A98F'));
+            $this->assertSame('white', MashaFeedlyMemberExtension::iconColorForAvatarColor('#69b85a'));
         } finally {
             Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', $previousURL);
             Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', $previousKey);
             Config::modify()->set(MashaFeedlyEffectProvider::class, 'base_url', $previousBase);
         }
+    }
+
+    /** Das Icon-Popup zeigt eine Kategorie als Tab und lädt Bildadressen für inaktive Gruppen verzögert. */
+    public function testAvatarIconPickerUsesTabsAndDefersInactiveCategoryImages(): void
+    {
+        $client = new class extends MashaFeedlyEffectClient {
+            public function avatarIcons(): array
+            {
+                return [
+                    'categories' => [
+                        ['id' => 'people', 'name' => 'Menschen'],
+                        ['id' => 'space', 'name' => 'Weltraum'],
+                    ],
+                    'icons' => [
+                        ['id' => 'person', 'name' => 'Person', 'category' => 'people', 'files' => ['black' => '/person-black.svg', 'white' => '/person-white.svg']],
+                        ['id' => 'planet', 'name' => 'Planet', 'category' => 'space', 'files' => ['black' => '/planet-black.svg', 'white' => '/planet-white.svg']],
+                    ],
+                ];
+            }
+        };
+        $extension = new class extends MashaFeedlyMemberExtension {
+            public static function renderPickerForTest(string $selectedID, MashaFeedlyEffectClient $client): string
+            {
+                return parent::renderAvatarIconPicker($selectedID, '#F4D06F', $client);
+            }
+        };
+
+        $html = $extension::renderPickerForTest('', $client);
+        $this->assertStringContainsString('role="tablist"', $html);
+        $this->assertStringContainsString('role="tab"', $html);
+        $this->assertStringContainsString('aria-selected="true"', $html);
+        $this->assertStringContainsString('role="tabpanel"', $html);
+        $this->assertStringContainsString('src="/person-black.svg"', $html);
+        $this->assertStringNotContainsString('<img src="/planet-black.svg"', $html);
+        $this->assertStringContainsString('data-icon-src="/planet-black.svg"', $html);
     }
 
     /** Bei erreichbarer Konfiguration, aber ausgefallenem Anbieter wird ein Hinweis statt einer leeren Stelle gezeigt. */
@@ -473,6 +514,20 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
 
         $member->MashaFeedlyColor = '#123456';
         $this->assertSame($colors[0], $member->getMashaFeedlyDisplayColor());
+        $member->MashaFeedlyColor = '';
+        $member->write();
+        $stored = Member::get()->byID($member->ID);
+        $this->assertContains($stored->MashaFeedlyColor, $colors);
+        $automaticColor = $stored->MashaFeedlyColor;
+        $stored->write();
+        $this->assertSame($automaticColor, Member::get()->byID($member->ID)->MashaFeedlyColor);
+        $stored->MashaFeedlyColor = '#C05CC8';
+        $stored->MashaFeedlyAvatarIcon = 'person';
+        $stored->write();
+        $this->assertSame('#C05CC8', Member::get()->byID($member->ID)->MashaFeedlyColor);
+        $preview = $stored->renderAvatarPreview();
+        $this->assertStringContainsString('background-color:#C05CC8', $preview);
+        $this->assertStringContainsString('/avatar/person/white', $preview);
     }
 
     /** Schreibt die Testfreigabe in die Konfiguration, ohne produktive Mitglieder anzulegen. */

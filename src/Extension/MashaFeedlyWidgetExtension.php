@@ -84,15 +84,17 @@ class MashaFeedlyWidgetExtension extends Extension
                     'Name' => (string)$member->getName(),
                     'Initials' => (string)$member->getMashaFeedlyInitials(),
                     'Color' => (string)$member->getMashaFeedlyDisplayColor(),
-                    'ImageURL' => method_exists($member, 'getMashaFeedlyAvatarURL') ? $member->getMashaFeedlyAvatarURL() : '',
+                    'ImageURL' => (string)$member->getMashaFeedlyAvatarURL(),
                 ];
             }
         }
         $currentMember = Security::getCurrentUser();
-        $onboardingEnabled = MashaFeedlyConfigExtension::isExplicitlyAllowed($currentMember)
+        $canPersonalize = MashaFeedlyConfigExtension::isExplicitlyAllowed($currentMember);
+        $onboardingEnabled = $canPersonalize
             && (!((bool)($currentMember?->MashaFeedlyOnboardingCompleted ?? false))
                 || (bool)($currentMember?->MashaFeedlyShowOnboarding ?? false));
-        $avatarIconPickerHTML = $onboardingEnabled
+        // Ein Neustart aus der Hilfe erfolgt ohne Seitenreload; seine Abschlussfelder müssen bereits vorhanden sein.
+        $avatarIconPickerHTML = $canPersonalize
             ? MashaFeedlyMemberExtension::renderAvatarIconPickerForWidget(
                 (string)$currentMember?->MashaFeedlyAvatarIcon,
                 MashaFeedlyMemberExtension::normalizeColor((string)$currentMember?->MashaFeedlyColor)
@@ -103,7 +105,7 @@ class MashaFeedlyWidgetExtension extends Extension
             Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-avatar-icons.js');
         }
         $profileThemeOptions = [];
-        if ($onboardingEnabled) {
+        if ($canPersonalize) {
             foreach (\KW\MashaFeedly\Service\MashaFeedlyEffectClient::themeOptions((string)$currentMember?->MashaFeedlyTheme) as $themeID => $themeTitle) {
                 $profileThemeOptions[] = [
                     'ID' => $themeID,
@@ -133,7 +135,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'ProfileTheme' => (string)($currentMember?->MashaFeedlyTheme ?? ''),
             'ProfileColor' => (string)($currentMember?->MashaFeedlyColor ?? ''),
             'ProfileAvatarIcon' => (string)($currentMember?->MashaFeedlyAvatarIcon ?? ''),
-            'AvatarColorPaletteHTML' => $onboardingEnabled
+            'AvatarColorPaletteHTML' => $canPersonalize
                 ? MashaFeedlyMemberExtension::renderColorPalette('MashaFeedlyColor', (string)$currentMember?->MashaFeedlyColor)
                 : '',
             'AvatarIconPickerHTML' => $avatarIconPickerHTML,

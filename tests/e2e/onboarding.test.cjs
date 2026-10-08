@@ -123,16 +123,34 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     const themeSelect = preferences.locator('[name="MashaFeedlyTheme"]');
     const currentTheme = await themeSelect.inputValue();
     const availableThemes = await themeSelect.locator('option').evaluateAll((options) => options.map((option) => option.value));
-    const nextTheme = availableThemes.find((theme) => theme !== currentTheme);
-    assert.ok(availableThemes.length > 0, 'Mindestens die Website-Vorgabe muss verfügbar sein.');
+    const nextTheme = availableThemes.find((theme) => theme !== '' && theme !== currentTheme);
+    assert.ok(availableThemes.length > 1, 'Auch nach Neustart aus der Hilfe müssen persönliche Effekt-Kategorien auswählbar sein.');
     if (nextTheme !== undefined) await themeSelect.selectOption(nextTheme);
-    const effectiveTheme = await widget.getAttribute('data-theme');
 
     const colorField = preferences.locator('[name="MashaFeedlyColor"]');
     const currentColor = await colorField.inputValue();
+    const colorDetails = preferences.locator('[data-masha-feedly-onboarding-colors]');
+    await expect(colorDetails).not.toHaveAttribute('open', '');
+    await colorDetails.locator('summary').click();
+    await expect(colorDetails).toHaveAttribute('open', '');
     const colorChoices = await preferences.locator('[data-masha-feedly-color-option]').evaluateAll((options) => options.map((option, index) => ({ color: option.dataset.color, index })));
-    const nextColor = colorChoices.find((choice) => choice.color !== currentColor);
+    assert.equal(colorChoices.filter(choice => choice.color).length, 18, 'Der Abschlussdialog muss auch beim Neustart die vollständige Farbpalette enthalten.');
+    const nextColor = colorChoices.find((choice) => choice.color === '#35A98F');
     if (nextColor) await preferences.locator('[data-masha-feedly-color-option]').nth(nextColor.index).click();
+    const iconResponse = await context.request.get(new URL('/__masha-feedly-effects/icons', config.baseURL).href);
+    if (iconResponse.ok()) {
+      const iconCatalogue = await iconResponse.json();
+      if (iconCatalogue.icons?.length) {
+        await expect(preferences.locator('[data-masha-feedly-avatar-icon-open]')).toBeVisible();
+        await preferences.locator('[data-masha-feedly-avatar-icon-open]').click();
+        await expect(preferences.locator('[data-masha-feedly-avatar-icon-dialog]')).toBeVisible();
+        const icon = preferences.locator('[data-masha-feedly-avatar-icons] [role="tabpanel"]:visible img').first();
+        await expect.poll(() => icon.evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+        await expect(icon).toHaveAttribute('src', /\/white$/);
+        await expect(icon).toHaveCSS('background-color', 'rgb(53, 169, 143)');
+        await preferences.locator('button[data-masha-feedly-avatar-icon-close]').click();
+      }
+    }
 
     const profileResponsePromise = page.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/saveProfilePreferences'));
@@ -147,7 +165,7 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     }
     assert.equal(profileResponse.ok(), true, `Profileinstellungen speichern: ${profileResult.message || profileResponse.status()}`);
     assert.equal(profileResult.success, true, 'Der Server muss die Profileinstellungen bestätigen.');
-    assert.equal(profileResult.theme, nextTheme || effectiveTheme || 'playful');
+    assert.equal(profileResult.theme, nextTheme || currentTheme || 'playful');
     if (nextColor) assert.equal(await colorField.inputValue(), nextColor.color);
     await expect(preferences.locator('[data-masha-feedly-profile-preferences-status]')).toContainText('gespeichert');
     await expect(widget.locator('[data-masha-feedly-thanks-close]')).toBeVisible();

@@ -58,10 +58,13 @@
                 <div class="kw-masha-feedly__onboarding-preferences-grid">
                     <label><%t KW\MashaFeedly\Translations.PROFILE_THEME 'Effekt-Kategorie' %><select name="MashaFeedlyTheme"><option value=""><%t KW\MashaFeedly\Translations.PROFILE_THEME_DEFAULT 'Website-Vorgabe' %></option><% loop $ProfileThemeOptions %><option value="$ID" <% if $Selected %>selected<% end_if %>>$Title</option><% end_loop %></select></label>
                 </div>
-                $AvatarColorPaletteHTML.RAW
+                <details class="kw-masha-feedly__onboarding-colors" data-masha-feedly-onboarding-colors>
+                    <summary><span class="kw-masha-feedly__onboarding-color-swatch" data-masha-feedly-color-preview style="background-color: $ProfileColor" aria-hidden="true"></span><span><strong><%t KW\MashaFeedly\Translations.COLOR_PALETTE_TITLE 'Verfügbare Farben' %></strong><small><%t KW\MashaFeedly\Translations.PROFILE_COLOR 'Avatarfarbe' %></small></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+                    $AvatarColorPaletteHTML.RAW
+                </details>
                 <input type="hidden" name="MashaFeedlyColor" value="$ProfileColor">
                 <% if $AvatarIconPickerAvailable %>
-                    <details class="kw-masha-feedly__onboarding-icon-details"><summary><%t KW\MashaFeedly\Translations.TOUR_ICON_CHOICES 'Eigenes Icon wählen' %></summary><input type="hidden" name="MashaFeedlyAvatarIcon" value="$ProfileAvatarIcon" data-masha-feedly-avatar-icon-value>$AvatarIconPickerHTML.RAW</details>
+                    <div class="kw-masha-feedly__onboarding-icon-details"><input type="hidden" name="MashaFeedlyAvatarIcon" value="$ProfileAvatarIcon" data-masha-feedly-avatar-icon-value>$AvatarIconPickerHTML.RAW</div>
                 <% else_if $AvatarIconPickerHTML %>
                     $AvatarIconPickerHTML.RAW
                 <% end_if %>
@@ -164,7 +167,7 @@
                 </section>
                 <% end_if %>
                 <% if $Members %>
-                    <fieldset class="kw-masha-feedly__assignees"><legend><%t KW\MashaFeedly\Translations.ASSIGNEES_LABEL 'Verantwortlich' %></legend><div><% loop $Members %><label class="kw-masha-feedly__assignee-choice" title="$Name"><input type="checkbox" name="AssignedMemberIDs[]" value="$ID"><span class="kw-masha-feedly__assignee-avatar" style="background-color: $Color" aria-label="$Name"><% if $ImageURL %><img src="$ImageURL" alt=""><% else %>$Initials<% end_if %></span><span class="kw-masha-feedly__assignee-name">$Name</span></label><% end_loop %></div></fieldset>
+                    <fieldset class="kw-masha-feedly__assignees"><legend><%t KW\MashaFeedly\Translations.ASSIGNEES_LABEL 'Verantwortlich' %></legend><div><% loop $Members %><label class="kw-masha-feedly__assignee-choice" title="$Name"><input type="checkbox" name="AssignedMemberIDs[]" value="$ID"><span class="kw-masha-feedly__assignee-avatar" data-avatar-initials="$Initials" style="background-color: $Color" aria-label="$Name"><% if $ImageURL %><img src="$ImageURL" alt=""><% else %>$Initials<% end_if %></span><span class="kw-masha-feedly__assignee-name">$Name</span></label><% end_loop %></div></fieldset>
                 <% end_if %>
                 <p class="kw-masha-feedly__form-status" data-masha-feedly-form-status role="status" aria-live="polite" aria-atomic="true"></p>
             </form>
@@ -201,7 +204,7 @@
                         <label class="kw-masha-feedly__estimate-note"><%t KW\MashaFeedly\Translations.ESTIMATE_NOTE 'Erläuterung' %><textarea name="EstimatedCostNote" rows="2" maxlength="2000" disabled></textarea></label>
                     </div><% end_if %>
                 </section><% end_if %>
-                <% if $Members %><fieldset class="kw-masha-feedly__assignees"><legend><%t KW\MashaFeedly\Translations.ASSIGNEES_SELECT 'Verantwortliche auswählen' %></legend><div><% loop $Members %><label class="kw-masha-feedly__assignee-choice" title="$Name"><input type="checkbox" name="AssignedMemberIDs[]" value="$ID"><span class="kw-masha-feedly__assignee-avatar" style="background-color: $Color" aria-label="$Name"><% if $ImageURL %><img src="$ImageURL" alt=""><% else %>$Initials<% end_if %></span><span class="kw-masha-feedly__assignee-name">$Name</span></label><% end_loop %></div></fieldset><% end_if %>
+                <% if $Members %><fieldset class="kw-masha-feedly__assignees"><legend><%t KW\MashaFeedly\Translations.ASSIGNEES_SELECT 'Verantwortliche auswählen' %></legend><div><% loop $Members %><label class="kw-masha-feedly__assignee-choice" title="$Name"><input type="checkbox" name="AssignedMemberIDs[]" value="$ID"><span class="kw-masha-feedly__assignee-avatar" data-avatar-initials="$Initials" style="background-color: $Color" aria-label="$Name"><% if $ImageURL %><img src="$ImageURL" alt=""><% else %>$Initials<% end_if %></span><span class="kw-masha-feedly__assignee-name">$Name</span></label><% end_loop %></div></fieldset><% end_if %>
                 <p class="kw-masha-feedly__form-status" data-masha-feedly-edit-status role="status" aria-live="polite" aria-atomic="true"></p>
                 <footer class="kw-masha-feedly__dialog-actions"><button type="button" class="kw-masha-feedly__secondary" data-masha-feedly-close-edit><%t KW\MashaFeedly\Translations.EDIT_CLOSE 'Schließen' %></button><button type="submit" class="kw-masha-feedly__submit"><%t KW\MashaFeedly\Translations.EDIT_SAVE 'Änderungen speichern' %> <span aria-hidden="true">→</span></button></footer>
                 <div class="kw-masha-feedly__edit-extra-details">

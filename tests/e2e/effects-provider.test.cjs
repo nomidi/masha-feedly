@@ -12,6 +12,61 @@ const value = key => process.env[key] || local[key];
 const config = Object.fromEntries(['BASE_URL', 'SUPERADMIN_EMAIL', 'SUPERADMIN_PASSWORD'].map(key => [key, value(`MASHA_FEEDLY_E2E_${key}`)]));
 const missing = Object.entries(config).filter(([, value]) => !value).map(([key]) => key);
 
+/** Prüft die CMS-Farbänderung neben dem gleichnamigen Widget-Feld und stellt die ursprüngliche Farbe wieder her. */
+test('Profil: Avatarfarbe bleibt nach CMS-Speichern und Neuladen erhalten', { skip: missing.length ? `E2E-Konfiguration fehlt: ${missing.join(', ')}` : false }, async () => {
+  const { chromium, expect } = require('@playwright/test');
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  const page = await context.newPage();
+  const profileURL = new URL('/admin/myprofile#Root_MashaFeedly', config.BASE_URL).href;
+  let originalColor;
+  let changed = false;
+  const saveColor = async (color) => {
+    const appearance = page.locator('.masha-feedly-profile-appearance');
+    await appearance.locator(`[data-masha-feedly-color-option][data-color="${color}"]`).click();
+    await expect(appearance.locator('[name="MashaFeedlyColor"]')).toHaveValue(color);
+    await Promise.all([
+      page.waitForResponse(response => response.request().method() === 'POST', { timeout: 10000 }),
+      page.locator('[name="action_save"]').click({ timeout: 10000 }),
+    ]);
+    await page.goto(profileURL);
+    await expect(page.locator('.masha-feedly-profile-appearance [name="MashaFeedlyColor"]')).toHaveValue(color);
+    const preview = page.locator('[data-masha-feedly-avatar-preview]');
+    const channels = color.slice(1).match(/.{2}/g).map(channel => parseInt(channel, 16));
+    await expect(preview).toHaveCSS('background-color', `rgb(${channels.join(', ')})`);
+    const iconID = await preview.getAttribute('data-icon-id');
+    if (iconID) {
+      const luminance = (0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]) / 255;
+      const variant = ['#35A98F', '#69B85A'].includes(color.toUpperCase()) || luminance <= 0.52 ? 'white' : 'black';
+      await expect(preview.locator('img')).toHaveAttribute('src', new RegExp(`/avatar/${iconID}/${variant}$`));
+      await expect.poll(() => preview.locator('img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+    }
+  };
+  try {
+    await page.goto(new URL('/Security/login', config.BASE_URL).href);
+    await page.locator('input[type="email"], input[name$="Email"]').first().fill(config.SUPERADMIN_EMAIL);
+    await page.locator('input[type="password"]').first().fill(config.SUPERADMIN_PASSWORD);
+    await page.locator('button[type="submit"], input[type="submit"]').first().click();
+    await page.goto(profileURL);
+    const appearance = page.locator('.masha-feedly-profile-appearance');
+    await expect(appearance).toBeVisible();
+    const verification = page.locator('.sudo-mode-password-field__notice-button');
+    await expect(verification).toBeVisible();
+    await verification.click();
+    await page.locator('[name="SudoModePassword"]').fill(config.SUPERADMIN_PASSWORD);
+    await page.locator('.sudo-mode-password-field__verify-button').click();
+    await expect(page.locator('[name="action_save"]')).toBeEnabled();
+    originalColor = await appearance.locator('[name="MashaFeedlyColor"]').inputValue();
+    const selectedColor = originalColor === '#6383D8' ? '#35A98F' : '#6383D8';
+    changed = true;
+    await saveColor(selectedColor);
+    await expect(page.locator(`.masha-feedly-profile-appearance [data-color="${selectedColor}"]`)).toHaveAttribute('aria-pressed', 'true');
+  } finally {
+    try { if (changed) { await page.goto(profileURL); await saveColor(originalColor); } }
+    finally { await context.close(); await browser.close(); }
+  }
+});
+
 /** Prüft die vollständige Verbindung vom CMS-Katalog bis zur Animation im isolierten Widget. */
 test('Effekt-Anbieter: CMS-Katalog lädt versionierte Dateien und spielt im Shadow Root', { skip: missing.length ? `E2E-Konfiguration fehlt: ${missing.join(', ')}` : false }, async () => {
   const { chromium, expect } = require('@playwright/test');
@@ -30,6 +85,12 @@ test('Effekt-Anbieter: CMS-Katalog lädt versionierte Dateien und spielt im Shad
     const proxyURL = await page.evaluate(() => window.KWMashaFeedlyEffectsManifestURL);
     const proxyResponse = await context.request.get(proxyURL);
     assert.equal(proxyResponse.status(), 200, `Proxy-Status ${proxyResponse.status()} für ${proxyURL}`);
+    const iconResponse = await context.request.get(new URL('/__masha-feedly-effects/icons', config.BASE_URL).href);
+    const iconCatalog = await iconResponse.json();
+    assert.equal(iconResponse.status(), 200, `Icon-Proxy-Status ${iconResponse.status()}: ${JSON.stringify(iconCatalog)}`);
+    assert.equal(iconCatalog.version, 1);
+    assert.ok(iconCatalog.categories.length > 0, 'Der Icon-Katalog muss Kategorien enthalten.');
+    assert.ok(iconCatalog.icons.length > 0, 'Der Icon-Katalog muss Icons enthalten.');
     const result = await page.evaluate(async () => {
       const effects = await window.KWMashaFeedlyEffects.refresh();
       const widget = window.KWMashaFeedlyDOM.widget();
@@ -69,6 +130,46 @@ test('Effekt-Anbieter: CMS-Katalog lädt versionierte Dateien und spielt im Shad
     await expect(page.locator('select[name="JavaScriptFile"]')).toHaveValue(/js\/.+\.js/);
     assert.deepEqual(errors, []);
   } finally { await browser.close(); }
+});
+
+/** Prüft den separat gestreamten Profil-Icon-Katalog über den zugriffsgeschützten Feedly-Proxy. */
+test('Effekt-Anbieter: Profil-Icon-Katalog wird vollständig über Feedly geladen', { skip: missing.length ? `E2E-Konfiguration fehlt: ${missing.join(', ')}` : false }, async () => {
+  const { chromium, expect } = require('@playwright/test');
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  const page = await context.newPage();
+  try {
+    await page.goto(new URL('/Security/login', config.BASE_URL).href);
+    await page.locator('input[type="email"], input[name$="Email"]').first().fill(config.SUPERADMIN_EMAIL);
+    await page.locator('input[type="password"]').first().fill(config.SUPERADMIN_PASSWORD);
+    await page.locator('button[type="submit"], input[type="submit"]').first().click();
+    const response = await page.request.get(new URL('/__masha-feedly-effects/icons', config.BASE_URL).href);
+    const catalogue = await response.json();
+    assert.equal(response.status(), 200, `Icon-Proxy-Status ${response.status()}: ${JSON.stringify(catalogue)}`);
+    assert.equal(catalogue.version, 1);
+    assert.equal(catalogue.categories.length, 11);
+    assert.equal(catalogue.icons.length, 116);
+    await page.goto(new URL('/admin/myprofile#Root_MashaFeedly', config.BASE_URL).href);
+    await expect(page.locator('.masha-feedly-avatar-icons')).toBeVisible();
+    await expect(page.locator('.masha-feedly-avatar-icons__unavailable')).toHaveCount(0);
+    await page.locator('[data-masha-feedly-avatar-icon-open]').click();
+    await expect(page.locator('[data-masha-feedly-avatar-icon-dialog]')).toBeVisible();
+    const iconDialog = page.locator('[data-masha-feedly-avatar-icon-dialog]');
+    const tabs = iconDialog.locator('[data-masha-feedly-avatar-icon-tab]');
+    await expect(tabs).toHaveCount(11);
+    const activePanel = iconDialog.locator('[role="tabpanel"]:not([hidden])');
+    await expect(activePanel).toHaveCount(1);
+    await expect(activePanel.locator('img[src]')).not.toHaveCount(0);
+    await expect(iconDialog.locator('[role="tabpanel"][hidden] img[src]')).toHaveCount(0);
+    await tabs.nth(1).click();
+    await expect(iconDialog.locator('[role="tabpanel"]:not([hidden]) img[src]')).not.toHaveCount(0);
+    const iconChoice = iconDialog.locator('[role="tabpanel"]:not([hidden]) [data-masha-feedly-avatar-icon-choice]').first();
+    await expect(iconChoice).toBeVisible();
+    const iconID = await iconChoice.getAttribute('data-icon-id');
+    await iconChoice.click();
+    await expect(page.locator('[name="MashaFeedlyAvatarIcon"]').last()).toHaveValue(iconID);
+    await expect(page.locator('[data-masha-feedly-avatar-icon-dialog]')).toBeHidden();
+  } finally { await context.close(); await browser.close(); }
 });
 
 /** Erzeugt echte CMS-Zugänge, prüft Rotation und Widerruf und entfernt den eigenen Testdatensatz. */

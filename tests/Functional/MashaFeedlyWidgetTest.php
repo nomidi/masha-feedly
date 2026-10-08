@@ -51,6 +51,27 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('masha-feedly-color-palette__grid', $body, 'Die Farbauswahl wird auf der Profilseite gerendert.');
     }
 
+    /** Zuständigkeitsfelder rendern das ausgewählte lokale Symbol statt nur Initialen. */
+    public function testAssigneeChoiceRendersSelectedAvatarIcon(): void
+    {
+        $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
+        $page->publishRecursive();
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $member->MashaFeedlyAvatarIcon = 'person';
+        $member->MashaFeedlyColor = '#F4D06F';
+        $member->write();
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
+        $config->write();
+        $this->logInAs($member);
+
+        $response = $this->get('/masha-feedly-widget-test');
+        $this->assertSame(200, $response->getStatusCode());
+        $markup = $this->widgetMarkup($response->getBody());
+        $this->assertStringContainsString('data-avatar-initials="EM"', $markup);
+        $this->assertStringContainsString('src="http://localhost/__masha-feedly-effects/avatar/person/black"', $markup);
+    }
+
     /** Prüft, dass nur freigegebene Benutzer das globale Widget erhalten. */
     public function testWidgetIsRenderedOnlyForAllowedMembers(): void
     {
@@ -186,8 +207,12 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertMatchesRegularExpression('/data-masha-feedly-onboarding-welcome[\s\S]*?data-masha-feedly-profile-link href="[^"]*myprofile[^"]*#Root_MashaFeedly/i', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-onboarding-thanks', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertMatchesRegularExpression('/data-masha-feedly-profile-link href="[^"]*myprofile[^\"]*#Root_MashaFeedly/i', $this->widgetMarkup($allowedResponse->getBody()));
-        $this->assertStringContainsString('E-Mail-Benachrichtigungen zu Kommentaren einrichten', $allowedResponse->getBody());
-        $this->assertStringContainsString('Profileinstellungen öffnen', $allowedResponse->getBody());
+        $this->assertStringContainsString('Jetzt kannst du Masha noch persönlich gestalten.', $widgetMarkup);
+        $this->assertStringContainsString('data-masha-feedly-profile-preferences', $widgetMarkup);
+        $this->assertStringContainsString('name="MashaFeedlyTheme"', $widgetMarkup);
+        $this->assertStringContainsString('name="MashaFeedlyColor"', $widgetMarkup);
+        $this->assertStringContainsString('Auswahl speichern', $widgetMarkup);
+        $this->assertStringContainsString('Weitere Profileinstellungen', $widgetMarkup);
         $this->assertStringContainsString('kw-masha-feedly__onboarding-logo', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-tour-start', $this->widgetMarkup($allowedResponse->getBody()));
         $this->assertStringContainsString('data-masha-feedly-tour-cancel', $this->widgetMarkup($allowedResponse->getBody()));
@@ -359,6 +384,9 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $markup = $this->widgetMarkup($allowedResponse->getBody());
         $this->assertNotSame('', $markup);
         $this->assertStringNotContainsString('data-onboarding-enabled="1"', $markup);
+        $this->assertStringContainsString('masha-feedly-color-palette__grid', $markup, 'Der Neustart aus der Hilfe benötigt die Farbauswahl bereits im ausgelieferten Abschlussdialog.');
+        $this->assertStringContainsString('value="playful"', $markup);
+        $this->assertStringContainsString('value="serious"', $markup);
     }
 
     /** Dekodiert den serverseitig gerenderten Widget-Markup-String für Inhaltstests. */
