@@ -49,7 +49,7 @@ class MashaFeedlyCategory extends DataObject
 
     private static $summary_fields = [
         'Title' => 'Kategorie',
-        'Entries.Count' => 'Einträge',
+        'Entries.Count' => 'Meldungen',
     ];
 
     private static $default_sort = 'Sort ASC, Title ASC';
@@ -225,7 +225,7 @@ class MashaFeedlyCategory extends DataObject
                 'Als abgeschlossen behandeln'
             ))->setDescription(i18n::_t(
                 'KW\\MashaFeedly\\Translations.CATEGORY_CLOSED_DESCRIPTION',
-                'Einträge in dieser Kategorie werden nicht als Fehler-Markierung auf der Webseite angezeigt.'
+                'Meldungen in dieser Kategorie werden nicht als Fehler-Markierung auf der Webseite angezeigt.'
             ))
         );
         return $fields;
@@ -300,7 +300,7 @@ class MashaFeedlyCategory extends DataObject
     {
         $fields = parent::summaryFields();
         $fields['Title'] = i18n::_t('KW\\MashaFeedly\\Translations.FIELD_CATEGORY', 'Kategorie');
-        $fields['Entries.Count'] = i18n::_t('KW\\MashaFeedly\\Translations.FIELD_ENTRIES', 'Einträge');
+        $fields['Entries.Count'] = i18n::_t('KW\\MashaFeedly\\Translations.FIELD_ENTRIES', 'Meldungen');
         $fields['IsClosed'] = i18n::_t('KW\\MashaFeedly\\Translations.CATEGORY_CLOSED', 'Abgeschlossen');
         return $fields;
     }

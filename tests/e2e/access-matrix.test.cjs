@@ -68,7 +68,8 @@ const createProtectedContent = async (page, expect) => {
 
   await widget.locator('[data-masha-feedly-open-list]').click();
   const card = widget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${created.entryID}"]`);
-  await expect(card).toBeVisible();
+  // Die Zugriffskontrolle beginnt erst nach dem asynchronen Laden der Testmeldung.
+  await expect(card).toBeVisible({ timeout: 30000 });
   await card.click();
   const commentForm = widget.locator('[data-masha-feedly-comment-form]');
   await commentForm.locator('[name="CommentText"]').fill(commentText);
@@ -92,6 +93,33 @@ const assertPrivateAssetDenied = async (requestContext, attachmentURL) => {
   assert.notEqual(body.toString('base64'), png.toString('base64'), 'Die geschützte Bilddatei darf nicht ausgeliefert werden.');
   assert.ok(response.status() !== 200 || !contentType.toLowerCase().startsWith('image/'), 'Ein geschützter Anhang darf nicht als Bildantwort erreichbar sein.');
 };
+
+test('Nicht zugeordneter CMS-Admin sieht keinen Feedly-Menüpunkt und erhält beim Direktaufruf 403', {
+  skip: !config.baseURL || missingDeniedConfig.length ? 'E2E-Konfiguration für das nicht freigegebene Konto fehlt.' : false,
+}, async () => {
+  const { chromium, expect } = require('@playwright/test');
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  try {
+    const page = await context.newPage();
+    await signIn(page, config.deniedEmail, config.deniedPassword);
+    await page.goto(new URL('/admin/pages', config.baseURL).href);
+    await expect(page.locator('.cms-menu')).toBeVisible();
+    await expect(page.locator('#Menu-KW-MashaFeedly-Admin-MashaFeedlyAdmin')).toHaveCount(0);
+    await page.goto(new URL('/admin/myprofile#Root_MashaFeedly', config.baseURL).href);
+    await expect(page.locator('form')).toBeVisible();
+    await expect(page.locator('a[href="#Root_MashaFeedly"]')).toHaveCount(0);
+    await expect(page.locator('#Root_MashaFeedly')).toHaveCount(0);
+    await expect(page.locator('[name="MashaFeedlyColor"], [name="MashaFeedlyAvatarIcon"]')).toHaveCount(0);
+    for (const route of ['/admin/masha-feedly', '/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry']) {
+      const response = await context.request.get(new URL(route, config.baseURL).href);
+      assert.equal(response.status(), 403, 'Die Adminansicht muss auch beim direkten Aufruf geschützt sein.');
+    }
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+});
 
 test('Zugriff im Browser: Gast sieht keine Feedly-Daten und kann private Anhänge nicht abrufen', {
   skip: missingAllowedConfig.length ? `E2E-Konfiguration fehlt: ${missingAllowedConfig.join(', ')}` : false,

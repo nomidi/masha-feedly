@@ -1,0 +1,12 @@
+---
+Name: masha-feedly-effects-proxy
+---
+SilverStripe\Control\Director:
+  rules:
+    '__masha-feedly-effects': 'KW\MashaFeedly\Control\MashaFeedlyEffectsController'
+SilverStripe\Core\Injector\Injector:
+  Psr\SimpleCache\CacheInterface.MashaFeedlyEffects:
+    factory: SilverStripe\Core\Cache\CacheFactory
+    constructor:
+      namespace: 'MashaFeedlyEffects'
+      defaultLifetime: 300

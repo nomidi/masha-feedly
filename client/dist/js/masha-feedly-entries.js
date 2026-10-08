@@ -231,6 +231,9 @@ window.KWMashaFeedlyEntries = (() => {
     assignedMemberIDs: (entry.assignedMemberIDs || []).map(Number),
     context: t('ENTRY_CONTEXT_STATUS', { status: entry.categoryTitle || t('ENTRY_WITHOUT_CATEGORY') }),
     description: entry.content || t('ENTRY_NO_DESCRIPTION'),
+    stepsToReproduce: entry.stepsToReproduce || '',
+    expectedResult: entry.expectedResult || '',
+    actualResult: entry.actualResult || '',
     assignees: entry.assignees || [],
   });
 
@@ -267,6 +270,10 @@ window.KWMashaFeedlyEntries = (() => {
       image.src = creator.imageURL;
       image.alt = '';
       image.loading = 'lazy';
+      image.addEventListener('error', () => {
+        container.replaceChildren();
+        container.textContent = creator.initials || '?';
+      }, { once: true });
       container.append(image);
     } else {
       container.textContent = creator.initials || '?';
@@ -320,6 +327,10 @@ window.KWMashaFeedlyEntries = (() => {
         image.src = member.imageURL;
         image.alt = '';
         image.loading = 'lazy';
+        image.addEventListener('error', () => {
+          avatar.replaceChildren();
+          avatar.textContent = member.initials || '?';
+        }, { once: true });
         avatar.append(image);
       } else {
         avatar.textContent = member.initials || '?';
@@ -365,9 +376,6 @@ window.KWMashaFeedlyEntries = (() => {
   };
 
   const effects = window.KWMashaFeedlyEffects || {};
-  const celebrateDone = (document, window) => effects.confetti?.(document, window) || null;
-  const celebrateClosedCategory = (document, window, imageURL) => effects.unicorn?.(document, window, imageURL) || null;
-  const celebrateRocketLaunch = (document, window) => effects.rocket?.(document, window) || null;
   const celebrateCompletion = (document, window, imageURL, theme = "playful", random = Math.random) =>
     effects.playOnDone?.(document, window, imageURL, theme, random) || null;
   const previewCompletionAnimation = (document, window, animation, imageURL) =>
@@ -491,7 +499,7 @@ window.KWMashaFeedlyEntries = (() => {
     else if (offset < text.length) container.append(documentRef.createTextNode(text.slice(offset)));
   };
 
-  return { sortEntries, toggleSorting, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, renderCommentReactions, priorityIconSVG, resolveTarget, createMarker, setActiveMarker, trackMarkers, celebrateDone, celebrateClosedCategory, celebrateRocketLaunch, celebrateCompletion, previewCompletionAnimation, trapFocus };
+  return { sortEntries, toggleSorting, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, renderCommentReactions, priorityIconSVG, resolveTarget, createMarker, setActiveMarker, trackMarkers, celebrateCompletion, previewCompletionAnimation, trapFocus };
 })();
 
 /** Lädt Einträge, zeichnet Seitenmarkierungen und zeigt die filterbare Übersicht. */
@@ -655,6 +663,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const editContext = widget.querySelector('[data-masha-feedly-edit-context]');
   const editRelations = widget.querySelector('[data-masha-feedly-edit-relations]');
   const editDescription = widget.querySelector('[data-masha-feedly-edit-description]');
+  const editDiagnostics = widget.querySelector('[data-masha-feedly-edit-diagnostics]');
   const editAttachments = widget.querySelector('[data-masha-feedly-edit-attachments]');
   const editEnvironment = widget.querySelector('[data-masha-feedly-edit-environment]');
   const editEnvironmentDetails = widget.querySelector('[data-masha-feedly-edit-environment-details]');
@@ -957,6 +966,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (commentForm?.elements.EntryID) commentForm.elements.EntryID.value = String(editable.id);
     editForm.elements.CategoryID.value = String(editable.categoryID);
     editForm.elements.PriorityID.value = String(editable.priorityID);
+    ['StepsToReproduce', 'ExpectedResult', 'ActualResult'].forEach((name) => {
+      const key = { StepsToReproduce: 'stepsToReproduce', ExpectedResult: 'expectedResult', ActualResult: 'actualResult' }[name];
+      if (editForm.elements[name]) editForm.elements[name].value = editable[key] || '';
+    });
+    if (editDiagnostics) {
+      const hasDiagnostics = Boolean(editable.stepsToReproduce || editable.expectedResult || editable.actualResult);
+      editDiagnostics.hidden = !hasDiagnostics;
+      editDiagnostics.open = hasDiagnostics;
+      [editForm.elements.StepsToReproduce, editForm.elements.ExpectedResult, editForm.elements.ActualResult].forEach((field) => {
+        if (field) field.disabled = false;
+      });
+    }
     if (editForm.elements.DueDate) editForm.elements.DueDate.value = editable.dueDate;
     renderEstimate(entry);
     editHeading.textContent = t('ENTRY_NUMBER', { id: editable.id });
@@ -980,7 +1001,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .map((candidate) => {
           const option = document.createElement('option');
           option.value = String(candidate.id);
-          option.textContent = `#${candidate.id} · ${candidate.title || candidate.content || 'Eintrag'}`;
+          option.textContent = `#${candidate.id} · ${candidate.title || candidate.content || 'Meldung'}`;
           option.dataset.search = `${candidate.title || ''} ${candidate.content || ''} ${candidate.categoryTitle || ''}`.toLocaleLowerCase('de');
           option.selected = linkedIDs.has(Number(candidate.id));
           return option;
@@ -1002,11 +1023,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     editContext.textContent = editable.context;
     editStatus.textContent = '';
+    delete editStatus.dataset.feedbackNotice;
+    delete editStatus.dataset.noticeTitle;
     editModal.hidden = false;
     editReturnFocus = trigger;
     editHeading?.focus?.();
     widget.setAttribute('data-edit-open', 'true');
-    document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-entry-opened'));
+    document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-entry-opened', {
+      detail: { entryID: Number(entry.id) },
+    }));
     const target = window.KWMashaFeedlyEntries.resolveTarget(entry, document);
     target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
@@ -1033,7 +1058,7 @@ document.addEventListener('DOMContentLoaded', () => {
         relatedEntries.replaceChildren(...window.KWMashaFeedlyEntries.relatedEntryOptions(relationCandidates, activeEntry).map((candidate) => {
           const option = document.createElement('option');
           option.value = String(candidate.id);
-          option.textContent = `#${candidate.id} · ${candidate.title || candidate.content || 'Eintrag'}`;
+          option.textContent = `#${candidate.id} · ${candidate.title || candidate.content || 'Meldung'}`;
           option.dataset.search = `${candidate.title || ''} ${candidate.content || ''} ${candidate.categoryTitle || ''}`.toLocaleLowerCase('de');
           option.selected = selectedIDs.has(Number(candidate.id)) || (activeEntry.relations || []).some((relation) => relation.direction !== 'incoming' && Number(relation.id) === Number(candidate.id));
           return option;
@@ -1054,8 +1079,30 @@ document.addEventListener('DOMContentLoaded', () => {
     comments.forEach((comment, index) => {
       const bubble = document.createElement('article');
       bubble.className = `kw-masha-feedly__comment${index % 2 ? ' is-right' : ' is-left'}`;
+      const authorRow = document.createElement('div');
+      authorRow.className = 'kw-masha-feedly__comment-author';
       const author = document.createElement('strong');
       author.textContent = comment.author || t('MEMBER_FALLBACK');
+      if (comment.authorImageURL) {
+        const avatar = document.createElement('span');
+        avatar.className = 'kw-masha-feedly__comment-avatar';
+        avatar.style.backgroundColor = comment.authorColor || '#d9b6cd';
+        avatar.setAttribute('aria-hidden', 'true');
+        const image = document.createElement('img');
+        image.src = comment.authorImageURL;
+        image.alt = '';
+        image.loading = 'lazy';
+        avatar.append(image);
+        authorRow.append(avatar);
+      } else if (comment.authorInitials) {
+        const avatar = document.createElement('span');
+        avatar.className = 'kw-masha-feedly__comment-avatar';
+        avatar.style.backgroundColor = comment.authorColor || '#d9b6cd';
+        avatar.textContent = comment.authorInitials;
+        avatar.setAttribute('aria-hidden', 'true');
+        authorRow.append(avatar);
+      }
+      authorRow.append(author);
       const body = document.createElement('p');
       window.KWMashaFeedlyEntries.renderLinks(body, comment.text || '', document);
       const date = document.createElement('time');
@@ -1095,7 +1142,7 @@ document.addEventListener('DOMContentLoaded', () => {
           button.disabled = false;
         }
       });
-      bubble.append(author, body, date, reactions);
+      bubble.append(authorRow, body, date, reactions);
       if (comment.canManage) {
         const actions = document.createElement('div');
         actions.className = 'kw-masha-feedly__comment-actions';
@@ -1557,6 +1604,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderMarkers(data.entries || []);
       }
       renderList(data);
+      document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-list-rendered'));
       if (requestedEntryID && mode === 'page') {
         const requestedEntry = (data.entries || []).find((entry) => Number(entry.id) === Number(requestedEntryID));
         if (requestedEntry) {
@@ -1756,6 +1804,8 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     const submit = editForm.querySelector('[type="submit"]');
     submit.disabled = true;
+    delete editStatus.dataset.feedbackNotice;
+    delete editStatus.dataset.noticeTitle;
     editStatus.textContent = t('EDIT_SAVING');
     const data = new FormData(editForm);
     data.set('SecurityID', editForm.dataset.securityId);
@@ -1777,10 +1827,21 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok || !result.success) throw new Error(result.message || t('EDIT_SAVE_ERROR'));
       saveConfirmed = true;
       editStatus.textContent = result.message;
+      if (result.sentToFeedback === true) {
+        editStatus.dataset.feedbackNotice = 'true';
+        editStatus.dataset.noticeTitle = t('EDIT_FEEDBACK_NOTICE_TITLE');
+        editStatus.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+      }
       if (activeEntry) activeEntry.attachments = result.attachments || activeEntry.attachments || [];
       if (activeEntry && Object.hasOwn(result, 'dueDate')) {
         activeEntry.dueDate = result.dueDate || '';
         if (editForm.elements.DueDate) editForm.elements.DueDate.value = activeEntry.dueDate;
+      }
+      if (activeEntry) {
+        activeEntry.stepsToReproduce = editForm.elements.StepsToReproduce?.value || '';
+        activeEntry.expectedResult = editForm.elements.ExpectedResult?.value || '';
+        activeEntry.actualResult = editForm.elements.ActualResult?.value || '';
+        if (editDiagnostics) editDiagnostics.hidden = !Boolean(activeEntry.stepsToReproduce || activeEntry.expectedResult || activeEntry.actualResult);
       }
       if (activeEntry && Object.hasOwn(result, 'estimateAmount')) {
         activeEntry = {

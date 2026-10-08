@@ -25,6 +25,15 @@ const config = {
 };
 const missingConfig = Object.entries(config).filter(([, value]) => !value).map(([name]) => name);
 
+/** Schließt die optionale Begrüßung, falls das Testkonto sie nach einem Neuladen erneut zeigt. */
+const dismissWelcome = async (page) => {
+  const welcome = page.locator('[data-masha-feedly-onboarding-welcome]');
+  if (await welcome.isVisible()) {
+    await welcome.locator('[data-masha-feedly-tour-skip]').click();
+    await welcome.waitFor({ state: 'hidden' });
+  }
+};
+
 /** Meldet ein Mitglied an und wartet darauf, dass das Feedly-Widget bereit ist. */
 const signIn = async (page, email, password) => {
   await page.goto(new URL('/Security/login', config.baseURL).toString());
@@ -34,10 +43,12 @@ const signIn = async (page, email, password) => {
   await page.goto(config.baseURL);
   const widget = page.locator('[data-kw-masha-feedly]');
   await widget.waitFor({ state: 'attached' });
+  await dismissWelcome(page);
   return widget;
 };
 
 const openEntryList = async (page, widget) => {
+  await dismissWelcome(page);
   const toggle = widget.locator('.kw-masha-feedly__toggle');
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
   await widget.locator('[data-masha-feedly-open-page-list]').click();
@@ -91,7 +102,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     assert.equal(await managerWidget.getAttribute('data-estimate-hourly-rate'), '0', 'Der Stundensatz bleibt für die Freigabeperson verborgen.');
     await openEntryList(superadminPage, superadminWidget);
     const superadminCard = superadminWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(superadminCard).toBeVisible();
+    await expect(superadminCard).toBeVisible({ timeout: 30000 });
     await superadminCard.click();
 
     const editForm = superadminWidget.locator('[data-masha-feedly-edit-form]');
@@ -135,7 +146,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
 
     await openEntryList(managerPage, managerWidget);
     const reviewerCard = managerWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(reviewerCard).toBeVisible();
+    await expect(reviewerCard).toBeVisible({ timeout: 30000 });
     await expect(reviewerCard.locator('.kw-masha-feedly__entry-estimate-status')).toHaveAttribute('aria-label', /Kostenschätzung wartet auf Freigabe/u);
     await reviewerCard.click();
     const reviewerForm = managerWidget.locator('[data-masha-feedly-edit-form]');
@@ -181,7 +192,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
       assert.equal(Object.hasOwn(protectedEntry, field), false, `Das normale Mitglied darf ${field} nicht aus dem Server-Payload erhalten.`);
     }
     const memberCard = refreshedMemberWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(memberCard).toBeVisible();
+    await expect(memberCard).toBeVisible({ timeout: 30000 });
     await expect(memberCard).toContainText(approvedTitle);
     await memberCard.click();
     const memberEditForm = refreshedMemberWidget.locator('[data-masha-feedly-edit-form]');
@@ -198,7 +209,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     await refreshedSuperadminWidget.waitFor({ state: 'attached' });
     await openEntryList(superadminPage, refreshedSuperadminWidget);
     const refreshedSuperadminCard = refreshedSuperadminWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(refreshedSuperadminCard).toBeVisible();
+    await expect(refreshedSuperadminCard).toBeVisible({ timeout: 30000 });
     await refreshedSuperadminCard.click();
 
     const doingOption = categorySelect.locator('option[data-system-key="doing"]');

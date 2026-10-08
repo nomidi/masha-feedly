@@ -1,24 +1,22 @@
-# Masha:Feedly-Modul
+# Masha:Feedly
 
-Masha:Feedly ergänzt SilverStripe CMS um einen gemeinsamen Fehler- und Feedback-Tracker. Nutzer melden Probleme direkt auf der Website, während das Team Einträge im Frontend und CMS bearbeitet.
+Masha:Feedly ergänzt Silverstripe CMS um einen gemeinsamen Fehler- und Feedback-Tracker. Berechtigte Personen melden Probleme direkt auf der Website; das Team bearbeitet Meldungen im Frontend und CMS.
 
-## Dokumentation
+## Anforderungen
 
-- [Benutzung auf Deutsch](docs/de/README.md)
-- [Usage in English](docs/en/README.md)
+- PHP 7.4 oder neuer
+- Silverstripe CMS 4.13 (Branch `sstripe-4`)
 
 ## Installation
 
-Im Silverstripe-Projektverzeichnis ausführen:
+Im Silverstripe-Projektverzeichnis:
 
 ```sh
-composer require kooperativeweb/masha-feedly
-sake dev/build flush=1
+composer require kooperativeweb/masha-feedly:dev-sstripe-4
+vendor/bin/sake dev/build flush=1
 ```
 
-## Installation aus GitHub
-
-Bis die Version auf Packagist verfügbar ist, kann das Paket direkt aus GitHub installiert werden. Dafür in der `composer.json` des Silverstripe-Projekts ein VCS-Repository ergänzen und die Entwicklungsversion anfordern:
+Falls das Paket noch nicht auf Packagist verfügbar ist, kann es über GitHub eingebunden werden. Dafür ein VCS-Repository in der `composer.json` ergänzen:
 
 ```json
 {
@@ -26,32 +24,25 @@ Bis die Version auf Packagist verfügbar ist, kann das Paket direkt aus GitHub i
     { "type": "vcs", "url": "https://github.com/nomidi/masha-feedly" }
   ],
   "require": {
-    "kooperativeweb/masha-feedly": "dev-main"
+    "kooperativeweb/masha-feedly": "dev-sstripe-4"
   }
 }
 ```
 
-Anschließend ausführen:
+Danach im Projektverzeichnis ausführen:
 
 ```sh
 composer update kooperativeweb/masha-feedly
-sake dev/build flush=1
+vendor/bin/sake dev/build flush=1
 ```
 
-## Anforderungen
+## Dokumentation
 
-- PHP 7.4 oder neuer
-- Silverstripe CMS 4.13 oder neuer innerhalb der Silverstripe-4-Reihe
+- [Benutzung und Konfiguration auf Deutsch](docs/de/README.md)
+- [Usage and configuration in English](docs/en/README.md)
+- [Browserbasierte Ende-zu-Ende-Tests](tests/e2e/README.md)
 
-## Fälligkeitserinnerungen
-
-Einträge können ein Fälligkeitsdatum erhalten. Damit Erinnerungen automatisch versendet werden, richte im Silverstripe-Projekt einen täglichen Cron-Aufruf ein:
-
-```sh
-vendor/bin/sake dev/tasks/MashaFeedlyDueDateReminderTask
-```
-
-Die Erinnerung wird einmalig an freigegebene zuständige Personen und die erstellende Person gesendet. In den Masha:Feedly-Einstellungen lässt sich wählen, ob die Prüfung per täglichem Cronjob oder beim ersten Websitebesuch des Tages startet. Im Besuchsmodus bleibt der Versand aus, solange niemand die Website aufruft. Jeder Empfänger kann Fälligkeitserinnerungen in den Masha:Feedly-Profileinstellungen deaktivieren.
+Die Anleitungen beschreiben mobile Bedienung und Einführung, Screenshots mit Ausschnittwahl, optionale Schritte zum Nachstellen, Zugriffsrechte, Profilvorschau und Tonwahl, E-Mail-Benachrichtigungen und Footer-Konfiguration, Fälligkeitserinnerungen sowie optionale Effekt-Anbieter und deren Vertrag.
 
 ## Lizenz
 

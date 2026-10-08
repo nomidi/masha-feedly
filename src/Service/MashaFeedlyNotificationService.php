@@ -4,13 +4,17 @@ namespace KW\MashaFeedly\Service;
 
 use KW\MashaFeedly\Admin\MashaFeedlyAdmin;
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
+use KW\MashaFeedly\Extension\MashaFeedlyMemberExtension;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyComment;
 use SilverStripe\Control\Director;
 use SilverStripe\Control\Email\Email;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
+use SilverStripe\Admin\CMSProfileController;
 use SilverStripe\SiteConfig\SiteConfig;
+use SilverStripe\ORM\ArrayList;
+use SilverStripe\View\ArrayData;
 use SilverStripe\i18n\i18n;
 use Throwable;
 
@@ -24,6 +28,30 @@ use Throwable;
  */
 class MashaFeedlyNotificationService
 {
+    /** Ergänzt Maildaten um den zentralen Footer und den direkten Profil-Link. */
+    private static function emailData(array $data, ?Member $member = null): array
+    {
+        $profileURL = Director::absoluteURL(CMSProfileController::singleton()->Link() . '#Root_MashaFeedly');
+        $isFormal = $member
+            ? MashaFeedlyMemberExtension::addressFor($member) === 'sie'
+            : MashaFeedlyConfigExtension::address() === 'sie';
+        return array_merge($data, [
+            // Silverstripe 4 benötigt benannte Datenobjekte statt einer Liste roher Textwerte.
+            'EmailFooterLines' => ArrayList::create(array_map(
+                static fn(string $line): ArrayData => ArrayData::create(['Text' => $line]),
+                preg_split('/\R/u', MashaFeedlyConfigExtension::emailFooter()) ?: []
+            )),
+            'EmailProfileURL' => $profileURL,
+            'EmailImprintURL' => 'https://www.kooperative-web.de/impressum',
+            'EmailOptOutText' => i18n::_t(
+                $isFormal ? 'KW\\MashaFeedly\\Translations.EMAIL_FOOTER_OPT_OUT_SIE' : 'KW\\MashaFeedly\\Translations.EMAIL_FOOTER_OPT_OUT_DU',
+                $isFormal
+                    ? 'Möchten Sie keine Statusmeldungen per E-Mail mehr erhalten? Passen Sie Ihre Auswahl in Ihrem Profil an.'
+                    : 'Möchtest du keine Statusmeldungen per E-Mail mehr erhalten? Passe deine Auswahl in deinem Profil an.'
+            ),
+        ]);
+    }
+
     /** Versendet eine Benachrichtigung, ohne einen fachlichen Schreibvorgang durch Mailfehler abzubrechen. */
     private static function sendSafely(Email $email): bool
     {
@@ -46,7 +74,9 @@ class MashaFeedlyNotificationService
         Email::create()
             ->setTo((string)$member->Email)
             ->setSubject('Masha:Feedly – Test-E-Mail')
-            ->setBody('Der E-Mail-Versand von ' . $siteTitle . ' funktioniert.')
+            ->setHTMLTemplate('KW/MashaFeedly/Email/TestEmail')
+            ->setPlainTemplate('KW/MashaFeedly/Email/TestEmailPlain')
+            ->setData(self::emailData(['SiteTitle' => $siteTitle], $member))
             ->send();
     }
 
@@ -88,12 +118,12 @@ class MashaFeedlyNotificationService
                 ))
                 ->setHTMLTemplate('KW/MashaFeedly/Email/DueDateReminderEmail')
                 ->setPlainTemplate('KW/MashaFeedly/Email/DueDateReminderEmailPlain')
-                ->setData([
+                ->setData(self::emailData([
                     'SiteTitle' => $siteTitle,
                     'BugTitle' => $entry->getTitle(),
                     'DueDate' => (string)$entry->DueDate,
                     'EntryURL' => $entryURL,
-                ])
+                ], $member))
             )) {
                 $sent++;
             }
@@ -123,7 +153,7 @@ class MashaFeedlyNotificationService
             ))
             ->setHTMLTemplate('KW/MashaFeedly/Email/AccessGrantedEmail')
             ->setPlainTemplate('KW/MashaFeedly/Email/AccessGrantedEmailPlain')
-            ->setData(['SiteTitle' => $siteTitle, 'WidgetURL' => $widgetURL])
+            ->setData(self::emailData(['SiteTitle' => $siteTitle, 'WidgetURL' => $widgetURL], $member))
         );
     }
 
@@ -138,10 +168,18 @@ class MashaFeedlyNotificationService
         $entryURL = Director::absoluteURL(
             MashaFeedlyAdmin::singleton()->getCMSEditLinkForManagedDataObject($entry)
         );
-        $bugDescription = trim(html_entity_decode(strip_tags((string)$entry->Content), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        $descriptionHTML = (string)$entry->Content;
+        $descriptionText = preg_replace('/<\\s*br\\s*\\/?\\s*>|<\\/\\s*(?:p|div|li|h[1-6])\\s*>/i', "\n", $descriptionHTML) ?? $descriptionHTML;
+        $bugDescription = trim(html_entity_decode(strip_tags($descriptionText), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
         $siteTitle = trim((string)SiteConfig::current_site_config()->Title);
-        $currentMember = Security::getCurrentUser();
-        $currentMemberID = $currentMember ? (int)$currentMember->ID : 0;
+        $assignedMembers = $entry->AssignedMembers()->sort('Surname ASC, FirstName ASC');
+        $assignedNames = [];
+        foreach ($assignedMembers as $assignedMember) {
+            $assignedNames[] = (string)$assignedMember->getName();
+        }
+        $dueDate = trim((string)$entry->DueDate);
+        $reporterName = trim($entry->reportedByName());
+        $currentMemberID = (int)((Security::getCurrentUser() ? Security::getCurrentUser()->ID : null) ?? 0);
         if ($siteTitle === '') {
             $siteTitle = 'Masha:Feedly';
         }
@@ -160,17 +198,21 @@ class MashaFeedlyNotificationService
                 ->setTo((string)$member->Email)
                 ->setSubject(i18n::_t(
                     'KW\\MashaFeedly\\Translations.EMAIL_NEW_SUBJECT',
-                    '{siteTitle}: Neuer Masha-Feedly-Bug: {title}',
-                    ['siteTitle' => $siteTitle, 'title' => $entry->getTitle()]
+                    'Neue Meldung auf {siteTitle}',
+                    ['siteTitle' => $siteTitle]
                 ))
                 ->setHTMLTemplate('KW/MashaFeedly/Email/NewEntryEmail')
                 ->setPlainTemplate('KW/MashaFeedly/Email/NewEntryEmailPlain')
-                ->setData([
+                ->setData(self::emailData([
                     'SiteTitle' => $siteTitle,
-                    'BugTitle' => $entry->getTitle(),
                     'BugDescription' => $bugDescription,
+                    'ReporterName' => $reporterName,
+                    'CategoryTitle' => trim((string)$entry->Category()->Title),
+                    'PriorityTitle' => trim((string)$entry->Priority()->Title),
+                    'DueDate' => $dueDate !== '' ? (string)$entry->dbObject('DueDate')->Nice() : '',
+                    'AssignedNames' => implode(', ', $assignedNames),
                     'EntryURL' => $entryURL,
-                ])
+                ], $member))
             );
         }
     }
@@ -207,17 +249,17 @@ class MashaFeedlyNotificationService
                 ->setTo((string)$member->Email)
                 ->setSubject(i18n::_t(
                     'KW\\MashaFeedly\\Translations.EMAIL_UPDATED_SUBJECT',
-                    '{siteTitle}: Masha-Feedly-Eintrag geändert: {title}',
+                    '{siteTitle}: Masha-Feedly-Meldung geändert: {title}',
                     ['siteTitle' => $siteTitle, 'title' => $entry->getTitle()]
                 ))
                 ->setHTMLTemplate('KW/MashaFeedly/Email/UpdatedEntryEmail')
                 ->setPlainTemplate('KW/MashaFeedly/Email/UpdatedEntryEmailPlain')
-                ->setData([
+                ->setData(self::emailData([
                     'SiteTitle' => $siteTitle,
                     'BugTitle' => $entry->getTitle(),
                     'EntryURL' => $entryURL,
                     'CategoryTitle' => (string)$entry->Category()->Title,
-                ])
+                ], $member))
             );
         }
     }
@@ -261,13 +303,13 @@ class MashaFeedlyNotificationService
                 ))
                 ->setHTMLTemplate('KW/MashaFeedly/Email/NewCommentEmail')
                 ->setPlainTemplate('KW/MashaFeedly/Email/NewCommentEmailPlain')
-                ->setData([
+                ->setData(self::emailData([
                     'SiteTitle' => $siteTitle,
                     'BugTitle' => $entry->getTitle(),
                     'CommentAuthor' => (string)$comment->AuthorName,
                     'CommentText' => (string)$comment->CommentText,
                     'EntryURL' => $entryURL,
-                ])
+                ], $member))
             );
         }
     }
@@ -305,11 +347,11 @@ class MashaFeedlyNotificationService
                 ))
                 ->setHTMLTemplate('KW/MashaFeedly/Email/CostEstimateRequestedEmail')
                 ->setPlainTemplate('KW/MashaFeedly/Email/CostEstimateRequestedEmailPlain')
-                ->setData([
+                ->setData(self::emailData([
                     'SiteTitle' => $siteTitle,
                     'EntryTitle' => $entry->getTitle(),
                     'EntryURL' => $entryURL,
-                ])
+                ], $member))
             )) {
                 $sent++;
             }

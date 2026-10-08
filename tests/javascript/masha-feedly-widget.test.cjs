@@ -25,7 +25,7 @@ function renderWidget(frameElement = null, captureEvents = false) {
     ['.kw-masha-feedly__panel', { set hidden(value) { this.isHidden = value; } }],
     ['.kw-masha-feedly__close', { addEventListener() {} }],
   ]);
-  const triggerAttributes = new Map([['aria-label', 'Offene Fehler auf der gesamten Website ansehen'], ['aria-describedby', 'vorhandene-hilfe']]);
+  const triggerAttributes = new Map([['aria-label', 'Offene Meldungen auf der gesamten Website ansehen'], ['aria-describedby', 'vorhandene-hilfe']]);
   const trigger = {
     closest(selector) { return selector.includes('kw-masha-feedly__count-button') ? this : null; },
     contains() { return false; },
@@ -51,7 +51,7 @@ function renderWidget(frameElement = null, captureEvents = false) {
     contains(element) { return element === trigger; },
   };
   const surface = { append(element) { appendedElements.push(element); }, setAttribute() {} };
-  const root = { append() {}, querySelector(selector) {
+  const root = { append() {}, addEventListener() {}, querySelector(selector) {
     return selector === '[data-kw-masha-feedly]' ? widget : surface;
   } };
   const host = { setAttribute() {}, attachShadow(options) { assert.equal(options.mode, 'open'); this.shadowRoot = root; return root; } };
@@ -124,7 +124,7 @@ test('blendet einen vollständig im Viewport platzierten Tooltip ein und stellt 
   state.dispatch('pointerover', { target: state.trigger });
 
   assert.ok(state.tooltip);
-  assert.equal(state.tooltip.textContent, 'Offene Fehler auf der gesamten Website ansehen');
+  assert.equal(state.tooltip.textContent, 'Offene Meldungen auf der gesamten Website ansehen');
   assert.equal(state.tooltip['aria-hidden'], 'false');
   assert.ok(state.classes.has('is-left'));
   assert.ok(state.classes.has('is-visible'));
@@ -149,4 +149,11 @@ test('kapselt Widget und Overlays gemeinsam und löst retargetete Ereignisse auf
   assert.equal(state.dom.activeElement(), state.trigger);
   state.dispatch('pointerover', { target: state.host, composedPath: () => [state.trigger, state.root, state.host] });
   assert.ok(state.tooltip);
+});
+
+test('Avatarfarben zeigen den Hover-Effekt nur bei änderbaren Farbfeldern', () => {
+  assert.match(hoverStyles[0], /&:hover:not\(:disabled\)/);
+  assert.match(hoverStyles[0], /&:disabled:hover \{ transform: none !important;/);
+  assert.match(hoverStyles[1], /masha-feedly-color-palette__item:hover:not\(:disabled\)/);
+  assert.match(hoverStyles[1], /masha-feedly-color-palette__item:disabled:hover\{transform:none !important/);
 });

@@ -121,20 +121,20 @@ class MashaFeedlyConfigExtensionTest extends SapphireTest
         $this->assertSame('small', MashaFeedlyConfigExtension::fontSize());
     }
 
-    /** Themeauswahl akzeptiert nur Verspielt oder Seriös und erhält Altinstallationen. */
-    public function testConfiguredThemeSupportsPlayfulAndSeriousWithPlayfulFallback(): void
+    /** Anbieter-Kategorien bleiben erhalten; leere oder syntaktisch ungültige Kennungen verwenden Verspielt. */
+    public function testConfiguredThemeSupportsProviderCategoriesWithPlayfulFallback(): void
     {
         $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
         $siteConfig->MashaFeedlyTheme = '';
         $siteConfig->write();
         $this->assertSame('playful', MashaFeedlyConfigExtension::theme(), 'Eine nicht konfigurierte Website-Vorgabe startet immer verspielt.');
-        foreach (['playful', 'serious'] as $theme) {
+        foreach (['playful', 'serious', 'seasons', 'provider-category'] as $theme) {
             $siteConfig->MashaFeedlyTheme = $theme;
             $siteConfig->write();
             $this->assertSame($theme, MashaFeedlyConfigExtension::theme());
         }
 
-        $siteConfig->MashaFeedlyTheme = 'unexpected';
+        $siteConfig->MashaFeedlyTheme = 'invalid/category';
         $siteConfig->write();
         $this->assertSame('playful', MashaFeedlyConfigExtension::theme());
     }
