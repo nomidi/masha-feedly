@@ -9,6 +9,7 @@ use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
 use SilverStripe\Core\Injector\Injector;
+use SilverStripe\Core\Environment;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Security\Member;
@@ -55,6 +56,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $member = $this->objFromFixture(Member::class, 'allowed');
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->Title = 'Projekt Wolke';
+        $config->MashaFeedlyEmailFooter = "Masha:Feedly · Kooperative Web\nKontakt: example@example.test · Kennung: TEST-123";
         $config->write();
         $mailer = new class implements MailerInterface {
             /** @var RawMessage[] */
@@ -71,8 +73,29 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertSame('allowed@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
             $this->assertSame('Masha:Feedly – Test-E-Mail', $mailer->messages[0]->getSubject());
             $this->assertStringContainsString('Projekt Wolke', (string)$mailer->messages[0]->getTextBody());
+            $this->assertStringContainsString('Impressum:', (string)$mailer->messages[0]->getTextBody());
+            $this->assertStringContainsString('E-Mail-Einstellungen ändern:', (string)$mailer->messages[0]->getTextBody());
+            $this->assertStringContainsString('automatische E-Mail, weil du solche Benachrichtigungen aktiviert hast', (string)$mailer->messages[0]->getTextBody());
+            $this->assertStringContainsString('Kontakt: example@example.test · Kennung: TEST-123', (string)$mailer->messages[0]->getTextBody());
+            $this->assertSame(1, substr_count((string)$mailer->messages[0]->getTextBody(), 'Kennung:'));
         } finally {
             $injector->registerService($originalMailer, MailerInterface::class);
+        }
+    }
+
+    /** Ein leerer CMS-Footer wird aus der Serverumgebung mit Zeilenumbrüchen vorbelegt. */
+    public function testDefaultEmailFooterUsesEnvironmentValue(): void
+    {
+        $environmentKey = 'MASHA_FEEDLY_EMAIL_FOOTER';
+        $originalValue = Environment::getEnv($environmentKey);
+        Environment::setEnv($environmentKey, 'Projekt Kooperative Web\\nKontakt: example@example.test');
+        try {
+            $this->assertSame(
+                "Projekt Kooperative Web\nKontakt: example@example.test",
+                MashaFeedlyConfigExtension::defaultEmailFooter()
+            );
+        } finally {
+            Environment::setEnv($environmentKey, is_string($originalValue) ? $originalValue : '');
         }
     }
 
@@ -148,10 +171,9 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertCount(1, $mailer->messages);
             $message = $mailer->messages[0];
             $this->assertStringContainsString('Projekt Wolke', $message->getSubject());
-            $this->assertStringContainsString('Eine Meldung erstellen', (string)$message->getTextBody());
-            $this->assertStringContainsString('Status und Zuständigkeit', (string)$message->getTextBody());
-            $this->assertStringContainsString('Benachrichtigungen und Profil', (string)$message->getTextBody());
-            $this->assertStringContainsString('freigegeben sind', (string)$message->getTextBody());
+            $this->assertStringContainsString('So erstellst du eine Meldung', (string)$message->getTextBody());
+            $this->assertStringContainsString('Dein Profil und deine E-Mails', (string)$message->getTextBody());
+            $this->assertStringContainsString('freigeschaltet sind', (string)$message->getTextBody());
         } finally {
             $injector->registerService($originalMailer, MailerInterface::class);
         }
@@ -195,6 +217,8 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $allowedMember = $this->objFromFixture(Member::class, 'allowed');
         $notAllowedMember = $this->objFromFixture(Member::class, 'notAllowed');
         $disabledMember = $this->objFromFixture(Member::class, 'normalize');
+        $allowedMember->MashaFeedlyEmailNotifications = true;
+        $allowedMember->MashaFeedlyNotifyNewEntries = true;
         $disabledMember->MashaFeedlyNotifyNewEntries = false;
         $disabledMember->MashaFeedlyNotifyEntryUpdates = false;
         $allowedMember->MashaFeedlyNotifyEntryUpdates = false;
@@ -226,19 +250,37 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $entry = MashaFeedlyEntry::create([
                 'Content' => 'Der Speichern-Button löst einen Fehler aus.',
                 'EntryDate' => '2026-10-01',
+                'DueDate' => '2026-10-12',
+                'ReportedByID' => (int)$allowedMember->ID,
             ]);
             $entry->write();
+            $entry->AssignedMembers()->add($allowedMember);
+            $mailer->messages = [];
+            MashaFeedlyNotificationService::notifyNewEntry($entry);
 
             $this->assertCount(1, $mailer->messages);
             $message = $mailer->messages[0];
             $this->assertSame('allowed@example.test', $message->getTo()[0]->getAddress());
             $this->assertSame(
-                'Projekt Wolke: Neuer Masha-Feedly-Bug: Der Speichern-Button löst einen Fehler aus.',
+                'Neue Meldung auf Projekt Wolke',
                 $message->getSubject()
             );
-            $this->assertStringContainsString('Der Speichern-Button löst einen Fehler aus.', (string)$message->getTextBody());
+            $this->assertSame(1, substr_count((string)$message->getTextBody(), 'Der Speichern-Button löst einen Fehler aus.'));
+            $this->assertStringContainsString('Neue Meldung', (string)$message->getTextBody());
+            $this->assertStringContainsString('Auf Projekt Wolke wurde eine neue Meldung erstellt.', (string)$message->getTextBody());
+            $this->assertStringContainsString('Vollständige Beschreibung:', (string)$message->getTextBody());
+            $this->assertStringContainsString('Gemeldet von:', (string)$message->getTextBody());
+            $this->assertStringContainsString((string)$allowedMember->getName(), (string)$message->getTextBody());
+            $this->assertStringContainsString('Kategorie:', (string)$message->getTextBody());
+            $this->assertStringContainsString((string)$entry->Category()->Title, (string)$message->getTextBody());
+            $this->assertStringContainsString('Priorität:', (string)$message->getTextBody());
+            $this->assertStringContainsString((string)$entry->Priority()->Title, (string)$message->getTextBody());
+            $this->assertStringContainsString('Fällig am:', (string)$message->getTextBody());
+            $this->assertStringContainsString((string)$entry->dbObject('DueDate')->Nice(), (string)$message->getTextBody());
+            $this->assertStringContainsString('Verantwortlich:', (string)$message->getTextBody());
+            $this->assertStringNotContainsString('Neue Meldung: Der Speichern-Button löst einen Fehler aus.', (string)$message->getTextBody());
+            $this->assertStringContainsString('Meldung ansehen:', (string)$message->getTextBody());
             $this->assertStringContainsString('/admin/masha-feedly/', (string)$message->getTextBody());
-            $this->assertStringContainsString('Projekt Wolke', (string)$message->getTextBody());
 
             $entry->Content = 'Aktualisierte Beschreibung';
             $entry->write();
@@ -289,6 +331,9 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
     {
         $allowedMember = $this->objFromFixture(Member::class, 'allowed');
         $disabledMember = $this->objFromFixture(Member::class, 'normalize');
+        $allowedMember->MashaFeedlyEmailNotifications = true;
+        $allowedMember->MashaFeedlyNotifyEntryUpdates = true;
+        $allowedMember->write();
         $disabledMember->MashaFeedlyNotifyEntryUpdates = false;
         $disabledMember->MashaFeedlyNotifyNewEntries = false;
         $disabledMember->write();
@@ -335,7 +380,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $message = $mailer->messages[1];
             $this->assertSame('allowed@example.test', $message->getTo()[0]->getAddress());
             $this->assertSame(
-                'Masha Feedly: Masha-Feedly-Eintrag geändert: Der Fehler tritt jetzt beim Aktualisieren auf.',
+                'Masha Feedly: Masha-Feedly-Meldung geändert: Der Fehler tritt jetzt beim Aktualisieren auf.',
                 $message->getSubject()
             );
             $this->assertStringContainsString('Aktuelle Kategorie: Doing', (string)$message->getTextBody());
@@ -351,6 +396,9 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
     public function testOwnEntryAndUpdateEmailsAreConfigurable(): void
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
+        $member->MashaFeedlyEmailNotifications = true;
+        $member->MashaFeedlyNotifyNewEntries = true;
+        $member->MashaFeedlyNotifyEntryUpdates = true;
         $member->write();
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
@@ -409,6 +457,8 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $optedOut = $this->objFromFixture(Member::class, 'notAllowed');
         $author->MashaFeedlyNotifyNewEntries = false;
         $assignee->MashaFeedlyNotifyNewEntries = false;
+        $assignee->MashaFeedlyEmailNotifications = true;
+        $assignee->MashaFeedlyNotifyComments = true;
         $author->write();
         $assignee->write();
         $optedOut->MashaFeedlyNotifyComments = false;
@@ -473,6 +523,9 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $member->MashaFeedlyNotifyNewEntries = false;
             $member->write();
         }
+        $creator->MashaFeedlyEmailNotifications = true;
+        $creator->MashaFeedlyNotifyComments = true;
+        $creator->write();
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->Title = 'Projekt Wolke';
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$author->ID, (int)$creator->ID]);
@@ -546,7 +599,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $message = $mailer->messages[0];
             $this->assertSame('allowed@example.test', $message->getTo()[0]->getAddress());
             $this->assertSame('Willkommen bei Masha:Feedly auf Projekt Wolke', $message->getSubject());
-            $this->assertStringContainsString('klicke auf das plus', mb_strtolower((string)$message->getTextBody()));
+            $this->assertStringContainsString('pinke plus', mb_strtolower((string)$message->getTextBody()));
 
             $config->write();
             $this->assertCount(1, $mailer->messages);

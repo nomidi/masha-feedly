@@ -14,6 +14,7 @@ use KW\MashaFeedly\Service\MashaFeedlyMiteClient;
 use KW\MashaFeedly\Service\MashaFeedlyMiteService;
 use KW\MashaFeedly\Service\MashaFeedlyResetService;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
+use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
 use SilverStripe\Assets\Image;
 use SilverStripe\Admin\ModelAdmin;
 use SilverStripe\Control\Controller;
@@ -32,7 +33,9 @@ use SilverStripe\Forms\LiteralField;
 use SilverStripe\Forms\HiddenField;
 use SilverStripe\Forms\ListboxField;
 use SilverStripe\Forms\NumericField;
+use SilverStripe\Forms\ToggleCompositeField;
 use SilverStripe\Forms\TextField;
+use SilverStripe\Forms\TextareaField;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\Security;
@@ -55,7 +58,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     private static $menu_title = 'Masha:Feedly';
     private static $menu_icon = 'kooperativeweb/masha-feedly:client/dist/icons/masha-feedly.svg';
     private static $managed_models = [
-        MashaFeedlyEntry::class => ['title' => 'Einträge'],
+        MashaFeedlyEntry::class => ['title' => 'Meldungen'],
         MashaFeedlyCategory::class => ['title' => 'Kategorien'],
         MashaFeedlyPriority::class => ['title' => 'Prioritäten'],
         MashaFeedlyComment::class => ['title' => 'Kommentare'],
@@ -94,6 +97,10 @@ class MashaFeedlyAdmin extends ModelAdmin
     {
         $requestedModel = $this->getRequest()->param('ModelClass');
         $member = Security::getCurrentUser();
+        // Auch direkte CMS-Aufrufe müssen die Modulfreigabe prüfen, bevor Formulare aufgebaut werden.
+        if ($member instanceof Member && !$this->canView($member)) {
+            $this->httpError(403);
+        }
         if (
             $requestedModel
             && str_replace('-', '\\', $requestedModel) === SiteConfig::class
@@ -113,7 +120,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     }
 
     /**
-     * Prüft den Zugriff für Administratoren und ausdrücklich freigegebene Benutzer.
+     * Erlaubt den Bereich nur freigegebenen Mitgliedern oder dem konfigurierten Betreiberkonto.
      *
      * @param Member|null $member Zu prüfendes Silverstripe-Mitglied.
      * @return bool Gibt zurück, ob das Mitglied den Bereich öffnen darf.
@@ -122,7 +129,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     {
         $member ??= Security::getCurrentUser();
         return $member instanceof Member && (
-            Permission::checkMember($member, 'ADMIN')
+            MashaFeedlyEntry::canManageReporter($member)
             || MashaFeedlyConfigExtension::canUse($member)
         );
     }
@@ -168,7 +175,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             $members[(string)$member->ID] = (string)$member->getName();
         }
         $fields = FieldList::create(
-            DropdownField::create('MashaFeedlyAddress', self::translate('CONFIG_ADDRESS', 'Anrede im Modul'), [
+            DropdownField::create('MashaFeedlyAddress', self::translate('CONFIG_ADDRESS', 'Wie möchtest du angesprochen werden?'), [
                 'du' => self::translate('CONFIG_ADDRESS_DU', 'Du'),
                 'sie' => self::translate('CONFIG_ADDRESS_SIE', 'Sie'),
             ])
@@ -181,17 +188,32 @@ class MashaFeedlyAdmin extends ModelAdmin
             ])
                 ->setValue(MashaFeedlyConfigExtension::fontSize())
                 ->setDescription(self::translate('CONFIG_FONT_SIZE_DESCRIPTION', 'Passt die Schriftgröße für alle Masha:Feedly-Ansichten an.')),
-            DropdownField::create('MashaFeedlyTheme', self::translate('CONFIG_THEME', 'Erscheinungsbild'), [
-                'playful' => self::translate('CONFIG_THEME_PLAYFUL', 'Verspielt'),
-                'serious' => self::translate('CONFIG_THEME_SERIOUS', 'Seriös'),
-            ])
+            DropdownField::create('MashaFeedlyTheme', self::translate('CONFIG_THEME', 'Standard-Effekt-Kategorie'), MashaFeedlyEffectClient::themeOptions(MashaFeedlyConfigExtension::theme()))
                 ->setValue(MashaFeedlyConfigExtension::theme())
                 ->setDescription(self::translate('CONFIG_THEME_DESCRIPTION', 'Legt Farben, Erfolgsmeldungen und Abschlussanimationen im Widget fest.')),
             ListboxField::create('AllowedMemberIDs', self::translate('CONFIG_ALLOWED_MEMBERS', 'Benutzer mit Zugriff'), $members)
                 ->setValue(MashaFeedlyConfigExtension::memberIDs())
-                ->setDescription(self::translate('CONFIG_ALLOWED_MEMBERS_DESCRIPTION', 'Wähle alle Benutzer aus, die das Widget und die Einträge verwenden dürfen. Auch Administratoren benötigen eine Freigabe.'))
+                ->setDescription(self::translate('CONFIG_ALLOWED_MEMBERS_DESCRIPTION', 'Wähle alle Benutzer aus, die das Widget und die Meldungen verwenden dürfen. Auch Administratoren benötigen eine Freigabe.'))
         );
+        if (!MashaFeedlyConfigExtension::emailTestSucceeded()) {
+            $fields->insertBefore('MashaFeedlyAddress', LiteralField::create(
+                'MashaFeedlyEmailTestNotice',
+                '<section class="masha-feedly-email-test-notice" role="alert">'
+                    . '<span class="masha-feedly-email-test-notice__icon" aria-hidden="true">!</span>'
+                    . '<div><strong>' . self::translate('CONFIG_EMAIL_TEST_REQUIRED_TITLE', 'E-Mail-Test noch nicht erfolgreich durchgeführt') . '</strong>'
+                    . '<p>' . self::translate('CONFIG_EMAIL_TEST_REQUIRED_DESCRIPTION', 'Sende zuerst eine Test-E-Mail über die Schaltfläche „Test-E-Mail senden“. Erst danach können Mitglieder ihre persönlichen E-Mail-Benachrichtigungen einrichten.') . '</p></div>'
+                    . '</section>'
+            ));
+        }
         if ($canManageSensitiveSettings) {
+            $fields->insertBefore('AllowedMemberIDs', TextareaField::create(
+                'MashaFeedlyEmailFooter',
+                self::translate('CONFIG_EMAIL_FOOTER', 'Footer in allen Masha:Feedly-E-Mails'),
+                MashaFeedlyConfigExtension::emailFooter()
+            )->setRows(5)->setDescription(self::translate(
+                'CONFIG_EMAIL_FOOTER_DESCRIPTION',
+                'Dieser Text erscheint klein am Ende jeder E-Mail. Eine Zeile wird jeweils als eigene Zeile angezeigt. Der Text ist mit den Angaben aus dem Kooperative-Web-Impressum vorausgefüllt.'
+            )));
             $fields->insertBefore('AllowedMemberIDs', DropdownField::create('MashaFeedlyDueDateReminderMode', self::translate('CONFIG_DUE_DATE_REMINDER_MODE', 'Fälligkeitserinnerungen ausführen'), [
                 'cron' => self::translate('CONFIG_DUE_DATE_REMINDER_CRON', 'Serverseitig per Cronjob'),
                 'visitor' => self::translate('CONFIG_DUE_DATE_REMINDER_VISITOR', 'Bei Websitebesuchen'),
@@ -208,7 +230,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                 '<section class="masha-feedly-reset"><h3>'
                     . self::translate('RESET_TITLE', 'Masha:Feedly-Daten zurücksetzen')
                     . '</h3><p>'
-                    . self::translate('RESET_DESCRIPTION', 'Löscht alle Einträge samt Kommentaren, Anhängen, Reaktionen, Verknüpfungen und Verlauf. Kategorien werden anschließend neu angelegt. Benutzer, Zugriffsrechte, Profile und Einstellungen bleiben erhalten.')
+                    . self::translate('RESET_DESCRIPTION', 'Löscht alle Meldungen samt Kommentaren, Anhängen, Reaktionen, Verknüpfungen und Verlauf. Kategorien werden anschließend neu angelegt. Benutzer, Zugriffsrechte, Profile und Einstellungen bleiben erhalten.')
                     . '</p><p><strong>'
                     . self::translate('RESET_CONFIRMATION_INSTRUCTION', 'Diese Aktion kann nicht rückgängig gemacht werden. Tippe zur Bestätigung genau: RESET')
                     . '</strong></p></section>'
@@ -218,6 +240,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                 self::translate('RESET_CONFIRMATION_LABEL', 'Bestätigung')
             )->setAttribute('autocomplete', 'off')->setAttribute('spellcheck', 'false'));
         }
+        $memberColorFieldNames = [];
         foreach ($canManageSensitiveSettings && $authorizedMemberIDs ? Member::get()->filter('ID', $authorizedMemberIDs)->sort('Surname ASC, FirstName ASC') : [] as $authorizedMember) {
             $colorFieldName = 'MashaFeedlyMemberColor_' . (int)$authorizedMember->ID;
             $fields->push(CompositeField::create(
@@ -234,30 +257,45 @@ class MashaFeedlyAdmin extends ModelAdmin
                     MashaFeedlyMemberExtension::normalizeColor((string)$authorizedMember->MashaFeedlyColor) ?? ''
                 )
             )->setName('MashaFeedlyMemberColorGroup_' . (int)$authorizedMember->ID)
-                ->setTitle(self::translate('CONFIG_AVATAR_COLOR', 'Avatarfarbe: {name}', ['name' => $authorizedMember->getName()])));
+                ->setTitle(self::translate('CONFIG_AVATAR_COLOR', 'Profilfarbe: {name}', ['name' => $authorizedMember->getName()])));
+            $memberColorFieldNames[] = 'MashaFeedlyMemberColorGroup_' . (int)$authorizedMember->ID;
         }
+        $takeFields = static function (array $names) use ($fields): FieldList {
+            $group = FieldList::create();
+            foreach ($names as $name) {
+                $field = $fields->fieldByName($name);
+                if ($field) {
+                    $fields->removeByName($name);
+                    $group->push($field);
+                }
+            }
+            return $group;
+        };
+        $generalFields = $takeFields(['MashaFeedlyEmailTestNotice', 'MashaFeedlyAddress', 'MashaFeedlyFontSize', 'MashaFeedlyTheme', 'MashaFeedlyAnimationPreviews']);
+        $accessFields = $takeFields(array_merge(['AllowedMemberIDs'], $memberColorFieldNames));
+        $sections = [
+            ToggleCompositeField::create('GeneralSettings', self::translate('CONFIG_SECTION_GENERAL', 'Allgemein'), $generalFields)
+                ->setStartClosed(false)->addExtraClass('masha-feedly-config-section masha-feedly-config-section--general'),
+            ToggleCompositeField::create('AccessSettings', self::translate('CONFIG_SECTION_ACCESS', 'Zugriff & Darstellung'), $accessFields)
+                ->setStartClosed(false)->addExtraClass('masha-feedly-config-section masha-feedly-config-section--access'),
+        ];
+        if ($canManageSensitiveSettings) {
+            $operationsFields = $takeFields(['MashaFeedlyDueDateReminderMode', 'MashaFeedlyHourlyRate']);
+            $emailFooterFields = $takeFields(['MashaFeedlyEmailFooter']);
+            $resetFields = $takeFields(['MashaFeedlyResetHeading', 'ResetConfirmation']);
+            $sections[] = ToggleCompositeField::create('OperationsSettings', self::translate('CONFIG_SECTION_OPERATIONS', 'Erinnerungen & Schätzungen'), $operationsFields)
+                ->addExtraClass('masha-feedly-config-section masha-feedly-config-section--operations');
+            $sections[] = ToggleCompositeField::create('ResetSettings', self::translate('CONFIG_SECTION_RESET', 'Daten zurücksetzen'), $resetFields)
+                ->addExtraClass('masha-feedly-config-section masha-feedly-config-section--reset');
+            $sections[] = ToggleCompositeField::create('EmailFooterSettings', self::translate('CONFIG_SECTION_EMAIL_FOOTER', 'E-Mail-Footer'), $emailFooterFields)
+                ->setStartClosed(true)->addExtraClass('masha-feedly-config-section masha-feedly-config-section--email-footer');
+        }
+        $fields = FieldList::create(...$sections);
         Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly-admin.css');
         Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly.css');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-colors.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/unicorn.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rocket.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/hearts.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/arcade.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/retro.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/dino.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/ducks.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/frogs.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/icon-shower.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/ghost-swarm.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/potion.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/cat-paws.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/flower-power.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/pinball-tilt.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/check.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/glow.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/rings.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/confirmation.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/effects/runner.js');
+        \KW\MashaFeedly\Service\MashaFeedlyEffectProvider::requireLoader();
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-admin.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-entries.js');
         $actions = FieldList::create(
             FormAction::create('saveConfiguration', self::translate('CONFIG_SAVE', 'Konfiguration speichern'))
@@ -423,91 +461,11 @@ class MashaFeedlyAdmin extends ModelAdmin
     /** Rendert die sofort abspielbaren Vorschauen für verspielte Abschlussanimationen. */
     private function renderCompletionAnimationPreviews(): string
     {
-        $unicornURL = (string)ModuleResourceLoader::resourceURL(
-            'kooperativeweb/masha-feedly:client/dist/icons/masha-feedly-unicorn.svg'
-        );
-        $playfulMessage = $this->escapeBoardValue(self::translate('CONFIG_ANIMATION_PREVIEW_STARTED', 'Vorschau gestartet.'));
-        $reducedMotionMessage = $this->escapeBoardValue(self::translate('CONFIG_ANIMATION_REDUCED_MOTION', 'Animationen sind für reduzierte Bewegung ausgeschaltet.'));
-        $previewLabel = self::translate('CONFIG_ANIMATION_PREVIEW', 'Vorschau ansehen');
-        return '<section class="masha-feedly-animation-previews" data-masha-feedly-animation-previews data-unicorn-url="'
-            . $this->escapeBoardValue($unicornURL) . '">'
+        return '<section class="masha-feedly-animation-previews" data-masha-feedly-animation-previews>'
             . '<h3>' . self::translate('CONFIG_ANIMATIONS_TITLE', 'Abschlussanimationen ansehen') . '</h3>'
-            . '<p>' . self::translate('CONFIG_ANIMATIONS_DESCRIPTION', 'Klicke auf eine Vorschau. Beim Abschließen wird je nach Theme zufällig eine passende Animation abgespielt.') . '</p>'
-            . '<div class="masha-feedly-animation-previews__grid">'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">✨🦄</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_UNICORN', 'Konfetti & Chaos-Einhorn') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="playful" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🚀</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_ROCKET', 'Raketenstart') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="rocket" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">💖</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_HEARTS', 'Herzregen') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="hearts" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">👾</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_ARCADE', '8-Bit-Level geschafft') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="arcade" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🪟</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_RETRO', 'Retro: Windows 80er/90er') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="retro" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🦖</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_DINO', 'Pixel-Dino frisst den Speichern-Button') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="dino" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🦆</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_DUCKS', 'Gummienten-Parade') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="ducks" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🐸</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_FROGS', 'Froschparade') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="frogs" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🎊</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_ICON_SHOWER', 'Bunter Icon-Schauer') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="iconShower" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">👻</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_GHOST_SWARM', 'Geisterschwarm') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="ghostSwarm" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🧪</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_POTION', 'Zaubertrank-Blubbern') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="potion" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🐾</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_CAT_PAWS', 'Katzenpfoten-Spur') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="catPaws" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🌼</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_FLOWER_POWER', 'Flower Power') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="flowerPower" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="playful"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">🎱</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_PINBALL_TILT', 'Flipper: Tilt!') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="pinballTilt" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">✓</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_CHECK', 'Gezeichnetes Häkchen') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="check" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">◌</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_GLOW', 'Sanfter Lichtimpuls') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="glow" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">◎</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_RINGS', 'Ruhige Ringwellen') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="rings" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '<article class="masha-feedly-animation-preview" data-masha-feedly-animation-preview-card data-masha-feedly-theme="serious"><span class="masha-feedly-animation-preview__icon" aria-hidden="true">▱</span>'
-            . '<div><strong>' . self::translate('CONFIG_ANIMATION_CONFIRMATION', 'Leise Statuskarte') . '</strong>'
-            . '<button type="button" data-masha-feedly-animation-preview="confirmation" data-preview-message="' . $playfulMessage
-            . '" data-reduced-motion-message="' . $reducedMotionMessage . '">' . $previewLabel . '</button></div></article>'
-            . '</div><p class="masha-feedly-animation-previews__status" data-masha-feedly-animation-preview-status role="status" aria-live="polite"></p>'
-            . '</section>';
+            . '<p>' . self::translate('CONFIG_ANIMATIONS_DESCRIPTION', 'Die verfügbaren Effekte werden vom Effekt-Anbieter geladen.') . '</p>'
+            . '<div class="masha-feedly-animation-previews__grid" data-masha-feedly-effect-catalog></div>'
+            . '<p data-masha-feedly-animation-preview-status role="status" aria-live="polite"></p></section>';
     }
 
     /**
@@ -519,7 +477,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     public function moveEntry(HTTPRequest $request): HTTPResponse
     {
         if (!$this->canView()) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung.'], 403);
+            return $this->jsonResponse(['success' => false, 'message' => 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.'], 403);
         }
         if (!$request->isPOST()) {
             return $this->jsonResponse(['success' => false, 'message' => 'POST erforderlich.'], 405);
@@ -540,7 +498,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                 'success' => false,
                 'message' => i18n::_t(
                     'KW\\MashaFeedly\\Translations.ESTIMATE_APPROVAL_REQUIRED',
-                    'Dieser Eintrag wartet auf die Freigabe der Kostenschätzung. Er kann nur in „Kostenschätzung freigegeben“ verschoben werden.'
+                    'Diese Meldung wartet auf die Freigabe der Kostenschätzung. Wähle den Status „Kostenschätzung freigegeben“, wenn du die Schätzung geprüft hast.'
                 ),
             ], 409);
         }
@@ -549,6 +507,9 @@ class MashaFeedlyAdmin extends ModelAdmin
             && MashaFeedlyConfigExtension::miteTriggersCategory((int)$category->ID);
         $entry->CategoryID = (int)$category->ID;
         $entry->write();
+        $sentToFeedback = (int)$entry->CategoryID !== (int)$category->ID
+            && (string)$entry->Category()->SystemKey === 'feedback';
+        $category = $entry->Category();
         $entryIDs = array_values(array_unique(array_filter(array_map(
             'intval',
             (array)$request->postVar('EntryIDs')
@@ -572,7 +533,10 @@ class MashaFeedlyAdmin extends ModelAdmin
             'success' => true,
             'unreadCount' => $unreadCount,
             'feedbackCount' => self::feedbackCount(),
-            'mitePrompt' => $movedToMiteCategory && MashaFeedlyEntry::canManageReporter($member),
+            'categoryID' => (int)$entry->CategoryID,
+            'sentToFeedback' => $sentToFeedback,
+            'message' => $sentToFeedback ? self::translate('EDIT_WAITING_FOR_CREATOR', 'Die Meldung bleibt offen und wartet auf die Bestätigung durch den Ersteller oder die eingetragene Meldeperson.') : '',
+            'mitePrompt' => !$sentToFeedback && $movedToMiteCategory && MashaFeedlyEntry::canManageReporter($member),
         ]);
     }
 
@@ -581,7 +545,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     {
         $member = Security::getCurrentUser();
         if (!$this->canView() || !$member || !Permission::checkMember($member, 'ADMIN')) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung.'], 403);
+            return $this->jsonResponse(['success' => false, 'message' => 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.'], 403);
         }
         if (!$request->isPOST()) {
             return $this->jsonResponse(['success' => false, 'message' => 'POST erforderlich.'], 405);
@@ -618,7 +582,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     {
         $member = Security::getCurrentUser();
         if (!$this->canView() || !$member || !Permission::checkMember($member, 'ADMIN')) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung.'], 403);
+            return $this->jsonResponse(['success' => false, 'message' => 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.'], 403);
         }
         if (!$request->isPOST()) {
             return $this->jsonResponse(['success' => false, 'message' => 'POST erforderlich.'], 405);
@@ -653,7 +617,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     {
         $member = Security::getCurrentUser();
         if (!$this->canView() || !$member || !Permission::checkMember($member, 'ADMIN')) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung.'], 403);
+            return $this->jsonResponse(['success' => false, 'message' => 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.'], 403);
         }
         if (!$request->isPOST()) {
             return $this->jsonResponse(['success' => false, 'message' => 'POST erforderlich.'], 405);
@@ -697,9 +661,9 @@ class MashaFeedlyAdmin extends ModelAdmin
         $adminTranslations = [];
         foreach ([
             'BOARD_SAVING' => 'Änderung wird gespeichert …',
-            'BOARD_SAVE_ERROR' => 'Speichern fehlgeschlagen.',
-            'BOARD_SAVE_SUCCESS' => 'Eintrag wurde gespeichert.',
-            'BOARD_SAVE_FAILURE' => 'Eintrag konnte nicht gespeichert werden.',
+            'BOARD_SAVE_ERROR' => 'Speichern fehlgeschlagen. Bitte prüfe deine Verbindung und versuche es erneut.',
+            'BOARD_SAVE_SUCCESS' => 'Meldung wurde gespeichert.',
+            'BOARD_SAVE_FAILURE' => 'Meldung konnte nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.',
             'BOARD_CATEGORY_SAVING' => 'Kategorien werden sortiert …',
             'BOARD_CATEGORY_SAVE_ERROR' => 'Sortieren fehlgeschlagen.',
             'BOARD_CATEGORY_SAVE_SUCCESS' => 'Kategorienreihenfolge gespeichert.',
@@ -716,9 +680,9 @@ class MashaFeedlyAdmin extends ModelAdmin
             'BOARD_CATEGORY_DELETE_FAILURE' => 'Kategorie konnte nicht gelöscht werden.',
             'BOARD_CATEGORY_DRAG_ARIA' => 'Kategorie sortieren',
             'BOARD_CATEGORY_DRAG_TITLE' => 'Kategorie zum Sortieren ziehen',
-            'BOARD_ENTRY_SAVING' => 'Eintrag wird gespeichert …',
-            'BOARD_ENTRY_SAVE_ERROR' => 'Eintrag konnte nicht gespeichert werden.',
-            'BOARD_ENTRY_SAVE_SUCCESS' => 'Eintrag wurde gespeichert.',
+            'BOARD_ENTRY_SAVING' => 'Meldung wird gespeichert …',
+            'BOARD_ENTRY_SAVE_ERROR' => 'Meldung konnte nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.',
+            'BOARD_ENTRY_SAVE_SUCCESS' => 'Meldung wurde gespeichert.',
             'BOARD_ENTRY_UPLOAD_HINT' => 'Bilder, PDFs oder ZIP-Dateien auswählen',
             'MITE_LOADING' => 'Mite-Projekte und laufender Timer werden geladen …',
             'MITE_STARTING' => 'Mite-Timer wird gestartet …',
@@ -755,11 +719,11 @@ class MashaFeedlyAdmin extends ModelAdmin
                 'createCategory'
             )) . '" data-create-entry-url="'
             . $this->escapeBoardValue(Controller::join_links(Director::baseURL(), '__masha-feedly', 'createEntry')) . '">';
-        $html .= '<header class="masha-feedly-board__header"><div><h2>' . self::translate('BOARD_HEADER', 'Einträge nach Kategorie') . '</h2>'
+        $html .= '<header class="masha-feedly-board__header"><div><h2>' . self::translate('BOARD_HEADER', 'Meldungen nach Kategorie') . '</h2>'
             . '<p>' . self::translate('BOARD_HELP', 'Ziehe Einträge in andere Kategorien. Admins können Kategorien am Griff sortieren und eigene leere Kategorien löschen.') . '</p></div>'
             . '<div class="masha-feedly-board__header-actions">';
         //$html .= '<button type="button" class="btn btn-primary masha-feedly-board__action-button masha-feedly-board__action-button--entry" data-open-entry-form aria-haspopup="dialog">'
-        //    . self::translate('BOARD_CREATE_ENTRY', 'Eintrag hinzufügen') . '</button>';
+        //    . self::translate('BOARD_CREATE_ENTRY', 'Meldung hinzufügen') . '</button>';
         if ($canManageCategories) {
             $html .= '<button type="button" class="btn btn-default masha-feedly-board__action-button masha-feedly-board__action-button--category" data-open-category-form aria-haspopup="dialog">'
                 . self::translate('BOARD_CATEGORY_ADD', 'Kategorie hinzufügen') . '</button>';
@@ -773,7 +737,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             $html .= '<nav class="masha-feedly-board__views" role="tablist" aria-label="'
                 . $this->escapeBoardValue(self::translate('REPORTER_TABS_LABEL', 'Masha:Feedly-Ansichten')) . '">'
                 . '<button type="button" class="masha-feedly-board__view-tab is-active" role="tab" aria-selected="true" aria-controls="masha-feedly-entry-board-panel" data-admin-view-tab="entries">'
-                . self::translate('ADMIN_ENTRIES', 'Einträge') . '</button>'
+                . self::translate('ADMIN_ENTRIES', 'Meldungen') . '</button>'
                 . '<button type="button" class="masha-feedly-board__view-tab" role="tab" aria-selected="false" aria-controls="masha-feedly-reporter-panel" data-admin-view-tab="reporters">'
                 . self::translate('REPORTER_TAB', 'Meldepersonen ändern') . '</button></nav>';
         }
@@ -802,8 +766,8 @@ class MashaFeedlyAdmin extends ModelAdmin
         $html .= '<div class="masha-feedly-board__modal kw-masha-feedly__modal kw-masha-feedly__create-modal" data-entry-modal hidden="hidden">'
             . '<section class="masha-feedly-board__dialog masha-feedly-board__entry-dialog kw-masha-feedly__dialog" role="dialog" aria-modal="true" aria-labelledby="masha-feedly-create-title">'
             . '<header class="masha-feedly-board__dialog-header kw-masha-feedly__dialog-header"><div><span class="masha-feedly-board__eyebrow kw-masha-feedly__eyebrow">'
-            . self::translate('BOARD_CREATE_ENTRY_EYEBROW', 'NEUER EINTRAG') . '</span><h2 id="masha-feedly-create-title">'
-            . self::translate('BOARD_CREATE_ENTRY_TITLE', 'Eintrag hinzufügen') . '</h2></div>'
+            . self::translate('BOARD_CREATE_ENTRY_EYEBROW', 'NEUE MELDUNG') . '</span><h2 id="masha-feedly-create-title">'
+            . self::translate('BOARD_CREATE_ENTRY_TITLE', 'Meldung hinzufügen') . '</h2></div>'
             . '<button type="button" class="masha-feedly-board__dialog-close kw-masha-feedly__close" data-close-entry-modal aria-label="'
             . $this->escapeBoardValue(self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen')) . '">×</button></header>'
             . '<form class="masha-feedly-board__entry-form kw-masha-feedly__create-form" data-admin-create-entry-form data-create-url="'
@@ -842,7 +806,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                 $imageURL = $this->memberProfileImageURL($assignee);
                 $html .= '<label class="kw-masha-feedly__assignee-choice" title="' . $this->escapeBoardValue($name) . '">'
                     . '<input type="checkbox" name="AssignedMemberIDs[]" value="' . (int)$assignee->ID . '">'
-                    . '<span class="kw-masha-feedly__assignee-avatar" style="background-color: '
+                    . '<span class="kw-masha-feedly__assignee-avatar" data-avatar-initials="' . $this->escapeBoardValue((string)$assignee->getMashaFeedlyInitials()) . '" style="background-color: '
                     . $this->escapeBoardValue((string)$assignee->getMashaFeedlyDisplayColor()) . '" aria-label="' . $this->escapeBoardValue($name) . '">'
                     . ($imageURL !== '' ? '<img src="' . $this->escapeBoardValue($imageURL) . '" alt="" loading="lazy">' : $this->escapeBoardValue((string)$assignee->getMashaFeedlyInitials()))
                     . '</span><span class="kw-masha-feedly__assignee-name">' . $this->escapeBoardValue($name) . '</span></label>';
@@ -852,7 +816,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         $html .= '<p class="masha-feedly-board__dialog-status kw-masha-feedly__form-status" data-entry-form-status role="status" aria-live="polite"></p>'
             . '<footer class="masha-feedly-board__dialog-actions kw-masha-feedly__dialog-actions"><button type="button" class="btn btn-default kw-masha-feedly__secondary" data-close-entry-modal>'
             . self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen') . '</button><button type="submit" class="btn btn-primary kw-masha-feedly__submit">'
-            . self::translate('BOARD_CREATE_ENTRY', 'Eintrag hinzufügen') . '</button></footer></form></section></div>';
+            . self::translate('BOARD_CREATE_ENTRY', 'Meldung hinzufügen') . '</button></footer></form></section></div>';
         $unreadEntryIDs = $member instanceof Member
             ? MashaFeedlyEntryRead::unreadEntryIDs($member)
             : [];
@@ -864,9 +828,9 @@ class MashaFeedlyAdmin extends ModelAdmin
             $assignedMemberID = '';
         }
 
-        $html .= '<div class="masha-feedly-board__filters"><label for="MashaFeedlyAssignedFilter">' . self::translate('BOARD_FILTER_LABEL', 'Einträge anzeigen') . '</label>'
+        $html .= '<div class="masha-feedly-board__filters"><label for="MashaFeedlyAssignedFilter">' . self::translate('BOARD_FILTER_LABEL', 'Meldungen anzeigen') . '</label>'
             . '<select id="MashaFeedlyAssignedFilter" data-masha-feedly-assignee-filter>'
-            . '<option value=""' . ($assignedMemberID === '' ? ' selected' : '') . '>' . self::translate('BOARD_FILTER_ALL', 'Alle Einträge') . '</option>'
+            . '<option value=""' . ($assignedMemberID === '' ? ' selected' : '') . '>' . self::translate('BOARD_FILTER_ALL', 'Alle Meldungen') . '</option>'
             . '<option value="0"' . ($assignedMemberID === '0' ? ' selected' : '') . '>' . self::translate('BOARD_FILTER_UNASSIGNED', 'Nicht zugeordnet') . '</option>';
         foreach ($allowedMemberIDs ? Member::get()->filter('ID', $allowedMemberIDs)->sort('Surname ASC, FirstName ASC') : [] as $authorizedMember) {
             $memberID = (string)$authorizedMember->ID;
@@ -952,7 +916,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                     $assigneesHTML .= '</div>';
                 }
                 $html .= '<span class="masha-feedly-board__drag-handle" draggable="true"'
-                    . ' title="' . $this->escapeBoardValue(self::translate('BOARD_DRAG_TITLE', 'Zum Sortieren ziehen')) . '" aria-label="' . $this->escapeBoardValue(self::translate('BOARD_DRAG_ARIA', 'Eintrag sortieren')) . '">⠿</span>'
+                    . ' title="' . $this->escapeBoardValue(self::translate('BOARD_DRAG_TITLE', 'Zum Sortieren ziehen')) . '" aria-label="' . $this->escapeBoardValue(self::translate('BOARD_DRAG_ARIA', 'Meldung sortieren')) . '">⠿</span>'
                     . '</div><div class="masha-feedly-board__card-heading">';
                 $frontendEntryURL = $this->frontendEntryURL($entry);
                 if ($frontendEntryURL !== '') {
@@ -961,7 +925,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                 } else {
                     $html .= '<span class="masha-feedly-board__entry-title">';
                 }
-                $html .= $this->escapeBoardValue($entry->getTitle() ?: self::translate('BOARD_ENTRY_NO_DESCRIPTION', 'Eintrag ohne Beschreibung'));
+                $html .= $this->escapeBoardValue($entry->getTitle() ?: self::translate('BOARD_ENTRY_NO_DESCRIPTION', 'Meldung ohne Beschreibung'));
                 $html .= $frontendEntryURL !== '' ? '</a></div>' : '</span></div>';
                 $html .= '<time class="masha-feedly-board__card-date" datetime="'
                     . $this->escapeBoardValue((string)$entry->EntryDate) . '">'
@@ -1001,7 +965,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             . '</div><button type="button" class="kw-masha-feedly__close" data-mite-close aria-label="'
             . $this->escapeBoardValue(self::translate('CLOSE_MODAL', 'Dialog schließen')) . '">×</button></header>'
             . '<form class="kw-masha-feedly__mite-form" data-mite-controls>'
-            . '<p class="kw-masha-feedly__selected-context">' . self::translate('MITE_DIALOG_DESCRIPTION', 'Bei Bedarf startet hier die Zeiterfassung in Mite. Beschreibung und Seitenlink des Eintrags werden übernommen.') . '</p>'
+            . '<p class="kw-masha-feedly__selected-context">' . self::translate('MITE_DIALOG_DESCRIPTION', 'Bei Bedarf startet hier die Zeiterfassung in Mite. Beschreibung und Seitenlink der Meldung werden übernommen.') . '</p>'
             . '<label>' . self::translate('MITE_PROJECT', 'Mite-Projekt') . '<select data-mite-project disabled></select></label>'
             . '<label>' . self::translate('MITE_SERVICE', 'Mite-Leistung') . '<select data-mite-service disabled></select></label>'
             . '<p class="kw-masha-feedly__mite-active" data-mite-active-timer></p><p class="kw-masha-feedly__form-status" data-mite-status role="status" aria-live="polite"></p>'
@@ -1054,16 +1018,16 @@ class MashaFeedlyAdmin extends ModelAdmin
             . '<header class="masha-feedly-reporter-manager__header"><div><span class="masha-feedly-board__eyebrow">'
             . self::translate('REPORTER_TAB_EYEBROW', 'VERWALTUNG') . '</span><h2>'
             . self::translate('REPORTER_TAB_TITLE', 'Angezeigte Meldeperson ändern') . '</h2><p>'
-            . self::translate('REPORTER_TAB_DESCRIPTION', 'Wähle, wessen Name bei einem Eintrag angezeigt wird. Der technische Ersteller bleibt im Verlauf erhalten.')
+            . self::translate('REPORTER_TAB_DESCRIPTION', 'Wähle, wessen Name bei einer Meldung angezeigt wird. Der technische Ersteller bleibt im Verlauf erhalten.')
             . '</p></div><label class="masha-feedly-reporter-manager__search">'
-            . self::translate('REPORTER_SEARCH', 'Einträge durchsuchen')
+            . self::translate('REPORTER_SEARCH', 'Meldungen durchsuchen')
             . '<input type="search" data-reporter-search placeholder="'
             . $this->escapeBoardValue(self::translate('REPORTER_SEARCH_PLACEHOLDER', 'Titel oder ID eingeben …')) . '"></label></header>'
             . '<div class="masha-feedly-reporter-manager__table-wrap"><table class="masha-feedly-reporter-manager__table"><thead><tr><th>'
-            . self::translate('REPORTER_ENTRY', 'Eintrag') . '</th><th>' . self::translate('REPORTER_CREATOR', 'Technisch erstellt von')
+            . self::translate('REPORTER_ENTRY', 'Meldung') . '</th><th>' . self::translate('REPORTER_CREATOR', 'Technisch erstellt von')
             . '</th><th>' . self::translate('REPORTER_DISPLAYED', 'Angezeigte Meldeperson') . '</th></tr></thead><tbody>';
         foreach ($entries as $entry) {
-            $title = $entry->getTitle() ?: self::translate('BOARD_ENTRY_NO_DESCRIPTION', 'Eintrag ohne Beschreibung');
+            $title = $entry->getTitle() ?: self::translate('BOARD_ENTRY_NO_DESCRIPTION', 'Meldung ohne Beschreibung');
             $creatorName = $creatorNames[(int)$entry->ID] ?? '';
             $html .= '<tr data-reporter-row data-search="' . $this->escapeBoardValue(mb_strtolower('#' . $entry->ID . ' ' . $title))
                 . '"><td><strong>#' . (int)$entry->ID . '</strong><span>' . $this->escapeBoardValue($title) . '</span></td><td>'
@@ -1074,7 +1038,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                 . $this->escapeBoardValue(self::translate('REPORTER_SAVING', 'Meldeperson wird gespeichert …')) . '" data-error-message="'
                 . $this->escapeBoardValue(self::translate('REPORTER_SAVE_ERROR', 'Meldeperson konnte nicht gespeichert werden.')) . '"><input type="hidden" name="EntryID" value="'
                 . (int)$entry->ID . '"><select name="ReportedByID" aria-label="'
-                . $this->escapeBoardValue(self::translate('REPORTER_SELECT_ARIA', 'Angezeigte Meldeperson für Eintrag {id}', ['id' => (string)$entry->ID]))
+                . $this->escapeBoardValue(self::translate('REPORTER_SELECT_ARIA', 'Angezeigte Meldeperson für Meldung {id}', ['id' => (string)$entry->ID]))
                 . '"><option value="0"' . ((int)$entry->ReportedByID === 0 ? ' selected' : '') . '>'
                 . self::translate('REPORTER_USE_CREATOR', 'Technischen Ersteller verwenden') . '</option>';
             foreach ($reporters as $reporter) {
@@ -1092,7 +1056,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     public function saveReporter(HTTPRequest $request): HTTPResponse
     {
         if (!MashaFeedlyEntry::canManageReporter()) {
-            return $this->jsonResponse(['success' => false, 'message' => 'Keine Berechtigung.'], 403);
+            return $this->jsonResponse(['success' => false, 'message' => 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.'], 403);
         }
         if (!$request->isPOST()) {
             return $this->jsonResponse(['success' => false, 'message' => 'POST erforderlich.'], 405);
@@ -1178,6 +1142,8 @@ class MashaFeedlyAdmin extends ModelAdmin
     /** Liefert das Profilbild eines Mitglieds, falls ein passendes Bildfeld vorhanden ist. */
     private function memberProfileImageURL(Member $member): string
     {
+        $avatarURL = (string)$member->getMashaFeedlyAvatarURL();
+        if ($avatarURL !== '') return $avatarURL;
         foreach (['MashaFeedlyIconImage', 'ProfileImage', 'Photo', 'Portrait'] as $relationName) {
             if (!$member->hasMethod($relationName)) {
                 continue;
@@ -1234,9 +1200,11 @@ class MashaFeedlyAdmin extends ModelAdmin
         $fontSize = strtolower((string)($data['MashaFeedlyFontSize'] ?? 'small'));
         $siteConfig->MashaFeedlyFontSize = in_array($fontSize, ['small', 'medium', 'large'], true) ? $fontSize : 'small';
         $theme = strtolower((string)($data['MashaFeedlyTheme'] ?? 'playful'));
-        $siteConfig->MashaFeedlyTheme = in_array($theme, ['playful', 'serious'], true) ? $theme : 'playful';
+        $siteConfig->MashaFeedlyTheme = preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $theme) ? $theme : 'playful';
         $canManageSensitiveSettings = MashaFeedlyEntry::canManageReporter($member);
         if ($canManageSensitiveSettings) {
+            $footer = trim((string)($data['MashaFeedlyEmailFooter'] ?? MashaFeedlyConfigExtension::emailFooter()));
+            $siteConfig->MashaFeedlyEmailFooter = mb_substr($footer, 0, 10000);
             $reminderMode = strtolower((string)($data['MashaFeedlyDueDateReminderMode'] ?? MashaFeedlyConfigExtension::dueDateReminderMode()));
             $siteConfig->MashaFeedlyDueDateReminderMode = in_array($reminderMode, ['cron', 'visitor'], true) ? $reminderMode : 'cron';
             $hourlyRate = str_replace(',', '.', trim((string)($data['MashaFeedlyHourlyRate'] ?? MashaFeedlyConfigExtension::hourlyRate())));
@@ -1246,7 +1214,6 @@ class MashaFeedlyAdmin extends ModelAdmin
         }
         $siteConfig->write();
 
-        $usedColors = [];
         foreach ($memberIDs as $authorizedMemberID) {
             $authorizedMember = Member::get()->byID($authorizedMemberID);
             if (!$authorizedMember) {
@@ -1259,12 +1226,11 @@ class MashaFeedlyAdmin extends ModelAdmin
                     ? (string)$data[$colorField]
                     : (string)$authorizedMember->MashaFeedlyColor;
                 $color = MashaFeedlyMemberExtension::normalizeColor($colorValue)
-                    ?? MashaFeedlyMemberExtension::nextAvailableColor($usedColors);
+                    ?? '';
                 $authorizedMember->MashaFeedlyColor = $color;
 
                 $authorizedMember->write();
                 $authorizedMember->protectMashaFeedlyIconImage();
-                $usedColors[] = $color;
             }
         }
 
@@ -1304,11 +1270,31 @@ class MashaFeedlyAdmin extends ModelAdmin
             $form->sessionMessage(self::translate('CONFIG_TEST_EMAIL_SENT', 'Test-E-Mail wurde an {email} gesendet.', ['email' => (string)$member->Email]), 'good');
         } catch (\Throwable $exception) {
             error_log('[Masha:Feedly] Test-E-Mail fehlgeschlagen (' . get_class($exception) . '): ' . $exception->getMessage());
-            $form->sessionMessage(self::translate('CONFIG_TEST_EMAIL_FAILED', 'Test-E-Mail konnte nicht gesendet werden. Prüfe die Mailserver-Konfiguration und das PHP-Fehlerprotokoll.'), 'bad');
+            $form->sessionMessage(self::translate(
+                'CONFIG_TEST_EMAIL_FAILED',
+                'Test-E-Mail fehlgeschlagen: {error}. Prüfe die Mailserver-Konfiguration und das PHP-Fehlerprotokoll.',
+                ['error' => self::emailTestErrorDetails($exception)]
+            ), 'bad');
         }
         return $this->getResponseNegotiator()->respond($request, [
             'CurrentForm' => fn(): string => $this->getEditForm()->forTemplate(),
         ]);
+    }
+
+    /** Bereitet den SMTP-Fehler für die Adminmeldung auf und entfernt mögliche Zugangsdaten. */
+    private static function emailTestErrorDetails(\Throwable $exception): string
+    {
+        $message = preg_replace('/[\x00-\x1F\x7F]+/', ' ', $exception->getMessage()) ?? '';
+        $message = preg_replace('~([a-z][a-z0-9+.-]*://)[^/@\s]+@~i', '$1[redacted]@', $message) ?? $message;
+        $message = preg_replace(
+            '~\b(password|passwd|pwd|secret|token)\b(\s*[:=]\s*)(?:"[^"]*"|\'[^\']*\'|[^\s,;]+)~i',
+            '$1$2[redacted]',
+            $message
+        ) ?? $message;
+        $message = mb_substr(trim($message), 0, 600);
+        $class = substr(strrchr('\\' . get_class($exception), '\\'), 1);
+
+        return $message === '' ? $class : $class . ': ' . $message;
     }
 
     /**
@@ -1320,7 +1306,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     {
         $models = parent::getManagedModels();
         $titles = [
-            MashaFeedlyEntry::class => ['ADMIN_ENTRIES', 'Einträge'],
+            MashaFeedlyEntry::class => ['ADMIN_ENTRIES', 'Meldungen'],
             MashaFeedlyCategory::class => ['ADMIN_CATEGORIES', 'Kategorien'],
             MashaFeedlyComment::class => ['ADMIN_COMMENTS', 'Kommentare'],
             SiteConfig::class => ['ADMIN_CONFIGURATION', 'Konfiguration'],

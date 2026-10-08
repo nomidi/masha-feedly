@@ -13,9 +13,9 @@ use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\Security;
 use SilverStripe\Forms\FieldList;
+use SilverStripe\Forms\DropdownField;
 use SilverStripe\Forms\TextareaField;
 use SilverStripe\Forms\DatetimeField;
-use SilverStripe\Forms\DropdownField;
 use SilverStripe\Forms\LiteralField;
 use SilverStripe\Forms\ListboxField;
 use SilverStripe\Forms\GridField\GridField;
@@ -28,6 +28,9 @@ use SilverStripe\i18n\i18n;
  * @property int $ID Datenbank-ID des Eintrags.
  * @property-read string $Title Automatisch aus dem Anfang der Bug-Beschreibung gebildeter Titel.
  * @property string $Content Inhalt des Eintrags.
+ * @property string $StepsToReproduce Optionale Schritte zum Nachstellen eines Fehlers.
+ * @property string $ExpectedResult Optionales erwartetes Ergebnis.
+ * @property string $ActualResult Optionales tatsächliches Ergebnis.
  * @property string $EntryDate Datum und Uhrzeit des Eintrags.
  * @property string $DueDate Fälligkeitstermin des Eintrags.
  * @property string $DueDateReminderSentAt Zeitpunkt der letzten Fälligkeitserinnerung.
@@ -73,6 +76,9 @@ class MashaFeedlyEntry extends DataObject
 
     private static $db = [
         'Content' => 'HTMLText',
+        'StepsToReproduce' => 'Text',
+        'ExpectedResult' => 'Text',
+        'ActualResult' => 'Text',
         'EntryDate' => 'Datetime',
         'DueDate' => 'Date',
         'DueDateReminderSentAt' => 'Datetime',
@@ -117,7 +123,7 @@ class MashaFeedlyEntry extends DataObject
     ];
 
     private static $summary_fields = [
-        'Title' => 'Bug-Hinweis',
+        'Title' => 'Meldung',
         'Category.Title' => 'Status',
         'EntryDate.Nice' => 'Datum',
         'DueDate.Nice' => 'Fällig am',
@@ -127,6 +133,8 @@ class MashaFeedlyEntry extends DataObject
     private static $default_sort = 'Sort ASC, EntryDate DESC, Created DESC';
 
     private bool $notifyMembersAfterWrite = false;
+
+    private bool $deferNewEntryNotification = false;
 
     private bool $notifyMembersAfterUpdate = false;
 
@@ -148,6 +156,12 @@ class MashaFeedlyEntry extends DataObject
 
     private bool $notifyCostEstimateRequestedAfterWrite = false;
 
+    /** Verschiebt die Erstellungsbenachrichtigung, bis der Controller Zuständigkeiten gespeichert hat. */
+    public function deferNewEntryNotification(): void
+    {
+        $this->deferNewEntryNotification = true;
+    }
+
 
     /**
      * Erstellt die im CMS bearbeitbaren Felder des Eintrags.
@@ -161,7 +175,10 @@ class MashaFeedlyEntry extends DataObject
             'Comments', 'ClassName', 'Title', 'Sort', 'ReportedByID',
             'EstimatedCostAmount', 'EstimatedCostAmountMax', 'EstimatedCostDuration', 'EstimatedCostCurrency', 'EstimatedCostNote',
         ]);
-        $fields->replaceField('Content', TextareaField::create('Content', $this->translate('FIELD_DESCRIPTION', 'Bug-Beschreibung')));
+        $fields->replaceField('Content', TextareaField::create('Content', $this->translate('FIELD_DESCRIPTION', 'Beschreibung')));
+        $fields->replaceField('StepsToReproduce', TextareaField::create('StepsToReproduce', $this->translate('DIAGNOSTICS_STEPS', 'Schritte zum Nachstellen'))->setRows(5));
+        $fields->replaceField('ExpectedResult', TextareaField::create('ExpectedResult', $this->translate('DIAGNOSTICS_EXPECTED', 'Erwartetes Ergebnis'))->setRows(3));
+        $fields->replaceField('ActualResult', TextareaField::create('ActualResult', $this->translate('DIAGNOSTICS_ACTUAL', 'Tatsächliches Ergebnis'))->setRows(3));
         $dateField = DatetimeField::create('EntryDate', $this->translate('FIELD_DATETIME', 'Datum und Uhrzeit'));
         if (!$this->isInDB() && !$this->EntryDate) {
             $dateField->setValue(self::currentEntryDateTime());
@@ -280,7 +297,7 @@ class MashaFeedlyEntry extends DataObject
     public function summaryFields()
     {
         $fields = parent::summaryFields();
-        $fields['Title'] = $this->translate('FIELD_TITLE', 'Bug-Hinweis');
+        $fields['Title'] = $this->translate('FIELD_TITLE', 'Meldung');
         $fields['Category.Title'] = $this->translate('FIELD_STATUS', 'Status');
         $fields['Priority.Title'] = $this->translate('FIELD_PRIORITY', 'Priorität');
         $fields['EntryDate.Nice'] = $this->translate('FIELD_DATE', 'Datum');
@@ -319,6 +336,17 @@ class MashaFeedlyEntry extends DataObject
         }
 
         return rtrim(mb_substr($plainText, 0, 69)) . '…';
+    }
+
+    /** Prüft, wer den Abschluss bestätigen darf: Ersteller oder angezeigte Meldeperson.
+     * @param Member|null $member Prüfendes Mitglied.
+     * @return bool Ob dieses Mitglied die Meldung endgültig abschließen darf.
+     */
+    public function canConfirmCompletion(?Member $member = null): bool
+    {
+        $member = $member ?? Security::getCurrentUser();
+        return $member instanceof Member && (int)$member->ID > 0
+            && in_array((int)$member->ID, [$this->creatorMemberID(), (int)$this->ReportedByID], true);
     }
 
     /** Liefert die ursprüngliche Autorin aus dem unveränderlichen Erstellungseintrag im Verlauf. */
@@ -474,6 +502,15 @@ class MashaFeedlyEntry extends DataObject
                 $oldRole = (string)$storedEntry->Category()->SystemKey;
                 $newCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
                 $newRole = (string)($newCategory?->SystemKey ?? '');
+                // Auch direkte CMS-Speicherung darf die Bestätigung durch die Meldeperson nicht umgehen.
+                if ($newRole === 'done' && $oldRole !== 'done'
+                    && Security::getCurrentUser() && !$storedEntry->canConfirmCompletion()) {
+                    $feedback = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first();
+                    $this->CategoryID = $feedback ? (int)$feedback->ID : (int)$storedEntry->CategoryID;
+                    $newCategory = $feedback ?? $storedEntry->Category();
+                    $newRole = (string)$newCategory->SystemKey;
+                }
+
                 $invalidEstimateTransition = ($newRole === 'estimate_pending'
                         && !self::canManageEstimate()
                         && !($oldRole === 'estimate_pending' && (int)$storedEntry->CategoryID === (int)$this->CategoryID))
@@ -606,7 +643,7 @@ class MashaFeedlyEntry extends DataObject
             if ($oldRole === 'estimate_pending' && !in_array($newRole, ['estimate_pending', 'estimate_approved'], true)) {
                 $result->addFieldError('CategoryID', $this->translate(
                     'ESTIMATE_APPROVAL_REQUIRED',
-                    'Dieser Eintrag wartet auf die Freigabe der Kostenschätzung. Er kann nur in „Kostenschätzung freigegeben“ verschoben werden.'
+                    'Diese Meldung wartet auf die Freigabe der Kostenschätzung. Wähle den Status „Kostenschätzung freigegeben“, wenn du die Schätzung geprüft hast.'
                 ));
             }
             if ($newRole === 'estimate_approved'
@@ -730,7 +767,10 @@ class MashaFeedlyEntry extends DataObject
         }
         if ($this->notifyMembersAfterWrite) {
             MashaFeedlyEntryHistory::record($this, 'created', '', $this->getTitle(), Security::getCurrentUser());
-            MashaFeedlyNotificationService::notifyNewEntry($this);
+            if (!$this->deferNewEntryNotification) {
+                MashaFeedlyNotificationService::notifyNewEntry($this);
+            }
+            $this->deferNewEntryNotification = false;
         } elseif ($this->notifyMembersAfterUpdate) {
             MashaFeedlyNotificationService::notifyUpdatedEntry($this);
         }

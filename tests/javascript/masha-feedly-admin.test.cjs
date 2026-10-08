@@ -218,7 +218,7 @@ test('speichert eine ausgewählte Meldeperson aus der CMS-Übersicht mit Statusm
   assert.equal(button.disabled, false);
 });
 
-test('spielt die im Konfigurationsbereich angeklickte Animationsvorschau ab', () => {
+test('spielt die im Konfigurationsbereich angeklickte Animationsvorschau ab', async () => {
   const previewCalls = [];
   const entriesAPI = {
     previewCompletionAnimation(...args) {
@@ -239,6 +239,7 @@ test('spielt die im Konfigurationsbereich angeklickte Animationsvorschau ab', ()
 
   documentListeners.click({ target: button });
 
+  await Promise.resolve();
   assert.deepEqual(previewCalls, [['rocket', '/unicorn.svg']]);
   assert.equal(preview.status.textContent, 'Vorschau gestartet.');
 });
@@ -249,14 +250,33 @@ test('zeigt im CMS nur die Vorschauen des ausgewählten Themes', () => {
   assert.match(styles, /\.masha-feedly-animation-preview\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
   const themeSelect = new TestElement('theme-select');
   themeSelect.value = 'playful';
-  const cards = ['playful', 'playful', 'serious', 'serious'].map((theme) =>
-    new TestElement('animation-preview-card', { mashaFeedlyTheme: theme }));
+  const cards = [['playful'], ['playful'], ['serious'], ['serious']].map((categories) =>
+    new TestElement('animation-preview-card', { mashaFeedlyCategories: categories.join(',') }));
   const { documentListeners } = createBoardEnvironment(undefined, true, 'du', () => true, 'complete', true, null, { themeSelect, cards });
 
   assert.deepEqual(cards.map((card) => card.hidden), [false, false, true, true]);
   themeSelect.value = 'serious';
   documentListeners.change({ target: themeSelect });
   assert.deepEqual(cards.map((card) => card.hidden), [true, true, false, false]);
+});
+
+test('zeigt bei fehlendem Effekt-Anbieter den lokalen Standard und einen Einrichtungshinweis', () => {
+  assert.match(source, /const createEffectProviderCard = \(providerError = '', effectCount = 0\) =>/);
+  assert.match(source, /const createLocalFallbackCard = \(\) =>/);
+  assert.match(source, /grid\.append\(createLocalFallbackCard\(\)\)/);
+  assert.match(source, /grid\.replaceChildren\(createEffectProviderCard\(providerError\), createLocalFallbackCard\(\)\)/);
+  assert.match(source, /createEffectProviderCard\('', effects\.length\)/);
+  assert.match(source, /EFFECT_LOCAL_DEFAULT_TITLE/);
+  assert.match(source, /EFFECT_LOCAL_DEFAULT_DESCRIPTION/);
+  assert.match(source, /EFFECT_PROVIDER_SETUP_LINK/);
+  assert.match(source, /EFFECT_PROVIDER_CONNECTED/);
+  assert.match(source, /EFFECT_PROVIDER_ERROR_LABEL/);
+  assert.match(source, /status\.textContent = providerError/);
+  assert.match(source, /const renderLocalFallback = \(grid, providerError = ''\) =>/);
+  assert.match(source, /previewFallback\?\.\(document\)/);
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
+  assert.match(styles, /&--provider\.is-unavailable/);
+  assert.match(styles, /&--provider\.is-connected/);
 });
 
 test('ordnet Admin-Karten als Kopfzeile, Titel-Auszug und Datum darunter an', () => {
@@ -586,9 +606,9 @@ function createBoardEnvironment(fetchImplementation = async () => ({
   }
   const dictionary = {
     BOARD_SAVING: 'Änderung wird gespeichert …',
-    BOARD_SAVE_ERROR: 'Speichern fehlgeschlagen.',
-    BOARD_SAVE_SUCCESS: 'Eintrag wurde gespeichert.',
-    BOARD_SAVE_FAILURE: 'Eintrag konnte nicht gespeichert werden.',
+    BOARD_SAVE_ERROR: 'Speichern fehlgeschlagen. Bitte prüfe deine Verbindung und versuche es erneut.',
+    BOARD_SAVE_SUCCESS: 'Meldung wurde gespeichert.',
+    BOARD_SAVE_FAILURE: 'Meldung konnte nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.',
     BOARD_CATEGORY_SAVING: 'Kategorien werden sortiert …',
     BOARD_CATEGORY_SAVE_ERROR: 'Sortieren fehlgeschlagen.',
     BOARD_CATEGORY_SAVE_SUCCESS: 'Kategorienreihenfolge gespeichert.',
@@ -605,9 +625,9 @@ function createBoardEnvironment(fetchImplementation = async () => ({
     BOARD_CATEGORY_DELETE_ERROR: 'Kategorie konnte nicht gelöscht werden.',
     BOARD_CATEGORY_DELETE_SUCCESS: 'Leere Kategorie gelöscht.',
     BOARD_CATEGORY_DELETE_FAILURE: 'Kategorie konnte nicht gelöscht werden.',
-    BOARD_ENTRY_SAVING: 'Eintrag wird gespeichert …',
-    BOARD_ENTRY_SAVE_ERROR: 'Eintrag konnte nicht gespeichert werden.',
-    BOARD_ENTRY_SAVE_SUCCESS: 'Eintrag wurde gespeichert.',
+    BOARD_ENTRY_SAVING: 'Meldung wird gespeichert …',
+    BOARD_ENTRY_SAVE_ERROR: 'Meldung konnte nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.',
+    BOARD_ENTRY_SAVE_SUCCESS: 'Meldung wurde gespeichert.',
   };
   let reloadCount = 0;
   vm.runInNewContext(source, {
@@ -767,13 +787,33 @@ test('sendet beim Verschieben Kategorie und Reihenfolge und macht die Karte wied
   ]);
   assert.equal(card.parentElement, targetList);
   assert.equal(card.classList.contains('is-dragging'), false);
-  assert.equal(board.status.textContent, 'Eintrag wurde gespeichert.');
+  assert.equal(board.status.textContent, 'Meldung wurde gespeichert.');
+});
+
+test('verschiebt den vom Server umgeleiteten Abschluss nach Feedback und erklärt den offenen Status', async () => {
+  const message = 'Die Meldung bleibt offen und wartet auf die Bestätigung.';
+  const { board } = createBoardEnvironment(async () => ({
+    ok: true, json: async () => ({ success: true, sentToFeedback: true, categoryID: 6, message }),
+  }));
+  const sourceList = new TestElement('list', { categoryId: '1' });
+  const doneList = new TestElement('list', { categoryId: '4' });
+  const feedbackList = new TestElement('list', { categoryId: '6' });
+  const originalQuery = board.querySelector.bind(board);
+  board.querySelector = (selector) => selector === '.masha-feedly-board__list[data-category-id="6"]'
+    ? feedbackList : originalQuery(selector);
+  const card = new TestElement('card', { entryId: '42' });
+  sourceList.appendChild(card);
+  startDragging(board, card);
+  await board.listeners.drop({ target: doneList, preventDefault() {} });
+  assert.equal(card.parentElement, feedbackList);
+  assert.equal(board.status.textContent, message);
+  assert.equal(card.classList.contains('is-dragging'), false);
 });
 
 test('stellt die Karte nach einem fehlgeschlagenen Verschieben in der Ursprungskategorie wieder her', async () => {
   const { board } = createBoardEnvironment(async () => ({
     ok: false,
-    json: async () => ({ success: false, message: 'Speichern fehlgeschlagen.' }),
+    json: async () => ({ success: false, message: 'Speichern fehlgeschlagen. Bitte prüfe deine Verbindung und versuche es erneut.' }),
   }));
   const sourceList = new TestElement('list', { categoryId: '1' });
   const targetList = new TestElement('list', { categoryId: '2' });
@@ -785,7 +825,7 @@ test('stellt die Karte nach einem fehlgeschlagenen Verschieben in der Ursprungsk
 
   assert.equal(card.parentElement, sourceList);
   assert.equal(card.classList.contains('is-dragging'), false);
-  assert.equal(board.status.textContent, 'Speichern fehlgeschlagen.');
+  assert.equal(board.status.textContent, 'Speichern fehlgeschlagen. Bitte prüfe deine Verbindung und versuche es erneut.');
 });
 
 test('sortiert Kategorien per Drag-and-drop und speichert ihre vollständige Reihenfolge', async () => {
@@ -1019,7 +1059,7 @@ test('speichert einen neuen Eintrag aus dem CMS-Overlay mit CSRF-Token und lädt
   const { board, formDataInstances, reloadCount } = createBoardEnvironment(async (url, options) => {
     requestURL = url;
     requestOptions = options;
-    return { ok: true, json: async () => ({ success: true, message: 'Eintrag wurde gespeichert.' }) };
+    return { ok: true, json: async () => ({ success: true, message: 'Meldung wurde gespeichert.' }) };
   });
   board.openEntryFormButton.listeners.click();
 
@@ -1033,14 +1073,14 @@ test('speichert einen neuen Eintrag aus dem CMS-Overlay mit CSRF-Token und lädt
     ['SecurityID', 'csrf-test-token'],
   ]);
   assert.equal(board.entryModal.hidden, true);
-  assert.equal(board.status.textContent, 'Eintrag wurde gespeichert.');
+  assert.equal(board.status.textContent, 'Meldung wurde gespeichert.');
   assert.equal(reloadCount(), 1);
 });
 
 test('lässt das CMS-Overlay bei einem fehlgeschlagenen Eintrag offen und bewahrt den Text', async () => {
   const { board, reloadCount } = createBoardEnvironment(async () => ({
     ok: false,
-    json: async () => ({ success: false, message: 'Eintrag konnte nicht gespeichert werden.' }),
+    json: async () => ({ success: false, message: 'Meldung konnte nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.' }),
   }));
   board.openEntryFormButton.listeners.click();
 
@@ -1048,7 +1088,7 @@ test('lässt das CMS-Overlay bei einem fehlgeschlagenen Eintrag offen und bewahr
 
   assert.equal(board.entryModal.hidden, false);
   assert.equal(board.entryForm.contentInput.value, 'Ein Testeintrag');
-  assert.equal(board.entryForm.status.textContent, 'Eintrag konnte nicht gespeichert werden.');
+  assert.equal(board.entryForm.status.textContent, 'Meldung konnte nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.');
   assert.equal(reloadCount(), 0);
   assert.equal(board.entryForm.submitButton.disabled, false);
 });

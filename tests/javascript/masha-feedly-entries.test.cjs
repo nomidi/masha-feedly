@@ -7,12 +7,9 @@ const vm = require('node:vm');
 /** Tests für Sortierung, Kategorien und am Seitenbereich verankerte Eintragsblasen. @author Kooperative Web */
 const source = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-entries.js'), 'utf8');
 const compiledSource = fs.readFileSync(path.resolve(__dirname, '../../client/dist/js/masha-feedly-entries.js'), 'utf8');
-const effectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'dino', 'ducks', 'frogs', 'icon-shower', 'ghost-swarm', 'potion', 'cat-paws', 'flower-power', 'pinball-tilt', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/js/effects/${name}.js`), 'utf8'));
-const compiledEffectSources = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'dino', 'ducks', 'frogs', 'icon-shower', 'ghost-swarm', 'potion', 'cat-paws', 'flower-power', 'pinball-tilt', 'check', 'glow', 'rings', 'confirmation', 'runner'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/dist/js/effects/${name}.js`), 'utf8'));
 const scss = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly.scss'), 'utf8');
 const compiledStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly.css'), 'utf8');
 const compiledAdminStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly-admin.css'), 'utf8');
-const effectStyles = ['_confetti.scss', '_unicorn.scss', '_rocket.scss', '_hearts.scss', '_arcade.scss', '_retro.scss', '_dino.scss', '_check.scss', '_glow.scss', '_rings.scss', '_confirmation.scss', '_ducks.scss', '_frogs.scss', '_icon-shower.scss', '_ghost-swarm.scss', '_potion.scss', '_cat-paws.scss', '_flower-power.scss', '_pinball-tilt.scss'].map((name) => fs.readFileSync(path.resolve(__dirname, `../../client/src/scss/effects/${name}`), 'utf8'));
 const widgetTemplate = fs.readFileSync(path.resolve(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
 const germanTranslations = fs.readFileSync(path.resolve(__dirname, '../../lang/de.yml'), 'utf8');
 const messages = {
@@ -21,71 +18,71 @@ const messages = {
   ENV_OPERATING_SYSTEM: 'Betriebssystem', ENV_BROWSER: 'Browser', ENV_SELECTED_AREA: 'Ausgewählter Bereich',
   ENV_ELEMENT_TEXT: 'Text im Bereich', ENV_RESOLUTION: 'Bildschirmauflösung', ENV_BROWSER_WINDOW: 'Browserfenster',
   ENV_COLOR_DEPTH: 'Farbtiefe', ENV_USER_AGENT: 'Browserkennung', ASSIGNEES_ARIA: 'Verantwortliche',
-  MEMBER_FALLBACK: 'Mitglied', ENTRY_MARKER_ARIA: 'Eintrag {number}: {title}', ENTRY_MARKER_TITLE: '{category} · {title}',
+  MEMBER_FALLBACK: 'Mitglied', ENTRY_MARKER_ARIA: 'Meldung {number}: {title}', ENTRY_MARKER_TITLE: '{category} · {title}',
   HISTORY_STATUS_CHANGE: 'Status: {oldValue} → {newValue}', HISTORY_ASSIGNEES_CHANGE: 'Zuständigkeit: {oldValue} → {newValue}',
   HISTORY_RELATIONS_CHANGE: 'Verknüpfungen: {oldValue} → {newValue}', HISTORY_NO_RELATIONS: 'Keine Verknüpfungen',
   HISTORY_REPORTED_BY: 'Meldeperson: {oldValue} → {newValue}',
-  HISTORY_CREATED: 'Eintrag erstellt: {title}', HISTORY_COMMENT: 'Kommentar: {text}',
+  HISTORY_CREATED: 'Meldung erstellt: {title}', HISTORY_COMMENT: 'Kommentar: {text}',
   HISTORY_ATTACHMENT: 'Datei hochgeladen: {text}',
   HISTORY_COMMENT_EDITED: 'Kommentar bearbeitet: {oldValue} → {newValue}',
   HISTORY_COMMENT_DELETED: 'Kommentar gelöscht: {text}',
   HISTORY_COMMENT_REACTION: 'Reaktion auf Kommentar geändert: {oldValue} → {newValue}', HISTORY_NO_REACTION: 'Keine Reaktion',
   HISTORY_NOBODY: 'Niemand', HISTORY_META: '{actor} · {when}', HISTORY_PRIORITY_CHANGE: 'Priorität: {oldValue} → {newValue}',
   HISTORY_DUE_DATE_CHANGE: 'Fälligkeit: {oldValue} → {newValue}', NO_DUE_DATE: 'Kein Termin', ENTRY_DUE_DATE: 'Fällig am {date}',
-  ENTRY_NUMBER: 'Eintrag #{id}', ENTRY_REPORTED_BY: 'Gemeldet von {author}', ENTRY_CREATED_UNKNOWN: 'Unbekannt', CATEGORY_ALL: 'Alle Kategorien', LIST_COUNT_MINE_DU: 'für dich',
+  ENTRY_NUMBER: 'Meldung #{id}', ENTRY_REPORTED_BY: 'Gemeldet von {author}', ENTRY_CREATED_UNKNOWN: 'Unbekannt', CATEGORY_ALL: 'Alle Kategorien', LIST_COUNT_MINE_DU: 'für dich',
   LIST_COUNT_MINE_SIE: 'für Sie', LIST_COUNT_ALL: 'insgesamt', LIST_COUNT_PAGE: 'auf dieser Seite',
   LIST_COUNT_UNREAD: 'mit neuen Aktivitäten', NEWS_BUTTON_DU: 'Neu seit deinem letzten Besuch',
   NEWS_BUTTON_SIE: 'Neu seit Ihrem letzten Besuch', NEWS_EMPTY: 'Alles ist auf dem neuesten Stand.',
   LIST_COUNT_OPEN: 'offen', LIST_COUNT_CLOSED: 'abgeschlossen', LIST_COUNT_FEEDBACK: 'warten auf Feedback',
   OPEN_ALL_LABEL: 'Gesamte Website', OPEN_PAGE_LABEL: 'Aktuelle Seite',
-  FILTER_OPEN: 'Offene Einträge', FILTER_CLOSED: 'Abgeschlossene Einträge',
+  FILTER_OPEN: 'Offene Meldungen', FILTER_CLOSED: 'Abgeschlossene Meldungen',
   FILTER_ALL_PRIORITIES: 'Alle Prioritäten', SAVED_VIEW_NONE: 'Ansicht auswählen …',
   SAVED_VIEW_SAVED: 'Ansicht gespeichert.', SAVED_VIEW_DELETED: 'Ansicht gelöscht.',
   SAVED_VIEW_ERROR: 'Ansicht konnte nicht gespeichert werden.', SAVED_VIEW_DELETE_ERROR: 'Ansicht konnte nicht gelöscht werden.',
-  ENTRY_SINGULAR: 'Eintrag', ENTRY_PLURAL: 'Einträge', EMPTY_MINE_DU: 'Du hast noch keine Einträge.',
-  EMPTY_MINE_SIE: 'Sie haben noch keine Einträge.', EMPTY_ALL: 'Es gibt noch keine Einträge.',
-  EMPTY_PAGE: 'Auf dieser Seite gibt es noch keine Einträge.', ENTRY_WITHOUT_TITLE: 'Eintrag ohne Titel',
-  EMPTY_OPEN: 'Es gibt keine offenen Einträge.', EMPTY_CLOSED: 'Es gibt keine behobenen Einträge.',
-  ENTRY_OPEN_ARIA: 'Eintrag öffnen: {title}', ENTRY_CONTEXT_AREA: 'Bereich: {text}', ENTRY_PAGE_LINK: 'Zur Seite wechseln',
+  ENTRY_SINGULAR: 'Meldung', ENTRY_PLURAL: 'Meldungen', EMPTY_MINE_DU: 'Du hast noch keine Meldungen.',
+  EMPTY_MINE_SIE: 'Sie haben noch keine Meldungen.', EMPTY_ALL: 'Es gibt noch keine Meldungen.',
+  EMPTY_PAGE: 'Auf dieser Seite gibt es noch keine Meldungen.', ENTRY_WITHOUT_TITLE: 'Meldung ohne Titel',
+  EMPTY_OPEN: 'Es gibt keine offenen Meldungen.', EMPTY_CLOSED: 'Es gibt keine behobenen Einträge.',
+  ENTRY_OPEN_ARIA: 'Meldung öffnen: {title}', ENTRY_CONTEXT_AREA: 'Bereich: {text}', ENTRY_PAGE_LINK: 'Zur Seite wechseln',
   ENTRY_SHARE_ARIA: 'Link zu {title} teilen', ENTRY_SHARE_DONE: 'Direktlink wurde geteilt oder kopiert',
   ENTRY_SHARE_ERROR: 'Link konnte nicht geteilt werden',
-  ENTRY_RELATIONS_ARIA: 'Verknüpfte Einträge', RELATION_RELATED: 'Thematisch verwandt',
+  ENTRY_RELATIONS_ARIA: 'Verknüpfte Meldungen', RELATION_RELATED: 'Thematisch verwandt',
   RELATION_RELATED_TO: 'Thematisch verwandt mit', RELATION_BLOCKED_BY: 'Blockiert durch',
-  RELATION_BLOCKS: 'Blockiert', RELATION_DUPLICATE_OF: 'Duplikat von', RELATION_HAS_DUPLICATE: 'Hat Duplikat',
+  RELATION_BLOCKS: 'Blockiert', RELATION_DUPLICATE_OF: 'Bereits in einer anderen Meldung beschrieben', RELATION_HAS_DUPLICATE: 'Hat Duplikat',
   ENTRY_PRIORITY_ARIA: 'Priorität: {priority}', PRIORITY_FALLBACK: 'Keine Priorität',
-  LIST_LOADING: 'Einträge werden geladen …', LIST_LOAD_ERROR: 'Einträge konnten nicht geladen werden.',
-  RAINBOW_EMPTY_BOARD_TITLE: 'Bugfrei – oder noch nichts eingetragen!',
+  LIST_LOADING: 'Meldungen werden geladen …', LIST_LOAD_ERROR: 'Meldungen konnten nicht geladen werden.',
+  RAINBOW_EMPTY_BOARD_TITLE: 'Noch keine offenen Meldungen',
   RAINBOW_EMPTY_BOARD_MESSAGE: 'Hier wurde noch nichts erfasst. Wir feiern vorsichtshalber trotzdem.',
-  RAINBOW_BOARD_TITLE: 'Alles im grünen Bereich!', RAINBOW_BOARD_MESSAGE: 'Alle Einträge sind erledigt oder archiviert. Stark!',
+  RAINBOW_BOARD_TITLE: 'Alles im grünen Bereich!', RAINBOW_BOARD_MESSAGE: 'Alle Meldungen sind erledigt oder archiviert. Stark!',
   RAINBOW_PAGE_TITLE: 'Auf dieser Seite keine Fehler',
   RAINBOW_PAGE_MESSAGE: 'Alle Meldungen auf dieser Seite sind erledigt oder archiviert. Stark!',
   RAINBOW_EMPTY_PAGE_MESSAGE: 'Hier wurde noch nichts eingetragen – vielleicht ist die Seite schon perfekt.',
-  SUCCESS_EMPTY_BOARD_TITLE: 'Noch keine Einträge',
-  SUCCESS_EMPTY_BOARD_MESSAGE: 'Für Masha:Feedly liegen noch keine Einträge vor.',
-  SUCCESS_BOARD_TITLE: 'Keine offenen Einträge', SUCCESS_BOARD_MESSAGE: 'Alle Einträge sind abgeschlossen oder archiviert.',
-  SUCCESS_PAGE_TITLE: 'Keine offenen Einträge auf dieser Seite',
-  SUCCESS_PAGE_MESSAGE: 'Auf dieser Seite gibt es derzeit keine offenen Einträge.',
-  SUCCESS_EMPTY_PAGE_MESSAGE: 'Für diese Seite wurden noch keine Einträge erfasst.',
-  EDIT_SAVING: 'Änderungen werden gespeichert …', EDIT_SAVE_ERROR: 'Änderungen konnten nicht gespeichert werden.',
-  EDIT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderungen gespeichert wurden, ist unklar. Bitte lade die Eintragsliste neu, bevor du es erneut versuchst.',
-  SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Eintragsliste neu.',
+  SUCCESS_EMPTY_BOARD_TITLE: 'Noch keine Meldungen',
+  SUCCESS_EMPTY_BOARD_MESSAGE: 'Für Masha:Feedly liegen noch keine Meldungen vor.',
+  SUCCESS_BOARD_TITLE: 'Keine offenen Meldungen', SUCCESS_BOARD_MESSAGE: 'Alle Meldungen sind abgeschlossen oder archiviert.',
+  SUCCESS_PAGE_TITLE: 'Keine offenen Meldungen auf dieser Seite',
+  SUCCESS_PAGE_MESSAGE: 'Auf dieser Seite gibt es derzeit keine offenen Meldungen.',
+  SUCCESS_EMPTY_PAGE_MESSAGE: 'Für diese Seite wurden noch keine Meldungen erfasst.',
+  EDIT_SAVING: 'Änderungen werden gespeichert …', EDIT_SAVE_ERROR: 'Änderungen konnten nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.',
+  EDIT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderungen gespeichert wurden, ist unklar. Bitte lade die Meldungsliste neu, bevor du es erneut versuchst.',
+  SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Meldungsliste neu.',
   COMMENT_SAVING: 'Kommentar wird gesendet …',
   COMMENT_SAVED: 'Kommentar gesendet.',
   COMMENT_SAVE_ERROR: 'Kommentar konnte nicht gesendet werden.',
   COMMENT_UPDATE_ERROR: 'Kommentar konnte nicht gespeichert werden.',
   COMMENT_DELETE_ERROR: 'Kommentar konnte nicht gelöscht werden.',
-  COMMENT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderung gespeichert wurde, ist unklar. Bitte öffne den Eintrag neu, bevor du es erneut versuchst.',
-  COMMENT_SAVED_DISPLAY_ERROR: 'Die Änderung wurde gespeichert, aber die Anzeige konnte nicht aktualisiert werden. Bitte öffne den Eintrag neu, bevor du es erneut versuchst.',
+  COMMENT_UNCLEAR_RESULT_ERROR: 'Die Verbindung ist abgebrochen oder der Server hat unerwartet geantwortet. Ob die Änderung gespeichert wurde, ist unklar. Bitte öffne die Meldung neu, bevor du es erneut versuchst.',
+  COMMENT_SAVED_DISPLAY_ERROR: 'Die Änderung wurde gespeichert, aber die Anzeige konnte nicht aktualisiert werden. Bitte öffne die Meldung neu, bevor du es erneut versuchst.',
   UNREAD_ACTIVITY: 'Neue Aktivität',
   NEWS_TITLE: 'Neuigkeiten',
-  NEWS_SUMMARY: 'Einträge: {entries} · Kommentare: {comments}',
-  OPEN_FEEDBACK_ENTRIES: 'Einträge anzeigen, bei denen Feedback aussteht',
-  OPEN_CLOSED_ENTRIES: 'Abgeschlossene Einträge ansehen',
+  NEWS_SUMMARY: 'Meldungen: {entries} · Kommentare: {comments}',
+  OPEN_FEEDBACK_ENTRIES: 'Meldungen anzeigen, bei denen Feedback aussteht',
+  OPEN_CLOSED_ENTRIES: 'Abgeschlossene Meldungen ansehen',
   FILTERS_TITLE: 'Filter', FILTERS_NONE: 'Keine aktiv', FILTERS_ACTIVE: '{count} aktiv',
   FILTER_REMOVE: 'Filter entfernen: {label}', FILTERS_CLEAR: 'Alle Filter zurücksetzen',
-  FILTER_MODE: 'Ansicht', FILTER_OPEN: 'Offene Einträge', FILTER_PAGE_OPEN: 'Offene Fehler hier',
+  FILTER_MODE: 'Ansicht', FILTER_OPEN: 'Offene Meldungen', FILTER_PAGE_OPEN: 'Offene Meldungen hier',
   SORTING_TITLE: 'Sortierung', SORT_DUE: 'Fälligkeit', SORT_CREATED: 'Erstellt am', SORT_PRIORITY: 'Priorität', SORT_ASSIGNEE: 'Zuständigkeit', SORT_ACTIVITY: 'Letzte Aktivität', SORT_ASCENDING: 'aufsteigend', SORT_DESCENDING: 'absteigend',
-  FILTER_FEEDBACK: 'Wartet auf Feedback', FILTER_CLOSED: 'Abgeschlossene Einträge', FILTER_ALL: 'Alle Einträge',
+  FILTER_FEEDBACK: 'Wartet auf Feedback', FILTER_CLOSED: 'Abgeschlossene Meldungen', FILTER_ALL: 'Alle Meldungen',
   FILTER_PAGE: 'Alle Einträge auf dieser Seite', FILTER_MINE: 'Für mich', FILTER_UNREAD: 'Neuigkeiten',
   FILTER_CATEGORY: 'Kategorie', FILTER_PRIORITY: 'Priorität',
   COMMENT_REACTIONS: 'Reaktionen auf diesen Kommentar', COMMENT_REACTION_LIKE: 'Gefällt mir',
@@ -104,15 +101,17 @@ const document = { addEventListener() {} };
 const window = {
   KWMashaFeedlyTranslate: translate,
   KWMashaFeedlyTranslations: {},
-  KWMashaFeedlyEffectModules: {},
+  KWMashaFeedlyEffects: { playOnDone() { return Promise.resolve(null); } },
 };
-effectSources.forEach((effectSource) => vm.runInNewContext(effectSource, { window }));
 vm.runInNewContext(source, { document, window, URL });
+const sharedEffects = { playOnDone(_document, simulatedWindow, _image, theme) {
+  simulatedWindow.effectCalls = [...(simulatedWindow.effectCalls || []), theme];
+  return Promise.resolve({ played: true });
+} };
 const entriesUI = window.KWMashaFeedlyEntries;
-const sharedEffects = window.KWMashaFeedlyEffects;
 test('beschriftet den Zähler als Zahl abgeschlossener Einträge und nennt die Zielübersicht', () => {
-  assert.match(germanTranslations, /OPEN_CLOSED_ENTRIES: 'Abgeschlossene Einträge ansehen'/);
-  assert.match(germanTranslations, /CLOSED_ENTRIES_BUTTON: 'abgeschlossene Einträge'/);
+  assert.match(germanTranslations, /OPEN_CLOSED_ENTRIES: 'Abgeschlossene Meldungen ansehen'/);
+  assert.match(germanTranslations, /CLOSED_ENTRIES_BUTTON: 'abgeschlossene Meldungen'/);
   assert.match(widgetTemplate, /data-masha-feedly-open-closed[^>]*aria-label="<%t KW\\MashaFeedly\\Translations\.OPEN_CLOSED_ENTRIES/);
   assert.match(widgetTemplate, /data-masha-feedly-closed-count>[^<]*<\/strong><span class="kw-masha-feedly__sr-only"><%t KW\\MashaFeedly\\Translations\.CLOSED_ENTRIES_BUTTON/);
 });
@@ -139,6 +138,11 @@ test('zeigt Urheber und lokalen Erstellungszeitpunkt direkt am geöffneten Eintr
   assert.match(compiledStyles, /\.kw-masha-feedly__entry-created\{[^}]*border-radius:999px;[^}]*background:linear-gradient/);
   assert.match(scss, /\.kw-masha-feedly__entry-created-avatar img \{ width: 100%; height: 100%; object-fit: cover; \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__entry-created-avatar img\{width:100%;height:100%;object-fit:cover\}/);
+  // Ein Hintergrundbild würde die vom Profil gesetzte Hintergrundfarbe überdecken.
+  const creatorAvatarStyle = compiledStyles.match(/\.kw-masha-feedly__entry-created-avatar\{([^}]*)\}/)[1];
+  assert.doesNotMatch(creatorAvatarStyle, /gradient|background-image/);
+  assert.match(scss, /\.kw-masha-feedly__entry-created-avatar img\[src\*="\/__masha-feedly-effects\/avatar\/"\] \{ padding: 5px; object-fit: contain; \}/);
+  assert.match(scss, /\.kw-masha-feedly__assignee-avatar img\[src\*="\/__masha-feedly-effects\/avatar\/"\] \{ padding: 5px; object-fit: contain; \}/);
 });
 
 test('zeigt die konfigurierte Meldeperson statt des technischen Erstellers und rendert deren Änderung im Verlauf', () => {
@@ -163,9 +167,9 @@ test('zeigt die konfigurierte Meldeperson statt des technischen Erstellers und r
   assert.equal(rows[0].children[0].text, 'Meldeperson: CMS Betreiber → Historische Meldung von Ada');
 });
 
-test('zeigt beim Ersteller dasselbe Profilbild wie bei Zuständigkeiten und nutzt Initialen als Fallback', () => {
+test('zeigt beim Ersteller das Profilbild, nutzt Initialen bei Ladefehlern und zeigt Zuständigkeits-Icons', () => {
   const images = [];
-  const fakeDocument = { createElement: () => { const image = {}; images.push(image); return image; } };
+  const fakeDocument = { createElement: () => { const image = { addEventListener(name, callback) { this[name] = callback; } }; images.push(image); return image; } };
   const avatar = {
     style: {},
     children: [],
@@ -180,6 +184,9 @@ test('zeigt beim Ersteller dasselbe Profilbild wie bei Zuständigkeiten und nutz
   assert.equal(images[0].loading, 'lazy');
   assert.equal(avatar.style.backgroundColor, '#123456');
   assert.equal(avatar.children[0], images[0]);
+  images[0].error();
+  assert.equal(avatar.textContent, 'EM');
+  assert.equal(avatar.children.length, 0);
 
   entriesUI.renderEntryCreatorAvatar(avatar, {
     author: 'Erika Muster', initials: 'EM', color: '#654321', imageURL: '',
@@ -281,7 +288,7 @@ test('Dialoge sind modal beschriftet, fokussierbar und Statusfelder live angekü
   assert.match(widgetTemplate, /data-masha-feedly-edit-heading tabindex="-1"/);
   assert.match(widgetTemplate, /data-masha-feedly-edit-priority role="img" aria-label="Priorität"/);
   assert.equal((widgetTemplate.match(/role="status" aria-live="polite" aria-atomic="true"/g) || []).length >= 3, true);
-  assert.match(scss, /:focus-visible,[\s\S]*outline: 3px solid #a91c62/);
+  assert.match(scss, /:focus-visible,[\s\S]*outline: 3px solid \$masha-color-a91c62/);
 });
 
 test('sortiert innerhalb des Status nach Priorität und bei gleicher Priorität nach Datum', () => {
@@ -324,9 +331,9 @@ test('zeigt an Eintragskarten ein verständliches Icon mit Beziehungstyp und ver
     { id: 45, title: 'Suche ist langsam', type: 'related' },
     { id: 47, title: 'Suchfeld springt', type: 'related_to', direction: 'incoming' },
   ], documentRef);
-  assert.equal(container['aria-label'], 'Verknüpfte Einträge');
+  assert.equal(container['aria-label'], 'Verknüpfte Meldungen');
   assert.equal(container.children.length, 6);
-  assert.equal(container.children[0].children[1].textContent, 'Duplikat von · #42 Login speichert nicht');
+  assert.equal(container.children[0].children[1].textContent, 'Bereits in einer anderen Meldung beschrieben · #42 Login speichert nicht');
   assert.equal(container.children[0].dataset.relationKind, 'duplicate');
   assert.doesNotMatch(container.children[0].children[1].textContent, /RELATION_DUPLICATE_OF/);
   assert.match(container.children[0].children[0].innerHTML, /<svg viewBox="0 0 24 24"/);
@@ -430,11 +437,11 @@ test('zeigt Reaktionen kompakt und öffnet die sechs Optionen erst auf Klick', a
   assert.equal(picker.children[0].attributes['aria-pressed'], 'true');
   picker.children[2].listeners.click();
   assert.equal(reactedTo, '😂', 'Eine Auswahl wird zum Speichervorgang übergeben und ersetzt die bisherige eigene Reaktion.');
-  assert.match(scss, /\.kw-masha-feedly__comment-reactions\s*\{\s*position: relative;/);
-  assert.match(scss, /\.kw-masha-feedly__comment-reaction-picker\s*\{\s*position: absolute; z-index: 8; bottom: calc\(100% \+ 6px\); left: 0;/);
+  assert.match(scss, /&-reactions\s*\{\s*position: relative;/);
+  assert.match(scss, /&-reaction-picker\s*\{\s*position: absolute; z-index: 8; bottom: calc\(100% \+ 6px\); left: 0;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__comment-reaction-picker\{position:absolute;z-index:8;bottom:calc\(100% \+ 6px\);left:0;/);
-  assert.match(scss, /comment-reaction-picker-toggle\s*\{[^}]*place-items:\s*center/);
-  assert.match(scss, /comment-reaction-picker-face\s*\{[^}]*line-height:\s*1[^}]*transform:\s*translateY\(-1px\)/);
+  assert.match(scss, /&-reaction-picker-toggle\s*\{[^}]*place-items:\s*center/);
+  assert.match(scss, /&-reaction-picker-face\s*\{[^}]*line-height:\s*1[^}]*transform:\s*translateY\(-1px\)/);
 });
 
 test('führt eine Eintragskarte zur Originalseite und übergibt die Eintragskennung', () => {
@@ -577,12 +584,18 @@ test('bereitet die Bugbeschreibung nur zum Lesen sowie Status und Avatar-Zustän
     assignees: [{ name: 'Ada Beispiel', initials: 'EM', color: '#E95DAB', imageURL: '' }],
     assignedMemberIDs: ['12'],
     content: 'Der Originaltext darf nicht im Bearbeitungsformular landen.',
+    stepsToReproduce: '1. Kontakt öffnen',
+    expectedResult: 'Bestätigung erscheint.',
+    actualResult: 'Ladeanzeige bleibt stehen.',
   });
   assert.equal(editable.id, 71);
   assert.equal(editable.categoryID, 3);
   assert.deepEqual(Array.from(editable.assignedMemberIDs), [12]);
   assert.equal(editable.context, 'Status: Doing');
   assert.equal(editable.description, 'Der Originaltext darf nicht im Bearbeitungsformular landen.');
+  assert.equal(editable.stepsToReproduce, '1. Kontakt öffnen');
+  assert.equal(editable.expectedResult, 'Bestätigung erscheint.');
+  assert.equal(editable.actualResult, 'Ladeanzeige bleibt stehen.');
   assert.equal('content' in editable, false);
   assert.equal(editable.assignees[0].initials, 'EM');
 });
@@ -621,7 +634,7 @@ test('zeichnet Mitglieder als farbige Initialen oder Profilbilder ohne Zuweisung
     setAttribute(name, value) { this[name] = value; },
     append(child) { this.children.push(child); },
   };
-  const document = { createElement(tagName) { return { tagName, style: {}, children: [], append(child) { this.children.push(child); }, setAttribute(name, value) { this[name] = value; } }; } };
+  const document = { createElement(tagName) { return { tagName, style: {}, children: [], append(child) { this.children.push(child); }, replaceChildren() { this.children = []; }, addEventListener(name, callback) { this[name] = callback; }, setAttribute(name, value) { this[name] = value; } }; } };
   entriesUI.renderAssignees(container, [
     { name: 'Erika Muster', initials: 'EM', color: '#E95DAB' },
     { name: 'Max Beispiel', initials: 'MB', color: '#91B8E8', imageURL: '/protected/avatar.jpg' },
@@ -630,6 +643,8 @@ test('zeichnet Mitglieder als farbige Initialen oder Profilbilder ohne Zuweisung
   assert.equal(container.children[0].textContent, 'EM');
   assert.equal(container.children[0].style.backgroundColor, '#E95DAB');
   assert.equal(container.children[1].children[0].src, '/protected/avatar.jpg');
+  container.children[1].children[0].error();
+  assert.equal(container.children[1].textContent, 'MB');
 });
 
 test('rendert den Verlauf mit Status, Zuständigkeit, handelnder Person und Zeitpunkt als Text', () => {
@@ -648,7 +663,7 @@ test('rendert den Verlauf mit Status, Zuständigkeit, handelnder Person und Zeit
     { type: 'relations', oldValue: '', newValue: 'Duplikat von #18 Suchfehler', actor: 'Erika Muster', created: '2026-10-02 09:32:00' },
   ], document);
   assert.equal(container.children.length, 8);
-  assert.match(container.children[0].children[0].textContent, /Eintrag erstellt: Suchfehler/);
+  assert.match(container.children[0].children[0].textContent, /Meldung erstellt: Suchfehler/);
   assert.match(container.children[1].children[0].textContent, /Datei hochgeladen: screenshot\.png/);
   assert.match(container.children[2].children[0].textContent, /Kommentar: Keine Ergebnisse\./);
   assert.match(container.children[3].children[0].textContent, /Kommentar bearbeitet: Keine Ergebnisse\. → Die Suche ist leer\./);
@@ -812,6 +827,8 @@ test('lässt nur den aktuell ausgewählten Eintrag pulsiert markieren und setzt 
 });
 
 test('färbt das Website-Symbol in Prioritätsfarbe und zeigt es immer als Fehler-Marker', () => {
+  assert.match(scss, /\.kw-masha-feedly\[data-list-open="true"\],[\s\S]*?\.kw-masha-feedly\[data-edit-open="true"\] \{ z-index: 10010; \}/);
+  assert.match(compiledStyles, /\.kw-masha-feedly\[data-list-open=true\],\.kw-masha-feedly\[data-edit-open=true\]\{z-index:10010\}/);
   assert.match(scss, /\.kw-masha-feedly__page-marker-icon\s*\{[^}]*fill: currentColor/);
   assert.match(scss, /\.kw-masha-feedly__page-marker\s*\{[^}]*color: var\(--masha-feedly-priority-color/);
   assert.match(scss, /\.kw-masha-feedly__page-marker\.is-active \.kw-masha-feedly__page-marker-icon,[\s\S]*?\.kw-masha-feedly__page-marker:hover \.kw-masha-feedly__page-marker-icon\s*\{[^}]*animation: kw-masha-feedly-marker-selected/);
@@ -824,563 +841,9 @@ test('färbt das Website-Symbol in Prioritätsfarbe und zeigt es immer als Fehle
   assert.match(scss, /@keyframes kw-masha-feedly-marker-in \{ from \{ opacity: 0; \} to \{ opacity: 1; \} \}/);
   assert.match(scss, /\.kw-masha-feedly__page-marker:focus-visible\s*\{[^}]*outline-color: var\(--masha-feedly-priority-color/);
   assert.match(scss, /\.kw-masha-feedly__page-marker:focus-visible\s*\{[^}]*box-shadow: 0 0 0 6px color-mix\(in srgb, var\(--masha-feedly-priority-color/);
-  assert.match(scss, /:focus-visible:not\(\.kw-masha-feedly__page-marker\)\s*\{[^}]*outline-color: #334155/);
+  assert.match(scss, /:focus-visible:not\(\.kw-masha-feedly__page-marker\)\s*\{[^}]*outline-color: \$masha-color-334155/);
   assert.match(compiledStyles, /\.kw-masha-feedly\[data-theme=serious\] :focus-visible:not\(\.kw-masha-feedly__page-marker\)\{outline-color:#334155/);
   assert.match(compiledStyles, /\.kw-masha-feedly__page-marker:focus-visible\{outline-color:var\(--masha-feedly-priority-color/);
-});
-
-test('erzeugt 128 Konfettiteile aus allen Richtungen für Done und räumt sie wieder auf', () => {
-  let cleanup;
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(piece) { this.children.push(piece); }, remove() { this.removed = true; } };
-  let created = 0;
-  const document = { body: { append(item) { this.layer = item; } }, createElement() { created += 1; return created === 1 ? layer : { style: {}, dataset: {}, setAttribute(name, value) { this[name] = value; } }; } };
-  const window = { setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 13000); } };
-  const confetti = entriesUI.celebrateDone(document, window);
-  assert.equal(confetti, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__confetti');
-  assert.equal(layer.children.length, 128);
-  assert.equal(layer.children[0].style.animationDuration, '8.80s');
-  assert.equal(layer.children[11].style.animationDuration, '11.44s');
-  assert.deepEqual([...new Set(layer.children.map((piece) => piece.dataset.origin))], ['oben', 'rechts', 'unten', 'links']);
-  cleanup();
-  assert.equal(layer.removed, true);
-});
-
-test('lässt nach einem Abschluss das Einhorn-Asset über die Seite laufen', () => {
-  let cleanup;
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(...items) { this.children.push(...items); }, remove() { this.removed = true; } };
-  let created = 0;
-  const document = { body: { append(item) { this.layer = item; } }, createElement() { created += 1; return created === 1 ? layer : {}; } };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 13000); } };
-  const runner = entriesUI.celebrateClosedCategory(document, window, '/_resources/kooperativeweb/masha-feedly/client/dist/icons/masha-feedly-unicorn.svg');
-  assert.equal(runner, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__unicorn-runner');
-  assert.equal(layer.children[0].className, 'kw-masha-feedly__unicorn');
-  assert.equal(layer.children[0].src, '/_resources/kooperativeweb/masha-feedly/client/dist/icons/masha-feedly-unicorn.svg');
-  assert.equal(layer.children[0].alt, '');
-  cleanup();
-  assert.equal(layer.removed, true);
-});
-
-test('bricht alle achtzehn Abschlussanimationen beim nächsten Klick vollständig ab', () => {
-  const runnerSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/effects/runner.js'), 'utf8');
-  const animationNames = ['unicorn', 'rocket', 'hearts', 'arcade', 'retro', 'dino', 'ducks', 'frogs', 'iconShower', 'ghostSwarm', 'potion', 'catPaws', 'flowerPower', 'pinballTilt', 'check', 'glow', 'rings', 'confirmation'];
-  const removedByEffect = new Map();
-  const modules = Object.fromEntries(animationNames.map((name) => [name, {
-    play() {
-      const nodes = [
-        { remove() { this.removed = true; } },
-        ...(name === 'unicorn' ? [{ remove() { this.removed = true; } }] : []),
-      ];
-      removedByEffect.set(name, nodes);
-      return name === 'unicorn' ? { confetti: nodes[0], unicorn: nodes[1] } : { [name]: nodes[0] };
-    },
-  }]));
-  const simulatedWindow = {
-    KWMashaFeedlyEffectModules: modules,
-    matchMedia: () => ({ matches: false }),
-    setTimeout: () => 1,
-    clearTimeout() {},
-  };
-  let clickHandler;
-  const document = { addEventListener(type, callback, capture) {
-    assert.equal(type, 'pointerdown');
-    assert.equal(capture, true);
-    clickHandler = callback;
-  } };
-  vm.runInNewContext(runnerSource, { window: simulatedWindow });
-
-  animationNames.forEach((name) => {
-    simulatedWindow.KWMashaFeedlyEffects.play(name, document, simulatedWindow);
-    const nodes = removedByEffect.get(name);
-    clickHandler({ type: 'click' });
-    assert.ok(nodes.every((node) => node.removed), `${name} entfernt auch seine sichtbaren Ebenen.`);
-
-    simulatedWindow.KWMashaFeedlyEffects.play(name, document, simulatedWindow);
-    const newlyStartedNodes = removedByEffect.get(name);
-    assert.ok(newlyStartedNodes.every((node) => !node.removed), `${name} bleibt nach dem Klick als neue Vorschau sichtbar.`);
-    clickHandler({ type: 'pointerdown' });
-    assert.ok(newlyStartedNodes.every((node) => node.removed), `${name} endet erst beim darauffolgenden Klick.`);
-  });
-});
-
-test('startet beim Raketenstart eine barrierefreie Rakete mit Sternenspur und räumt sie auf', () => {
-  let cleanup;
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(...items) { this.children.push(...items); }, remove() { this.removed = true; } };
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { tagName, children: [], style: {}, dataset: {}, setAttribute(name, value) { this[name] = value; }, append(...items) { this.children.push(...items); } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 5200); } };
-  const rocket = entriesUI.celebrateRocketLaunch(document, window);
-  assert.equal(rocket, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__rocket-runner');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.filter((child) => child.className === 'kw-masha-feedly__rocket-star').length, 14);
-  const smoke = layer.children.find((child) => child.className === 'kw-masha-feedly__rocket-smoke');
-  assert.ok(smoke, 'Der Start enthält eine graue Rauchwolke.');
-  assert.deepEqual(smoke.children.map((puff) => puff.dataset.attempt), ['1', '2', '3']);
-  assert.equal(layer.children.at(-1).className, 'kw-masha-feedly__rocket');
-  assert.match(layer.children.at(-1).innerHTML, /kw-masha-feedly__rocket-nose/);
-  assert.match(layer.children.at(-1).innerHTML, /kw-masha-feedly__rocket-body/);
-  assert.match(layer.children.at(-1).innerHTML, /kw-masha-feedly-rocket-rainbow/);
-  assert.equal((layer.children.at(-1).innerHTML.match(/kw-masha-feedly__rocket-speedline /g) || []).length, 5);
-  cleanup();
-  assert.equal(layer.removed, true);
-});
-
-test('lässt sieben Gummienten mit Abstand watschelnd durchs Bild ziehen', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } }, setAttribute(name, value) { this[name] = value; } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 12000); } };
-  const modules = {};
-  const simulatedWindow = { matchMedia: window.matchMedia, setTimeout: window.setTimeout, KWMashaFeedlyEffectModules: modules };
-  vm.runInNewContext(effectSources[6], { window: simulatedWindow });
-
-  const effect = modules.ducks.play(document, window);
-  assert.equal(effect.ducks, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__duck-parade');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 7);
-  assert.equal(layer.children[0].className, 'kw-masha-feedly__parade-duck');
-  assert.equal(layer.children[0].style.animationDelay, '0s');
-  assert.equal(layer.children[6].style.animationDelay, '2.88s');
-  assert.equal(layer.children[0].style['--duck-body-color'], '#fec80e');
-  assert.equal(layer.children[3].style['--duck-body-color'], '#242424');
-  assert.match(layer.children[0].innerHTML, /viewBox="0 0 512 512"/);
-  assert.match(layer.children[0].innerHTML, /kw-masha-feedly__duck-beak/);
-  assert.match(layer.children[0].innerHTML, /m252\.59 211\.91/);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.ducks.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('lässt fünf bunte Frösche versetzt durchs Bild hüpfen', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 10000); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[7], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.frogs.play(document, window);
-  assert.equal(effect.frogs, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__frog-parade');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 5);
-  assert.equal(layer.children[0].style.animationDelay, '0s');
-  assert.equal(layer.children[4].style.animationDelay, '2.08s');
-  assert.match(layer.children[0].innerHTML, /kw-masha-feedly__frog-smile/);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.frogs.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('lässt fünfzig wechselnde Motive als Icon-Schauer einfliegen', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 10500); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[8], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.iconShower.play(document, window);
-  assert.equal(effect.iconShower, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__icon-shower');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 50);
-  assert.match(layer.children[0].innerHTML, /viewBox="0 0 64 64"/);
-  assert.notEqual(layer.children[0].innerHTML, layer.children[1].innerHTML);
-  assert.ok(layer.children.every((icon) => icon.style['--icon-duration'].endsWith('s')));
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.iconShower.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('lässt einen geisterschwarm durch nebel schweben und kurz flackern', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 8500); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[9], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.ghostSwarm.play(document, window);
-  assert.equal(effect.ghostSwarm, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__ghost-swarm');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__swarm-ghost').length, 9);
-  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__ghost-mist').length, 12);
-  assert.match(layer.children[0].innerHTML, /kw-masha-feedly__ghost-shape/);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.ghostSwarm.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('blubbert Zauberblasen in leuchtenden Farben aus dem Kessel', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 7600); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[10], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.potion.play(document, window);
-  assert.equal(effect.potion, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__potion-effect');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 20);
-  assert.equal(layer.children[0].className, 'kw-masha-feedly__potion-glow');
-  assert.match(layer.children[1].innerHTML, /kw-masha-feedly__cauldron-brew/);
-  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__potion-bubble').length, 18);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.potion.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('lässt Katzenpfoten in einer geschwungenen Spur verblassen', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 6500); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[11], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.catPaws.play(document, window);
-  assert.equal(effect.catPaws, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__cat-paw-trail');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 18);
-  assert.equal(layer.children[0].style['--paw-x'], '-3vw');
-  assert.equal(layer.children[1].style['--paw-delay'], '0.22s');
-  assert.equal(layer.children[0].style['--paw-color'], '#ff1744');
-  assert.match(layer.children[0].innerHTML, /viewBox="0 0 64 64"/);
-  assert.match(layer.children[0].innerHTML, /m40\.1 33\.51a11\.78 11\.78/);
-  assert.match(layer.children[0].innerHTML, /kw-masha-feedly__cat-paw-toe-4/);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.catPaws.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('bringt den Flower-Power-Sonnenkreis und acht tanzende Blumen zum Leuchten', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const document = {
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 6200); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[12], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.flowerPower.play(document, window);
-  assert.equal(effect.flowerPower, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__flower-power');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 10);
-  assert.equal(layer.children[0].className, 'kw-masha-feedly__flower-power-sun');
-  assert.equal(layer.children[1].textContent, 'GROOVY!');
-  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__flower-power-flower').length, 8);
-  assert.equal((layer.children[2].innerHTML.match(/<ellipse/g) || []).length, 10);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(modules.flowerPower.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('rüttelt die Browseransicht und blendet die Tilt-Warnung ein', () => {
-  const layer = { children: [], setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() { this.removed = true; } };
-  let cleanup;
-  const rootClasses = new Set();
-  const document = {
-    documentElement: { classList: { add(name) { rootClasses.add(name); }, remove(name) { rootClasses.delete(name); } } },
-    body: { append(item) { this.layer = item; } },
-    createElement(tagName) {
-      if (tagName === 'div') return layer;
-      return { style: { setProperty(name, value) { this[name] = value; } } };
-    },
-  };
-  const window = { matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { cleanup = callback; assert.equal(delay, 2100); } };
-  const modules = {};
-  vm.runInNewContext(effectSources[13], { window: { KWMashaFeedlyEffectModules: modules } });
-
-  const effect = modules.pinballTilt.play(document, window);
-  assert.equal(effect.pinball, layer);
-  assert.equal(layer.className, 'kw-masha-feedly__pinball-tilt');
-  assert.equal(layer['aria-hidden'], 'true');
-  assert.equal(layer.children.length, 13);
-  assert.equal(layer.children[0].className, 'kw-masha-feedly__pinball-tilt-word');
-  assert.equal(layer.children[0].textContent, 'TILT!');
-  assert.ok(rootClasses.has('kw-masha-feedly__pinball-viewport-shake'));
-  assert.equal(layer.children.filter((item) => item.className === 'kw-masha-feedly__pinball-light').length, 12);
-  cleanup();
-  assert.equal(layer.removed, true);
-  assert.equal(rootClasses.has('kw-masha-feedly__pinball-viewport-shake'), false);
-  assert.equal(modules.pinballTilt.play(document, { matchMedia: () => ({ matches: true }) }), null);
-});
-
-test('wählt theme-basiert zwischen Einhorn, Rakete, Herzen, Arcade, Retro, Dino, Gummienten, Fröschen, Icon-Schauer, Geisterschwarm, Zaubertrank, Katzenpfoten, Flower Power und Pinball Tilt', () => {
-  const layers = [];
-  const document = {
-    documentElement: { classList: { add() {}, remove() {} } },
-    body: { append(layer) { layers.push(layer); } },
-    createElement(tagName) {
-      return tagName === 'div'
-        ? { children: [], style: { setProperty(name, value) { this[name] = value; } }, setAttribute(name, value) { this[name] = value; }, append(item) { this.children.push(item); }, remove() {} }
-        : { children: [], style: { setProperty(name, value) { this[name] = value; } }, dataset: {}, setAttribute(name, value) { this[name] = value; }, append(...items) { this.children.push(...items); } };
-    },
-  };
-  const window = { innerWidth: 1200, innerHeight: 800, matchMedia: () => ({ matches: false }), setTimeout() {} };
-  const unicornCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.04);
-  assert.ok(unicornCompletion.confetti);
-  assert.ok(unicornCompletion.unicorn);
-  assert.equal(unicornCompletion.rocket, undefined);
-  assert.equal(unicornCompletion.unicorn.children[0].src, '/unicorn.svg');
-  const rocketCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.1);
-  assert.deepEqual(Object.keys(rocketCompletion), ['rocket']);
-  assert.equal(layers.at(-1).className, 'kw-masha-feedly__rocket-runner');
-  const heartsCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.18);
-  assert.deepEqual(Object.keys(heartsCompletion), ['hearts']);
-  assert.equal(heartsCompletion.hearts.className, 'kw-masha-feedly__heart-burst');
-  assert.equal(heartsCompletion.hearts.children.length, 28);
-  assert.equal(heartsCompletion.hearts.children[0].textContent, '♥');
-  assert.equal(heartsCompletion.hearts.children[0].style.color, '#ff3b91');
-  const arcadeCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.25);
-  assert.deepEqual(Object.keys(arcadeCompletion), ['arcade']);
-  assert.equal(arcadeCompletion.arcade.className, 'kw-masha-feedly__arcade-effect');
-  const arcadeScreen = arcadeCompletion.arcade.children[0];
-  assert.equal(arcadeScreen.className, 'kw-masha-feedly__arcade-screen');
-  assert.equal(arcadeScreen.children.filter((child) => child.className === 'kw-masha-feedly__arcade-pixel').length, 56);
-  assert.equal(arcadeScreen.children.filter((child) => child.className === 'kw-masha-feedly__arcade-invader').length, 4);
-  assert.equal(arcadeScreen.children.at(-1).textContent, 'MISSION COMPLETE!');
-  const retroCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.32);
-  assert.deepEqual(Object.keys(retroCompletion), ['retro']);
-  assert.equal(retroCompletion.retro.className, 'kw-masha-feedly__retro-effect');
-  assert.equal(retroCompletion.retro.children[0].className, 'kw-masha-feedly__retro-dialog');
-  const dinoCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.39);
-  assert.deepEqual(Object.keys(dinoCompletion), ['dino']);
-  assert.equal(dinoCompletion.dino.className, 'kw-masha-feedly__dino-effect');
-  assert.equal(dinoCompletion.dino.children[0].textContent, 'Speichern');
-  assert.match(dinoCompletion.dino.children[1].innerHTML, /viewBox="0 0 56 60"/);
-  assert.equal(dinoCompletion.dino.children[2].textContent, 'HAPS!');
-  assert.equal(dinoCompletion.dino.children.filter((child) => child.className === 'kw-masha-feedly__dino-pixel').length, 10);
-  const ducksCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.46);
-  assert.equal(ducksCompletion.ducks.className, 'kw-masha-feedly__duck-parade');
-  assert.equal(ducksCompletion.ducks.children.length, 7);
-  const frogsCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.53);
-  assert.equal(frogsCompletion.frogs.className, 'kw-masha-feedly__frog-parade');
-  assert.equal(frogsCompletion.frogs.children.length, 5);
-  const iconShowerCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.6);
-  assert.equal(iconShowerCompletion.iconShower.children.length, 50);
-  const ghostSwarmCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.68);
-  assert.equal(ghostSwarmCompletion.ghostSwarm.children.length, 21);
-  const potionCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.75);
-  assert.equal(potionCompletion.potion.children.length, 20);
-  const catPawsCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.82);
-  assert.equal(catPawsCompletion.catPaws.children.length, 18);
-  const flowerPowerCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.9);
-  assert.equal(flowerPowerCompletion.flowerPower.children.length, 10);
-  const pinballCompletion = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'playful', () => 0.97);
-  assert.equal(pinballCompletion.pinball.children.length, 13);
-  const rocketPreview = entriesUI.previewCompletionAnimation(document, window, 'rocket', '/unicorn.svg');
-  assert.equal(rocketPreview.confetti, undefined);
-  assert.equal(rocketPreview.unicorn, undefined);
-  assert.ok(rocketPreview.rocket);
-  const heartsPreview = entriesUI.previewCompletionAnimation(document, window, 'hearts', '/unicorn.svg');
-  assert.equal(heartsPreview.hearts.children.length, 28);
-  const arcadePreview = entriesUI.previewCompletionAnimation(document, window, 'arcade', '/unicorn.svg');
-  assert.equal(arcadePreview.arcade.children[0].children.at(-1).textContent, 'MISSION COMPLETE!');
-  const retroPreview = entriesUI.previewCompletionAnimation(document, window, 'retro', '/unicorn.svg');
-  assert.equal(retroPreview.retro.className, 'kw-masha-feedly__retro-effect');
-  const dinoPreview = entriesUI.previewCompletionAnimation(document, window, 'dino', '/unicorn.svg');
-  assert.equal(dinoPreview.dino.children[0].textContent, 'Speichern');
-  const ducksPreview = entriesUI.previewCompletionAnimation(document, window, 'ducks', '/unicorn.svg');
-  assert.equal(ducksPreview.ducks.children.length, 7);
-  const frogsPreview = entriesUI.previewCompletionAnimation(document, window, 'frogs', '/unicorn.svg');
-  assert.equal(frogsPreview.frogs.children.length, 5);
-  const iconShowerPreview = entriesUI.previewCompletionAnimation(document, window, 'iconShower', '/unicorn.svg');
-  assert.equal(iconShowerPreview.iconShower.children.length, 50);
-  const ghostSwarmPreview = entriesUI.previewCompletionAnimation(document, window, 'ghostSwarm', '/unicorn.svg');
-  assert.equal(ghostSwarmPreview.ghostSwarm.children.length, 21);
-  const potionPreview = entriesUI.previewCompletionAnimation(document, window, 'potion', '/unicorn.svg');
-  assert.equal(potionPreview.potion.children.length, 20);
-  const catPawsPreview = entriesUI.previewCompletionAnimation(document, window, 'catPaws', '/unicorn.svg');
-  assert.equal(catPawsPreview.catPaws.children.length, 18);
-  const flowerPowerPreview = entriesUI.previewCompletionAnimation(document, window, 'flowerPower', '/unicorn.svg');
-  assert.equal(flowerPowerPreview.flowerPower.children.length, 10);
-  const pinballPreview = entriesUI.previewCompletionAnimation(document, window, 'pinballTilt', '/unicorn.svg');
-  assert.equal(pinballPreview.pinball.children.length, 13);
-  const playful = entriesUI.previewCompletionAnimation(document, window, 'playful', '/unicorn.svg');
-  assert.ok(playful.confetti);
-  assert.ok(playful.unicorn);
-  const seriousEffects = ['check', 'glow', 'rings', 'confirmation'];
-  seriousEffects.forEach((name, index) => {
-    const result = entriesUI.celebrateCompletion(document, window, '/unicorn.svg', 'serious', () => (index + 0.1) / seriousEffects.length);
-    assert.deepEqual(Object.keys(result), [name]);
-  });
-  assert.equal(entriesUI.previewCompletionAnimation(document, window, 'check').check.className, 'kw-masha-feedly__serious-check');
-  const reducedWindow = { matchMedia: () => ({ matches: true }) };
-  assert.equal(entriesUI.previewCompletionAnimation(document, reducedWindow, 'rocket'), null);
-  assert.equal(entriesUI.celebrateCompletion(document, reducedWindow, '/unicorn.svg', 'playful', () => { throw new Error('Zufall darf bei reduzierter Bewegung nicht ausgewertet werden.'); }), null);
-});
-
-test('lässt den grünen T-Rex zum Speichern-Button laufen und zerbeißt dessen Darstellung', () => {
-  const layer = { children: [], style: { setProperty(name, value) { this[name] = value; } }, setAttribute(name, value) { this[name] = value; }, append(child) { this.children.push(child); }, remove() {} };
-  const saveButton = { textContent: 'Änderungen speichern →', getClientRects: () => [{}], getBoundingClientRect: () => ({ left: 320, top: 460, width: 180, height: 48 }) };
-  let created = 0;
-  const document = {
-    querySelectorAll(selector) { assert.equal(selector, 'button.kw-masha-feedly__submit[type="submit"]'); return [saveButton]; },
-    createElement() { created += 1; return created === 1 ? layer : { className: '', style: {}, children: [], append(child) { this.children.push(child); } }; },
-    body: { append(item) { this.layer = item; } },
-  };
-  const simulatedWindow = { innerWidth: 1200, innerHeight: 800, matchMedia: () => ({ matches: false }), setTimeout(callback, delay) { assert.equal(delay, 3400); }, KWMashaFeedlyEffectModules: {} };
-  vm.runInNewContext(effectSources[5], { window: simulatedWindow });
-  const result = simulatedWindow.KWMashaFeedlyEffectModules.dino.play(document, simulatedWindow);
-  assert.equal(result.dino, layer);
-  assert.equal(layer.style['--dino-target-left'], '320px');
-  assert.equal(layer.style['--dino-target-top'], '460px');
-  assert.equal(layer.style['--dino-target-width'], '180px');
-  assert.equal(layer.style['--dino-bite-left'], '452px');
-  assert.equal(layer.children[0].textContent, 'Änderungen speichern →');
-  assert.equal(layer.children[1].className, 'kw-masha-feedly__dino-character');
-  assert.match(layer.children[1].innerHTML, /viewBox="0 0 56 60"/);
-  assert.match(layer.children[1].innerHTML, /fill="#60a917"/);
-  assert.match(effectStyles[6], /translateX\(calc\(100vw \+ 17rem\)\)/);
-  assert.match(effectStyles[6], /--dino-bite-left/);
-  assert.doesNotMatch(effectStyles[6], /scaleX\(-1\)/);
-  assert.equal(layer.children[2].textContent, 'HAPS!');
-  assert.equal(layer.children.filter((child) => child.className === 'kw-masha-feedly__dino-pixel').length, 10);
-  assert.equal(saveButton.className, undefined, 'Die gespeicherte Schaltfläche wird nur visuell überlagert, nicht im DOM verändert.');
-});
-
-test('spielt beim 8-Bit-Erfolg eine kurze, freigeschaltete Chiptune-Siegsmelodie', async () => {
-  const oscillators = [];
-  const listeners = {};
-  const fakeContext = {
-    state: 'suspended', currentTime: 2, destination: {},
-    resume() { this.state = 'running'; return Promise.resolve(); },
-    createOscillator() {
-      const oscillator = { frequency: { setValueAtTime(value, at) { this.value = value; this.at = at; } }, connect(target) { this.target = target; }, start(at) { this.startedAt = at; }, stop(at) { this.stoppedAt = at; } };
-      oscillators.push(oscillator);
-      return oscillator;
-    },
-    createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {} }; },
-  };
-  const simulatedWindow = {
-    AudioContext: function AudioContext() { return fakeContext; },
-    addEventListener(type, callback, options) { listeners[type] = { callback, options }; },
-  };
-  vm.runInNewContext(effectSources[3], { window: simulatedWindow });
-  assert.equal(listeners.pointerdown.options.once, true);
-  listeners.pointerdown.callback();
-  await Promise.resolve();
-  const played = simulatedWindow.KWMashaFeedlyEffectModules.arcade.playVictorySound(simulatedWindow);
-  assert.equal(played, true);
-  assert.equal(oscillators.length, 6);
-  assert.ok(oscillators.every((oscillator) => oscillator.type === 'square'));
-  assert.deepEqual(oscillators.map((oscillator) => oscillator.frequency.value), [659.25, 783.99, 987.77, 1318.51, 987.77, 1318.51]);
-  assert.ok(oscillators.every((oscillator) => oscillator.stoppedAt > oscillator.startedAt));
-});
-
-test('Admin-Vorschau nutzt die auswählbaren verspielten Abschlussanimationen', () => {
-  const adminSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-admin.js'), 'utf8');
-  const adminStyleSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/scss/masha-feedly-admin.scss'), 'utf8');
-  assert.match(adminSource, /data-masha-feedly-animation-preview/);
-  assert.match(adminSource, /previewCompletionAnimation/);
-  assert.match(adminStyleSource, /&__grid/);
-  const adminPHP = fs.readFileSync(path.resolve(__dirname, '../../src/Admin/MashaFeedlyAdmin.php'), 'utf8');
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="hearts"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="arcade"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="retro"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="dino"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="ducks"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="frogs"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="iconShower"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="ghostSwarm"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="potion"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="catPaws"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="flowerPower"/);
-  assert.match(adminPHP, /data-masha-feedly-animation-preview="pinballTilt"/);
-  const widgetPHP = fs.readFileSync(path.resolve(__dirname, '../../src/Extension/MashaFeedlyWidgetExtension.php'), 'utf8');
-  for (const name of ['check', 'glow', 'rings', 'confirmation']) {
-    assert.match(adminPHP, new RegExp(`data-masha-feedly-animation-preview="${name}"`));
-  }
-  const orderedEffects = 'effects/unicorn\\.js[\\s\\S]*effects/rocket\\.js[\\s\\S]*effects/hearts\\.js[\\s\\S]*effects/arcade\\.js[\\s\\S]*effects/retro\\.js[\\s\\S]*effects/dino\\.js[\\s\\S]*effects/ducks\\.js[\\s\\S]*effects/frogs\\.js[\\s\\S]*effects/icon-shower\\.js[\\s\\S]*effects/ghost-swarm\\.js[\\s\\S]*effects/potion\\.js[\\s\\S]*effects/cat-paws\\.js[\\s\\S]*effects/flower-power\\.js[\\s\\S]*effects/pinball-tilt\\.js[\\s\\S]*effects/check\\.js[\\s\\S]*effects/glow\\.js[\\s\\S]*effects/rings\\.js[\\s\\S]*effects/confirmation\\.js[\\s\\S]*effects/runner\\.js[\\s\\S]*masha-feedly-entries\\.js';
-  assert.match(adminPHP, new RegExp(orderedEffects));
-  assert.match(widgetPHP, new RegExp(orderedEffects));
-  assert.match(scss, /@use 'effects\/confetti';[\s\S]*@use 'effects\/unicorn';[\s\S]*@use 'effects\/rocket';[\s\S]*@use 'effects\/hearts';[\s\S]*@use 'effects\/arcade';[\s\S]*@use 'effects\/retro';[\s\S]*@use 'effects\/dino';[\s\S]*@use 'effects\/ducks';[\s\S]*@use 'effects\/frogs';[\s\S]*@use 'effects\/icon-shower';[\s\S]*@use 'effects\/ghost-swarm';[\s\S]*@use 'effects\/potion';[\s\S]*@use 'effects\/cat-paws';[\s\S]*@use 'effects\/flower-power';[\s\S]*@use 'effects\/pinball-tilt';[\s\S]*@use 'effects\/check';[\s\S]*@use 'effects\/glow';[\s\S]*@use 'effects\/rings';[\s\S]*@use 'effects\/confirmation';/);
-  assert.deepEqual(compiledEffectSources, effectSources);
-  assert.match(effectStyles[0], /kw-masha-feedly__confetti-piece/);
-  assert.match(effectStyles[1], /kw-masha-feedly__unicorn-runner/);
-  assert.match(effectStyles[2], /kw-masha-feedly__rocket-runner/);
-  assert.match(effectStyles[2], /kw-masha-feedly__rocket-speedline/);
-  assert.match(effectStyles[2], /kw-masha-feedly-rocket-speedline/);
-  assert.match(effectStyles[2], /kw-masha-feedly__rocket-smoke-puff:nth-child\(3\) \{[^}]*animation-delay: 1\.52s/);
-  assert.match(effectStyles[2], /kw-masha-feedly__rocket-flame \{[^}]*animation: kw-masha-feedly-rocket-flame[^}]*1\.88s/);
-  assert.ok(effectStyles[2].includes('65% { opacity: 1; transform: translate(34vw, -43vh)'));
-  assert.ok(effectStyles[2].includes('82% { opacity: 1; transform: translate(82vw, -97vh)'));
-  assert.match(effectStyles[3], /kw-masha-feedly__burst-heart/);
-  assert.match(effectStyles[3], /kw-masha-feedly-heart-pop/);
-  assert.match(effectStyles[3], /animation: kw-masha-feedly-heart-bloom 2\.5s/);
-  assert.match(effectStyles[3], /animation: kw-masha-feedly-heart-pop 2\.5s/);
-  assert.match(effectStyles[4], /kw-masha-feedly__arcade-pixel/);
-  assert.match(effectStyles[4], /kw-masha-feedly__arcade-invader/);
-  assert.match(effectStyles[4], /kw-masha-feedly__arcade-message/);
-  assert.match(effectStyles[5], /kw-masha-feedly__retro-dialog/);
-  assert.match(effectStyles[5], /#000080/);
-  assert.match(effectStyles[6], /kw-masha-feedly__dino-character/);
-  assert.match(effectStyles[6], /kw-masha-feedly-dino-eaten/);
-  assert.match(effectStyles[7], /kw-masha-feedly__serious-check-mark/);
-  assert.match(effectStyles[8], /kw-masha-feedly__serious-glow/);
-  assert.match(effectStyles[8], /::before[\s\S]*?radial-gradient[\s\S]*?opacity: 1[\s\S]*?scale\(1\.7\)/);
-  assert.match(effectStyles[8], /::after[\s\S]*?border: 3px solid[\s\S]*?scale\(3\.4\)/);
-  assert.match(effectStyles[9], /kw-masha-feedly__serious-ring/);
-  assert.match(effectStyles[10], /kw-masha-feedly__serious-confirmation-card/);
-  assert.match(effectStyles[11], /kw-masha-feedly__duck-parade/);
-  assert.match(effectStyles[11], /kw-masha-feedly-duck-waddle/);
-  assert.match(compiledStyles, /kw-masha-feedly__rocket-runner/);
 });
 
 test('ausgeliefertes JavaScript entspricht der getesteten Quelldatei', () => {
@@ -1389,7 +852,7 @@ test('ausgeliefertes JavaScript entspricht der getesteten Quelldatei', () => {
 
 test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widget-Stilen aus', () => {
   assert.match(widgetTemplate, /saved-view-select[\s\S]*?<details class="kw-masha-feedly__saved-views-details">[\s\S]*?SAVED_VIEW_DETAILS[\s\S]*?data-masha-feedly-saved-views/);
-  assert.match(scss, /\.kw-masha-feedly__comment-form textarea \{ font-size: 18px; line-height: 1\.5; \}/);
+  assert.match(scss, /&__comment-form textarea \{ font-size: 18px; line-height: 1\.5; \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__comment-form textarea\{font-size:18px;line-height:1\.5\}/);
   assert.match(scss, /\.kw-masha-feedly__toggle\s*\{\s*right: 0;\s*bottom: 28px;[\s\S]*?width: var\(--kw-feedly-panel-width, 64px\);\s*max-width: 100vw;\s*margin-right: 0;\s*height: 64px;[\s\S]*?border-radius: 16px 0 0 16px;/);
   assert.match(scss, /\.kw-masha-feedly__toggle:hover,[\s\S]*?\.kw-masha-feedly__toggle:focus-visible\s*\{\s*animation: kw-masha-feedly-toggle-sway 460ms ease-in-out; transform-origin: right center;/);
@@ -1403,12 +866,10 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__attachment-field\s*\{ position: relative; display: grid; grid-template-columns: 49\.6px/);
   assert.match(scss, /\.kw-masha-feedly__entry-attachments img\s*\{ display: block; max-width: 100%;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__entry-attachments img\{display:block;max-width:100%/);
-  assert.match(scss, /\.kw-masha-feedly__entry-description a, \.kw-masha-feedly__entry-card p a, \.kw-masha-feedly__comment p a\s*\{ color: #9e1c60; text-decoration: underline;/);
+  assert.match(scss, /\.kw-masha-feedly__entry-description a, \.kw-masha-feedly__entry-card p a, \.kw-masha-feedly__comment p a\s*\{ color: \$masha-color-9e1c60; text-decoration: underline;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__entry-description a,\.kw-masha-feedly__entry-card p a,\.kw-masha-feedly__comment p a\{color:#9e1c60/);
   assert.match(scss, /\.kw-masha-feedly__entry-description\s*\{[^}]*font-size:\s*calc\(24px \* var\(--masha-font-scale, 1\)\)/s);
   assert.match(scss, /kw-masha-feedly-fan-from-under/);
-  assert.match(effectStyles[1], /kw-masha-feedly-unicorn-run/);
-  assert.match(effectStyles[1], /kw-masha-feedly-unicorn-run 4\.8s/);
   assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button \{ box-sizing: border-box; width: 56px; min-width: 56px; height: 56px; min-height: 56px; flex: 0 0 56px; align-self: flex-start; margin: 0; padding: 6px; border-radius: 14px;/);
   for (const button of ['news-button', 'mite-button', 'rainbow', 'help-button', 'feedback-button', 'closed-button', 'estimate-queue-button']) {
     assert.match(widgetTemplate, new RegExp(`kw-masha-feedly__${button}[^\"]*kw-masha-feedly__action-icon-button`));
@@ -1416,13 +877,13 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__rainbow \{ position: relative; display: grid; place-items: center;/);
   assert.match(scss, /kw-masha-feedly__rainbow-copy\[hidden\]/);
   assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button \{[^}]*border-radius: 14px;/);
-  assert.match(scss, /\.kw-masha-feedly__rainbow \{[^}]*background: linear-gradient\(145deg, #fff 18%, #fff8fc 68%, #f5fbff\)/);
+  assert.match(scss, /\.kw-masha-feedly__rainbow \{[^}]*background: linear-gradient\(145deg, \$masha-color-fff 18%, \$masha-color-fff8fc 68%, \$masha-color-f5fbff\)/);
   assert.match(scss, /\.kw-masha-feedly__rainbow-icon \{ display: block; width: 38px; height: 38px;/);
   assert.match(scss, /\.kw-masha-feedly__help-button \{ font-size: 36px; \}/);
   assert.match(scss, /\.kw-masha-feedly__column \{ gap: 8px; \}/);
   assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button:hover,[\s\S]*?\.kw-masha-feedly__action-icon-button:focus-visible,[\s\S]*?\.kw-masha-feedly__action-icon-button\[aria-expanded="true"\] \{ z-index: 7; transform: translateY\(-3px\);/);
-  assert.match(scss, /\.kw-masha-feedly__assignee-choice:hover \.kw-masha-feedly__assignee-avatar \{ outline: 3px solid #e8a4c5; outline-offset: 2px; transform: translateY\(-3px\) scale\(1\.16\); box-shadow:/);
-  assert.match(scss, /\.kw-masha-feedly__assignee-choice:hover input:checked \+ \.kw-masha-feedly__assignee-avatar \{ outline-color: #e6007e; box-shadow: 0 0 0 3px #e6007e/);
+  assert.match(scss, /\.kw-masha-feedly__assignee-choice:hover \.kw-masha-feedly__assignee-avatar \{ outline: 3px solid \$masha-color-e8a4c5; outline-offset: 2px; transform: translateY\(-3px\) scale\(1\.16\); box-shadow:/);
+  assert.match(scss, /\.kw-masha-feedly__assignee-choice:hover input:checked \+ \.kw-masha-feedly__assignee-avatar \{ outline-color: \$masha-color-e6007e; box-shadow: 0 0 0 3px \$masha-color-e6007e/);
   assert.match(scss, /prefers-reduced-motion: reduce\) \{ \.kw-masha-feedly__assignee-avatar \{ transition: none;/);
   assert.match(scss, /\.kw-masha-feedly__help-button:hover,[\s\S]*?\.kw-masha-feedly__help-button:focus-visible \{ z-index: 7; transform: translateY\(-3px\);/);
   assert.match(scss, /\.kw-masha-feedly__rainbow-copy \{ position: absolute; z-index: 3;/);
@@ -1440,7 +901,7 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__entry-environment-details > summary \{ overflow-wrap: anywhere; \}/);
   assert.match(scss, /\.kw-masha-feedly__entries-dialog > \.kw-masha-feedly__dialog-header,[\s\S]*?\.kw-masha-feedly__entries-list \{ padding-right: 160px; \}/);
   assert.match(scss, /\.kw-masha-feedly__entries-modal \{ width: 528px; \}/);
-  assert.match(scss, /@media \(max-width: 76rem\) \{[\s\S]*?\.kw-masha-feedly__entries-list \{ padding-right: 112px; \}/);
+  assert.match(scss, /@media \(max-width: \$masha-breakpoint-wide\) \{[\s\S]*?\.kw-masha-feedly__entries-list \{ padding-right: 112px; \}/);
   assert.match(scss, /\.kw-masha-feedly__entries-modal \{ width: calc\(33vw \+ 48px\); \}/);
   assert.match(scss, /\.kw-masha-feedly__actions\s*\{ flex-direction: column; align-items: center; gap: 16px;/);
   assert.match(scss, /\.kw-masha-feedly__add\s*\{ display: flex; width: 100%; min-height: 112px; height: 112px; flex: 0 0 112px; box-sizing: border-box; align-items: center; justify-content: center;/);
@@ -1451,12 +912,13 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__closed-button\s*\{ display: flex; width: 100%; min-height: 72px;/);
   assert.match(scss, /\.kw-masha-feedly__edit-modal,[\s\S]*?data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ width: min\(688px, calc\(100vw - 576px\)\); \}/);
   assert.match(scss, /\.kw-masha-feedly__edit-dialog > \.kw-masha-feedly__dialog-header,[\s\S]*?\.kw-masha-feedly__edit-dialog > form \{ padding-right: 256px; \}/);
-  assert.match(scss, /@media \(max-width: 76rem\) \{[\s\S]*?padding-right: clamp\(96px, 9vw, 128px\); \}/);
-  assert.match(scss, /@media \(max-width: 40rem\) \{[\s\S]*?padding-right: 20px; \}/);
+  assert.match(scss, /@media \(max-width: \$masha-breakpoint-wide\) \{[\s\S]*?padding-right: clamp\(96px, 9vw, 128px\); \}/);
+  assert.match(scss, /@media \(max-width: \$masha-breakpoint-mobile\) \{[\s\S]*?padding-right: 20px; \}/);
   assert.match(scss, /data-success-visible="true"\]\[data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ width: min\(688px, calc\(100vw - 688px\)\); \}/);
   assert.match(scss, /\.kw-masha-feedly\[data-edit-open="true"\] \.kw-masha-feedly__entries-modal \{ visibility: hidden; \}/);
-  assert.match(scss, /\.kw-masha-feedly__add > span:first-child\s*\{ display: block; margin: 0; font-size: calc\(88px \* var\(--masha-font-scale, 1\)\); font-weight: 400; line-height: 1; transform: translateY\(-4px\);/);
-  assert.match(scss, /\.kw-masha-feedly__actions > \.kw-masha-feedly__add > span:first-child \{ font-size: 40px; transform: translateY\(1px\); \}/);
+  assert.match(scss, /\.kw-masha-feedly__add > svg \{ width: 60px; height: 60px; \}/);
+  assert.match(scss, /\.kw-masha-feedly__actions > \.kw-masha-feedly__add > svg \{ width: 28px; height: 28px; \}/);
+  assert.match(widgetTemplate, /<button class="kw-masha-feedly__add"[\s\S]*?<svg viewBox="0 0 24 24"/);
   assert.match(scss, /\.kw-masha-feedly__help-button\s*\{ display: grid; width: 52px; min-width: 52px; height: 52px; min-height: 52px; flex: 0 0 52px; aspect-ratio: 1; margin-top: 32px; padding: 0; place-items: center;/);
   assert.match(scss, /\.kw-masha-feedly__entries-modal\s*\{ right: 256px;/);
   assert.match(scss, /data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ right: 560px;/);
@@ -1486,30 +948,42 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /--kw-feedly-panel-width:\s*clamp\(240px, 18vw, 272px\)/);
   assert.match(scss, /--kw-feedly-list-width:\s*clamp\(320px, 30vw, 480px\)/);
   assert.match(scss, /--kw-feedly-edit-width:\s*clamp\(360px, 34vw, 560px\)/);
-  assert.match(scss, /@media \(max-width: 40rem\) \{[\s\S]*?--kw-feedly-panel-width: min\(82vw, 272px\); --kw-feedly-list-width: 100vw; --kw-feedly-edit-width: 100vw;/);
+  assert.match(scss, /@media \(max-width: \$masha-breakpoint-mobile\) \{[\s\S]*?--kw-feedly-panel-width: min\(82vw, 272px\); --kw-feedly-list-width: 100vw; --kw-feedly-edit-width: 100vw;/);
   assert.match(scss, /--kw-feedly-panel-width:\s*clamp\(200px, 15vw, 224px\)/);
   assert.match(scss, /__actions > \.kw-masha-feedly__add \{ min-height: 72px; height: 72px;/);
   assert.match(scss, /__actions > \.kw-masha-feedly__news-button,[\s\S]*?min-height: 56px; height: 56px;/);
   assert.match(scss, /--kw-feedly-panel-width:\s*clamp\(64px, 4\.5vw, 76px\)/);
   assert.match(scss, /__actions > \.kw-masha-feedly__add,[\s\S]*?width: 56px; min-width: 56px; min-height: 56px; height: 56px;/);
-  assert.match(scss, /__count-button strong \{ position: absolute; top: -5px; right: -5px; display: grid; min-width: 20px; width: auto; height: 20px;[\s\S]*?border-radius: 999px; background: #39882d;/);
+  assert.match(scss, /__count-button strong \{ position: absolute; top: -5px; right: -5px; display: grid; min-width: 20px; width: auto; height: 20px;[\s\S]*?border-radius: 999px; background: \$masha-color-39882d;/);
   assert.match(scss, /\.kw-masha-feedly__entries-toolbar,[\s\S]*?padding-right:\s*32px;/);
   assert.match(scss, /\.kw-masha-feedly__edit-dialog > form,[\s\S]*?padding-right:\s*40px;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__entries-toolbar\{display:grid/);
   assert.match(compiledStyles, /\.kw-masha-feedly__edit-dialog>form,[\s\S]*?padding-right:\s*40px/);
-  assert.match(scss, /\.kw-masha-feedly__comment-edited\s*\{ display: inline-block;/);
+  assert.match(scss, /&-edited\s*\{ display: inline-block;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__comment-edited\{display:inline-block/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-shade\s*\{ position: fixed; z-index: 9999;/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-tip\.is-feedback\s*\{ border-color: #d51b43;/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-shade\s*\{ position: fixed; z-index: 9999;/);
+  assert.match(scss, /\.kw-masha-feedly__help-modal \{ z-index: 10020; \}/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-modal \{ z-index: 10020; \}/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-tip \{ position: fixed; z-index: 10021;/);
+  assert.match(scss, /\.kw-masha-feedly\s*\{[\s\S]*?z-index: 2147483000;/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__help-modal\{z-index:10020\}/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-modal\{z-index:10020\}/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-tip\{position:fixed;z-index:10021/);
+  assert.match(compiledStyles, /\.kw-masha-feedly\{[^}]*z-index:2147483000/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-tip\.is-feedback\s*\{ border-color: \$masha-color-d51b43;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-shade\{position:fixed;z-index:9999/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-tip\.is-feedback\{border-color:#d51b43/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-logo \{ display: block; width: 52px;/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-logo \{ display: block; width: 52px;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-logo\{display:block;width:52px/);
   assert.match(widgetTemplate, /kw-masha-feedly__onboarding-welcome-header[\s\S]*?kw-masha-feedly__onboarding-logo--welcome/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-welcome-header \{ align-items: center;/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-logo--welcome \{ width: clamp\(72px, 5vw, 84px\); height: clamp\(72px, 5vw, 84px\); \}/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-welcome-header \{ align-items: center;/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-welcome-header\{align-items:center;justify-content:flex-start;gap:12px\}/);
+  assert.match(germanTranslations, /TOUR_WELCOME_TEXT: .*ohne erst eine E-Mail zu schreiben/);
+  assert.match(germanTranslations, /TOUR_WELCOME_WORKFLOW: .*Verantwortliche.*kommentieren.*erledigt/);
+  assert.match(widgetTemplate, /Translations\.TOUR_WELCOME_WORKFLOW/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-logo--welcome \{ width: clamp\(72px, 5vw, 84px\); height: clamp\(72px, 5vw, 84px\); \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-logo--welcome\{width:clamp\(72px,5vw,84px\);height:clamp\(72px,5vw,84px\)\}/);
-  assert.match(scss, /\.kw-masha-feedly__onboarding-modal a\.kw-masha-feedly__submit \{ display: inline-flex;/);
+  assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-modal a\.kw-masha-feedly__submit \{ display: inline-flex;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-modal a\.kw-masha-feedly__submit\{display:inline-flex/);
 });
 
@@ -1519,7 +993,7 @@ test('liefert beide auswählbaren Erscheinungsbilder mit sachlicher Gestaltung a
   assert.match(compiledStyles, /\.kw-masha-feedly\[data-theme=serious\]/);
   assert.match(germanTranslations, /CONFIG_THEME_PLAYFUL: 'Verspielt/);
   assert.match(germanTranslations, /CONFIG_THEME_SERIOUS: 'Seriös/);
-  assert.match(germanTranslations, /SUCCESS_EMPTY_BOARD_TITLE: 'Noch keine Einträge'/);
+  assert.match(germanTranslations, /SUCCESS_EMPTY_BOARD_TITLE: 'Noch keine Meldungen'/);
 });
 
 test('zeigt den gestalteten Upload in Erstellung und Bearbeitung mit dem Upload-Symbol', () => {
@@ -1538,14 +1012,14 @@ test('zeigt den gestalteten Upload in Erstellung und Bearbeitung mit dem Upload-
 
 test('liefert den Feedback-Button mit Wartetext, zugänglichem Label und passendem Symbol aus', () => {
   assert.match(widgetTemplate, /data-masha-feedly-open-feedback/);
-  assert.match(widgetTemplate, /data-masha-feedly-open-page-list aria-label="[^"]*"><svg class="kw-masha-feedly__page-icon" aria-hidden="true" viewBox="0 0 512 512" focusable="false"><path d="m446\.605 124\.392-/);
+  assert.match(widgetTemplate, /data-masha-feedly-open-page-list[^\n]*? aria-label="[^"]*"><svg class="kw-masha-feedly__page-icon" aria-hidden="true" viewBox="0 0 512 512" focusable="false"><path d="m446\.605 124\.392-/);
   assert.match(widgetTemplate, /class="kw-masha-feedly__feedback-button kw-masha-feedly__action-icon-button"[^\n]*hidden/);
   assert.match(widgetTemplate, /data-masha-feedly-feedback-count/);
   assert.match(widgetTemplate, /viewBox="0 0 512 512" aria-hidden="true" focusable="false"><path d="M117\.333 149\.333H352/);
   assert.match(widgetTemplate, /value="feedback"/);
   assert.match(widgetTemplate, /value="page-open"/);
-  assert.match(widgetTemplate, /Der Globus zeigt offene Fehler auf der gesamten Website/);
-  assert.match(widgetTemplate, /Das Seitensymbol zeigt offene Fehler auf der Seite/);
+  assert.match(widgetTemplate, /HELP_ALL_TITLE/);
+  assert.match(widgetTemplate, /HELP_PAGE_TITLE/);
   assert.match(scss, /\.kw-masha-feedly__count-button::after \{ content: attr\(data-label\);/);
   assert.match(scss, /\.kw-masha-feedly__feedback-button\[hidden\] \{ display: none !important; \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__feedback-button\[hidden\]\{display:none !important\}/);
@@ -1587,7 +1061,7 @@ test('zeigt das Prioritätssymbol im Kopf des geöffneten Eintrags an', () => {
   assert.match(scss, /\.kw-masha-feedly__edit-header-actions \{ display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-left: auto; \}/);
   assert.match(scss, /\.kw-masha-feedly__dialog-header \{[^}]*align-items: center;/);
   assert.match(scss, /\.kw-masha-feedly__dialog-header \{ padding: 23\.2px 30\.4px; \}/);
-  assert.match(scss, /\.kw-masha-feedly__close:hover \{ border-color: #e6007e; background: #e6007e; color: #fff; box-shadow:/);
+  assert.match(scss, /\.kw-masha-feedly__close:hover \{ border-color: \$masha-color-e6007e; background: \$masha-color-e6007e; color: \$masha-color-fff; box-shadow:/);
   assert.doesNotMatch(scss, /\.kw-masha-feedly__close:hover \{ transform: rotate\(90deg\)/);
   assert.match(scss, /\.kw-masha-feedly__close \{[^}]*place-items: center; padding: 0;/);
   assert.match(scss, /\.kw-masha-feedly__dialog-header \.kw-masha-feedly__close \{[^}]*padding: 0;/);
@@ -1969,7 +1443,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
       assignedMemberIDs: entryAssigneeList.map((member) => member.id),
       history: [{ type: 'created', oldValue: '', newValue: entryTitleValue, actor: 'Erika Muster', created: '2026-10-01T10:00:00Z' }],
       comments: [
-        { id: 1, author: 'Erika Muster', text: 'Erster Kommentar https://example.test/kommentar', created: '2026-10-01 10:30:00', canManage: true, edited: true },
+        { id: 1, author: 'Erika Muster', authorInitials: 'EM', authorColor: '#F4D06F', authorImageURL: '/__masha-feedly-effects/avatar/person/black', text: 'Erster Kommentar https://example.test/kommentar', created: '2026-10-01 10:30:00', canManage: true, edited: true },
         { id: 2, author: 'Max Beispiel', text: '<script>zweiter</script><img src=x onerror=alert(2)> <svg onload=alert(3)> javascript:alert(4)', created: '2026-10-01 10:35:00', canManage: true },
       ],
     }],
@@ -2023,7 +1497,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
 }
 
 test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedback-Warteschlange', async () => {
-  assert.ok(widgetTemplate.indexOf('data-masha-feedly-open-feedback') < widgetTemplate.indexOf('data-masha-feedly-open-closed'), 'Der Button für abgeschlossene Einträge steht nach dem Feedback-Button.');
+  assert.ok(widgetTemplate.indexOf('data-masha-feedly-open-feedback') < widgetTemplate.indexOf('data-masha-feedly-open-closed'), 'Der Button für abgeschlossene Meldungen steht nach dem Feedback-Button.');
   assert.ok(widgetTemplate.indexOf('data-masha-feedly-open-closed') < widgetTemplate.indexOf('</div>', widgetTemplate.indexOf('data-masha-feedly-open-closed')), 'Der Button bleibt in der Aktionsgruppe des ersten Panels.');
   const env = createWidgetEnvironment();
   await env.listeners['kw-masha-feedly:opened']();
@@ -2032,8 +1506,8 @@ test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedbac
   assert.equal(env.openPageListButton.dataset.label, 'Aktuelle Seite');
   assert.equal(env.feedbackButton.hidden, false);
   assert.equal(env.feedbackCountDisplay.textContent, '1');
-  assert.equal(env.feedbackButton.attributes['data-tooltip'], 'Einträge anzeigen, bei denen Feedback aussteht · 1');
-  assert.equal(env.openClosedButton.attributes['data-tooltip'], 'Abgeschlossene Einträge ansehen · 0');
+  assert.equal(env.feedbackButton.attributes['data-tooltip'], 'Meldungen anzeigen, bei denen Feedback aussteht · 1');
+  assert.equal(env.openClosedButton.attributes['data-tooltip'], 'Abgeschlossene Meldungen ansehen · 0');
   assert.equal(env.feedbackButton.attributes.title, undefined);
   assert.equal(env.openClosedButton.attributes.title, undefined);
 
@@ -2056,9 +1530,9 @@ test('zeigt Neuigkeiten im ersten Panel und öffnet die Liste ungelesener Eintr�
   assert.equal(env.unreadCountDisplay.textContent, '3');
   assert.equal(env.openNewsButton.hidden, false);
   assert.equal(env.openNewsButton.attributes['data-has-news'], 'true');
-  assert.equal(env.newsSummary.textContent, 'Einträge: 1 · Kommentare: 2');
-  assert.equal(env.openNewsButton.attributes['aria-label'], 'Neuigkeiten · Einträge: 1 · Kommentare: 2');
-  assert.equal(env.openNewsButton.attributes['data-tooltip'], 'Neuigkeiten · Einträge: 1 · Kommentare: 2');
+  assert.equal(env.newsSummary.textContent, 'Meldungen: 1 · Kommentare: 2');
+  assert.equal(env.openNewsButton.attributes['aria-label'], 'Neuigkeiten · Meldungen: 1 · Kommentare: 2');
+  assert.equal(env.openNewsButton.attributes['data-tooltip'], 'Neuigkeiten · Meldungen: 1 · Kommentare: 2');
 
   await env.openNewsButton.listeners.click();
   assert.equal(env.requests.at(-1).searchParams.get('mode'), 'unread');
@@ -2215,6 +1689,11 @@ test('zeigt Kommentare als abwechselnde sichere Sprechblasen und sendet neue Kom
   assert.deepEqual(env.commentList.children.map((item) => item.className), [
     'kw-masha-feedly__comment is-left', 'kw-masha-feedly__comment is-right',
   ]);
+  const authorRow = env.commentList.children[0].children[0];
+  assert.equal(authorRow.className, 'kw-masha-feedly__comment-author');
+  assert.equal(authorRow.children[0].className, 'kw-masha-feedly__comment-avatar');
+  assert.equal(authorRow.children[0].children[0].src, '/__masha-feedly-effects/avatar/person/black');
+  assert.equal(authorRow.children[0].style.backgroundColor, '#F4D06F');
   assert.equal(env.commentList.children[1].children[1].textContent, '<script>zweiter</script><img src=x onerror=alert(2)> <svg onload=alert(3)> javascript:alert(4)');
   assert.equal(env.commentCount.textContent, '2');
   assert.equal(env.commentList.children[0].children[1].children.find((node) => node.tagName === 'a').href, 'https://example.test/kommentar');
@@ -2227,7 +1706,7 @@ test('zeigt Kommentare als abwechselnde sichere Sprechblasen und sendet neue Kom
   const editor = env.commentList.children[0].children[1];
   assert.deepEqual(editor.children[3].children.map((button) => button.textContent), ['Abbrechen', 'Änderungen speichern']);
   editor.children[2].value = 'Kommentar aktualisiert';
-  env.postResponses.push({ ok: true, json: async () => ({ success: true, comment: { id: 1, author: 'Erika Muster', text: 'Kommentar aktualisiert', created: '2026-10-01 10:30:00', canManage: true, edited: true }, history: [{ type: 'comment_edited', oldValue: 'Erster Kommentar', newValue: 'Kommentar aktualisiert', actor: 'Erika Muster', created: '2026-10-01T10:30:00Z' }] }) });
+  env.postResponses.push({ ok: true, json: async () => ({ success: true, comment: { id: 1, author: 'Erika Muster', authorInitials: 'EM', authorColor: '#F4D06F', authorImageURL: '/__masha-feedly-effects/avatar/person/black', text: 'Kommentar aktualisiert', created: '2026-10-01 10:30:00', canManage: true, edited: true }, history: [{ type: 'comment_edited', oldValue: 'Erster Kommentar', newValue: 'Kommentar aktualisiert', actor: 'Erika Muster', created: '2026-10-01T10:30:00Z' }] }) });
   await editor.listeners.submit({ preventDefault() {} });
   assert.equal(env.postCalls[0].url.pathname, '/__masha-feedly-comment');
   assert.equal(env.postCalls[0].options.body.values.CommentAction, 'edit');
@@ -2235,12 +1714,13 @@ test('zeigt Kommentare als abwechselnde sichere Sprechblasen und sendet neue Kom
   assert.equal(env.postCalls[0].options.body.values.CommentID, '1');
   assert.equal(env.postCalls[0].options.body.values.CommentText, 'Kommentar aktualisiert');
   assert.equal(env.commentList.children[0].children[1].textContent, 'Kommentar aktualisiert');
+  assert.equal(env.commentList.children[0].children[0].children[0].children[0].src, '/__masha-feedly-effects/avatar/person/black');
   assert.match(env.editHistory.children[0].children[0].textContent, /Kommentar bearbeitet: Erster Kommentar → Kommentar aktualisiert/);
   assert.equal(env.commentList.children[0].children[2].children[0].className, 'kw-masha-feedly__comment-edited');
   assert.equal(env.commentList.children[0].children[2].children[0].textContent, 'bearbeitet');
 
   env.commentForm.elements.CommentText.value = 'Noch ein Hinweis';
-  env.postResponses.push({ ok: true, json: async () => ({ success: true, comment: { id: 3, author: 'Erika Muster', text: 'Noch ein Hinweis', created: '2026-10-01 10:40:00' }, history: [{ type: 'comment', oldValue: '', newValue: 'Noch ein Hinweis', actor: 'Erika Muster', created: '2026-10-01T10:40:00Z' }] }) });
+  env.postResponses.push({ ok: true, json: async () => ({ success: true, comment: { id: 3, author: 'Erika Muster', authorInitials: 'EM', authorColor: '#F4D06F', authorImageURL: '/__masha-feedly-effects/avatar/person/black', text: 'Noch ein Hinweis', created: '2026-10-01 10:40:00' }, history: [{ type: 'comment', oldValue: '', newValue: 'Noch ein Hinweis', actor: 'Erika Muster', created: '2026-10-01T10:40:00Z' }] }) });
   await env.commentForm.listeners.submit({ preventDefault() {} });
   assert.equal(env.postCalls[1].url.pathname, '/__masha-feedly-comment');
   assert.equal(env.postCalls[1].options.body.values.SecurityID, 'test-token');
@@ -2421,9 +1901,9 @@ test('übernimmt bei einer 403-Antwort weder Kommentar noch Verlauf', async () =
   const previousCommentCount = env.commentCount.textContent;
   const previousHistoryCount = env.editHistory.children.length;
   env.commentForm.elements.CommentText.value = 'Unberechtigter Kommentar';
-  env.postResponses.push({ ok: false, json: async () => ({ success: false, message: 'Keine Berechtigung.' }) });
+  env.postResponses.push({ ok: false, json: async () => ({ success: false, message: 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.' }) });
   await env.commentForm.listeners.submit({ preventDefault() {} });
-  assert.equal(env.commentStatus.textContent, 'Keine Berechtigung.');
+  assert.equal(env.commentStatus.textContent, 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.');
   assert.equal(env.commentCount.textContent, previousCommentCount);
   assert.equal(env.editHistory.children.length, previousHistoryCount);
   assert.equal(env.commentForm.submitButton.disabled, false);
@@ -2436,6 +1916,48 @@ test('öffnet und schließt die kontextuelle Hilfe', async () => {
   assert.equal(env.helpModal.hidden, false);
   env.closeHelpButton.listeners.click();
   assert.equal(env.helpModal.hidden, true);
+});
+
+test('zeigt den Neustart der Einführung unten in der Hilfe als gestalteten Button', () => {
+  assert.match(germanTranslations, /HELP_RESTART_DU: .*Einführung noch einmal machen.*Klicke auf den Button/);
+  assert.match(germanTranslations, /HELP_RESTART_SIE: .*Einführung noch einmal machen.*Klicken Sie auf den Button/);
+  assert.match(widgetTemplate, /class="kw-masha-feedly__secondary kw-masha-feedly__help-restart-button" data-masha-feedly-restart-onboarding/);
+  assert.match(widgetTemplate, /<\/div>\s*<div class="kw-masha-feedly__help-restart">[\s\S]*?data-masha-feedly-restart-onboarding[\s\S]*?data-masha-feedly-restart-status/);
+  assert.match(scss, /\.kw-masha-feedly__help-restart-button:focus-visible/);
+  assert.match(scss, /&__help-modal > \.kw-masha-feedly__dialog \{ display: flex; flex-direction: column;[^}]*max-height: calc\(100dvh - 40px\); min-height: 0; overflow: hidden;/);
+  assert.match(scss, /\.kw-masha-feedly__help-restart \{ margin: 0; padding: 14px/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__help-restart-button:focus-visible/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__help-modal>\.kw-masha-feedly__dialog\{display:flex;flex-direction:column;[^}]*max-height:calc\(100dvh - 40px\);min-height:0;overflow:hidden/);
+});
+
+test('erklärt Einträge in einfacher Sprache mit einem Markierungsbeispiel', () => {
+  assert.match(germanTranslations, /HELP_CREATE_DU: .*Klicke auf \+ und danach auf die Stelle/);
+  assert.match(germanTranslations, /HELP_EDIT_DU: .*nummerierte Markierung zeigt.*Klicke auf die Markierung.*ändern und speichern/);
+  assert.match(germanTranslations, /HELP_MARKER_EXAMPLE_TEXT: .*sitzt an der gemeldeten Stelle.*Klicke darauf/);
+  assert.match(widgetTemplate, /kw-masha-feedly__help-marker-example[\s\S]*?class="kw-masha-feedly__page-marker-icon" viewBox="0 0 612\.001 612\.001"[\s\S]*?HELP_MARKER_EXAMPLE_TEXT/);
+  assert.doesNotMatch(widgetTemplate.match(/kw-masha-feedly__help-marker-example"[\s\S]*?kw-masha-feedly__help-marker-example-arrow/)?.[0] || '', /<strong>\d+<\/strong>/);
+  assert.match(scss, /\.kw-masha-feedly__help-marker-example \{ display: flex;/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__help-marker-example\{display:flex/);
+});
+
+test('Hilfe zeigt echte Widget-Symbole mit einfachen Erklärungen', () => {
+  for (const icon of ['--add', '--news']) {
+    assert.match(widgetTemplate, new RegExp(`kw-masha-feedly__help-action-icon${icon}`));
+  }
+  assert.match(widgetTemplate, /kw-masha-feedly__help-actions[\s\S]*?viewBox="0 0 512 512"[\s\S]*?HELP_ALL_TITLE/);
+  assert.match(widgetTemplate, /viewBox="0 0 177800 177800"[\s\S]*?HELP_NEWS_TITLE/);
+  assert.match(widgetTemplate, /viewBox="0 0 512 512"[\s\S]*?HELP_FEEDBACK_TITLE/);
+  assert.match(germanTranslations, /HELP_ADD_TEXT_DU: .*Klicke auf \+.*Stelle/);
+  assert.match(germanTranslations, /HELP_ALL_TEXT_DU: .*ganzen Website/);
+  assert.match(germanTranslations, /HELP_PAGE_TEXT: .*nur offene Meldungen auf der Seite/);
+  assert.match(germanTranslations, /HELP_NEWS_TEXT: .*neue Meldungen und Kommentare/);
+  assert.match(germanTranslations, /HELP_FEEDBACK_TEXT: .*Rückmeldung wartet/);
+  assert.match(scss, /\.kw-masha-feedly__help-actions \{ display: grid;/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__help-actions\{display:grid/);
+  assert.match(scss, /\.kw-masha-feedly__help-action strong \{[^}]*font-size: calc\(16px/);
+  assert.match(scss, /\.kw-masha-feedly__help-action small \{[^}]*font-size: calc\(14px/);
+  assert.match(scss, /\.kw-masha-feedly__help-action-icon--add \{ width: 60px; height: 60px; flex-basis: 60px; border-radius: 18\.4px;/);
+  assert.match(scss, /\.kw-masha-feedly__add \{ display: grid; width: 60px; height: 60px; place-items: center; padding: 0; border: 0; border-radius: 18\.4px;/);
 });
 
 test('öffnet den Seitenzähler direkt in der gefilterten Seitenübersicht', async () => {
@@ -2470,7 +1992,7 @@ test('zeigt den Seitenerfolg nur ohne offene Fehler und unterscheidet den global
   env.setOpenEntryCount(0);
   env.setTotalEntriesCount(0);
   await env.listeners['kw-masha-feedly:opened']();
-  assert.match(env.rainbowTitle.textContent, /noch nichts eingetragen/);
+  assert.equal(env.rainbowTitle.textContent, 'Noch keine offenen Meldungen');
   assert.match(env.rainbowMessage.textContent, /vorsichtshalber trotzdem/);
 });
 
@@ -2515,13 +2037,13 @@ test('zeigt abgeschlossene Kategorie-Einträge in der Liste, aber nicht als Fehl
   assert.equal(env.listContainer.children[0].textContent, 'Done');
 });
 
-test('zeigt offene und abgeschlossene Einträge in der Übersicht getrennt an', async () => {
+test('zeigt offene und abgeschlossene Meldungen in der Übersicht getrennt an', async () => {
   const openEnv = createWidgetEnvironment();
   await openEnv.listeners['kw-masha-feedly:opened']();
-  assert.equal(openEnv.openClosedButton.hidden, true, 'Ohne abgeschlossene Einträge bleibt der Button verborgen.');
+  assert.equal(openEnv.openClosedButton.hidden, true, 'Ohne abgeschlossene Meldungen bleibt der Button verborgen.');
   await openEnv.openListButton.listeners.click();
   assert.equal(openEnv.requests[1].searchParams.get('mode'), 'open');
-  assert.equal(openEnv.listCount.textContent, '1 Eintrag offen');
+  assert.equal(openEnv.listCount.textContent, '1 Meldung offen');
 
   const closedEnv = createWidgetEnvironment();
   closedEnv.setEntryClosed(true);
@@ -2536,10 +2058,10 @@ test('zeigt offene und abgeschlossene Einträge in der Übersicht getrennt an', 
   assert.equal(closedEnv.closedCountDisplay.textContent, '3');
   await closedEnv.openListButton.listeners.click();
   assert.equal(closedEnv.requests[1].searchParams.get('mode'), 'open');
-  assert.equal(closedEnv.listCount.textContent, '0 Einträge offen');
+  assert.equal(closedEnv.listCount.textContent, '0 Meldungen offen');
   await closedEnv.openClosedButton.listeners.click();
   assert.equal(closedEnv.requests[2].searchParams.get('mode'), 'closed');
-  assert.equal(closedEnv.listCount.textContent, '1 Eintrag abgeschlossen');
+  assert.equal(closedEnv.listCount.textContent, '1 Meldung abgeschlossen');
   assert.ok(closedEnv.listContainer.children.some((child) => child.className === 'kw-masha-feedly__entry-card'));
 
   closedEnv.setTotalEntriesCount(2);
@@ -2592,7 +2114,7 @@ test('öffnet den Eintrag aus der Kartenliste und springt zum gespeicherten Seit
   assert.equal(cardPriority.dataset.iconType, 'warning');
   assert.match(cardPriority.innerHTML, /viewBox="0 0 24 24"/);
   assert.equal(env.editForm.assigneeFields[0].checked, true);
-  assert.equal(env.editHeading.textContent, 'Eintrag #71');
+  assert.equal(env.editHeading.textContent, 'Meldung #71');
   assert.equal(env.editContext.textContent, 'Status: Backlog');
   assert.equal(env.editDescription.textContent, 'Der Inhalt ist verschoben.');
   assert.ok(env.editEnvironment.children.some((field) => field.textContent === 'Mac OS 10.15.7'));
@@ -2719,7 +2241,8 @@ test('übernimmt den vom Server erzwungenen Feedback-Status statt Done vorzutäu
   env.editForm.elements.CategoryID.value = '4';
   env.postResponses.push({ ok: true, json: async () => ({
     success: true,
-    message: 'Der Eintrag wartet jetzt auf die Freigabe durch die erstellende Person.',
+    message: 'Die Meldung wartet jetzt auf die Freigabe durch die erstellende Person.',
+    sentToFeedback: true,
     categoryID: 6,
     categoryTitle: 'Rückmeldung',
     categoryIsClosed: false,
@@ -2727,9 +2250,14 @@ test('übernimmt den vom Server erzwungenen Feedback-Status statt Done vorzutäu
 
   await env.editForm.listeners.submit({ preventDefault() {} });
 
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly.css'), 'utf8');
+  assert.match(styles, /data-feedback-notice[\s\S]*?border-left:5px solid/);
+  assert.match(styles, /content:attr\(data-notice-title\)/);
+  assert.equal(env.editStatus.dataset.feedbackNotice, 'true');
+  assert.ok(env.editStatus.dataset.noticeTitle);
   assert.equal(env.editForm.elements.CategoryID.value, '6');
   assert.equal(env.editContext.textContent, 'Status: Rückmeldung');
-  assert.equal(env.editStatus.textContent, 'Der Eintrag wartet jetzt auf die Freigabe durch die erstellende Person.');
+  assert.equal(env.editStatus.textContent, 'Die Meldung wartet jetzt auf die Freigabe durch die erstellende Person.');
   assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__confetti'), false);
   assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__unicorn-runner'), false);
 });
@@ -2840,30 +2368,7 @@ test('startet erst nach bestätigtem Feedback-Abschluss zufällig einen passende
     success: true, message: 'Erledigt.', categoryID: 4, categoryTitle: 'Fertig', categoryIsClosed: true, celebrateCompletion: true,
   }) });
   await env.editForm.listeners.submit({ preventDefault() {} });
-  const party = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__confetti');
-  const unicorn = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__unicorn-runner');
-  const rocket = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__rocket-runner');
-  const hearts = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__heart-burst');
-  const arcade = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__arcade-effect');
-  const retro = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__retro-effect');
-  const dino = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__dino-effect');
-  const ducks = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__duck-parade');
-  const frogs = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__frog-parade');
-  const iconShower = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__icon-shower');
-  const ghostSwarm = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__ghost-swarm');
-  const potion = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__potion-effect');
-  const catPaws = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__cat-paw-trail');
-  const flowerPower = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__flower-power');
-  const pinball = env.document.body.children.find((child) => child.className === 'kw-masha-feedly__pinball-tilt');
-  const playfulEffects = [party && unicorn, rocket, hearts, arcade, retro, dino, ducks, frogs, iconShower, ghostSwarm, potion, catPaws, flowerPower, pinball].filter(Boolean);
-  assert.equal(playfulEffects.length, 1, 'Es läuft genau ein zufällig gewählter Effekt.');
-  if (party && unicorn) {
-    assert.equal(party.children.length, 128);
-    assert.equal(unicorn.children[0].src, env.widget.dataset.unicornUrl);
-  }
-  if (retro) assert.equal(retro.children[0].className, 'kw-masha-feedly__retro-dialog');
-  if (dino) assert.equal(dino.children[0].className, 'kw-masha-feedly__dino-save-copy');
-  assert.equal(env.editContext.textContent, 'Status: Fertig');
+  assert.deepEqual(env.window.effectCalls, ['playful']);
 });
 
 test('meldet bestätigtes Speichern auch dann als Erfolg, wenn die Abschlussanimation einen Fehler auslöst', async () => {
@@ -2896,8 +2401,8 @@ test('zeigt im seriösen Theme sachliche Erfolgstexte', async () => {
   env.setOpenEntryCount(0);
   env.setTotalEntriesCount(0);
   await env.listeners['kw-masha-feedly:opened']();
-  assert.equal(env.rainbowTitle.textContent, 'Noch keine Einträge');
-  assert.equal(env.rainbowMessage.textContent, 'Für Masha:Feedly liegen noch keine Einträge vor.');
+  assert.equal(env.rainbowTitle.textContent, 'Noch keine Meldungen');
+  assert.equal(env.rainbowMessage.textContent, 'Für Masha:Feedly liegen noch keine Meldungen vor.');
 });
 
 test('spielt im seriösen Theme nach bestätigtem Abschluss einen ruhigen Effekt', async () => {
@@ -2914,10 +2419,7 @@ test('spielt im seriösen Theme nach bestätigtem Abschluss einen ruhigen Effekt
     success: true, message: 'Erledigt.', categoryID: 4, categoryTitle: 'Fertig', categoryIsClosed: true, celebrateCompletion: true,
   }) });
   await env.editForm.listeners.submit({ preventDefault() {} });
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__confetti'), false);
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__unicorn-runner'), false);
-  const calmEffects = ['kw-masha-feedly__serious-check', 'kw-masha-feedly__serious-glow', 'kw-masha-feedly__serious-rings', 'kw-masha-feedly__serious-confirmation'];
-  assert.equal(env.document.body.children.filter((child) => calmEffects.includes(child.className)).length, 1);
+  assert.deepEqual(env.window.effectCalls, ['serious']);
 });
 
 test('startet keine Erfolgsanimation ohne serverseitig bestätigten Abschluss', async () => {
@@ -2933,8 +2435,7 @@ test('startet keine Erfolgsanimation ohne serverseitig bestätigten Abschluss', 
 
   await env.editForm.listeners.submit({ preventDefault() {} });
 
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__confetti'), false);
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__unicorn-runner'), false);
+  assert.equal(env.window.effectCalls, undefined);
 });
 
 test('startet keine Erfolgsanimation beim Wechsel in die Archivkategorie', async () => {
@@ -2948,9 +2449,7 @@ test('startet keine Erfolgsanimation beim Wechsel in die Archivkategorie', async
     success: true, message: 'Gespeichert.', categoryID: 5, categoryTitle: 'Archiv', categoryIsClosed: true, celebrateCompletion: false,
   }) });
   await env.editForm.listeners.submit({ preventDefault() {} });
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__confetti'), false);
-  assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__unicorn-runner'), false);
-  assert.equal(env.editContext.textContent, 'Status: Archiv');
+  assert.equal(env.window.effectCalls, undefined);
 });
 
 test('lässt den Dialog offen und zeigt den Fehler, wenn das Speichern fehlschlägt', async () => {
@@ -2959,7 +2458,7 @@ test('lässt den Dialog offen und zeigt den Fehler, wenn das Speichern fehlschl�
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   env.listContainer.listeners.click({ target: card, preventDefault() {} });
-  env.postResponses.push({ ok: false, json: async () => ({ success: false, message: 'Änderungen konnten nicht gespeichert werden.' }) });
+  env.postResponses.push({ ok: false, json: async () => ({ success: false, message: 'Änderungen konnten nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.' }) });
   await env.editForm.listeners.submit({ preventDefault() {} });
   assert.equal(env.editModal.hidden, false);
   assert.match(env.editStatus.textContent, /konnten nicht gespeichert werden/);

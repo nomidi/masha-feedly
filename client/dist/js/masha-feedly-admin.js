@@ -18,14 +18,143 @@
    */
   const applyAnimationTheme = () => {
     const themeField = document.querySelector('select[name="MashaFeedlyTheme"]');
-    const selectedTheme = themeField?.value === 'serious' ? 'serious' : 'playful';
+    const selectedTheme = themeField?.value || 'playful';
     document.querySelectorAll('[data-masha-feedly-animation-preview-card]').forEach((card) => {
-      card.hidden = card.dataset.mashaFeedlyTheme !== selectedTheme;
+      const categories = (card.dataset.mashaFeedlyCategories || '').split(',').filter(Boolean);
+      card.hidden = (categories.length > 0 && !categories.includes(selectedTheme));
     });
   };
 
+  /** Übernimmt Anbieter-Kategorien in Konfiguration und persönliches Profil. */
+  const populateThemeOptions = (categories) => {
+    document.querySelectorAll('select[name="MashaFeedlyTheme"]').forEach((field) => {
+      const selected = field.value;
+      const emptyOption = [...field.options].find((option) => option.value === '');
+      field.replaceChildren(...(emptyOption ? [emptyOption] : []));
+      categories.forEach((category) => {
+        const option = document.createElement('option');
+        option.value = category.id;
+        option.textContent = category.name;
+        field.append(option);
+      });
+      if (selected && !categories.some((category) => category.id === selected)) {
+        const option = document.createElement('option');
+        option.value = selected;
+        option.textContent = `${selected} (gespeicherte Auswahl)`;
+        field.append(option);
+      }
+      field.value = selected;
+    });
+    applyAnimationTheme();
+  };
+
+  const effectText = (key, fallback) => {
+    const translated = window.KWMashaFeedlyTranslate?.(key);
+    return translated && translated !== key ? translated : fallback;
+  };
+  /** Rendert den Anbieterstatus getrennt vom lokalen Effekt. */
+  const createEffectProviderCard = (providerError = '', effectCount = 0) => {
+    const card = document.createElement('article');
+    card.className = `masha-feedly-animation-preview masha-feedly-animation-preview--provider${providerError ? ' is-unavailable' : ' is-connected'}`;
+    card.setAttribute('data-masha-feedly-animation-preview-card', '');
+    card.dataset.mashaFeedlyCategories = '';
+    const icon = document.createElement('span');
+    icon.className = 'masha-feedly-animation-preview__icon masha-feedly-animation-preview__icon--provider';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '↗';
+    const copy = document.createElement('div');
+    const title = document.createElement('strong');
+    title.textContent = effectText('EFFECT_PROVIDER_CARD_TITLE', 'Effekt-Anbieter');
+    const status = document.createElement('p');
+    status.className = 'masha-feedly-animation-preview__provider-status';
+    status.setAttribute('role', 'status');
+    status.textContent = providerError
+      ? `${effectText('EFFECT_PROVIDER_ERROR_LABEL', 'Verbindung fehlgeschlagen')}: ${providerError}`
+      : effectText('EFFECT_PROVIDER_CONNECTED', `${effectCount} Anbieter-Effekte verfügbar.`).replace('{count}', String(effectCount));
+    const link = document.createElement('a');
+    link.href = 'https://github.com/nomidi/masha-feedly/blob/main/docs/de/README.md#abschluss-effekte';
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = effectText('EFFECT_PROVIDER_SETUP_LINK', 'Effekt-Anbieter einrichten ↗');
+    copy.append(title, status, link);
+    card.append(icon, copy);
+    return card;
+  };
+  /** Rendert den zuverlässigen lokalen Abschluss als eigenständige Vorschaukarte. */
+  const createLocalFallbackCard = () => {
+    const card = document.createElement('article');
+    card.className = 'masha-feedly-animation-preview masha-feedly-animation-preview--local';
+    card.setAttribute('data-masha-feedly-animation-preview-card', '');
+    card.dataset.mashaFeedlyCategories = '';
+    const icon = document.createElement('span');
+    icon.className = 'masha-feedly-animation-preview__icon masha-feedly-animation-preview__icon--local';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = '✓';
+    const copy = document.createElement('div');
+    const title = document.createElement('strong');
+    title.textContent = effectText('EFFECT_LOCAL_DEFAULT_TITLE', 'Lokaler Standard: Ruhiges Häkchen');
+    const description = document.createElement('p');
+    description.textContent = effectText('EFFECT_LOCAL_DEFAULT_DESCRIPTION', 'Funktioniert unabhängig vom Effekt-Anbieter.');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.mashaFeedlyAnimationPreview = '__localCheck';
+    button.textContent = effectText('CONFIG_ANIMATION_PREVIEW', 'Vorschau ansehen');
+    copy.append(title, description, button);
+    card.append(icon, copy);
+    return card;
+  };
+  const renderLocalFallback = (grid, providerError = '') => {
+    grid.replaceChildren(createEffectProviderCard(providerError), createLocalFallbackCard());
+    grid.dataset.effectsLoaded = 'fallback';
+    applyAnimationTheme();
+  };
+  /** Erstellt die Vorschauen aus dem aktuellen Katalog statt aus einer festen Theme-Liste. */
+  const loadEffectPreviews = async () => {
+    const grids = [...document.querySelectorAll('[data-masha-feedly-effect-catalog]')].filter((grid) => !grid.dataset.effectsLoaded);
+    grids.forEach((grid) => { grid.dataset.effectsLoaded = 'loading'; });
+    if (!grids.length) return;
+    try {
+      const catalogue = await window.KWMashaFeedlyEffects.refreshCatalogue();
+      const effects = catalogue.effects;
+      populateThemeOptions(catalogue.categories);
+      grids.forEach((grid) => {
+        grid.replaceChildren(createEffectProviderCard('', effects.length));
+        effects.forEach((effect) => {
+          const card = document.createElement('article');
+          card.className = 'masha-feedly-animation-preview';
+          card.setAttribute('data-masha-feedly-animation-preview-card', '');
+          card.dataset.mashaFeedlyCategories = effect.categories.join(',');
+          card.dataset.hasSound = effect.hasSound ? '1' : '0';
+          const title = document.createElement('strong'); title.textContent = effect.name;
+          const button = document.createElement('button'); button.type = 'button';
+          button.dataset.mashaFeedlyAnimationPreview = effect.id;
+          button.textContent = effectText('CONFIG_ANIMATION_PREVIEW', 'Vorschau ansehen');
+          card.append(title, button); grid.append(card);
+        });
+        grid.append(createLocalFallbackCard());
+        grid.dataset.effectsLoaded = 'true';
+      });
+      applyAnimationTheme();
+    } catch (error) {
+      const providerError = error instanceof Error ? error.message : effectText('EFFECT_PROVIDER_UNAVAILABLE', 'Effekt-Anbieter nicht erreichbar.');
+      grids.forEach((grid) => renderLocalFallback(grid, providerError));
+    }
+  };
+  const initialiseEffectPreviews = () => {
+    loadEffectPreviews();
+    if (typeof MutationObserver !== 'undefined' && document.body) {
+      new MutationObserver(loadEffectPreviews).observe(document.body, { childList: true, subtree: true });
+    }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialiseEffectPreviews, { once: true });
+  else initialiseEffectPreviews();
+  document.addEventListener('kw-masha-feedly:opened', loadEffectPreviews);
+
   document.addEventListener('change', (event) => {
-    if (event.target?.matches?.('select[name="MashaFeedlyTheme"]')) applyAnimationTheme();
+    if ((event.target?.matches?.('select[name="MashaFeedlyTheme"]') || event.target?.matches?.('input[name="MashaFeedlyDisableSoundEffects"]'))) {
+      window.KWMashaFeedlyEffects?.cancelActive();
+      applyAnimationTheme();
+    }
     if (event.target?.matches?.('input[name="MashaFeedlyMiteEnabled"][type="checkbox"]')) applyMiteConfiguration();
   }, true);
   if (document.readyState === 'loading') {
@@ -57,17 +186,21 @@
       const preview = previewButton.closest('[data-masha-feedly-animation-previews]');
       const status = preview?.querySelector('[data-masha-feedly-animation-preview-status]');
       const animation = previewButton.dataset.mashaFeedlyAnimationPreview;
-      const result = window.KWMashaFeedlyEntries?.previewCompletionAnimation(
+      const result = animation === '__localCheck'
+        ? window.KWMashaFeedlyEffects?.previewFallback?.(document)
+        : window.KWMashaFeedlyEntries?.previewCompletionAnimation(
         document,
         window,
         animation,
         preview?.dataset.unicornUrl
       );
-      if (status) {
-        status.textContent = result
-          ? previewButton.dataset.previewMessage || ''
-          : previewButton.dataset.reducedMotionMessage || '';
-      }
+      Promise.resolve(result).then((played) => {
+        if (status) status.textContent = played
+          ? effectText('CONFIG_ANIMATION_PREVIEW_STARTED', 'Vorschau gestartet.')
+          : effectText('EFFECT_PREVIEW_UNAVAILABLE', 'Dieser Effekt ist momentan nicht verfügbar.');
+      }).catch(() => {
+        if (status) status.textContent = effectText('EFFECT_PROVIDER_UNAVAILABLE', 'Effekt-Anbieter nicht erreichbar.');
+      });
       return;
     }
     const button = event.target?.closest?.('[data-open-category-form]');
@@ -608,12 +741,16 @@
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || t('BOARD_SAVE_ERROR'));
+      if (result.sentToFeedback) {
+        const targetList = board.querySelector(`.masha-feedly-board__list[data-category-id="${Number(result.categoryID)}"]`);
+        if (targetList) targetList.append(card);
+      }
       board.querySelectorAll('.masha-feedly-board__column').forEach((column) => {
         const columnList = column.querySelector('.masha-feedly-board__list');
         column.querySelector('.masha-feedly-board__column-header span').textContent =
           columnList.querySelectorAll('.masha-feedly-board__card:not([hidden])').length;
       });
-      status.textContent = t('BOARD_SAVE_SUCCESS');
+      status.textContent = result.message || t('BOARD_SAVE_SUCCESS');
       if (result.mitePrompt) openMiteDialog(card.dataset.entryId, card.querySelector('a'));
     } catch (error) {
       if (previousList) previousList.insertBefore(card, previousNextCard && previousNextCard.parentElement === previousList ? previousNextCard : null);

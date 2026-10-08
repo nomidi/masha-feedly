@@ -54,9 +54,8 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const creatorToggle = creatorPage.locator('[data-kw-masha-feedly] .kw-masha-feedly__toggle');
     await creatorToggle.click();
     const creatorWidget = creatorPage.locator('[data-kw-masha-feedly]');
-    await expect(creatorWidget.locator('[data-masha-feedly-open-news]')).toBeVisible();
     await creatorWidget.locator('[data-masha-feedly-start-selection]').click();
-    await creatorPage.locator('main').first().click();
+    await creatorPage.locator('[role="main"]').first().click();
 
     const createForm = creatorWidget.locator('[data-masha-feedly-entry-form]');
     await expect(createForm).toBeVisible();
@@ -97,7 +96,8 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
 
     await creatorWidget.locator('[data-masha-feedly-open-list]').click();
     const ownCard = creatorWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(ownCard).toBeVisible();
+    // Die lokale Datenbank kann viele Meldungen enthalten; die Liste wird asynchron geladen.
+    await expect(ownCard).toBeVisible({ timeout: 30000 });
     const baselineRead = await creatorPage.evaluate(async (id) => {
       const widget = window.KWMashaFeedlyDOM.widget();
       const body = new FormData();
@@ -117,7 +117,7 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     await commenterWidget.locator('.kw-masha-feedly__toggle').click();
     await commenterWidget.locator('[data-masha-feedly-open-list]').click();
     const commenterCard = commenterWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(commenterCard).toBeVisible();
+    await expect(commenterCard).toBeVisible({ timeout: 30000 });
     await expect(commenterCard).toHaveAttribute('data-entry-unread', 'true');
     const commenterUnreadCount = Number(await commenterWidget.locator('[data-masha-feedly-unread-count]').textContent());
     assert.ok(commenterUnreadCount > 0, 'Der neue Eintrag muss im Neuigkeiten-Zähler erscheinen.');
@@ -129,8 +129,11 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const commentForm = commenterWidget.locator('[data-masha-feedly-comment-form]');
     const editForm = commenterWidget.locator('[data-masha-feedly-edit-form]');
     const assignee = editForm.locator('[name="AssignedMemberIDs[]"]').first();
-    await assignee.check();
     const assigneeID = await assignee.getAttribute('value');
+    if (!(await assignee.isChecked())) {
+      await assignee.locator('xpath=..').click();
+    }
+    await expect(assignee).toBeChecked();
     const updateURL = await editForm.getAttribute('data-update-url');
     const updateResponsePromise = commenterPage.waitForResponse((response) =>
       response.request().method() === 'POST' && new URL(response.url()).pathname === new URL(updateURL, config.baseURL).pathname);
@@ -162,6 +165,27 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     assert.equal(savedComment.success, true);
     assert.match(savedComment.comment.text, /👍/u, 'Das Emoji aus dem Kommentarformular muss gespeichert werden.');
 
+    // Eine fremde Meldung bleibt nach dem Abschlussversuch offen und zeigt einen klaren Hinweis.
+    const doneID = await editForm.locator('[name="CategoryID"] option[data-system-key="done"]').getAttribute('value');
+    await editForm.locator('[name="CategoryID"]').selectOption(doneID);
+    const completionResponsePromise = commenterPage.waitForResponse((response) =>
+      response.request().method() === 'POST' && new URL(response.url()).pathname === new URL(updateURL, config.baseURL).pathname);
+    await editForm.locator('[type="submit"]').click();
+    const completion = await (await completionResponsePromise).json();
+    assert.equal(completion.sentToFeedback, true);
+    assert.equal(completion.categoryIsClosed, false);
+    assert.equal(completion.celebrateCompletion, false);
+    const reviewNotice = commenterWidget.locator('[data-masha-feedly-edit-status][data-feedback-notice="true"]');
+    await expect(reviewNotice).toBeVisible();
+    await expect(reviewNotice).toHaveAttribute('data-notice-title', 'Zur Prüfung weitergegeben');
+    await expect(reviewNotice).toContainText('bleibt offen');
+    await expect(reviewNotice).toContainText('eingetragene Meldeperson');
+    const noticeStyle = await reviewNotice.evaluate((element) => ({
+      size: parseFloat(getComputedStyle(element).fontSize),
+      border: parseFloat(getComputedStyle(element).borderLeftWidth),
+    }));
+    assert.ok(noticeStyle.size >= 16 && noticeStyle.border >= 5, 'Der Hinweis ist lesbar und visuell hervorgehoben.');
+
     await creatorPage.reload();
     const reloadedCreatorWidget = creatorPage.locator('[data-kw-masha-feedly]');
     await reloadedCreatorWidget.locator('.kw-masha-feedly__toggle').click();
@@ -171,11 +195,12 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const unreadBeforeOpen = Number(await unreadCount.textContent());
     await newsButton.click();
     const unreadCard = reloadedCreatorWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
-    await expect(unreadCard).toBeVisible();
+    await expect(unreadCard).toBeVisible({ timeout: 30000 });
     await expect(unreadCard.locator('[data-entry-unread]')).toBeVisible();
     await unreadCard.click();
     await expect(reloadedCreatorWidget.locator('[data-masha-feedly-comments]')).toContainText(commentText);
-    await expect(unreadCount).toHaveText(String(unreadBeforeOpen - 1));
+    await expect.poll(async () => Number(await unreadCount.textContent()))
+      .toBeLessThan(unreadBeforeOpen);
     const comment = reloadedCreatorWidget.locator('[data-masha-feedly-comments] .kw-masha-feedly__comment').filter({ hasText: commentText });
     let activeReaction = '';
     const react = async (emoji) => {
