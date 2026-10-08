@@ -69,7 +69,7 @@ Der mobile Ablauf in `onboarding.test.cjs` prüft die Feedly-Lasche, das Seitenp
 
 ## Größenwechsel ohne Neuladen
 
-`node --test tests/e2e/viewport.test.cjs` prüft Chromium, Firefox und WebKit: geöffnete Hilfe, laufende Einführung, Bereichsauswahl und ein ausgefülltes Formular beim Wechsel Desktop → mobil → Desktop. Der Test prüft geschlossene Fenster am Breakpoint, die neu gestartete Begrüßung, erhaltene Formulareingaben und freigegebene Bedienung nach „OK“ oder Abbrechen. Innerhalb derselben Variante bleibt die Hilfe geöffnet. Einführung-Neustart und -Abschluss werden nur im Browser simuliert; es wird keine Meldung gespeichert.
+`node --test masha-feedly/tests/e2e/viewport.test.cjs` prüft Chromium, Firefox und WebKit: geöffnete Hilfe, laufende Einführung, Bereichsauswahl und ein ausgefülltes Formular beim Wechsel Desktop → mobil → Desktop. Der Test prüft geschlossene Fenster am Breakpoint, die neu gestartete Begrüßung, erhaltene Formulareingaben und freigegebene Bedienung nach „OK“ oder Abbrechen. Innerhalb derselben Variante bleibt die Hilfe geöffnet. Einführung-Neustart und -Abschluss werden nur im Browser simuliert; es wird keine Meldung gespeichert.
 
 ## Simulierte Touch-Bedienung
 

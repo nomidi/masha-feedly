@@ -1,6 +1,6 @@
 # Masha:Feedly
 
-Masha:Feedly ergänzt Silverstripe CMS um einen gemeinsamen Fehler- und Feedback-Tracker. Berechtigte Personen melden Probleme direkt auf der Website; das Team bearbeitet Einträge im Frontend und CMS.
+Masha:Feedly ergänzt Silverstripe CMS um einen gemeinsamen Fehler- und Feedback-Tracker. Berechtigte Personen melden Probleme direkt auf der Website; das Team bearbeitet Meldungen im Frontend und CMS.
 
 ## Anforderungen
 
@@ -42,7 +42,7 @@ vendor/bin/sake dev/build flush=1
 - [Usage and configuration in English](docs/en/README.md)
 - [Browserbasierte Ende-zu-Ende-Tests](tests/e2e/README.md)
 
-Die Anleitungen beschreiben Zugriffsrechte, Benachrichtigungen, Fälligkeitserinnerungen, optionale Effekt-Anbieter und den erwarteten Anbieter-Vertrag.
+Die Anleitungen beschreiben mobile Bedienung und Einführung, Screenshots mit Ausschnittwahl, optionale Schritte zum Nachstellen, Zugriffsrechte, Profilvorschau und Tonwahl, E-Mail-Benachrichtigungen und Footer-Konfiguration, Fälligkeitserinnerungen sowie optionale Effekt-Anbieter und deren Vertrag.
 
 ## Lizenz
 
