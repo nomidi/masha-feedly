@@ -1,5 +1,5 @@
 ------
-<% loop $EmailFooterLines %>$Me.XML
+<% loop $EmailFooterLines %>$Text.XML
 <% end_loop %>
 <%t KW\MashaFeedly\Translations.EMAIL_FOOTER_IMPRINT "Impressum" %>: $EmailImprintURL.XML
 

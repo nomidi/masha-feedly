@@ -5,14 +5,14 @@ Masha:Feedly ergänzt Silverstripe CMS um einen gemeinsamen Fehler- und Feedback
 ## Anforderungen
 
 - PHP 8.3 oder neuer
-- Silverstripe CMS 6.2 oder neuer
+- Silverstripe CMS 5.4 (Branch `sstripe-5`)
 
 ## Installation
 
 Im Silverstripe-Projektverzeichnis:
 
 ```sh
-composer require kooperativeweb/masha-feedly
+composer require kooperativeweb/masha-feedly:dev-sstripe-5
 vendor/bin/sake dev/build flush=1
 ```
 
@@ -24,7 +24,7 @@ Falls das Paket noch nicht auf Packagist verfügbar ist, kann es über GitHub ei
     { "type": "vcs", "url": "https://github.com/nomidi/masha-feedly" }
   ],
   "require": {
-    "kooperativeweb/masha-feedly": "dev-main"
+    "kooperativeweb/masha-feedly": "dev-sstripe-5"
   }
 }
 ```

@@ -13,6 +13,8 @@ use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
 use SilverStripe\Admin\CMSProfileController;
 use SilverStripe\SiteConfig\SiteConfig;
+use SilverStripe\ORM\ArrayList;
+use SilverStripe\View\ArrayData;
 use SilverStripe\i18n\i18n;
 use Throwable;
 
@@ -34,7 +36,11 @@ class MashaFeedlyNotificationService
             ? MashaFeedlyMemberExtension::addressFor($member) === 'sie'
             : MashaFeedlyConfigExtension::address() === 'sie';
         return array_merge($data, [
-            'EmailFooterLines' => preg_split('/\R/u', MashaFeedlyConfigExtension::emailFooter()) ?: [],
+            // Silverstripe 5 benötigt benannte Datenobjekte statt einer Liste roher Textwerte.
+            'EmailFooterLines' => ArrayList::create(array_map(
+                static fn(string $line): ArrayData => ArrayData::create(['Text' => $line]),
+                preg_split('/\R/u', MashaFeedlyConfigExtension::emailFooter()) ?: []
+            )),
             'EmailProfileURL' => $profileURL,
             'EmailImprintURL' => 'https://www.kooperative-web.de/impressum',
             'EmailOptOutText' => i18n::_t(
