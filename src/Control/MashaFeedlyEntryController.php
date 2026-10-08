@@ -450,12 +450,9 @@ class MashaFeedlyEntryController extends Controller
         ) {
             return $this->respond(['success' => false, 'message' => $this->translate('ESTIMATE_APPROVAL_REQUIRED', 'Eine Freigabe kann nur für eine vorhandene Kostenschätzung erfolgen.')], 409);
         }
-        $wasWaitingForFeedback = $previousCategoryKey === 'feedback';
         $wasAlreadyClosed = (bool)$entry->Category()->IsClosed;
-        $creatorMemberID = $entry->creatorMemberID();
         if ((string)$category->SystemKey === 'done'
-            && $creatorMemberID > 0
-            && $creatorMemberID !== (int)$member->ID
+            && !$entry->canConfirmCompletion($member)
         ) {
             $feedbackCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first();
             if (!$feedbackCategory) {
@@ -587,7 +584,7 @@ class MashaFeedlyEntryController extends Controller
             );
         }
         $message = $sentToFeedback
-            ? $this->translate('EDIT_WAITING_FOR_CREATOR', 'Die Meldung wartet jetzt auf die Freigabe durch die erstellende Person.')
+            ? $this->translate('EDIT_WAITING_FOR_CREATOR', 'Die Meldung wurde als „Feedback“ gespeichert und bleibt offen. Der Ersteller oder die eingetragene Meldeperson prüft das Ergebnis und bestätigt es anschließend mit „Erledigt“. Andere Personen können die Meldung nicht endgültig abschließen.')
             : $this->translate('EDIT_SAVE_SUCCESS', 'Status, Priorität, Zuständigkeiten und Anhänge wurden gespeichert.');
         if ($closedDuplicateCount > 0) {
             $duplicateMessage = $closedDuplicateCount === 1
@@ -602,6 +599,7 @@ class MashaFeedlyEntryController extends Controller
         return $this->respond([
             'success' => true,
             'message' => $message,
+            'sentToFeedback' => $sentToFeedback,
             'closedDuplicateCount' => $closedDuplicateCount,
             'categoryID' => (int)$entry->CategoryID,
             'mitePrompt' => $previousCategoryID !== (int)$entry->CategoryID
@@ -615,7 +613,7 @@ class MashaFeedlyEntryController extends Controller
             'categoryIsClosed' => (bool)$entry->Category()->IsClosed,
             'celebrateCompletion' => (string)$entry->Category()->SystemKey === 'done'
                 && !$wasAlreadyClosed
-                && ($wasWaitingForFeedback || ($creatorMemberID > 0 && $creatorMemberID === (int)$member->ID)),
+                && $entry->canConfirmCompletion($member),
             'priorityID' => (int)$entry->PriorityID,
             'priorityTitle' => (string)$entry->Priority()->Title,
             'priorityColor' => (string)$entry->Priority()->Color,

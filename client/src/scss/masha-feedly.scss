@@ -2418,3 +2418,25 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
     &__help-mobile-browser { padding: 12px; border-radius: 12px; background: $masha-color-f6f2f6; }
   }
 }
+
+/* Abschluss zur Prüfung: dauerhaft sichtbarer Hinweis statt einer flüchtigen Erfolgsmeldung. */
+.kw-masha-feedly__edit-dialog .kw-masha-feedly__form-status[data-feedback-notice="true"] {
+  display: block;
+  margin: 18px 0;
+  padding: 20px 24px;
+  border: 1px solid $masha-color-c8d8ef;
+  border-left: 5px solid $masha-color-31557f;
+  border-radius: 14px;
+  background: $masha-color-fff;
+  color: $masha-color-31557f;
+  font-size: max(16px, calc(16px * var(--masha-font-scale, 1)));
+  line-height: 1.6;
+
+  &::before {
+    content: attr(data-notice-title);
+    display: block;
+    margin-bottom: 6px;
+    font-size: 1.25em;
+    font-weight: 700;
+  }
+}

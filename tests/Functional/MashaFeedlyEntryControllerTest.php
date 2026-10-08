@@ -1251,6 +1251,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
         $this->allowMember($member);
+        $this->logInAs($member);
         $member->MashaFeedlyAvatarIcon = 'person';
         $member->MashaFeedlyColor = '#F4D06F';
         $member->write();
@@ -1386,6 +1387,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $member = $this->objFromFixture(Member::class, 'allowed');
         $blockedMember = $this->objFromFixture(Member::class, 'notAllowed');
         $this->allowMember($member);
+        $this->logInAs($member);
         MashaFeedlyCategory::ensureDefaultCategories();
         $categories = MashaFeedlyCategory::get()->sort('Sort ASC')->toArray();
         $entry = MashaFeedlyEntry::create([
@@ -1475,7 +1477,8 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame('Rückmeldung', $data['categoryTitle']);
         $this->assertFalse($data['categoryIsClosed']);
         $this->assertFalse($data['celebrateCompletion']);
-        $this->assertSame('Die Meldung wartet jetzt auf die Freigabe durch die erstellende Person.', $data['message']);
+        $this->assertTrue($data['sentToFeedback']);
+        $this->assertStringContainsString('bleibt offen', $data['message']);
         $entry = MashaFeedlyEntry::get()->byID((int)$entry->ID);
         $this->assertSame((int)$feedback->ID, (int)$entry->CategoryID);
         $statusChange = MashaFeedlyEntryHistory::get()->filter([
@@ -1486,6 +1489,18 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame('Doing', (string)$statusChange->OldValue);
         $this->assertSame('Rückmeldung', (string)$statusChange->NewValue);
         $this->assertSame((int)$reviewer->ID, (int)$statusChange->ActorMemberID);
+
+        // Auch eine zuständige Person darf den wartenden Eintrag nicht selbst freigeben.
+        $entry->AssignedMembers()->add($reviewer);
+        $repeat = $this->post('/__masha-feedly/updateEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$entry->ID,
+            'CategoryID' => (int)$done->ID,
+        ]);
+        $this->assertTrue(json_decode($repeat->getBody(), true)['sentToFeedback']);
+        $entry->CategoryID = (int)$done->ID;
+        $entry->write();
+        $this->assertSame((int)$feedback->ID, (int)$entry->CategoryID, 'Direkte CMS-Speicherung beachtet dieselbe Abschlussregel.');
 
         $this->logInAs($creator);
         $approval = $this->post('/__masha-feedly/updateEntry', [
@@ -1498,6 +1513,40 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame((int)$done->ID, $approvalData['categoryID']);
         $this->assertTrue($approvalData['celebrateCompletion']);
         $this->assertSame((int)$done->ID, (int)MashaFeedlyEntry::get()->byID((int)$entry->ID)->CategoryID);
+    }
+
+    /** Die angezeigte Meldeperson darf nach Prüfung abschließen; bloße Zuständigkeit reicht nicht. */
+    public function testDesignatedReporterCanConfirmCompletion(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $creator = Security::getCurrentUser();
+        $reporter = $this->objFromFixture(Member::class, 'notAllowed');
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$creator->Email]);
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$creator->ID, (int)$reporter->ID]);
+        $config->write();
+        MashaFeedlyCategory::ensureDefaultCategories();
+        $this->logInAs($creator);
+        $entry = MashaFeedlyEntry::create([
+            'Content' => 'Meldeperson prüft das Ergebnis',
+            'ReportedByID' => (int)$reporter->ID,
+            'CategoryID' => (int)MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first()->ID,
+        ]);
+        $entry->write();
+        $this->assertTrue($entry->canConfirmCompletion($creator));
+        $this->assertTrue($entry->canConfirmCompletion($reporter));
+        $this->logInAs($reporter);
+        $done = MashaFeedlyCategory::get()->filter('SystemKey', 'done')->first();
+        $response = $this->post('/__masha-feedly/updateEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$entry->ID,
+            'CategoryID' => (int)$done->ID,
+        ]);
+        $data = json_decode($response->getBody(), true);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertFalse($data['sentToFeedback']);
+        $this->assertSame((int)$done->ID, $data['categoryID']);
+        $this->assertTrue($data['celebrateCompletion']);
     }
 
     /** Ein selbst erstellter Eintrag darf direkt abgeschlossen werden. */

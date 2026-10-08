@@ -2242,6 +2242,7 @@ test('übernimmt den vom Server erzwungenen Feedback-Status statt Done vorzutäu
   env.postResponses.push({ ok: true, json: async () => ({
     success: true,
     message: 'Die Meldung wartet jetzt auf die Freigabe durch die erstellende Person.',
+    sentToFeedback: true,
     categoryID: 6,
     categoryTitle: 'Rückmeldung',
     categoryIsClosed: false,
@@ -2249,6 +2250,11 @@ test('übernimmt den vom Server erzwungenen Feedback-Status statt Done vorzutäu
 
   await env.editForm.listeners.submit({ preventDefault() {} });
 
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly.css'), 'utf8');
+  assert.match(styles, /data-feedback-notice[\s\S]*?border-left:5px solid/);
+  assert.match(styles, /content:attr\(data-notice-title\)/);
+  assert.equal(env.editStatus.dataset.feedbackNotice, 'true');
+  assert.ok(env.editStatus.dataset.noticeTitle);
   assert.equal(env.editForm.elements.CategoryID.value, '6');
   assert.equal(env.editContext.textContent, 'Status: Rückmeldung');
   assert.equal(env.editStatus.textContent, 'Die Meldung wartet jetzt auf die Freigabe durch die erstellende Person.');

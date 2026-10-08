@@ -507,6 +507,9 @@ class MashaFeedlyAdmin extends ModelAdmin
             && MashaFeedlyConfigExtension::miteTriggersCategory((int)$category->ID);
         $entry->CategoryID = (int)$category->ID;
         $entry->write();
+        $sentToFeedback = (int)$entry->CategoryID !== (int)$category->ID
+            && (string)$entry->Category()->SystemKey === 'feedback';
+        $category = $entry->Category();
         $entryIDs = array_values(array_unique(array_filter(array_map(
             'intval',
             (array)$request->postVar('EntryIDs')
@@ -530,7 +533,10 @@ class MashaFeedlyAdmin extends ModelAdmin
             'success' => true,
             'unreadCount' => $unreadCount,
             'feedbackCount' => self::feedbackCount(),
-            'mitePrompt' => $movedToMiteCategory && MashaFeedlyEntry::canManageReporter($member),
+            'categoryID' => (int)$entry->CategoryID,
+            'sentToFeedback' => $sentToFeedback,
+            'message' => $sentToFeedback ? self::translate('EDIT_WAITING_FOR_CREATOR', 'Die Meldung bleibt offen und wartet auf die Bestätigung durch den Ersteller oder die eingetragene Meldeperson.') : '',
+            'mitePrompt' => !$sentToFeedback && $movedToMiteCategory && MashaFeedlyEntry::canManageReporter($member),
         ]);
     }
 

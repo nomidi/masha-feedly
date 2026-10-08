@@ -229,6 +229,37 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         );
     }
 
+    /** Auch das CMS-Board leitet einen fremden Abschluss nach Feedback um. */
+    public function testBoardMoveToDoneWaitsForReporterConfirmation(): void
+    {
+        $creator = $this->objFromFixture(Member::class, 'allowed');
+        $editor = $this->objFromFixture(Member::class, 'notAllowed');
+        $this->allowMember($creator);
+        $this->logInAs($creator);
+        MashaFeedlyCategory::ensureDefaultCategories();
+        $entry = MashaFeedlyEntry::create([
+            'Content' => 'Abschluss im CMS prüfen',
+            'CategoryID' => (int)MashaFeedlyCategory::get()->filter('SystemKey', 'backlog')->first()->ID,
+        ]);
+        $entry->write();
+        $this->allowMember($editor);
+        $this->logInAs($editor);
+        $done = MashaFeedlyCategory::get()->filter('SystemKey', 'done')->first();
+        $feedback = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first();
+        $response = $this->post('/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry/moveEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$entry->ID,
+            'CategoryID' => (int)$done->ID,
+            'EntryIDs' => [(int)$entry->ID],
+        ]);
+        $data = json_decode($response->getBody(), true);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertTrue($data['sentToFeedback']);
+        $this->assertSame((int)$feedback->ID, $data['categoryID']);
+        $this->assertStringContainsString('bleibt offen', $data['message']);
+        $this->assertSame((int)$feedback->ID, (int)MashaFeedlyEntry::get()->byID((int)$entry->ID)->CategoryID);
+    }
+
     /** Prüft, dass die Drag-and-drop-Aktion Kategorie und Reihenfolge serverseitig speichert. */
     public function testMoveEntryChangesCategoryAndSortOrder(): void
     {

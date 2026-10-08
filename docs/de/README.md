@@ -145,3 +145,7 @@ Der Effekt-Anbieter muss ebenfalls die aktuelle Masha:Effects-Version verwenden:
 
 
 Beim Wechsel zwischen mobiler und Desktop-Ansicht schließen sich die Feedly-Fenster. Eine laufende Einführung zeigt wieder die Begrüßung in der passenden Größe. Formulareingaben bleiben erhalten. Größenänderungen innerhalb derselben Ansicht schließen keine Fenster.
+
+### Abschluss bestätigen
+
+Wenn eine andere Person „Erledigt“ auswählt, bleibt die Meldung offen im Status „Feedback“. Ein hervorgehobener Hinweis erklärt die nächste Aktion. Der ursprüngliche Ersteller oder die unter „Angezeigte Meldeperson“ eingetragene Person prüft das Ergebnis und bestätigt den Abschluss mit „Erledigt“ und „Änderungen speichern“. Eine Zuständigkeitszuweisung allein berechtigt nicht zur endgültigen Bestätigung. Ein Kommentar ist freiwillig. Die Regel gilt auch beim Verschieben und Speichern im CMS.

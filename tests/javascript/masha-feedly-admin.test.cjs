@@ -790,6 +790,26 @@ test('sendet beim Verschieben Kategorie und Reihenfolge und macht die Karte wied
   assert.equal(board.status.textContent, 'Meldung wurde gespeichert.');
 });
 
+test('verschiebt den vom Server umgeleiteten Abschluss nach Feedback und erklärt den offenen Status', async () => {
+  const message = 'Die Meldung bleibt offen und wartet auf die Bestätigung.';
+  const { board } = createBoardEnvironment(async () => ({
+    ok: true, json: async () => ({ success: true, sentToFeedback: true, categoryID: 6, message }),
+  }));
+  const sourceList = new TestElement('list', { categoryId: '1' });
+  const doneList = new TestElement('list', { categoryId: '4' });
+  const feedbackList = new TestElement('list', { categoryId: '6' });
+  const originalQuery = board.querySelector.bind(board);
+  board.querySelector = (selector) => selector === '.masha-feedly-board__list[data-category-id="6"]'
+    ? feedbackList : originalQuery(selector);
+  const card = new TestElement('card', { entryId: '42' });
+  sourceList.appendChild(card);
+  startDragging(board, card);
+  await board.listeners.drop({ target: doneList, preventDefault() {} });
+  assert.equal(card.parentElement, feedbackList);
+  assert.equal(board.status.textContent, message);
+  assert.equal(card.classList.contains('is-dragging'), false);
+});
+
 test('stellt die Karte nach einem fehlgeschlagenen Verschieben in der Ursprungskategorie wieder her', async () => {
   const { board } = createBoardEnvironment(async () => ({
     ok: false,

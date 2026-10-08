@@ -144,3 +144,7 @@ The effect provider must also use the current Masha:Effects version: its JavaScr
 
 
 When switching between mobile and desktop layouts, Feedly closes its windows. Active onboarding returns to the welcome screen in the appropriate layout. Form input is preserved. Resizing within the same layout does not close windows.
+
+### Confirm completion
+
+When another person selects “Done”, the report remains open as “Feedback”. A prominent notice explains the next action. The original creator or designated reporter reviews the result and confirms completion with “Done” and “Save changes”. Assignment alone does not grant final approval. A comment is optional. This rule also applies when moving or saving reports in the CMS.

@@ -165,6 +165,27 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     assert.equal(savedComment.success, true);
     assert.match(savedComment.comment.text, /👍/u, 'Das Emoji aus dem Kommentarformular muss gespeichert werden.');
 
+    // Eine fremde Meldung bleibt nach dem Abschlussversuch offen und zeigt einen klaren Hinweis.
+    const doneID = await editForm.locator('[name="CategoryID"] option[data-system-key="done"]').getAttribute('value');
+    await editForm.locator('[name="CategoryID"]').selectOption(doneID);
+    const completionResponsePromise = commenterPage.waitForResponse((response) =>
+      response.request().method() === 'POST' && new URL(response.url()).pathname === new URL(updateURL, config.baseURL).pathname);
+    await editForm.locator('[type="submit"]').click();
+    const completion = await (await completionResponsePromise).json();
+    assert.equal(completion.sentToFeedback, true);
+    assert.equal(completion.categoryIsClosed, false);
+    assert.equal(completion.celebrateCompletion, false);
+    const reviewNotice = commenterWidget.locator('[data-masha-feedly-edit-status][data-feedback-notice="true"]');
+    await expect(reviewNotice).toBeVisible();
+    await expect(reviewNotice).toHaveAttribute('data-notice-title', 'Zur Prüfung weitergegeben');
+    await expect(reviewNotice).toContainText('bleibt offen');
+    await expect(reviewNotice).toContainText('eingetragene Meldeperson');
+    const noticeStyle = await reviewNotice.evaluate((element) => ({
+      size: parseFloat(getComputedStyle(element).fontSize),
+      border: parseFloat(getComputedStyle(element).borderLeftWidth),
+    }));
+    assert.ok(noticeStyle.size >= 16 && noticeStyle.border >= 5, 'Der Hinweis ist lesbar und visuell hervorgehoben.');
+
     await creatorPage.reload();
     const reloadedCreatorWidget = creatorPage.locator('[data-kw-masha-feedly]');
     await reloadedCreatorWidget.locator('.kw-masha-feedly__toggle').click();

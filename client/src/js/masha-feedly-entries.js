@@ -1023,6 +1023,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     editContext.textContent = editable.context;
     editStatus.textContent = '';
+    delete editStatus.dataset.feedbackNotice;
+    delete editStatus.dataset.noticeTitle;
     editModal.hidden = false;
     editReturnFocus = trigger;
     editHeading?.focus?.();
@@ -1802,6 +1804,8 @@ document.addEventListener('DOMContentLoaded', () => {
     event.preventDefault();
     const submit = editForm.querySelector('[type="submit"]');
     submit.disabled = true;
+    delete editStatus.dataset.feedbackNotice;
+    delete editStatus.dataset.noticeTitle;
     editStatus.textContent = t('EDIT_SAVING');
     const data = new FormData(editForm);
     data.set('SecurityID', editForm.dataset.securityId);
@@ -1823,6 +1827,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok || !result.success) throw new Error(result.message || t('EDIT_SAVE_ERROR'));
       saveConfirmed = true;
       editStatus.textContent = result.message;
+      if (result.sentToFeedback === true) {
+        editStatus.dataset.feedbackNotice = 'true';
+        editStatus.dataset.noticeTitle = t('EDIT_FEEDBACK_NOTICE_TITLE');
+        editStatus.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+      }
       if (activeEntry) activeEntry.attachments = result.attachments || activeEntry.attachments || [];
       if (activeEntry && Object.hasOwn(result, 'dueDate')) {
         activeEntry.dueDate = result.dueDate || '';

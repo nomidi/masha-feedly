@@ -338,6 +338,17 @@ class MashaFeedlyEntry extends DataObject
         return rtrim(mb_substr($plainText, 0, 69)) . '…';
     }
 
+    /** Prüft, wer den Abschluss bestätigen darf: Ersteller oder angezeigte Meldeperson.
+     * @param Member|null $member Prüfendes Mitglied.
+     * @return bool Ob dieses Mitglied die Meldung endgültig abschließen darf.
+     */
+    public function canConfirmCompletion(?Member $member = null): bool
+    {
+        $member = $member ?? Security::getCurrentUser();
+        return $member instanceof Member && (int)$member->ID > 0
+            && in_array((int)$member->ID, [$this->creatorMemberID(), (int)$this->ReportedByID], true);
+    }
+
     /** Liefert die ursprüngliche Autorin aus dem unveränderlichen Erstellungseintrag im Verlauf. */
     public function creatorMemberID(): int
     {
@@ -491,6 +502,15 @@ class MashaFeedlyEntry extends DataObject
                 $oldRole = (string)$storedEntry->Category()->SystemKey;
                 $newCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
                 $newRole = (string)($newCategory?->SystemKey ?? '');
+                // Auch direkte CMS-Speicherung darf die Bestätigung durch die Meldeperson nicht umgehen.
+                if ($newRole === 'done' && $oldRole !== 'done'
+                    && Security::getCurrentUser() && !$storedEntry->canConfirmCompletion()) {
+                    $feedback = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first();
+                    $this->CategoryID = $feedback ? (int)$feedback->ID : (int)$storedEntry->CategoryID;
+                    $newCategory = $feedback ?? $storedEntry->Category();
+                    $newRole = (string)$newCategory->SystemKey;
+                }
+
                 $invalidEstimateTransition = ($newRole === 'estimate_pending'
                         && !self::canManageEstimate()
                         && !($oldRole === 'estimate_pending' && (int)$storedEntry->CategoryID === (int)$this->CategoryID))

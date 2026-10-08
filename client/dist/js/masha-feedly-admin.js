@@ -741,12 +741,16 @@
       });
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.message || t('BOARD_SAVE_ERROR'));
+      if (result.sentToFeedback) {
+        const targetList = board.querySelector(`.masha-feedly-board__list[data-category-id="${Number(result.categoryID)}"]`);
+        if (targetList) targetList.append(card);
+      }
       board.querySelectorAll('.masha-feedly-board__column').forEach((column) => {
         const columnList = column.querySelector('.masha-feedly-board__list');
         column.querySelector('.masha-feedly-board__column-header span').textContent =
           columnList.querySelectorAll('.masha-feedly-board__card:not([hidden])').length;
       });
-      status.textContent = t('BOARD_SAVE_SUCCESS');
+      status.textContent = result.message || t('BOARD_SAVE_SUCCESS');
       if (result.mitePrompt) openMiteDialog(card.dataset.entryId, card.querySelector('a'));
     } catch (error) {
       if (previousList) previousList.insertBefore(card, previousNextCard && previousNextCard.parentElement === previousList ? previousNextCard : null);

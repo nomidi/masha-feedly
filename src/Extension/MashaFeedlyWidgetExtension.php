@@ -355,6 +355,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'BOARD_SAVE_ERROR' => 'Speichern fehlgeschlagen. Bitte prüfe deine Verbindung und versuche es erneut.',
             'BOARD_SAVE_SUCCESS' => 'Meldung wurde gespeichert.',
             'BOARD_SAVE_FAILURE' => 'Meldung konnte nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.',
+            'EDIT_FEEDBACK_NOTICE_TITLE' => 'Zur Prüfung weitergegeben',
             'EDIT_SAVING' => 'Änderungen werden gespeichert …',
             'EDIT_SAVE_ERROR' => 'Änderungen konnten nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.',
             'CREATE_SAVING' => 'Meldung wird gespeichert …',
