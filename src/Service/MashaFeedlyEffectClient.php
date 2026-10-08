@@ -294,7 +294,13 @@ class MashaFeedlyEffectClient
                 if (!in_array($type, ['js', 'css', 'image'], true) || !is_string($url) || $this->fileParameters($url)[2] !== $type) throw new RuntimeException('Ungültige Effekt-Datei.', 502);
             }
             if (array_key_exists('hasSound', $effect) && !is_bool($effect['hasSound'])) throw new RuntimeException('Ungültige Sound-Kennzeichnung.', 502);
-            $effects[] = array_intersect_key($effect, array_flip(['id', 'name', 'categories', 'weight', 'files', 'hasSound']));
+            // Ältere Anbieter liefern keine Texte; vorhandene Texte bleiben als Klartext erhalten.
+            foreach (['text', 'detail'] as $field) {
+                if (array_key_exists($field, $effect) && !is_string($effect[$field])) {
+                    throw new RuntimeException('Ungültiger Effekt-Text.', 502);
+                }
+            }
+            $effects[] = array_intersect_key($effect, array_flip(['id', 'name', 'categories', 'weight', 'files', 'hasSound', 'text', 'detail']));
         }
         $ttl = min(300, max(1, (int)($data['maxAge'] ?? 60)));
         $result = ['version' => 2, 'maxAge' => $ttl, 'categories' => array_values($categories), 'effects' => $effects];

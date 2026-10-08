@@ -132,6 +132,8 @@ Beispiel für ein Manifest:
     {
       "id": "myEffect",
       "name": "Mein Effekt",
+      "text": "Geschafft!",
+      "detail": "Die Meldung ist erledigt.",
       "categories": ["serious"],
       "weight": 1,
       "files": {

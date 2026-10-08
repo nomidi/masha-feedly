@@ -131,6 +131,8 @@ Example manifest:
     {
       "id": "myEffect",
       "name": "My effect",
+      "text": "Done!",
+      "detail": "The entry is completed.",
       "categories": ["serious"],
       "weight": 1,
       "files": {
