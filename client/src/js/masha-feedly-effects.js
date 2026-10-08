@@ -4,7 +4,9 @@
    * @typedef {Object} EffectDefinition
    * @property {string} id Kennung der JavaScript-Registrierung.
    * @property {string} name Anzeigename.
+   * @property {string} [text] Optionaler, im CMS gepflegter Effekttext.
    * @property {string[]} categories IDs der zugeordneten Effekt-Kategorien.
+   * @property {boolean} [hasSound] Effekt spielt Ton ab; ältere Kataloge liefern keine Kennzeichnung.
    * @property {number} weight Gewicht in der zufälligen Auswahl.
    * @property {{js: string, css?: string, image?: string}} files Versionierte öffentliche Dateien.
    */
@@ -111,14 +113,29 @@
     active.clear();
     return count;
   };
+  /**
+   * Übergibt die persönliche Tonwahl an das Effekt-Modul, ohne dessen Darstellung auszuschließen.
+   * @param {EffectDefinition} effect Geprüfter Effekt aus dem Katalog.
+   * @param {Document} document Dokument für die Darstellung.
+   * @param {number} token Generation zum Abbrechen noch ladender Vorschauen.
+   * @returns {Promise<unknown>} Darstellung oder null bei Abbruch.
+   */
   const start = async (effect, document, token) => {
     const module = await load(effect, document);
     if (token !== generation || reducedMotion()) return null;
-    const result = module.play(document, window, effect.files.image || '');
+    const result = module.play(document, window, effect.files.image || '', { muted: soundDisabled(), text: effect.text || '', detail: effect.detail || '' });
     const record = { layers: collectLayers(result), timer: null };
     active.add(record);
     record.timer = window.setTimeout(() => { record.layers.forEach((layer) => layer.remove()); active.delete(record); }, 15000);
     return result;
+  };
+  /** Beachtet auch noch nicht gespeicherte Profileinstellungen bei der Vorschau. */
+  const soundDisabled = () => {
+    const checkbox = document.querySelector?.('input[name="MashaFeedlyDisableSoundEffects"][type="checkbox"]')
+      || rootFor(document).querySelector?.('input[name="MashaFeedlyDisableSoundEffects"][type="checkbox"]');
+    if (checkbox) return checkbox.checked;
+    const widgetChoice = window.KWMashaFeedlyDOM?.widget()?.dataset.disableSoundEffects;
+    return widgetChoice !== undefined ? widgetChoice === '1' : window.KWMashaFeedlyDisableSoundEffects === true;
   };
   const candidatesFor = (effects, categoryID) => effects.filter((effect) => effect.categories.includes(categoryID));
   /** Zeigt ohne Anbieter einen lokalen, ruhigen Abschluss; benötigt keine externen Dateien. */
@@ -169,7 +186,7 @@
     return fallback(document, generation);
   });
   window.KWMashaFeedlyEffects = {
-    preload, refresh, refreshCatalogue: refreshCataloguePublic, choose, cancelActive,
+    preload, refresh, refreshCatalogue: refreshCataloguePublic, choose, cancelActive, soundDisabled, candidatesFor,
     preview: (id, document) => preview(id, document),
     previewFallback,
     play: (id, document) => preview(id, document),

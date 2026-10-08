@@ -13,13 +13,14 @@ const config = Object.fromEntries(['BASE_URL', 'SUPERADMIN_EMAIL', 'SUPERADMIN_P
 const missing = Object.entries(config).filter(([, value]) => !value).map(([key]) => key);
 
 /** Prüft die CMS-Farbänderung neben dem gleichnamigen Widget-Feld und stellt die ursprüngliche Farbe wieder her. */
-test('Profil: Avatarfarbe bleibt nach CMS-Speichern und Neuladen erhalten', { skip: missing.length ? `E2E-Konfiguration fehlt: ${missing.join(', ')}` : false }, async () => {
+test('Profil: Avatarfarbe und stumme CMS-Vorschau bleiben nach dem Speichern erhalten', { skip: missing.length ? `E2E-Konfiguration fehlt: ${missing.join(', ')}` : false }, async () => {
   const { chromium, expect } = require('@playwright/test');
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
   const profileURL = new URL('/admin/myprofile#Root_MashaFeedly', config.BASE_URL).href;
   let originalColor;
+  let originalSoundChoice;
   let changed = false;
   const saveColor = async (color) => {
     const appearance = page.locator('.masha-feedly-profile-appearance');
@@ -31,7 +32,7 @@ test('Profil: Avatarfarbe bleibt nach CMS-Speichern und Neuladen erhalten', { sk
     ]);
     await page.goto(profileURL);
     await expect(page.locator('.masha-feedly-profile-appearance [name="MashaFeedlyColor"]')).toHaveValue(color);
-    const preview = page.locator('[data-masha-feedly-avatar-preview]');
+    const preview = page.locator('.masha-feedly-profile-settings [data-masha-feedly-avatar-preview]');
     const channels = color.slice(1).match(/.{2}/g).map(channel => parseInt(channel, 16));
     await expect(preview).toHaveCSS('background-color', `rgb(${channels.join(', ')})`);
     const iconID = await preview.getAttribute('data-icon-id');
@@ -43,6 +44,17 @@ test('Profil: Avatarfarbe bleibt nach CMS-Speichern und Neuladen erhalten', { sk
     }
   };
   try {
+    await page.addInitScript(() => {
+      window.effectAudioStarts = 0;
+      const audioContext = window.AudioContext || window.webkitAudioContext;
+      if (audioContext) {
+        const createOscillator = audioContext.prototype.createOscillator;
+        audioContext.prototype.createOscillator = function (...args) {
+          window.effectAudioStarts++;
+          return createOscillator.apply(this, args);
+        };
+      }
+    });
     await page.goto(new URL('/Security/login', config.BASE_URL).href);
     await page.locator('input[type="email"], input[name$="Email"]').first().fill(config.SUPERADMIN_EMAIL);
     await page.locator('input[type="password"]').first().fill(config.SUPERADMIN_PASSWORD);
@@ -70,13 +82,30 @@ test('Profil: Avatarfarbe bleibt nach CMS-Speichern und Neuladen erhalten', { sk
     await expect(page.locator('[name="action_save"]')).toBeEnabled();
     await expect(appearance.locator('[data-masha-feedly-color-option]').first()).toBeEnabled();
     await expect(profileIcons).not.toHaveAttribute('inert', '');
+    const soundChoice = appearance.locator('input[name="MashaFeedlyDisableSoundEffects"]');
+    await expect(soundChoice).toBeVisible();
+    originalSoundChoice = await soundChoice.isChecked();
+    await soundChoice.check();
+    assert.equal(await page.evaluate(() => window.KWMashaFeedlyEffects.soundDisabled()), true);
+    await soundChoice.uncheck();
+    assert.equal(await page.evaluate(() => window.KWMashaFeedlyEffects.soundDisabled()), false);
+    await soundChoice.check();
     originalColor = await appearance.locator('[name="MashaFeedlyColor"]').inputValue();
     const selectedColor = originalColor === '#6383D8' ? '#35A98F' : '#6383D8';
     changed = true;
     await saveColor(selectedColor);
+    await expect(appearance.locator('input[name="MashaFeedlyDisableSoundEffects"]')).toBeChecked();
     await expect(page.locator(`.masha-feedly-profile-appearance [data-color="${selectedColor}"]`)).toHaveAttribute('aria-pressed', 'true');
+    // Regression: Auch die Konfigurationsvorschau muss nach dem Profil-Speichern stumm bleiben.
+    await page.goto(new URL('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig', config.BASE_URL).href);
+    assert.equal(await page.evaluate(() => window.KWMashaFeedlyDisableSoundEffects), true);
+    assert.equal(await page.evaluate(() => window.KWMashaFeedlyEffects.soundDisabled()), true);
+    await page.locator('[data-masha-feedly-animation-preview="arcade"]').click();
+    await expect(page.locator('.kw-masha-feedly__arcade-effect')).toBeVisible();
+    assert.equal(await page.evaluate(() => window.effectAudioStarts), 0, 'Die Animation erscheint ohne Tonerzeugung. Anbieter beachtet muted: ' + await page.evaluate(() => window.KWMashaFeedlyEffectModules.arcade.play.toString().includes('muted')));
+    await page.evaluate(() => window.KWMashaFeedlyEffects.cancelActive());
   } finally {
-    try { if (changed) { await page.goto(profileURL); await saveColor(originalColor); } }
+    try { if (changed) { await page.goto(profileURL); await page.locator('.masha-feedly-profile-appearance input[name="MashaFeedlyDisableSoundEffects"]').setChecked(originalSoundChoice); await saveColor(originalColor); } }
     finally { await context.close(); await browser.close(); }
   }
 });
@@ -137,7 +166,15 @@ test('Effekt-Anbieter: CMS-Katalog lädt versionierte Dateien und spielt im Shad
     } finally { await guest.close(); }
     await page.goto(new URL('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig', config.BASE_URL).href);
     await expect(page.locator('[data-masha-feedly-effect-catalog] [data-masha-feedly-animation-preview-card]').first()).toBeAttached();
-    await page.goto(new URL('/admin/masha-effects/KW-MashaEffects-Model-Effect', config.BASE_URL).href);
+    await page.goto(new URL('/admin/masha-effects/KW-MashaEffects-Model-Effect?flush=1', config.BASE_URL).href);
+    const soundHeader = page.getByRole('columnheader', { name: /^Mit Ton/ });
+    await expect(soundHeader).toBeVisible();
+    await soundHeader.locator('button').click();
+    await expect(soundHeader).toHaveAttribute('aria-sort', 'ascending');
+    await soundHeader.locator('button').click();
+    await expect(soundHeader).toHaveAttribute('aria-sort', 'descending');
+    await page.getByRole('columnheader', { name: /^Name/ }).locator('button').click();
+    await expect(page.getByRole('columnheader', { name: /^Name/ })).toHaveAttribute('aria-sort', 'ascending');
     const effectRow = page.locator('tr').filter({ hasText: result.name });
     await expect(effectRow).toHaveCount(1);
     // Silverstripe blendet die Bearbeiten-Aktion bis zum Öffnen des Zeilenmenüs aus.
@@ -145,6 +182,7 @@ test('Effekt-Anbieter: CMS-Katalog lädt versionierte Dateien und spielt im Shad
     assert.ok(editPath, `Bearbeiten-Link für ${result.name} muss vorhanden sein.`);
     await page.goto(new URL(editPath, config.BASE_URL).href);
     await expect(page.locator('input[name="Title"]')).toBeVisible();
+    await expect(page.locator('input[name="HasSound"]')).toBeVisible();
     await expect(page.locator('input[name^="Categories"]')).not.toHaveCount(0);
     await expect(page.locator('input[name="StartDate"]')).toBeAttached();
     await expect(page.locator('input[name="EndDate"]')).toBeAttached();

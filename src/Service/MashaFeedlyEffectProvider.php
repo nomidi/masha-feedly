@@ -5,6 +5,7 @@ namespace KW\MashaFeedly\Service;
 use SilverStripe\Control\Director;
 use SilverStripe\Core\Config\Configurable;
 use SilverStripe\Core\Environment;
+use SilverStripe\Security\Security;
 use SilverStripe\View\Requirements;
 
 /** Konfiguriert die öffentliche URL des unabhängigen Effekt-Anbieters. */
@@ -35,7 +36,13 @@ class MashaFeedlyEffectProvider
     public static function requireLoader(): void
     {
         $url = Director::absoluteURL('__masha-feedly-effects/manifest');
-        Requirements::customScript('window.KWMashaFeedlyEffectsManifestURL = ' . json_encode($url, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) . ';', 'masha-feedly-effects-provider');
+        // CMS-Vorschauen benötigen die persönliche Tonwahl auch ohne eingeblendetes Widget.
+        $disableSound = (bool)Security::getCurrentUser()?->MashaFeedlyDisableSoundEffects;
+        Requirements::customScript(
+            'window.KWMashaFeedlyEffectsManifestURL = ' . json_encode($url, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) . ';'
+                . 'window.KWMashaFeedlyDisableSoundEffects = ' . json_encode($disableSound) . ';',
+            'masha-feedly-effects-provider'
+        );
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-effects.js');
     }
 }

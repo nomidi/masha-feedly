@@ -46,7 +46,7 @@ class MashaFeedlyEffectClientTest extends SapphireTest
     /** @return array<string, mixed> Gültige Anbieterantwort mit versionierter Ressource. */
     private function catalogue(): array
     {
-        return ['version' => 2, 'maxAge' => 300, 'categories' => [['id' => 'playful', 'name' => 'Verspielt'], ['id' => 'serious', 'name' => 'Sachlich']], 'effects' => [['id' => 'test', 'name' => 'Test', 'categories' => ['playful', 'serious'], 'weight' => 1,
+        return ['version' => 2, 'maxAge' => 300, 'categories' => [['id' => 'playful', 'name' => 'Verspielt'], ['id' => 'serious', 'name' => 'Sachlich']], 'effects' => [['id' => 'test', 'name' => 'Test', 'categories' => ['playful', 'serious'], 'weight' => 1, 'hasSound' => true,
             'files' => ['js' => self::BASE . 'file/1/' . hash('sha256', self::BODY) . '/js']]]];
     }
 
@@ -64,6 +64,7 @@ class MashaFeedlyEffectClientTest extends SapphireTest
         $client = $this->client([new Response(200, ['Content-Type' => 'application/json'], json_encode($this->catalogue())), new Response(200, ['Content-Type' => 'text/javascript'], self::BODY)]);
         $manifest = $client->manifest();
         $this->assertSame('Verspielt', $manifest['categories'][0]['name']);
+        $this->assertTrue($manifest['effects'][0]['hasSound']);
         $this->assertStringContainsString('/__masha-feedly-effects/file/1/', $manifest['effects'][0]['files']['js']);
         $this->assertStringNotContainsString('effects.example.test', json_encode($manifest));
         $this->assertStringNotContainsString(str_repeat('a', 64), json_encode($manifest));
@@ -285,5 +286,18 @@ class MashaFeedlyEffectClientTest extends SapphireTest
         } finally {
             Config::modify()->set(MashaFeedlyEffectProvider::class, 'base_url', $previousBase);
         }
+    }
+    /** Ältere Kataloge bleiben gültig; eine vorhandene Ton-Kennzeichnung muss ein Boolean sein. */
+    public function testOptionalSoundMetadataIsStrictlyValidated(): void
+    {
+        $catalogue = $this->catalogue();
+        unset($catalogue['effects'][0]['hasSound']);
+        $client = $this->client([new Response(200, [], json_encode($catalogue))]);
+        $this->assertArrayNotHasKey('hasSound', $client->manifest()['effects'][0]);
+        $this->cache->clear();
+        $catalogue['effects'][0]['hasSound'] = 'false';
+        $client = $this->client([new Response(200, [], json_encode($catalogue))]);
+        $this->expectException(\RuntimeException::class);
+        $client->manifest();
     }
 }

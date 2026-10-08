@@ -41,10 +41,10 @@ function environment(effects = [definition()], options = {}) {
       if (element.tag === 'script') {
         const id = new URL(element.src).pathname.split('/').pop().split('.')[0];
         const version = element.src;
-        window.KWMashaFeedlyEffectModules[id] = { play: () => {
+        window.KWMashaFeedlyEffectModules[id] = { play: (document, window, image, options) => {
           if (options.failPlay) throw new Error('Animation fehlgeschlagen');
           const layer = { removed: false, remove() { this.removed = true; } };
-          played.push({ id, version, layer });
+          played.push({ id, version, layer, options });
           return { layer };
         } };
       }
@@ -57,7 +57,7 @@ function environment(effects = [definition()], options = {}) {
     addEventListener: (name, callback) => { listeners[name] = callback; },
     createElement: (tag) => ({ tag, events: {}, dataset: {}, style: {}, setAttribute() {}, animate() { const animation = { cancelled: false, cancel() { this.cancelled = true; } }; this.animation = animation; return animation; }, addEventListener(name, callback) { this.events[name] = callback; }, remove() { this.removed = true; } }),
   };
-  window.KWMashaFeedlyDOM = { root: () => shadow, widget: () => null };
+  window.KWMashaFeedlyDOM = { root: () => shadow, widget: () => options.widget || null };
   vm.runInNewContext(source, { window, document, URL, AbortSignal, Date: class extends Date { static now() { return now; } }, console: { warn() {} } });
   return { api: window.KWMashaFeedlyEffects, window, document, appended, played, listeners, timers, requests: () => requests, expire: () => { now += 301000; } };
 }
@@ -218,4 +218,54 @@ test('reduzierte Bewegung unterdrückt auch den lokalen Ersatzeffekt', async () 
   delete env.window.KWMashaFeedlyEffectsManifestURL;
   assert.equal(await env.api.playOnDone(env.document), null);
   assert.equal(env.appended.length, 0);
+});
+
+
+test('lädt und spielt Sound-Effekte bei stummer Profilwahl weiter, mit muted-Option', async () => {
+  const env = environment([{ ...definition('music'), hasSound: true }], { widget: { dataset: { disableSoundEffects: '1' } } });
+  await env.api.preload(env.document, 'playful');
+  assert.equal(env.appended.some(({ element }) => element.src?.includes('music')), true);
+  await env.api.playOnDone(env.document, env.window, '', 'playful', () => 0);
+  assert.equal(env.played[0].id, 'music');
+  assert.equal(env.played[0].options.muted, true);
+  await env.api.preview('music', env.document);
+  assert.equal(env.played[1].options.muted, true);
+});
+
+test('beachtet die aktuelle Ton-Checkbox sofort vor dem Speichern', async () => {
+  const env = environment([{ ...definition('music'), hasSound: true }]);
+  const checkbox = { checked: true };
+  env.document.querySelector = () => checkbox;
+  await env.api.preview('music', env.document);
+  assert.equal(env.played[0].options.muted, true);
+  checkbox.checked = false;
+  await env.api.preview('music', env.document);
+  assert.equal(env.played[1].options.muted, false);
+});
+
+test('CMS-Vorschau ohne Widget übernimmt die gespeicherte Tonwahl des Loaders', async () => {
+  const env = environment([{ ...definition('music'), hasSound: true }]);
+  env.window.KWMashaFeedlyDisableSoundEffects = true;
+  await env.api.preview('music', env.document);
+  assert.equal(env.played[0].options.muted, true);
+  env.window.KWMashaFeedlyDisableSoundEffects = false;
+  await env.api.preview('music', env.document);
+  assert.equal(env.played[1].options.muted, false);
+});
+
+test('aktuelle Checkbox und Widget haben Vorrang vor dem gespeicherten Loaderwert', async () => {
+  const env = environment([definition('music')], { widget: { dataset: { disableSoundEffects: '0' } } });
+  env.window.KWMashaFeedlyDisableSoundEffects = true;
+  await env.api.preview('music', env.document);
+  assert.equal(env.played[0].options.muted, false);
+  env.document.querySelector = () => ({ checked: true });
+  await env.api.preview('music', env.document);
+  assert.equal(env.played[1].options.muted, true);
+});
+
+test('spielt ältere Kataloge ohne Sound-Kennzeichnung mit der persönlichen Tonoption', async () => {
+  const env = environment([definition('quiet')], { widget: { dataset: { disableSoundEffects: '1' } } });
+  await env.api.playOnDone(env.document, env.window, '', 'playful');
+  assert.equal(env.played[0].id, 'quiet');
+  assert.equal(env.played[0].options.muted, true);
 });
