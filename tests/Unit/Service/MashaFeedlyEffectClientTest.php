@@ -58,6 +58,24 @@ class MashaFeedlyEffectClientTest extends SapphireTest
         return new MashaFeedlyEffectClient(new Client(['handler' => $stack]), $this->cache, $avatarIconStoragePath);
     }
 
+    /** Eine vertrauenswürdige interne Anbieter-URL reicht auch ohne externe Basis-URL. */
+    public function testLocalProviderConfigurationCountsAsConfigured(): void
+    {
+        $config = MashaFeedlyEffectProvider::config();
+        $previousBase = $config->get('base_url');
+        $previousLocalBase = $config->get('local_provider_base_url');
+        try {
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', '');
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', str_repeat('a', 64));
+            $config->set('base_url', '');
+            $config->set('local_provider_base_url', rtrim(\SilverStripe\Control\Director::absoluteURL('/'), '/'));
+            $this->assertTrue(MashaFeedlyEffectClient::hasConfiguredProvider());
+        } finally {
+            $config->set('base_url', $previousBase);
+            $config->set('local_provider_base_url', $previousLocalBase);
+        }
+    }
+
     /** Katalog und Dateien werden nur einmal geladen; der Browser erhält ausschließlich lokale URLs. */
     public function testPrivateCacheAndLocalURLs(): void
     {

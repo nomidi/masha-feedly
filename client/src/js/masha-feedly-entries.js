@@ -1113,7 +1113,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (relationType) relationType.value = entry.relations?.find((relation) => relation.direction !== 'incoming')?.type || 'related';
       if (relationSearch) relationSearch.value = '';
     }
-    editHistoryDetails.open = false;
+    if (editHistoryDetails) editHistoryDetails.open = false;
     editHistory.replaceChildren();
     if (Array.isArray(entry.history)) {
       window.KWMashaFeedlyEntries.renderHistory(editHistory, entry.history, document);

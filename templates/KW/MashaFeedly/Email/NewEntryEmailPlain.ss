@@ -1,5 +1,5 @@
 <%t KW\MashaFeedly\Translations.EMAIL_NEW_TITLE "Neue Meldung" %>
-<%t KW\MashaFeedly\Translations.EMAIL_NEW_INTRO "Auf {siteTitle} wurde eine neue Meldung erstellt." siteTitle=$SiteTitle %>
+<% if $NotificationIntroPlain %>$NotificationIntroPlain<% else %><%t KW\MashaFeedly\Translations.EMAIL_NEW_INTRO "Auf {siteTitle} wurde eine neue Meldung erstellt." siteTitle=$SiteTitle %><% end_if %>
 
 <% if $ReporterName %><%t KW\MashaFeedly\Translations.EMAIL_NEW_REPORTER "Gemeldet von" %>: $ReporterName
 <% end_if %><% if $CategoryTitle %><%t KW\MashaFeedly\Translations.EMAIL_NEW_CATEGORY "Kategorie" %>: $CategoryTitle

@@ -10,8 +10,10 @@ use SilverStripe\Security\Permission;
 use SilverStripe\SiteConfig\SiteConfig;
 use SilverStripe\ORM\DB;
 use SilverStripe\Core\Environment;
+use SilverStripe\Core\Injector\Injector;
 use SilverStripe\ORM\Connect\DatabaseException;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
+use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
 use KW\MashaFeedly\Model\MashaFeedlyMiteTrigger;
 
 /**
@@ -22,7 +24,19 @@ use KW\MashaFeedly\Model\MashaFeedlyMiteTrigger;
  * @property string $MashaFeedlyAllowedMemberIDs JSON-Liste freigegebener Mitglieds-IDs.
  * @property bool $MashaFeedlyClosedCategoriesMigrated Kennzeichnet die einmalige Übernahme abgeschlossener Kategorien.
  * @property bool $MashaFeedlyEmailTestSucceeded Kennzeichnet einen erfolgreichen globalen E-Mail-Test.
+ * @property string $MashaFeedlyWelcomeTextDu Willkommenstext in Du-Anrede.
+ * @property string $MashaFeedlyWelcomeTextSie Willkommenstext in Sie-Anrede.
  * @property string $MashaFeedlyEmailFooter Inhalt des zentralen E-Mail-Footers.
+ * @property string $MashaFeedlyNotificationNewEntryDu Text für Benachrichtigungen über neue Meldungen in Du-Anrede.
+ * @property string $MashaFeedlyNotificationNewEntrySie Text für Benachrichtigungen über neue Meldungen in Sie-Anrede.
+ * @property string $MashaFeedlyNotificationUpdatedEntryDu Text für Änderungsbenachrichtigungen in Du-Anrede.
+ * @property string $MashaFeedlyNotificationUpdatedEntrySie Text für Änderungsbenachrichtigungen in Sie-Anrede.
+ * @property string $MashaFeedlyNotificationNewCommentDu Text für Kommentarbenachrichtigungen in Du-Anrede.
+ * @property string $MashaFeedlyNotificationNewCommentSie Text für Kommentarbenachrichtigungen in Sie-Anrede.
+ * @property string $MashaFeedlyNotificationDueDateDu Text für Fälligkeitserinnerungen in Du-Anrede.
+ * @property string $MashaFeedlyNotificationDueDateSie Text für Fälligkeitserinnerungen in Sie-Anrede.
+ * @property string $MashaFeedlyNotificationCostEstimateDu Text für Kostenschätzungsbenachrichtigungen in Du-Anrede.
+ * @property string $MashaFeedlyNotificationCostEstimateSie Text für Kostenschätzungsbenachrichtigungen in Sie-Anrede.
  * @property int $MashaFeedlyMiteProjectID Standardprojekt für den persönlichen Mite-Timer.
  * @property bool $MashaFeedlyMiteEnabled Aktiviert die Mite-Timerfunktion für diese Website.
  * @method \SilverStripe\ORM\HasManyList<MashaFeedlyMiteTrigger> MashaFeedlyMiteTriggers() Auslösende Statuskategorien.
@@ -62,6 +76,18 @@ class MashaFeedlyConfigExtension extends Extension
         'MashaFeedlyClosedCategoriesMigrated' => 'Boolean',
         'MashaFeedlyEmailTestSucceeded' => 'Boolean',
         'MashaFeedlyEmailFooter' => 'Text',
+        'MashaFeedlyWelcomeTextDu' => 'HTMLText',
+        'MashaFeedlyWelcomeTextSie' => 'HTMLText',
+        'MashaFeedlyNotificationNewEntryDu' => 'HTMLText',
+        'MashaFeedlyNotificationNewEntrySie' => 'HTMLText',
+        'MashaFeedlyNotificationUpdatedEntryDu' => 'HTMLText',
+        'MashaFeedlyNotificationUpdatedEntrySie' => 'HTMLText',
+        'MashaFeedlyNotificationNewCommentDu' => 'HTMLText',
+        'MashaFeedlyNotificationNewCommentSie' => 'HTMLText',
+        'MashaFeedlyNotificationDueDateDu' => 'HTMLText',
+        'MashaFeedlyNotificationDueDateSie' => 'HTMLText',
+        'MashaFeedlyNotificationCostEstimateDu' => 'HTMLText',
+        'MashaFeedlyNotificationCostEstimateSie' => 'HTMLText',
     ];
 
     private static $defaults = [
@@ -83,25 +109,102 @@ class MashaFeedlyConfigExtension extends Extension
             'MashaFeedlyMiteEnabled',
             'MashaFeedlyMiteTriggers',
             'MashaFeedlyEmailFooter',
+            'MashaFeedlyWelcomeTextDu',
+            'MashaFeedlyWelcomeTextSie',
+            'MashaFeedlyNotificationNewEntryDu',
+            'MashaFeedlyNotificationNewEntrySie',
+            'MashaFeedlyNotificationUpdatedEntryDu',
+            'MashaFeedlyNotificationUpdatedEntrySie',
+            'MashaFeedlyNotificationNewCommentDu',
+            'MashaFeedlyNotificationNewCommentSie',
+            'MashaFeedlyNotificationDueDateDu',
+            'MashaFeedlyNotificationDueDateSie',
+            'MashaFeedlyNotificationCostEstimateDu',
+            'MashaFeedlyNotificationCostEstimateSie',
         ]);
     }
 
-    /** Ergänzt den E-Mail-Footer bei dev/build, solange noch kein eigener Text gespeichert wurde. */
-    public function requireDefaultRecords(): void
+    /** Ergänzt Footer und leere Benachrichtigungstexte bei dev/build, ohne eigene Inhalte zu überschreiben. */
+    public function onRequireDefaultRecords(): void
     {
-        if (!self::hasSiteConfigField('MashaFeedlyEmailFooter')) {
-            return;
+        // Während des ersten dev/build darf SiteConfig nicht gelesen werden, solange die neuen Spalten fehlen.
+        $fieldsToCheck = ['MashaFeedlyEmailFooter'];
+        foreach (self::notificationFieldMap() as $addresses) {
+            array_push($fieldsToCheck, ...array_values($addresses));
         }
+        foreach ($fieldsToCheck as $field) {
+            if (!self::hasSiteConfigField($field)) return;
+        }
+
         $config = self::currentSiteConfig();
-        if (trim((string)$config->MashaFeedlyEmailFooter) !== '') {
-            return;
+        $changed = false;
+        $footer = trim((string)$config->MashaFeedlyEmailFooter);
+        if ($footer === '' && ($defaultFooter = self::defaultEmailFooter()) !== '') {
+            $config->MashaFeedlyEmailFooter = $defaultFooter;
+            $changed = true;
         }
-        $footer = self::defaultEmailFooter();
-        if ($footer === '') {
-            return;
+
+        $emptyFields = self::emptyNotificationFields($config);
+        if ($emptyFields && MashaFeedlyEffectClient::hasConfiguredProvider()) {
+            try {
+                $providerTexts = Injector::inst()->get(MashaFeedlyEffectClient::class)->emailDefaults(true);
+                $defaults = ['welcome' => $providerTexts['welcome']] + $providerTexts['notifications'];
+                $changed = self::fillEmptyNotificationTexts($config, $defaults) || $changed;
+            } catch (\Throwable $exception) {
+                error_log('[Masha:Feedly] Benachrichtigungstexte konnten beim dev/build nicht vom Effekt-Anbieter geladen werden (' . get_class($exception) . ').');
+            }
         }
-        $config->MashaFeedlyEmailFooter = $footer;
-        $config->write();
+
+        if ($changed) $config->write();
+    }
+
+    /** Liefert die Feldnamen für die Willkommen und die fünf Benachrichtigungstypen in beiden Anreden. @return array<string, array<string, string>> Zuordnung Typ/Anrede zu SiteConfig-Feld. */
+    public static function notificationFieldMap(): array
+    {
+        return [
+            'welcome' => ['du' => 'MashaFeedlyWelcomeTextDu', 'sie' => 'MashaFeedlyWelcomeTextSie'],
+            'newEntry' => ['du' => 'MashaFeedlyNotificationNewEntryDu', 'sie' => 'MashaFeedlyNotificationNewEntrySie'],
+            'updatedEntry' => ['du' => 'MashaFeedlyNotificationUpdatedEntryDu', 'sie' => 'MashaFeedlyNotificationUpdatedEntrySie'],
+            'newComment' => ['du' => 'MashaFeedlyNotificationNewCommentDu', 'sie' => 'MashaFeedlyNotificationNewCommentSie'],
+            'dueDate' => ['du' => 'MashaFeedlyNotificationDueDateDu', 'sie' => 'MashaFeedlyNotificationDueDateSie'],
+            'costEstimate' => ['du' => 'MashaFeedlyNotificationCostEstimateDu', 'sie' => 'MashaFeedlyNotificationCostEstimateSie'],
+        ];
+    }
+
+    /** Ergänzt ausschließlich leere Textfelder aus einer geprüften Anbieterantwort. @param SiteConfig $config Website-Konfiguration. @param array<string, mixed> $defaults Texte nach Typ und Anrede. @return bool Gibt zurück, ob ein Feld geändert wurde. */
+    public static function fillEmptyNotificationTexts(SiteConfig $config, array $defaults): bool
+    {
+        $changed = false;
+        foreach (self::notificationFieldMap() as $type => $addresses) {
+            foreach ($addresses as $address => $field) {
+                if (trim((string)$config->$field) !== '') continue;
+                $text = $defaults[$type][$address] ?? '';
+                if (!is_string($text) || trim($text) === '') continue;
+                $config->$field = $text;
+                $changed = true;
+            }
+        }
+        return $changed;
+    }
+
+    /** Liefert alle derzeit leeren Benachrichtigungsfelder für dev/build. @param SiteConfig $config Website-Konfiguration. @return list<string> Leere Feldnamen. */
+    private static function emptyNotificationFields(SiteConfig $config): array
+    {
+        $emptyFields = [];
+        foreach (self::notificationFieldMap() as $addresses) {
+            foreach ($addresses as $field) {
+                if (trim((string)$config->$field) === '') $emptyFields[] = $field;
+            }
+        }
+        return $emptyFields;
+    }
+
+    /** Liefert den gespeicherten Text der persönlichen Anrede. @param string $type Benachrichtigungstyp. @param string $address Persönliche Profilanrede. @return string Formatierte Einleitung oder leer für die bisherige Mailvorlage. */
+    public static function notificationEmailText(string $type, string $address): string
+    {
+        $field = self::notificationFieldMap()[$type][$address] ?? null;
+        if (!$field || !self::hasSiteConfigField($field)) return '';
+        return trim((string)self::currentSiteConfig()->$field);
     }
 
     /** Liest den optionalen Footer aus der Serverumgebung und decodiert Zeilenumbrüche. */

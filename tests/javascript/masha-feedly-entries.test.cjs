@@ -1136,6 +1136,7 @@ test('sendet entfernte Verknüpfungen und zeigt die bestätigte Entfernung im Ve
   await env.listeners['kw-masha-feedly:opened']();
   const card = env.listContainer.children.find((child) => child.dataset?.entryId === '71');
   await env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  env.editHistoryDetails.open = true;
   env.relatedEntrySelect.options.forEach((option) => { option.selected = false; });
   env.postResponses.push({ ok: true, json: async () => ({
     success: true,
@@ -1268,6 +1269,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
   const editPriorityIcon = new Element(); editPriorityIcon.hidden = true;
   const shareActiveEntryButton = new Element();
   const editHistory = new Element();
+  const editHistoryDetails = new Element();
   const editContext = new Element();
   const editRelations = new Element();
   const relationTypeSelect = new Element(); relationTypeSelect.value = 'related';
@@ -1337,6 +1339,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
     ['[data-masha-feedly-edit-heading]', editHeading],
     ['[data-masha-feedly-edit-priority]', editPriorityIcon],
     ['[data-masha-feedly-history]', editHistory],
+    ['.kw-masha-feedly__history', editHistoryDetails],
     ['[data-masha-feedly-share-active-entry]', shareActiveEntryButton],
     ['[data-masha-feedly-edit-context]', editContext],
     ['[data-masha-feedly-edit-relations]', editRelations],
@@ -1515,7 +1518,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
   };
   vm.runInNewContext(source, context);
   listeners.DOMContentLoaded();
-  return { listeners, requests, detailRequests, detailResponses, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
+  return { listeners, requests, detailRequests, detailResponses, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editHistoryDetails, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
 }
 
 test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedback-Warteschlange', async () => {
@@ -1707,6 +1710,7 @@ test('zeigt Kommentare als abwechselnde sichere Sprechblasen und sendet neue Kom
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   await env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  env.editHistoryDetails.open = true;
   assert.equal(env.commentForm.elements.EntryID.value, '71');
   assert.deepEqual(env.commentList.children.map((item) => item.className), [
     'kw-masha-feedly__comment is-left', 'kw-masha-feedly__comment is-right',
@@ -1769,6 +1773,7 @@ test('sendet eine Kommentarreaktion an den geschützten Kommentar-Endpunkt und a
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   await env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  env.editHistoryDetails.open = true;
   const comment = env.commentList.children[0];
   const reactions = comment.children[3];
   const reactionToggle = reactions.children[0].children.at(-1);
@@ -1886,6 +1891,7 @@ test('meldet nach bestätigter Emoji-Reaktion einen Anzeige-Fehler als gespeiche
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   await env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  env.editHistoryDetails.open = true;
   const reactionContainer = env.commentList.children[0].children[3];
   reactionContainer.children[0].children.at(-1).listeners.click();
   const reactionButton = reactionContainer.children[1].children[0];
@@ -2356,6 +2362,7 @@ test('meldet Eintrag und Anhang nach bestätigter Speicherung als gespeichert, w
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   await env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  env.editHistoryDetails.open = true;
   const selectedFile = { name: 'plan.pdf' };
   env.editAttachmentInput.files = [selectedFile];
   env.postResponses.push({ ok: true, json: async () => ({

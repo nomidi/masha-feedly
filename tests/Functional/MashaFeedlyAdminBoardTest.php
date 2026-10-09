@@ -11,6 +11,7 @@ use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRelation;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRead;
+use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
 use SilverStripe\Dev\FunctionalTest;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\i18n\i18n;
@@ -173,6 +174,13 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringNotContainsString('data-mite-modal', $response->getBody());
         $miteResponse = $this->get('/admin/masha-feedly/mite');
         $this->assertSame(403, $miteResponse->getStatusCode());
+        $emailTextsResponse = $this->get('/admin/masha-feedly/email-texts');
+        $this->assertSame(403, $emailTextsResponse->getStatusCode());
+        $importResponse = $this->post('/admin/masha-feedly/email-texts/EditForm', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'action_importEffectNotificationTexts' => 'Texte aus Masha:Effects übernehmen',
+        ]);
+        $this->assertSame(403, $importResponse->getStatusCode());
         $saved = $this->post($url . '/saveReporter', [
             'SecurityID' => SecurityToken::getSecurityID(),
             'EntryID' => (int)$entry->ID,
@@ -601,6 +609,14 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('Access &amp; appearance', $response->getBody());
         $this->assertStringContainsString('Reminders &amp; estimates', $response->getBody());
         $this->assertStringContainsString('Reset data', $response->getBody());
+        $emailTextsResponse = $this->get('/admin/masha-feedly/email-texts');
+        $this->assertSame(200, $emailTextsResponse->getStatusCode());
+        $this->assertStringContainsString('action_importEffectNotificationTexts', $emailTextsResponse->getBody());
+        foreach (array_merge(...array_values(MashaFeedlyConfigExtension::notificationFieldMap())) as $notificationField) {
+            $this->assertStringContainsString('name="' . $notificationField . '"', $emailTextsResponse->getBody());
+        }
+        $this->assertStringContainsString('name="MashaFeedlyEmailFooter"', $emailTextsResponse->getBody());
+        $this->assertStringNotContainsString('action_importEffectNotificationTexts', $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig')->getBody());
         $this->assertStringContainsString('masha-feedly-config-section--general', $response->getBody());
         $this->assertStringContainsString('masha-feedly-config-section--operations ss-toggle ss-toggle-start-closed', $response->getBody());
         $this->assertStringContainsString('masha-feedly-config-section--reset ss-toggle ss-toggle-start-closed', $response->getBody());
@@ -651,6 +667,143 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $automaticallyColoredMember = Member::get()->byID((int)$this->objFromFixture(Member::class, 'notAllowed')->ID);
         $this->assertNotSame('', (string)$automaticallyColoredMember->MashaFeedlyColor);
         $this->assertNotSame('#B5A0E0', (string)$automaticallyColoredMember->MashaFeedlyColor);
+    }
+
+    /** Nur das konfigurierte Betreiberkonto kann Anbietertexte ausdrücklich in die SiteConfig übernehmen. */
+    public function testReporterManagerCanReplaceNotificationTextsFromEffects(): void
+    {
+        $this->logInAsAllowedAdmin();
+        $manager = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $manager);
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$manager->Email]);
+        $formResponse = $this->get('/admin/masha-feedly/email-texts');
+        $this->assertSame(200, $formResponse->getStatusCode());
+        $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $formResponse->getBody(), $matches));
+        foreach (array_merge(...array_values(MashaFeedlyConfigExtension::notificationFieldMap())) as $fieldName) {
+            $this->assertStringContainsString('name="action_sendEmailTextTest?EmailTextField=' . $fieldName . '"', $formResponse->getBody());
+        }
+        $this->assertStringContainsString('masha-feedly-email-text-test', $formResponse->getBody());
+        $this->assertStringContainsString('masha-feedly-email-text-import', $formResponse->getBody());
+        $this->assertGreaterThan(2, substr_count($formResponse->getBody(), 'masha-feedly-email-action-icon'));
+
+        $providerTexts = [];
+        foreach (MashaFeedlyConfigExtension::notificationFieldMap() as $type => $addresses) {
+            foreach ($addresses as $address => $_field) {
+                $providerTexts[$type][$address] = '<p>' . $type . ' ' . $address . '</p>';
+            }
+        }
+        $injector = Injector::inst();
+        $originalClient = $injector->get(MashaFeedlyEffectClient::class);
+        $client = new class($providerTexts) extends MashaFeedlyEffectClient {
+            public function __construct(private array $texts) {}
+            public function emailDefaults(bool $refresh = false): array { return ['version' => 1, 'footer' => '', 'welcome' => $this->texts['welcome'], 'notifications' => $this->texts]; }
+        };
+        $injector->registerService($client, MashaFeedlyEffectClient::class);
+        try {
+            $response = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                'action_importEffectNotificationTexts' => 'Texte aus Masha:Effects übernehmen',
+            ]);
+            $this->assertSame(200, $response->getStatusCode());
+            $config = MashaFeedlyConfigExtension::currentSiteConfig();
+            foreach (MashaFeedlyConfigExtension::notificationFieldMap() as $type => $addresses) {
+                foreach ($addresses as $address => $field) {
+                    $this->assertSame('<p>' . $type . ' ' . $address . '</p>', (string)$config->$field);
+                }
+            }
+        } finally {
+            $injector->registerService($originalClient, MashaFeedlyEffectClient::class);
+        }
+    }
+
+    /** Der Vorlagen-Testversand nutzt ungespeicherten Text und adressiert nur das erlaubte Betreiberkonto. */
+    public function testNotificationTextCanBeSentToReporterManagerForPreview(): void
+    {
+        $this->logInAsAllowedAdmin();
+        $manager = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $manager);
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$manager->Email]);
+        $formResponse = $this->get('/admin/masha-feedly/email-texts');
+        $this->assertSame(200, $formResponse->getStatusCode());
+        $this->assertSame(1, preg_match('/<form[^>]+action="([^"]+)"/', $formResponse->getBody(), $matches));
+
+        $mailer = new class implements MailerInterface {
+            /** @var RawMessage[] */
+            public array $messages = [];
+            public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
+        };
+        $injector = Injector::inst();
+        $originalMailer = $injector->get(MailerInterface::class);
+        $injector->registerService($mailer, MailerInterface::class);
+        try {
+            $fieldName = MashaFeedlyConfigExtension::notificationFieldMap()['welcome']['du'];
+            $response = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                $fieldName => '<h2>Willkommen auf {siteTitle}</h2><p>Vorschau für {recipientName}</p>',
+                'action_sendEmailTextTest?EmailTextField=' . $fieldName => '1',
+            ]);
+            $this->assertSame(200, $response->getStatusCode());
+            $this->assertCount(1, $mailer->messages);
+            $this->assertSame((string)$manager->Email, $mailer->messages[0]->getTo()[0]->getAddress());
+            $this->assertSame('Masha:Feedly – Test: Willkommen (Du)', $mailer->messages[0]->getSubject());
+            $this->assertStringContainsString('<h2>Willkommen auf', (string)$mailer->messages[0]->getHtmlBody());
+            $this->assertStringContainsString('Vorschau für', (string)$mailer->messages[0]->getTextBody());
+            $this->assertStringContainsString('Test-E-Mail wurde an', $response->getBody());
+
+            $newEntryField = MashaFeedlyConfigExtension::notificationFieldMap()['newEntry']['du'];
+            $newEntryResponse = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                $newEntryField => '<p>Auf {siteTitle} gibt es eine neue Meldung: {title}.</p>',
+                'action_sendEmailTextTest?EmailTextField=' . $newEntryField => '1',
+            ]);
+            $this->assertSame(200, $newEntryResponse->getStatusCode());
+            $this->assertCount(2, $mailer->messages);
+            $newEntryMessage = $mailer->messages[1];
+            $this->assertSame('Masha:Feedly – Test: Neue Meldung (Du)', $newEntryMessage->getSubject());
+            $this->assertStringContainsString('Alex Beispiel', (string)$newEntryMessage->getHtmlBody());
+            $this->assertStringContainsString('In Bearbeitung', (string)$newEntryMessage->getHtmlBody());
+            $this->assertStringContainsString('11.10.2026', (string)$newEntryMessage->getHtmlBody());
+            $this->assertStringContainsString('Kontaktformular zeigt', (string)$newEntryMessage->getHtmlBody());
+
+            $updatedField = MashaFeedlyConfigExtension::notificationFieldMap()['updatedEntry']['du'];
+            $updatedResponse = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
+                'SecurityID' => SecurityToken::getSecurityID(),
+                $updatedField => '<p>{title} auf {siteTitle} wurde aktualisiert.</p>',
+                'action_sendEmailTextTest?EmailTextField=' . $updatedField => '1',
+            ]);
+            $this->assertSame(200, $updatedResponse->getStatusCode());
+            $this->assertCount(3, $mailer->messages);
+            $updatedMessage = $mailer->messages[2];
+            $this->assertSame('Masha:Feedly – Test: Meldung geändert (Du)', $updatedMessage->getSubject());
+            $this->assertStringContainsString('Was wurde geändert?', (string)$updatedMessage->getHtmlBody());
+            $this->assertStringContainsString('10.10.2026', (string)$updatedMessage->getHtmlBody());
+            $this->assertStringContainsString('Sam Beispiel', (string)$updatedMessage->getHtmlBody());
+            $this->assertStringContainsString('Backlog → In Bearbeitung', (string)$updatedMessage->getTextBody());
+
+            foreach (['newComment', 'dueDate', 'costEstimate'] as $index => $type) {
+                $field = MashaFeedlyConfigExtension::notificationFieldMap()[$type]['du'];
+                $typeResponse = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
+                    'SecurityID' => SecurityToken::getSecurityID(),
+                    $field => '<p>Beispiel für {title} auf {siteTitle}</p>',
+                    'action_sendEmailTextTest?EmailTextField=' . $field => '1',
+                ]);
+                $this->assertSame(200, $typeResponse->getStatusCode());
+                $message = $mailer->messages[3 + $index];
+                $this->assertStringContainsString('Alex Beispiel', (string)$message->getHtmlBody());
+                $this->assertStringContainsString('In Bearbeitung', (string)$message->getHtmlBody());
+            }
+            $commentPreview = $mailer->messages[3];
+                        $this->assertStringContainsString('Ich prüfe das Formular', (string)$commentPreview->getHtmlBody());
+            $duePreview = $mailer->messages[4];
+            $this->assertStringContainsString(date('d.m.Y'), (string)$duePreview->getHtmlBody());
+            $this->assertStringContainsString('Kontaktformular zeigt', (string)$duePreview->getHtmlBody());
+            $estimatePreview = $mailer->messages[5];
+            $this->assertStringContainsString('2–3 Stunden', (string)$estimatePreview->getHtmlBody());
+            $this->assertStringContainsString('190,00 € – 285,00 €', (string)$estimatePreview->getHtmlBody());
+            $this->assertStringContainsString('Kontaktformular zeigt', (string)$estimatePreview->getHtmlBody());
+        } finally {
+            $injector->registerService($originalMailer, MailerInterface::class);
+        }
     }
 
     /** CMS-Administratoren können die konfigurierte Mailstrecke aus der Modulkonfiguration testen. */

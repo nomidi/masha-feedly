@@ -22,14 +22,55 @@ test('Profil: Avatarfarbe und stumme CMS-Vorschau bleiben nach dem Speichern erh
   let originalColor;
   let originalSoundChoice;
   let changed = false;
+  const profileRequests = [];
+  page.on('request', request => {
+    if (request.url().includes('/admin/myprofile')) {
+      profileRequests.push(`${request.method()} ${request.url()}`);
+      if (profileRequests.length > 12) profileRequests.shift();
+    }
+  });
+  const ensureProfileSaveAccess = async () => {
+    const verification = page.locator('.sudo-mode-password-field__notice-button');
+    if (await verification.isVisible()) {
+      await verification.click();
+      await page.locator('[name="SudoModePassword"]').fill(config.SUPERADMIN_PASSWORD);
+      await page.locator('.sudo-mode-password-field__verify-button').click();
+    }
+    await expect(page.locator('[name="action_save"]')).toBeEnabled();
+  };
   const saveColor = async (color) => {
+    await ensureProfileSaveAccess();
     const appearance = page.locator('.masha-feedly-profile-appearance');
     await appearance.locator(`[data-masha-feedly-color-option][data-color="${color}"]`).click();
     await expect(appearance.locator('[name="MashaFeedlyColor"]')).toHaveValue(color);
-    await Promise.all([
-      page.waitForResponse(response => response.request().method() === 'POST', { timeout: 10000 }),
-      page.locator('[name="action_save"]').click({ timeout: 10000 }),
-    ]);
+    try {
+      await Promise.all([
+        page.waitForResponse(response => response.request().method() === 'POST', { timeout: 10000 }),
+        page.locator('[name="action_save"]').click({ timeout: 10000 }),
+      ]);
+    } catch (error) {
+      const state = await page.locator('#Form_EditForm').evaluate(form => ({
+        action: form.action,
+        method: form.method,
+        saveButtons: [...form.querySelectorAll('[name="action_save"]')].map(button => ({
+          type: button.type,
+          disabled: button.disabled,
+          value: button.value,
+          formNoValidate: button.formNoValidate,
+        })),
+        color: form.querySelector('[name="MashaFeedlyColor"]')?.value ?? null,
+        soundDisabled: form.querySelector('[name="MashaFeedlyDisableSoundEffects"]')?.checked ?? null,
+        validity: form.checkValidity(),
+        invalidFields: [...form.querySelectorAll(':invalid')].map(field => ({
+          name: field.name || null,
+          id: field.id || null,
+          type: field.type || field.tagName.toLowerCase(),
+          required: field.required,
+          valueMissing: field.validity?.valueMissing ?? false,
+        })),
+      })).catch(e => ({ inspectionError: e.message }));
+      throw new Error(`${error.message}\nProfil-Speicherdiagnose: ${JSON.stringify({ state, requests: profileRequests })}`);
+    }
     await page.goto(profileURL);
     await expect(page.locator('.masha-feedly-profile-appearance [name="MashaFeedlyColor"]')).toHaveValue(color);
     const preview = page.locator('.masha-feedly-profile-settings [data-masha-feedly-avatar-preview]');
@@ -45,6 +86,9 @@ test('Profil: Avatarfarbe und stumme CMS-Vorschau bleiben nach dem Speichern erh
   };
   try {
     await page.addInitScript(() => {
+      const removeDebugBar = () => document.querySelectorAll('.phpdebugbar').forEach(bar => bar.remove());
+      new MutationObserver(removeDebugBar).observe(document, { childList: true, subtree: true });
+      removeDebugBar();
       window.effectAudioStarts = 0;
       const audioContext = window.AudioContext || window.webkitAudioContext;
       if (audioContext) {
@@ -56,6 +100,7 @@ test('Profil: Avatarfarbe und stumme CMS-Vorschau bleiben nach dem Speichern erh
       }
     });
     await page.goto(new URL('/Security/login', config.BASE_URL).href);
+    await expect(page.locator('.phpdebugbar')).toHaveCount(0);
     await page.locator('input[type="email"], input[name$="Email"]').first().fill(config.SUPERADMIN_EMAIL);
     await page.locator('input[type="password"]').first().fill(config.SUPERADMIN_PASSWORD);
     await page.locator('button[type="submit"], input[type="submit"]').first().click();
@@ -105,7 +150,7 @@ test('Profil: Avatarfarbe und stumme CMS-Vorschau bleiben nach dem Speichern erh
     assert.equal(await page.evaluate(() => window.effectAudioStarts), 0, 'Die Animation erscheint ohne Tonerzeugung. Anbieter beachtet muted: ' + await page.evaluate(() => window.KWMashaFeedlyEffectModules.arcade.play.toString().includes('muted')));
     await page.evaluate(() => window.KWMashaFeedlyEffects.cancelActive());
   } finally {
-    try { if (changed) { await page.goto(profileURL); await page.locator('.masha-feedly-profile-appearance input[name="MashaFeedlyDisableSoundEffects"]').setChecked(originalSoundChoice); await saveColor(originalColor); } }
+    try { if (changed) { await page.goto(profileURL); await ensureProfileSaveAccess(); await page.locator('.masha-feedly-profile-appearance input[name="MashaFeedlyDisableSoundEffects"]').setChecked(originalSoundChoice); await saveColor(originalColor); } }
     finally { await context.close(); await browser.close(); }
   }
 });
