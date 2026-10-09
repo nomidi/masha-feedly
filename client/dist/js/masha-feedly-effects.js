@@ -17,6 +17,9 @@
   const scripts = new Map();
   const stylesByRoot = new WeakMap();
   const active = new Set();
+  const effectPools = new Map();
+  const EFFECT_BATCH_SIZE = 10;
+  let idlePreloadScheduled = false;
   let generation = 0;
   const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const rootFor = (document) => window.KWMashaFeedlyDOM?.root() || document;
@@ -42,7 +45,9 @@
           } catch (_) { /* Ältere oder abgewiesene Proxy-Antworten enthalten kein JSON. */ }
           throw new Error(message);
         }
-        const data = await response.json();
+        let data;
+        try { data = await response.json(); }
+        catch (_) { throw new Error('Der Effekt-Anbieter hat eine ungültige Antwort gesendet. Bitte versuche es später erneut.'); }
         if (data.version !== 2 || !Array.isArray(data.categories) || !Array.isArray(data.effects)) throw new Error('Ungültiger Effekt-Katalog.');
         const categoryIDs = new Set(data.categories.filter((category) => /^[a-z][a-z0-9_-]{0,79}$/.test(category.id) && typeof category.name === 'string' && category.name.trim()).map((category) => category.id));
         catalog = {
@@ -168,12 +173,60 @@
     console.warn('[Masha:Feedly] Abschluss-Effekt nicht verfügbar:', error.message);
     return null;
   });
+  const chooseBatch = (effects, excludedIDs, random = Math.random) => {
+    const available = effects.filter((effect) => !excludedIDs.has(effect.id));
+    const batch = [];
+    while (available.length && batch.length < EFFECT_BATCH_SIZE) {
+      const effect = choose(available, random);
+      batch.push(effect);
+      available.splice(available.indexOf(effect), 1);
+    }
+    return batch;
+  };
+  const refillPool = (document, theme, state, random = Math.random) => {
+    if (state.refillPromise) return state.refillPromise;
+    state.refillPromise = (async () => {
+      const candidates = candidatesFor(await refresh(), theme);
+      const excludedIDs = new Set(state.effects.map((effect) => effect.id));
+      const batch = chooseBatch(candidates, excludedIDs, random);
+      await Promise.allSettled(batch.map((effect) => load(effect, document)));
+      state.effects.push(...batch);
+      return batch;
+    })().finally(() => { state.refillPromise = null; });
+    return state.refillPromise;
+  };
+  const poolFor = (theme) => {
+    if (!effectPools.has(theme)) effectPools.set(theme, { effects: [], refillPromise: null });
+    return effectPools.get(theme);
+  };
   const preload = (document, theme) => safely(async () => {
     if (reducedMotion()) return [];
-    const effects = candidatesFor(await refresh(), theme);
-    await Promise.allSettled(effects.map((effect) => load(effect, document)));
-    return effects;
+    const state = poolFor(theme);
+    if (state.effects.length <= 1) return refillPool(document, theme, state);
+    return state.effects;
   });
+  const takeEffect = async (document, theme, random) => {
+    const state = poolFor(theme);
+    if (!state.effects.length) await refillPool(document, theme, state, random);
+    const effect = choose(state.effects, random);
+    if (!effect) return null;
+    state.effects.splice(state.effects.indexOf(effect), 1);
+    if (state.effects.length <= 1) {
+      void refillPool(document, theme, state).catch((error) => {
+        console.warn('[Masha:Feedly] Effekte konnten nicht nachgeladen werden:', error.message);
+      });
+    }
+    return effect;
+  };
+  const scheduleIdlePreload = (document) => {
+    if (idlePreloadScheduled) return;
+    idlePreloadScheduled = true;
+    const widget = window.KWMashaFeedlyDOM?.widget();
+    const theme = widget?.dataset.theme || 'playful';
+    const run = () => { idlePreloadScheduled = false; void preload(document, theme); };
+    if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(run, { timeout: 1500 });
+    else window.setTimeout(run, 250);
+  };
   const preview = (id, document) => safely(async () => {
     if (reducedMotion()) return null;
     const token = generation;
@@ -194,7 +247,7 @@
       if (reducedMotion()) return null;
       const token = generation;
       try {
-        const effect = choose(candidatesFor(await refresh(), theme), random);
+        const effect = await takeEffect(document, theme, random);
         return effect ? await start(effect, document, token) : fallback(document, token);
       } catch (error) {
         console.warn('[Masha:Feedly] Lokaler Abschluss-Effekt:', error.message);
@@ -203,9 +256,5 @@
     }),
   };
   document.addEventListener('pointerdown', cancelActive, true);
-  document.addEventListener('kw-masha-feedly:opened', () => preload(document, window.KWMashaFeedlyDOM?.widget()?.dataset.theme || 'playful'));
-  document.addEventListener('DOMContentLoaded', () => {
-    const widget = window.KWMashaFeedlyDOM?.widget();
-    if (widget) window.setTimeout(() => preload(document, widget.dataset.theme || 'playful'), 1000);
-  });
+  document.addEventListener('kw-masha-feedly:onboarding-list-rendered', () => scheduleIdlePreload(document));
 })();

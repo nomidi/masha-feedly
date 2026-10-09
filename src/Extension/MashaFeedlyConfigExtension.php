@@ -3,6 +3,8 @@
 namespace KW\MashaFeedly\Extension;
 
 use SilverStripe\Core\Extension;
+use SilverStripe\Control\Controller;
+use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\SiteConfig\SiteConfig;
@@ -33,6 +35,18 @@ class MashaFeedlyConfigExtension extends Extension
 {
     /** @var int[] */
     private array $newlyAllowedMemberIDs = [];
+
+    /** @var int[]|null Freigabeliste für den aktuellen Request. */
+    private static ?array $memberIDsCache = null;
+
+    /** Request-Identität, damit Anfragen in Testläufen nicht dieselbe Cachekopie teilen. */
+    private static ?int $memberIDsCacheRequestID = null;
+
+    /** Schema-Prüfung für den aktuellen Request. */
+    private static ?HTTPRequest $schemaCheckRequest = null;
+
+    /** @var array<string, true>|null Vorhandene SiteConfig-Felder für den aktuellen Request. */
+    private static ?array $siteConfigFieldNamesCache = null;
 
     private static $db = [
         'MashaFeedlyAllowedMemberIDs' => 'Text',
@@ -75,7 +89,7 @@ class MashaFeedlyConfigExtension extends Extension
     /** Ergänzt den E-Mail-Footer bei dev/build, solange noch kein eigener Text gespeichert wurde. */
     public function requireDefaultRecords(): void
     {
-        if (!DB::get_schema()->hasField('SiteConfig', 'MashaFeedlyEmailFooter')) {
+        if (!self::hasSiteConfigField('MashaFeedlyEmailFooter')) {
             return;
         }
         $config = self::currentSiteConfig();
@@ -132,7 +146,7 @@ class MashaFeedlyConfigExtension extends Extension
     public static function emailTestSucceeded(): bool
     {
         // requireDefaultRecords kann während dev/build vor dem Schema-Update laufen.
-        if (!DB::get_schema()->hasField('SiteConfig', 'MashaFeedlyEmailTestSucceeded')) {
+        if (!self::hasSiteConfigField('MashaFeedlyEmailTestSucceeded')) {
             return false;
         }
 
@@ -170,6 +184,7 @@ class MashaFeedlyConfigExtension extends Extension
     /** Begrüßt Mitglieder nach erfolgreicher Speicherung ihrer neuen Freigabe. */
     protected function onAfterWrite(): void
     {
+        self::clearMemberIDsCache();
         foreach ($this->newlyAllowedMemberIDs as $memberID) {
             $member = Member::get()->byID($memberID);
             if ($member) {
@@ -237,11 +252,34 @@ class MashaFeedlyConfigExtension extends Extension
 
         // dev/build initialisiert Controller, bevor neue SiteConfig-Spalten angelegt sind.
         // In diesem kurzen Zeitraum darf keine ORM-Abfrage alle SiteConfig-Felder auswählen.
-        if (!DB::get_schema()->hasField('SiteConfig', 'MashaFeedlyEmailFooter')) {
+        if (!self::hasSiteConfigField('MashaFeedlyEmailFooter')) {
             return false;
         }
 
         return in_array((int)$member->ID, self::memberIDs(), true);
+    }
+
+    /** Prüft das während dev/build benötigte Feld einmal pro HTTP-Request. */
+    private static function hasSiteConfigField(string $fieldName): bool
+    {
+        $request = Controller::curr()?->getRequest();
+        if (!$request) {
+            return DB::get_schema()->hasField('SiteConfig', $fieldName);
+        }
+
+        if (self::$schemaCheckRequest !== $request) {
+            self::$schemaCheckRequest = $request;
+            self::$siteConfigFieldNamesCache = null;
+        }
+
+        if (self::$siteConfigFieldNamesCache === null) {
+            $schema = DB::get_schema();
+            self::$siteConfigFieldNamesCache = $schema->hasTable('SiteConfig')
+                ? array_fill_keys(array_keys($schema->fieldList('SiteConfig')), true)
+                : [];
+        }
+
+        return isset(self::$siteConfigFieldNamesCache[$fieldName]);
     }
 
     /** Prüft, ob ein Mitglied ausdrücklich in der Masha-Feedly-Freigabeliste steht. */
@@ -259,6 +297,12 @@ class MashaFeedlyConfigExtension extends Extension
      */
     public static function memberIDs(): array
     {
+        $request = Controller::curr()?->getRequest();
+        $requestID = $request ? spl_object_id($request) : null;
+        if ($requestID !== null && self::$memberIDsCacheRequestID === $requestID && self::$memberIDsCache !== null) {
+            return self::$memberIDsCache;
+        }
+
         $config = self::currentSiteConfig();
         $raw = (string)$config->MashaFeedlyAllowedMemberIDs;
         $decoded = json_decode($raw, true);
@@ -266,7 +310,16 @@ class MashaFeedlyConfigExtension extends Extension
             $decoded = preg_split('/\s*,\s*/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         }
 
-        return self::normalizeMemberIDs($decoded);
+        self::$memberIDsCache = self::normalizeMemberIDs($decoded);
+        self::$memberIDsCacheRequestID = $requestID;
+        return self::$memberIDsCache;
+    }
+
+    /** Verwirft die Request-Zwischenspeicherung nach Änderungen an der Freigabeliste. */
+    private static function clearMemberIDsCache(): void
+    {
+        self::$memberIDsCache = null;
+        self::$memberIDsCacheRequestID = null;
     }
 
     /**

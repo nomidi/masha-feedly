@@ -104,6 +104,17 @@ class MashaFeedlyEntryReadTest extends SapphireTest
         $this->assertSame([(int)$entry->ID], MashaFeedlyEntryRead::unreadEntryIDs($member));
     }
 
+    /** Prüft, dass der Ungelesen-Status eine bereits geladene Eintragsliste wiederverwenden kann. */
+    public function testUnreadEntryIDsCanUsePreloadedEntries(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMembers([$member]);
+        $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
+
+        $this->assertSame([], MashaFeedlyEntryRead::unreadEntryIDs($member, []));
+        $this->assertSame([(int)$entry->ID], MashaFeedlyEntryRead::unreadEntryIDs($member, [$entry]));
+    }
+
     /** Prüft, dass nicht gespeicherte Einträge ignoriert und Lesestände aktualisiert statt dupliziert werden. */
     public function testMarkAsSeenIgnoresUnsavedEntriesAndReusesExistingReadRecord(): void
     {
@@ -198,7 +209,11 @@ class MashaFeedlyEntryReadTest extends SapphireTest
             }
         }
 
+        $entry = MashaFeedlyEntry::get()->byID((int)$entry->ID);
+        $activityVersionBeforeComment = (int)$entry->ActivityVersion;
         MashaFeedlyEntryHistory::record($entry, 'comment', '', 'Neue Rückfrage', $assignee, 123);
+        $entry = MashaFeedlyEntry::get()->byID((int)$entry->ID);
+        $this->assertSame($activityVersionBeforeComment + 1, (int)$entry->ActivityVersion);
 
         $this->assertSame([(int)$entry->ID], MashaFeedlyEntryRead::unreadEntryIDs($creator));
         $this->assertSame([(int)$entry->ID], MashaFeedlyEntryRead::unreadEntryIDs($assignee));

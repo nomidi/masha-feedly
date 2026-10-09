@@ -1,4 +1,14 @@
 (() => {
+  /** Verbirgt HTML-/Parserfehler des CMS-Endpunkts hinter einer lesbaren Rückmeldung. */
+  const readJSONResponse = async (response) => {
+    try {
+      const result = await response.json();
+      if (!result || typeof result !== 'object' || Array.isArray(result)) throw new TypeError('Ungültige JSON-Antwort');
+      return result;
+    } catch (_) {
+      throw new Error('Der Server hat eine ungültige Antwort gesendet. Bitte versuche es erneut.');
+    }
+  };
   /** Zeigt die Startkategorien und das Projekt nur bei ausgewählter Mite-Aktivierung. */
   const applyMiteConfiguration = () => {
     const enabled = document.querySelector('input[name="MashaFeedlyMiteEnabled"][type="checkbox"]');
@@ -238,7 +248,7 @@
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: data,
       });
-      const result = await response.json();
+      const result = await readJSONResponse(response);
       if (!response.ok || !result.success) throw new Error(result.message || form.dataset.errorMessage || 'Meldeperson konnte nicht gespeichert werden.');
       if (status) status.textContent = result.message || 'Meldeperson gespeichert.';
     } catch (error) {
@@ -316,7 +326,7 @@
         credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' },
       });
       /** @type {MiteOptionsResponse} */
-      const result = await response.json();
+      const result = await readJSONResponse(response);
       if (!response.ok || !result.success) throw new Error(result.message || t('MITE_LOAD_ERROR'));
       if (loadVersion !== miteLoadVersion || miteModal.hidden) return;
       project.replaceChildren(new Option(t('MITE_CHOOSE_PROJECT'), ''));
@@ -407,7 +417,7 @@
         method: 'POST', credentials: 'same-origin',
         headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: data,
       });
-      const result = await response.json();
+      const result = await readJSONResponse(response);
       if (!response.ok || !result.success) throw new Error(result.message || t('MITE_START_ERROR'));
       miteBusy = false;
       if (stopping) {
@@ -546,7 +556,7 @@
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: formData,
       });
-      const result = await response.json();
+      const result = await readJSONResponse(response);
       if (!response.ok || !result.success || !result.category) {
         throw new Error(result.message || t('BOARD_CATEGORY_ADD_ERROR'));
       }
@@ -581,7 +591,7 @@
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: formData,
       });
-      const result = await response.json();
+      const result = await readJSONResponse(response);
       if (!response.ok || !result.success) throw new Error(result.message || t('BOARD_ENTRY_SAVE_ERROR'));
       if (entryStatus) entryStatus.textContent = result.message || t('BOARD_ENTRY_SAVE_SUCCESS');
       board.status.textContent = result.message || t('BOARD_ENTRY_SAVE_SUCCESS');
@@ -697,7 +707,7 @@
           headers: { 'X-Requested-With': 'XMLHttpRequest' },
           body: formData,
         });
-        const result = await response.json();
+        const result = await readJSONResponse(response);
         if (!response.ok || !result.success) throw new Error(result.message || t('BOARD_CATEGORY_SAVE_ERROR'));
         status.textContent = t('BOARD_CATEGORY_SAVE_SUCCESS');
       } catch (error) {
@@ -739,7 +749,7 @@
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: formData,
       });
-      const result = await response.json();
+      const result = await readJSONResponse(response);
       if (!response.ok || !result.success) throw new Error(result.message || t('BOARD_SAVE_ERROR'));
       if (result.sentToFeedback) {
         const targetList = board.querySelector(`.masha-feedly-board__list[data-category-id="${Number(result.categoryID)}"]`);
@@ -775,7 +785,7 @@
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: formData,
       });
-      const result = await response.json();
+      const result = await readJSONResponse(response);
       if (!response.ok || !result.success) throw new Error(result.message || t('BOARD_CATEGORY_DELETE_ERROR'));
       column.remove();
       status.textContent = t('BOARD_CATEGORY_DELETE_SUCCESS');

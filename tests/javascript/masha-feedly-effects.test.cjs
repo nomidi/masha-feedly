@@ -100,6 +100,39 @@ test('lädt CSS im Shadow Root und JS nur einmal pro Version im Dokument', async
   assert.ok(env.played.every(item => item.layer.removed));
 });
 
+test('startet das Vorladen erst nach dem Listen-Rendern in der Leerlaufzeit', async () => {
+  const env = environment();
+  assert.equal(env.requests(), 0);
+  env.listeners['kw-masha-feedly:onboarding-list-rendered']();
+  assert.equal(env.requests(), 0);
+  const idleCallback = [...env.timers.values()][0];
+  assert.equal(typeof idleCallback, 'function');
+  idleCallback();
+  await new Promise(setImmediate);
+  assert.equal(env.requests(), 1);
+  assert.deepEqual(env.appended.map(({ element }) => element.tag).sort(), ['link', 'script']);
+});
+
+test('lädt höchstens zehn Effekte vor und füllt den Pool bei einem verbleibenden Effekt nach', async () => {
+  const effects = Array.from({ length: 12 }, (_, index) => definition(`effect${index}`));
+  const env = environment(effects);
+  await env.api.preload(env.document, 'playful');
+  const loadedBeforePlayback = new Set(env.appended
+    .filter(({ element }) => element.tag === 'script')
+    .map(({ element }) => new URL(element.src).pathname));
+  assert.equal(loadedBeforePlayback.size, 10);
+
+  for (let index = 0; index < 9; index++) {
+    await env.api.playOnDone(env.document, env.window, '', 'playful', () => 0);
+  }
+  await new Promise(setImmediate);
+  const loadedAfterRefill = new Set(env.appended
+    .filter(({ element }) => element.tag === 'script')
+    .map(({ element }) => new URL(element.src).pathname));
+  assert.ok(loadedAfterRefill.size >= 11);
+  assert.equal(new Set(env.played.slice(0, 9).map(item => item.id)).size, 9);
+});
+
 test('spielt nach einem Abbruch auch eine noch wartende Manifest-Anfrage nicht ab', async () => {
   let resolve;
   const pending = new Promise(done => { resolve = done; });

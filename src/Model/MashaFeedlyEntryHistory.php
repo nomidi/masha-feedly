@@ -3,6 +3,7 @@
 namespace KW\MashaFeedly\Model;
 
 use SilverStripe\ORM\DataObject;
+use SilverStripe\ORM\DB;
 use SilverStripe\Security\Member;
 
 /** Unveränderlicher Verlaufseintrag für Status- und Zuständigkeitsänderungen. */
@@ -33,7 +34,7 @@ class MashaFeedlyEntryHistory extends DataObject
         int $relatedID = 0
     ): void
     {
-        self::create([
+        $history = self::create([
             'EntryID' => (int)$entry->ID,
             'ChangeType' => $type,
             'OldValue' => $oldValue,
@@ -41,7 +42,31 @@ class MashaFeedlyEntryHistory extends DataObject
             'ActorMemberID' => (int)($actor?->ID ?? 0),
             'ActorName' => mb_substr($actor?->getName() ?: 'System', 0, 120),
             'RelatedID' => $relatedID,
-        ])->write();
+        ]);
+        $history->write();
+
+        // Der Zähler erkennt Aktivitäten innerhalb derselben Sekunde und umgeht
+        // beim Metadatenspeichern den OnAfterWrite-Lesestatus des Eintrags.
+        $activityAt = (string)$history->Created;
+        $entryID = (int)$entry->ID;
+        $connection = DB::get_conn();
+        $table = $connection->escapeIdentifier(DataObject::getSchema()->tableName(MashaFeedlyEntry::class));
+        $idField = $connection->escapeIdentifier('ID');
+        $versionField = $connection->escapeIdentifier('ActivityVersion');
+        $activityField = $connection->escapeIdentifier('LastActivityAt');
+        DB::prepared_query(
+            "UPDATE {$table} SET {$versionField} = COALESCE({$versionField}, 0) + 1, "
+                . "{$activityField} = CASE WHEN {$activityField} IS NULL OR {$activityField} < ? "
+                . "THEN ? ELSE {$activityField} END WHERE {$idField} = ?",
+            [$activityAt, $activityAt, $entryID]
+        );
+
+        // Nachfolgende Aufrufer können den aktuellen Hash bilden, ohne den Eintrag erneut zu schreiben.
+        $updatedEntry = MashaFeedlyEntry::get()->byID($entryID);
+        if ($updatedEntry) {
+            $entry->ActivityVersion = (int)$updatedEntry->ActivityVersion;
+            $entry->LastActivityAt = (string)$updatedEntry->LastActivityAt;
+        }
     }
 
     /** Formatiert den Verlauf einheitlich für die Widget-Antworten. */
@@ -104,6 +129,13 @@ class MashaFeedlyEntryHistory extends DataObject
                     'RelatedID' => (int)$attachment->ID,
                     'Created' => (string)$attachment->Created,
                 ])->write();
+            }
+
+            $latestHistory = $entry->History()->sort('Created DESC, ID DESC')->first();
+            if ($latestHistory && (!$entry->LastActivityAt
+                || strtotime((string)$latestHistory->Created) > strtotime((string)$entry->LastActivityAt))) {
+                $entry->LastActivityAt = (string)$latestHistory->Created;
+                $entry->write();
             }
         }
     }

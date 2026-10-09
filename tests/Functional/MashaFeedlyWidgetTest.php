@@ -53,7 +53,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('masha-feedly-color-palette__grid', $body, 'Die Farbauswahl wird auf der Profilseite gerendert.');
     }
 
-    /** Zuständigkeitsfelder rendern das ausgewählte lokale Symbol statt nur Initialen. */
+    /** Nachgeladene Zuständigkeiten enthalten das ausgewählte lokale Symbol. */
     public function testAssigneeChoiceRendersSelectedAvatarIcon(): void
     {
         $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
@@ -70,8 +70,14 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $response = $this->get('/masha-feedly-widget-test');
         $this->assertSame(200, $response->getStatusCode());
         $markup = $this->widgetMarkup($response->getBody());
-        $this->assertStringContainsString('data-avatar-initials="EM"', $markup);
-        $this->assertStringContainsString('src="http://localhost/__masha-feedly-effects/avatar/person/black"', $markup);
+        $this->assertStringNotContainsString('data-avatar-initials="EM"', $markup);
+        $widgetData = json_decode($this->get('/__masha-feedly/widgetData')->getBody(), true);
+        $assignee = array_values(array_filter(
+            $widgetData['members'],
+            static fn(array $item): bool => $item['id'] === (int)$member->ID
+        ))[0];
+        $this->assertSame('EM', $assignee['initials']);
+        $this->assertSame('http://localhost/__masha-feedly-effects/avatar/person/black', $assignee['imageURL']);
     }
 
     /** Prüft, dass nur freigegebene Benutzer das globale Widget erhalten. */
@@ -351,7 +357,12 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $superAdminMarkup = $this->widgetMarkup($superAdminResponse->getBody());
         $this->assertStringContainsString('data-can-manage-estimate="1"', $superAdminMarkup);
         $this->assertStringContainsString('data-masha-feedly-create-estimate hidden', $superAdminMarkup);
-        $this->assertStringContainsString('data-system-key="estimate_pending"', $superAdminMarkup);
+        $widgetData = json_decode($this->get('/__masha-feedly/widgetData')->getBody(), true);
+        $pendingCategory = array_values(array_filter(
+            $widgetData['categories'],
+            static fn(array $item): bool => $item['systemKey'] === 'estimate_pending'
+        ))[0];
+        $this->assertTrue($pendingCategory['canSelectForNewEntry']);
 
         Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['someone-else@example.test']);
         $ordinaryAdminResponse = $this->get('/masha-feedly-widget-test');
@@ -361,6 +372,12 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringNotContainsString('data-masha-feedly-create-estimate', $ordinaryAdminMarkup);
         $this->assertStringNotContainsString('name="EstimatedCostDuration"', $ordinaryAdminMarkup);
         $this->assertStringNotContainsString('name="EstimatedCostNote"', $ordinaryAdminMarkup);
+        $widgetData = json_decode($this->get('/__masha-feedly/widgetData')->getBody(), true);
+        $pendingCategory = array_values(array_filter(
+            $widgetData['categories'],
+            static fn(array $item): bool => $item['systemKey'] === 'restricted_estimate'
+        ))[0];
+        $this->assertFalse($pendingCategory['canSelectForNewEntry']);
     }
 
     /** Admins benötigen eine ausdrückliche Freigabe, um das Widget zu sehen. */

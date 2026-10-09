@@ -1,6 +1,6 @@
 # Masha:Feedly Browsertests
 
-Die opt-in Playwright-Tests prüfen Kommentaraktivität, Onboarding, Kostenschätzungen, Zugriffsschutz, Screenshot-Zuschnitt und den Effekt-Anbieter. Die Suite muss seriell laufen, weil alle Browserläufe dieselbe Website und Datenbank verwenden.
+Die opt-in Playwright-Tests prüfen Tooltips, Kommentaraktivität, Onboarding, Kostenschätzungen, Zugriffsschutz, Screenshot-Zuschnitt und den Effekt-Anbieter. Die Suite muss seriell laufen, weil alle Browserläufe dieselbe Website und Datenbank verwenden.
 
 ## Konfiguration
 
@@ -39,6 +39,7 @@ Vom Projekt-Hauptverzeichnis aus:
 
 ```sh
 node --test masha-feedly/tests/e2e/comment-activity.test.cjs
+node --test masha-feedly/tests/e2e/tooltip.test.cjs
 node --test masha-feedly/tests/e2e/onboarding.test.cjs
 node --test masha-feedly/tests/e2e/estimate-workflow.test.cjs
 node --test masha-feedly/tests/e2e/access-matrix.test.cjs

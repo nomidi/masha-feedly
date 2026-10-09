@@ -101,6 +101,10 @@ const document = { addEventListener() {} };
 const window = {
   KWMashaFeedlyTranslate: translate,
   KWMashaFeedlyTranslations: {},
+  KWMashaFeedlyReadJSON: async (response) => {
+    try { const data = await response.json(); if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error(); return data; }
+    catch (_) { throw new Error('Der Server hat eine ungültige Antwort gesendet. Bitte versuche es erneut.'); }
+  },
   KWMashaFeedlyEffects: { playOnDone() { return Promise.resolve(null); } },
 };
 vm.runInNewContext(source, { document, window, URL });
@@ -463,7 +467,7 @@ test('hält Karten kompakt und zeigt Beschreibung sowie Seitenbereich nach dem �
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   assert.ok(card.children.find((child) => child.className === 'kw-masha-feedly__entry-title'));
   assert.equal(card.children.some((child) => child.tagName === 'P' || child.tagName === 'A' || child.className === 'kw-masha-feedly__entry-context'), false);
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   assert.equal(env.editModal.hidden, false);
   assert.equal(env.editDescription.textContent.includes('Der Inhalt ist verschoben.'), true);
   assert.equal(env.editEnvironment.children.length > 0, true);
@@ -553,7 +557,7 @@ test('zeigt die Teilen-Funktion auch im geöffneten Bugfenster und teilt genau d
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   assert.equal(env.editModal.hidden, false);
   await env.shareActiveEntryButton.listeners.click({ preventDefault() {}, stopPropagation() {} });
   const directLink = new URL(env.window.copiedText);
@@ -567,7 +571,7 @@ test('kopiert den Bug-Direktlink auch mit dem Browser-Fallback, wenn die Clipboa
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   await env.shareActiveEntryButton.listeners.click({ preventDefault() {}, stopPropagation() {} });
   assert.equal(env.window.clipboardCalls.length, 1);
   const copiedLink = new URL(env.window.copiedText);
@@ -1154,6 +1158,8 @@ test('sendet entfernte Verknüpfungen und zeigt die bestätigte Entfernung im Ve
 function createWidgetEnvironment(locationHref = 'https://feedly:8890/about-us?preview=1', address = 'du', priorityIconType = 'warning', entryDueDate = '') {
   const listeners = {};
   const requests = [];
+  const detailRequests = [];
+  const detailResponses = [];
   const dispatchedEvents = [];
   const postResponses = [];
   const postCalls = [];
@@ -1207,7 +1213,7 @@ function createWidgetEnvironment(locationHref = 'https://feedly:8890/about-us?pr
     cloneNode() { const clone = new Element(); clone.tagName = this.tagName; clone.className = this.className; return clone; }
     getBoundingClientRect() { return { left: 150, top: 120, width: 200 }; }
   }
-const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryReadUrl: '/__masha-feedly/markEntryRead', savedViewsUrl: '/__masha-feedly', saveViewUrl: '/__masha-feedly', deleteViewUrl: '/__masha-feedly', securityId: 'test-token', theme: 'playful' });
+const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetailsUrl: '/__masha-feedly/entryDetails', markEntryReadUrl: '/__masha-feedly/markEntryRead', savedViewsUrl: '/__masha-feedly', saveViewUrl: '/__masha-feedly', deleteViewUrl: '/__masha-feedly', securityId: 'test-token', theme: 'playful' });
   widget.dataset.address = address;
   widget.dataset.unicornUrl = '/_resources/kooperativeweb/masha-feedly/client/dist/icons/masha-feedly-unicorn.svg';
   widget.contains = () => false;
@@ -1385,6 +1391,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
     locationAssign: '',
     KWMashaFeedlyTranslate: translate,
     KWMashaFeedlyTranslations: {},
+    KWMashaFeedlyReadJSON: async (response) => { try { const data = await response.json(); if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error(); return data; } catch (_) { throw new Error('Der Server hat eine ungültige Antwort gesendet. Bitte versuche es erneut.'); } },
     KWMashaFeedlyEffects: sharedEffects,
     KWMashaFeedlyEntries: entriesUI,
     confirm: () => true,
@@ -1462,9 +1469,24 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
       if (parsedURL.pathname === '/__masha-feedly') {
         return { ok: true, json: async () => ({ success: true, views: savedViewsData }) };
       }
+      if (parsedURL.pathname === '/__masha-feedly/entryDetails') {
+        detailRequests.push(parsedURL);
+        if (detailResponses.length) {
+          const response = detailResponses.shift();
+          if (response instanceof Error) throw response;
+          return await response;
+        }
+        return { ok: true, json: async () => ({ success: true, entry: responseFor('page').entries.find((entry) => Number(entry.id) === Number(parsedURL.searchParams.get('EntryID'))) }) };
+      }
       const mode = parsedURL.searchParams.get('mode');
       requests.push(parsedURL);
-      return { ok: true, json: async () => responseFor(mode) };
+      const result = responseFor(mode);
+      result.entries = result.entries.map((entry) => {
+        const summary = { ...entry, activityAt: entry.history[0].created };
+        ['content', 'attachments', 'relations', 'history', 'comments', 'assignedMemberIDs', 'operatingSystem', 'browser', 'userAgent', 'resolution', 'browserWindow', 'colorDepth'].forEach((key) => delete summary[key]);
+        return summary;
+      });
+      return { ok: true, json: async () => result };
     },
     Option: class { constructor(text, value) { this.text = text; this.value = value; } },
     URL,
@@ -1493,7 +1515,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', markEntryRe
   };
   vm.runInNewContext(source, context);
   listeners.DOMContentLoaded();
-  return { listeners, requests, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
+  return { listeners, requests, detailRequests, detailResponses, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
 }
 
 test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedback-Warteschlange', async () => {
@@ -1684,7 +1706,7 @@ test('zeigt Kommentare als abwechselnde sichere Sprechblasen und sendet neue Kom
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   assert.equal(env.commentForm.elements.EntryID.value, '71');
   assert.deepEqual(env.commentList.children.map((item) => item.className), [
     'kw-masha-feedly__comment is-left', 'kw-masha-feedly__comment is-right',
@@ -1746,7 +1768,7 @@ test('sendet eine Kommentarreaktion an den geschützten Kommentar-Endpunkt und a
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   const comment = env.commentList.children[0];
   const reactions = comment.children[3];
   const reactionToggle = reactions.children[0].children.at(-1);
@@ -1807,7 +1829,7 @@ test('erklärt eine HTML-Fehlerantwort des Kommentar-Endpunkts lesbar', async ()
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.commentForm.elements.CommentText.value = 'Test';
   env.postResponses.push({ ok: false, json: async () => { throw new SyntaxError(`Unexpected token 'A', "Action 'commentEntry' isn't allowed" is not valid JSON`); } });
   await env.commentForm.listeners.submit({ preventDefault() {} });
@@ -1820,7 +1842,7 @@ test('meldet nach bestätigtem Senden einen Anzeige-Fehler als gespeichert', asy
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.commentForm.elements.CommentText.value = 'Neuer Kommentar';
   env.postResponses.push({ ok: true, json: async () => ({ success: true, comment: { id: 3, author: 'Erika', text: 'Neuer Kommentar' } }) });
   const originalRenderLinks = env.window.KWMashaFeedlyEntries.renderLinks;
@@ -1840,7 +1862,7 @@ test('meldet nach bestätigtem Bearbeiten einen Anzeige-Fehler als gespeichert',
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   const actions = env.commentList.children[0].children.find((child) => child.className === 'kw-masha-feedly__comment-actions');
   actions.children[0].listeners.click();
   const editor = env.commentList.children[0].children[1];
@@ -1863,7 +1885,7 @@ test('meldet nach bestätigter Emoji-Reaktion einen Anzeige-Fehler als gespeiche
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   const reactionContainer = env.commentList.children[0].children[3];
   reactionContainer.children[0].children.at(-1).listeners.click();
   const reactionButton = reactionContainer.children[1].children[0];
@@ -1885,7 +1907,7 @@ test('erklärt einen Kommentar-Netzwerkfehler mit unklarem Speicherstatus', asyn
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.postResponses.push(new Error('Failed to fetch'));
   await env.commentForm.listeners.submit({ preventDefault() {} });
   assert.equal(env.commentStatus.textContent, messages.COMMENT_UNCLEAR_RESULT_ERROR);
@@ -1897,7 +1919,7 @@ test('übernimmt bei einer 403-Antwort weder Kommentar noch Verlauf', async () =
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   const previousCommentCount = env.commentCount.textContent;
   const previousHistoryCount = env.editHistory.children.length;
   env.commentForm.elements.CommentText.value = 'Unberechtigter Kommentar';
@@ -2016,7 +2038,7 @@ test('öffnet den dritten Bereich direkt hinter dem ersten, wenn eine Seitenblas
   env.document.querySelector = (selector) => selector === '#about-title' ? env.pageTarget : null;
   await env.listeners['kw-masha-feedly:opened']();
   const marker = env.document.body.children[0];
-  marker.listeners.click({ preventDefault() {}, stopPropagation() {} });
+  await marker.listeners.click({ preventDefault() {}, stopPropagation() {} });
   assert.equal(env.listModal.hidden, true);
   assert.equal(env.editModal.hidden, false);
   assert.equal(env.widget.attributes['data-edit-open'], 'true');
@@ -2095,7 +2117,7 @@ test('öffnet den Eintrag aus der Kartenliste und springt zum gespeicherten Seit
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   assert.equal(card.children[0].children[0].textContent, '#71');
   assert.equal(card.children[0].children[1].textContent, 'Fehler auf About us');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   assert.equal(env.listModal.hidden, false);
   assert.equal(env.widget.attributes['data-list-open'], 'true');
   assert.equal(env.editModal.hidden, false);
@@ -2132,7 +2154,7 @@ test('zeigt Info-Prioritäten mit dem i-Symbol und beschriftet es barrierefrei',
   assert.equal(icon.dataset.iconType, 'info');
   assert.equal(icon.attributes['aria-label'], 'Info');
   assert.match(icon.innerHTML, /viewBox="0 0 512 512"/);
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   assert.equal(env.editPriorityIcon.dataset.iconType, 'info');
   assert.match(env.editPriorityIcon.innerHTML, /viewBox="0 0 512 512"/);
 });
@@ -2148,7 +2170,7 @@ test('macht Links in Eintragsbeschreibung anklickbar und zeigt Bildanhänge inli
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   assert.equal(card.children.some((child) => child.tagName === 'P' || child.tagName === 'A'), false, 'Die Übersichtskarte bleibt kompakt.');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   assert.equal(env.editDescription.children.find((node) => node.tagName === 'a').href, 'https://example.test/hilfe');
   const imageLink = env.editAttachments.children.find((node) => node.href === '/assets/private/ansicht.png');
   const pdfLink = env.editAttachments.children.find((node) => node.href === '/assets/private/details.pdf');
@@ -2163,7 +2185,7 @@ test('navigiert beim Klick auf einen anderen Seiteneintrag zur Seite mit Eintrag
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   const destination = new URL(env.window?.locationAssign || 'https://feedly:8890/about-us');
   assert.equal(destination.pathname, '/contact');
   assert.equal(destination.searchParams.get('masha-feedly-entry'), '71');
@@ -2174,7 +2196,7 @@ test('zeigt nach erfolgreichem Speichern die Bestätigung und lädt den aktualis
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.editForm.elements.CategoryID.value = '3';
   env.editForm.elements.PriorityID.value = '5';
   env.editForm.assigneeFields[0].checked = false;
@@ -2207,7 +2229,7 @@ test('zeigt eine gesetzte Fälligkeit auf der Karte und übernimmt sie ins Bearb
   const dueDate = metadata.children.find((child) => child.className === 'kw-masha-feedly__entry-due-date');
   assert.equal(dueDate.dateTime, '2026-10-10');
   assert.equal(dueDate.textContent, 'Fällig am 10.10.2026');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   assert.equal(env.editForm.elements.DueDate.value, '2026-10-10');
 });
 
@@ -2216,7 +2238,7 @@ test('zeigt die bestätigte automatische Duplikat-Schließung nach dem Speichern
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.editForm.elements.CategoryID.value = '4';
   env.postResponses.push({ ok: true, json: async () => ({
     success: true,
@@ -2237,7 +2259,7 @@ test('übernimmt den vom Server erzwungenen Feedback-Status statt Done vorzutäu
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.editForm.elements.CategoryID.value = '4';
   env.postResponses.push({ ok: true, json: async () => ({
     success: true,
@@ -2267,7 +2289,7 @@ test('sendet zusätzliche Dateien beim Bearbeiten und zeigt sie nach dem Speiche
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   const selectedFile = { name: 'plan.pdf' };
   env.editAttachmentInput.files = [selectedFile];
   env.editAttachmentInput.value = 'C:\\fakepath\\plan.pdf';
@@ -2291,7 +2313,7 @@ test('zeigt serverseitig abgelehnte Anhänge beim Bearbeiten an und hält den Di
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.editAttachmentInput.files = [{ name: 'bild.pdf' }];
   env.postResponses.push({
     ok: false,
@@ -2316,7 +2338,7 @@ test('meldet beim Eintrags-Update einen unklaren Speicherstatus nach Netzwerk- o
     await env.listeners['kw-masha-feedly:opened']();
     await env.openListButton.listeners.click();
     const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-    env.listContainer.listeners.click({ target: card, preventDefault() {} });
+    await env.listContainer.listeners.click({ target: card, preventDefault() {} });
     env.postResponses.push(failure);
 
     await env.editForm.listeners.submit({ preventDefault() {} });
@@ -2333,7 +2355,7 @@ test('meldet Eintrag und Anhang nach bestätigter Speicherung als gespeichert, w
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   const selectedFile = { name: 'plan.pdf' };
   env.editAttachmentInput.files = [selectedFile];
   env.postResponses.push({ ok: true, json: async () => ({
@@ -2362,7 +2384,7 @@ test('startet erst nach bestätigtem Feedback-Abschluss zufällig einen passende
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.editForm.elements.CategoryID.value = '4';
   env.postResponses.push({ ok: true, json: async () => ({
     success: true, message: 'Erledigt.', categoryID: 4, categoryTitle: 'Fertig', categoryIsClosed: true, celebrateCompletion: true,
@@ -2377,7 +2399,7 @@ test('meldet bestätigtes Speichern auch dann als Erfolg, wenn die Abschlussanim
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.editForm.elements.CategoryID.value = '4';
   env.postResponses.push({ ok: true, json: async () => ({
     success: true, message: 'Erledigt.', categoryID: 4, categoryTitle: 'Fertig', categoryIsClosed: true, celebrateCompletion: true,
@@ -2413,7 +2435,7 @@ test('spielt im seriösen Theme nach bestätigtem Abschluss einen ruhigen Effekt
   env.setEntryStatus({ id: 6, title: 'Rückmeldung', isClosed: false });
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.editForm.elements.CategoryID.value = '4';
   env.postResponses.push({ ok: true, json: async () => ({
     success: true, message: 'Erledigt.', categoryID: 4, categoryTitle: 'Fertig', categoryIsClosed: true, celebrateCompletion: true,
@@ -2427,7 +2449,7 @@ test('startet keine Erfolgsanimation ohne serverseitig bestätigten Abschluss', 
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.editForm.elements.CategoryID.value = '4';
   env.postResponses.push({ ok: true, json: async () => ({
     success: true, message: 'Gespeichert.', categoryID: 4, categoryTitle: 'Done', categoryIsClosed: true, celebrateCompletion: false,
@@ -2443,7 +2465,7 @@ test('startet keine Erfolgsanimation beim Wechsel in die Archivkategorie', async
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.editForm.elements.CategoryID.value = '5';
   env.postResponses.push({ ok: true, json: async () => ({
     success: true, message: 'Gespeichert.', categoryID: 5, categoryTitle: 'Archiv', categoryIsClosed: true, celebrateCompletion: false,
@@ -2457,7 +2479,7 @@ test('lässt den Dialog offen und zeigt den Fehler, wenn das Speichern fehlschl�
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
-  env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   env.postResponses.push({ ok: false, json: async () => ({ success: false, message: 'Änderungen konnten nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.' }) });
   await env.editForm.listeners.submit({ preventDefault() {} });
   assert.equal(env.editModal.hidden, false);
@@ -2476,4 +2498,38 @@ test('öffnet die angeforderte Eintragsbearbeitung nach Navigation zur Zielseite
   assert.equal(env.listModal.hidden, false);
   assert.equal(env.cleanedURL, '/about-us?preview=1');
   assert.equal(env.pageTarget.scrolled, true);
+});
+
+test('lädt Details erst beim Öffnen und erneut nach einem Ladefehler', async () => {
+  const env = createWidgetEnvironment();
+  await env.openListButton.listeners.click();
+  assert.equal(env.detailRequests.length, 0);
+  const card = env.listContainer.children.find((child) => child.dataset.entryId === '71');
+  env.detailResponses.push({ ok: false, json: async () => ({ success: false, message: 'Keine Berechtigung' }) });
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  assert.equal(env.editModal.hidden, true);
+  assert.equal(env.listCount.textContent, 'Keine Berechtigung');
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  assert.equal(env.detailRequests.length, 2);
+  assert.equal(env.detailRequests[1].searchParams.get('EntryID'), '71');
+  assert.equal(env.editModal.hidden, false);
+  assert.equal(env.commentCount.textContent, '2');
+});
+
+test('verwirft verspätete Details nach dem Schließen des Widgets', async () => {
+  const env = createWidgetEnvironment();
+  await env.openListButton.listeners.click();
+  const card = env.listContainer.children.find((child) => child.dataset.entryId === '71');
+  let finish;
+  env.detailResponses.push(new Promise((resolve) => { finish = resolve; }));
+  const opening = env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  env.listeners['kw-masha-feedly:closed']();
+  finish({ ok: true, json: async () => ({ success: true, entry: { id: 71 } }) });
+  await opening;
+  assert.equal(env.editModal.hidden, true);
+});
+
+test('sortiert schlanke Karten nach dem Aktivitätszeitpunkt ohne Verlauf', () => {
+  const entries = [{ id: 1, activityAt: '2026-10-01T10:00:00Z' }, { id: 2, activityAt: '2026-10-08T10:00:00Z' }];
+  assert.deepEqual(Array.from(entriesUI.sortEntries(entries, [], [], { key: 'activity', direction: 'desc' }), (entry) => entry.id), [2, 1]);
 });

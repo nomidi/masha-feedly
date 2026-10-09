@@ -385,7 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }, true);
 
   widget.querySelector('[data-masha-feedly-cancel-selection]')?.addEventListener('click', cancelSelection);
-  widget.querySelector('[data-masha-feedly-dismiss-toast]')?.addEventListener('click', () => { toast.hidden = true; });
+  widget.querySelector('[data-masha-feedly-dismiss-toast]')?.addEventListener('click', () => { toast.hidden = true; toast.classList.remove('is-error'); toast.removeAttribute?.('role'); });
   widget.querySelectorAll('[data-masha-feedly-close-modal]').forEach((button) => button.addEventListener('click', () => {
     modal.hidden = true;
     toggleButton?.focus?.();
@@ -418,10 +418,15 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: data,
       });
-      const result = await response.json();
+      const result = await window.KWMashaFeedlyReadJSON(response, t('CREATE_UNCLEAR_RESULT_ERROR'));
       if (!response.ok || !result.success) throw new Error(result.message || t('CREATE_SAVE_ERROR'));
       saveConfirmed = true;
       status.textContent = result.message;
+      toast.classList.remove('is-error');
+      toast.removeAttribute?.('role');
+      if (toast.style) { toast.style.backgroundColor = ''; toast.style.borderColor = ''; toast.style.color = ''; }
+      const toastIcon = toast.querySelector?.('.kw-masha-feedly__toast-icon');
+      if (toastIcon) { toastIcon.textContent = '✓'; toastIcon.style.backgroundColor = ''; }
       toastMessage.textContent = result.message;
       toast.hidden = false;
       const confirmation = document.createElement('article');
@@ -445,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       status.textContent = saveConfirmed
         ? t('SAVE_CONFIRMED_DISPLAY_ERROR')
-        : (error.message || t('CREATE_SAVE_ERROR'));
+        : (error.message === 'Failed to fetch' ? t('CREATE_UNCLEAR_RESULT_ERROR') : (error.message || t('CREATE_SAVE_ERROR')));
     } finally {
       submit.disabled = false;
     }

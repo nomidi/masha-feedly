@@ -34,6 +34,8 @@ use SilverStripe\i18n\i18n;
  * @property string $EntryDate Datum und Uhrzeit des Eintrags.
  * @property string $DueDate Fälligkeitstermin des Eintrags.
  * @property string $DueDateReminderSentAt Zeitpunkt der letzten Fälligkeitserinnerung.
+ * @property string $LastActivityAt Zeitpunkt der letzten Neuigkeit zu diesem Eintrag.
+ * @property int $ActivityVersion Anzahl der protokollierten Aktivitäten dieses Eintrags.
  * @property string $EstimatedCostAmount Freigegebene Kostenschätzung als Dezimalbetrag.
  * @property string $EstimatedCostAmountMax Oberer berechneter Kostenschätzungsbetrag.
  * @property string $EstimatedCostDuration Geschätzte Dauer.
@@ -82,6 +84,8 @@ class MashaFeedlyEntry extends DataObject
         'EntryDate' => 'Datetime',
         'DueDate' => 'Date',
         'DueDateReminderSentAt' => 'Datetime',
+        'LastActivityAt' => 'Datetime',
+        'ActivityVersion' => 'Int',
         'EstimatedCostAmount' => 'Decimal(12,2)',
         'EstimatedCostAmountMax' => 'Decimal(12,2)',
         'EstimatedCostDuration' => 'Varchar(80)',

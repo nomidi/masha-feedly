@@ -83,7 +83,7 @@ const createProtectedContent = async (page, expect) => {
   await expect(widget.locator('[data-masha-feedly-comments]')).toContainText(commentText);
   await expect(widget.locator('[data-masha-feedly-edit-attachments] img')).toBeVisible();
 
-  return { widget, unique, commentText, attachmentURL: new URL(created.attachments[0].url, config.baseURL).toString() };
+  return { widget, unique, commentText, entryID: created.entryID, attachmentURL: new URL(created.attachments[0].url, config.baseURL).toString() };
 };
 
 const assertPrivateAssetDenied = async (requestContext, attachmentURL) => {
@@ -136,8 +136,15 @@ test('Zugriff im Browser: Gast sieht keine Feedly-Daten und kann private Anhäng
     const allowedList = await allowedPage.request.get(new URL('/__masha-feedly/listEntries?mode=all', config.baseURL).toString());
     const allowedData = await allowedList.json();
     assert.equal(allowedList.status(), 200);
-    const entry = allowedData.entries.find((item) => item.content === protectedContent.unique);
-    assert.ok(entry, 'Das freigegebene Mitglied kann den Eintrag abrufen.');
+    const summary = allowedData.entries.find((item) => Number(item.id) === Number(protectedContent.entryID));
+    assert.ok(summary, 'Das freigegebene Mitglied kann den Eintrag auflisten.');
+    for (const field of ['content', 'comments', 'history', 'attachments', 'relations']) {
+      assert.equal(Object.hasOwn(summary, field), false, 'Die Übersicht lädt keine Detaildaten.');
+    }
+    const detailResponse = await allowedPage.request.get(new URL(`/__masha-feedly/entryDetails?EntryID=${protectedContent.entryID}`, config.baseURL).toString());
+    assert.equal(detailResponse.status(), 200);
+    const { entry } = await detailResponse.json();
+    assert.equal(entry.content, protectedContent.unique);
     assert.ok(entry.comments.some((item) => item.text === protectedContent.commentText), 'Das freigegebene Mitglied kann den Kommentar abrufen.');
     assert.equal(entry.attachments.length, 1, 'Das freigegebene Mitglied kann Anhangsdaten abrufen.');
     const allowedAsset = await allowedPage.request.get(protectedContent.attachmentURL);
@@ -149,6 +156,7 @@ test('Zugriff im Browser: Gast sieht keine Feedly-Daten und kann private Anhäng
     for (const route of [
       '/__masha-feedly',
       '/__masha-feedly/listEntries?mode=all',
+      `/__masha-feedly/entryDetails?EntryID=${protectedContent.entryID}`,
       '/__masha-feedly/savedViews',
       '/__masha-feedly-comment',
     ]) {
@@ -186,6 +194,7 @@ test('Zugriff im Browser: angemeldetes Mitglied ohne Feedly-Freigabe sieht keine
     for (const route of [
       '/__masha-feedly',
       '/__masha-feedly/listEntries?mode=all',
+      `/__masha-feedly/entryDetails?EntryID=${protectedContent.entryID}`,
       '/__masha-feedly/savedViews',
       '/__masha-feedly-comment',
     ]) {
