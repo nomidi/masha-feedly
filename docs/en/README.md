@@ -40,6 +40,8 @@ Filter the list by category, priority, page, and assignee. Expand **Filters** to
 
 History records status, priority, and assignment changes, comments, attachments, and relationships with the person and timestamp. When another person completes your entry, it can move to the required approval category so you can review and approve the result.
 
+The report list loads only the data needed for cards, filters, sorting, and page markers. Descriptions, comments, history, attachments, and relationships are fetched when you open a report. If loading fails, the list remains available; open the report again to retry.
+
 ## Relationships and duplicates
 
 In the expandable **Relationships** section, link entries as duplicates, thematically related, or blocked by. The relationship appears on both entries and is recorded in history. Completing a primary entry also completes its duplicates. Other status changes are not copied automatically.
@@ -160,3 +162,5 @@ When switching between mobile and desktop layouts, Feedly closes its windows. Ac
 ### Confirm completion
 
 When another person selects “Done”, the report remains open as “Feedback”. A prominent notice explains the next action. The original creator or designated reporter reviews the result and confirms completion with “Done” and “Save changes”. Assignment alone does not grant final approval. A comment is optional. This rule also applies when moving or saving reports in the CMS.
+
+Categories, priorities and assignees are fetched when the widget is first opened; the page initially renders empty selection fields. The protected endpoint only returns these values to members with access.

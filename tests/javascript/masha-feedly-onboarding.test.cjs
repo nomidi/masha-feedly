@@ -128,6 +128,8 @@ function setup(enabled = '1', fetchResult = { ok: true, json: async () => ({ suc
     getComputedStyle() { return { getPropertyValue: () => this.compact ? '1' : '0' }; },
     KWMashaFeedlyTranslate: (key) => key,
     KWMashaFeedlyTranslations: { TOUR_STEP_ICON_SIE: 'formal', TOUR_WELCOME_TEXT_SIE: 'formal' },
+    KWMashaFeedlyReadJSON: async (response) => { try { const result = await response.json(); if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error(); return result; } catch (_) { throw new Error('Der Server hat eine ungültige Antwort gesendet. Bitte versuche es erneut.'); } },
+    KWMashaFeedlyShowError: () => {},
     setTimeout(callback) { const id = ++timerID; timers.set(id, callback); return id; },
     clearTimeout(id) { timers.delete(id); },
   };

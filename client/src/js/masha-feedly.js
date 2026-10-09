@@ -7,6 +7,17 @@ window.KWMashaFeedlyTranslate = (key, values = {}) => {
   return message;
 };
 
+/** Liest ausschließlich JSON-Objektantworten und ersetzt Parserfehler durch einen verständlichen Hinweis. */
+window.KWMashaFeedlyReadJSON = async (response, fallback = 'Der Server hat eine ungültige Antwort gesendet. Bitte versuche es erneut.') => {
+  try {
+    const data = await response.json();
+    if (!data || typeof data !== 'object' || Array.isArray(data)) throw new TypeError('Ungültige JSON-Antwort');
+    return data;
+  } catch (_) {
+    throw new Error(fallback);
+  }
+};
+
 /** Gemeinsame DOM-Grenze: CMS-Vorschauen ohne Widget verwenden weiterhin das Dokument. */
 window.KWMashaFeedlyDOM = {
   root: () => document.querySelector('[data-masha-feedly-host]')?.shadowRoot || document,
@@ -14,6 +25,23 @@ window.KWMashaFeedlyDOM = {
   overlayRoot: () => window.KWMashaFeedlyDOM.root().querySelector('[data-masha-feedly-surface]') || document.body,
   activeElement: () => window.KWMashaFeedlyDOM.root().activeElement || document.activeElement,
   eventTarget: (event) => event.composedPath?.()[0] || event.target,
+};
+
+/** Zeigt unerwartete Serverantworten als zugängliche Meldung im Widget an. */
+window.KWMashaFeedlyShowError = (message) => {
+  const root = window.KWMashaFeedlyDOM.root();
+  const toast = root.querySelector('[data-masha-feedly-save-toast]');
+  if (!toast) return;
+  toast.classList.add('is-error');
+  toast.setAttribute('role', 'alert');
+  toast.style.backgroundColor = '#fff1f2';
+  toast.style.borderColor = '#fecdd3';
+  toast.style.color = '#9f1239';
+  const icon = toast.querySelector('.kw-masha-feedly__toast-icon');
+  if (icon) { icon.textContent = '!'; icon.style.backgroundColor = '#be123c'; }
+  const text = toast.querySelector('[data-masha-feedly-save-message]');
+  if (text) text.textContent = message || 'Die Anfrage ist fehlgeschlagen. Bitte versuche es erneut.';
+  toast.hidden = false;
 };
 
 /** Fügt das globale Masha-Feedly-Aufklappfeld in die Seite ein. */
@@ -67,6 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.body.append(host);
 
   const hoverHintSelector = [
+    '[data-tooltip]',
     '.kw-masha-feedly__add',
     '.kw-masha-feedly__count-button',
     '[data-masha-feedly-open-news]',
@@ -96,7 +125,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const showHoverHint = (target) => {
     if (!target || !widget.contains(target)) return;
-    const text = target.getAttribute('aria-label') || target.getAttribute('title');
+    const text = target.getAttribute('data-tooltip')
+      || target.getAttribute('aria-label')
+      || target.getAttribute('title');
     if (!text) return;
     window.clearTimeout(hideHoverHintTimer);
     if (!hoverHint) {
@@ -160,29 +191,98 @@ document.addEventListener('DOMContentLoaded', () => {
     else hoverHint.classList.add('is-visible');
   };
 
-  document.addEventListener('pointerover', (event) => {
+  root.addEventListener('pointerover', (event) => {
     const target = getHoverHintTarget(window.KWMashaFeedlyDOM.eventTarget(event));
     if (target) showHoverHint(target);
   });
-  document.addEventListener('pointerout', (event) => {
+  root.addEventListener('pointerout', (event) => {
     const target = getHoverHintTarget(window.KWMashaFeedlyDOM.eventTarget(event));
     if (target && target === hoverHintTarget && !target.contains(event.relatedTarget)) hideHoverHint();
   });
-  document.addEventListener('focusin', (event) => showHoverHint(getHoverHintTarget(window.KWMashaFeedlyDOM.eventTarget(event))));
-  document.addEventListener('focusout', (event) => {
+  root.addEventListener('focusin', (event) => showHoverHint(getHoverHintTarget(window.KWMashaFeedlyDOM.eventTarget(event))));
+  root.addEventListener('focusout', (event) => {
     const target = getHoverHintTarget(window.KWMashaFeedlyDOM.eventTarget(event));
     if (target && target === hoverHintTarget && !target.contains(event.relatedTarget)) hideHoverHint();
   });
-  document.addEventListener('keydown', (event) => {
+  root.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') hideHoverHint();
   });
-  document.addEventListener('click', (event) => {
+  root.addEventListener('click', (event) => {
     if (getHoverHintTarget(window.KWMashaFeedlyDOM.eventTarget(event))) hideHoverHint();
   });
 
   const toggle = widget.querySelector('.kw-masha-feedly__toggle');
   const panel = widget.querySelector('.kw-masha-feedly__panel');
   const close = widget.querySelector('.kw-masha-feedly__close');
+  let widgetDataPromise;
+  const loadWidgetData = () => {
+    if (widget.dataset.widgetDataLoaded === 'true') return Promise.resolve();
+    if (!widgetDataPromise) {
+      widgetDataPromise = fetch(widget.dataset.widgetDataUrl, {
+        credentials: 'same-origin',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      })
+        .then(async (response) => {
+          const data = await window.KWMashaFeedlyReadJSON(response, 'Widgetdaten konnten nicht gelesen werden. Bitte versuche es erneut.');
+          if (!response.ok || !data.success) throw new Error(data.message || 'Widgetdaten konnten nicht geladen werden.');
+          const root = window.KWMashaFeedlyDOM.root();
+          const categories = data.categories || [];
+          const priorities = data.priorities || [];
+          const option = (item, includeSystemKey = false) => {
+            const element = new Option(item.title, item.id);
+            if (includeSystemKey) element.dataset.systemKey = item.systemKey;
+            return element;
+          };
+          root.querySelectorAll('[data-masha-feedly-create-category]').forEach((select) => {
+            select.replaceChildren(...categories.filter((item) => item.canSelectForNewEntry).map((item) => option(item, true)));
+          });
+          root.querySelectorAll('[data-masha-feedly-edit-category]').forEach((select) => {
+            select.replaceChildren(...categories.map((item) => option(item, true)));
+          });
+          root.querySelectorAll('[data-masha-feedly-category-filter]').forEach((select) => {
+            const allOption = select.options[0];
+            select.replaceChildren(allOption, ...categories.map((item) => option(item)));
+          });
+          root.querySelectorAll('select[name="PriorityID"]').forEach((select) => {
+            select.replaceChildren(...priorities.map((item) => {
+              const priorityOption = option(item);
+              if (item.isDefault && select.closest('#kw-masha-feedly-create-form')) priorityOption.selected = true;
+              return priorityOption;
+            }));
+          });
+          root.querySelectorAll('[data-masha-feedly-priority-filter]').forEach((select) => {
+            const allOption = select.options[0];
+            select.replaceChildren(allOption, ...priorities.map((item) => option(item)));
+          });
+          root.querySelectorAll('[data-masha-feedly-assignees] > div').forEach((container) => {
+            const name = container.closest('[data-masha-feedly-edit-form]') ? 'AssignedMemberIDs[]' : 'AssignedMemberIDs[]';
+            container.replaceChildren(...(data.members || []).map((member) => {
+              const label = document.createElement('label');
+              label.className = 'kw-masha-feedly__assignee-choice';
+              const checkbox = document.createElement('input');
+              checkbox.type = 'checkbox'; checkbox.name = name; checkbox.value = member.id;
+              const avatar = document.createElement('span');
+              avatar.className = 'kw-masha-feedly__assignee-avatar';
+              avatar.dataset.avatarInitials = member.initials;
+              avatar.style.backgroundColor = member.color;
+              avatar.setAttribute('aria-label', member.name);
+              if (member.imageURL) { const image = document.createElement('img'); image.src = member.imageURL; image.alt = ''; avatar.append(image); }
+              else avatar.textContent = member.initials;
+              const title = document.createElement('span'); title.className = 'kw-masha-feedly__assignee-name'; title.textContent = member.name;
+              label.append(checkbox, avatar, title);
+              return label;
+            }));
+          });
+          widget.dataset.widgetDataLoaded = 'true';
+          document.dispatchEvent(new CustomEvent('kw-masha-feedly:widget-data-loaded'));
+        })
+        .catch((error) => {
+          widgetDataPromise = null;
+          window.KWMashaFeedlyShowError(error.message || 'Widgetdaten konnten nicht geladen werden. Bitte versuche es erneut.');
+        });
+    }
+    return widgetDataPromise;
+  };
   const setOpen = (open) => {
     toggle.setAttribute('aria-expanded', String(open));
     toggle.setAttribute('aria-label', window.KWMashaFeedlyTranslate(open ? 'CLOSE_WIDGET' : 'OPEN_WIDGET'));
@@ -192,6 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   toggle.addEventListener('click', () => {
     const expanded = toggle.getAttribute('aria-expanded') === 'true';
+    if (!expanded) loadWidgetData();
     setOpen(!expanded);
   });
   close.addEventListener('click', () => setOpen(false));

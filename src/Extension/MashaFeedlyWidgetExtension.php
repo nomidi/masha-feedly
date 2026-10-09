@@ -49,46 +49,12 @@ class MashaFeedlyWidgetExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-colors.js');
         \KW\MashaFeedly\Service\MashaFeedlyEffectProvider::requireLoader();
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-entries.js');
-        MashaFeedlyCategory::ensureDefaultCategories();
-        MashaFeedlyPriority::ensureDefaultPriorities();
         $canManageEstimate = \KW\MashaFeedly\Model\MashaFeedlyEntry::canManageEstimate(Security::getCurrentUser());
         $canApproveEstimate = \KW\MashaFeedly\Model\MashaFeedlyEntry::canApproveEstimate(Security::getCurrentUser());
+        // Kategorien, Prioritäten und Mitglieder werden erst beim ersten Öffnen geladen.
         $categories = [];
-        foreach (MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC') as $category) {
-            $systemKey = (string)$category->SystemKey;
-            $estimateRole = in_array($systemKey, ['estimate_pending', 'estimate_approved'], true);
-            $categories[] = [
-                'ID' => (int)$category->ID,
-                'Title' => $estimateRole && !$canApproveEstimate
-                    ? i18n::_t('KW\\MashaFeedly\\Translations.ESTIMATE_HIDDEN_CATEGORY', 'In Bearbeitung')
-                    : (string)$category->Title,
-                'SystemKey' => $estimateRole && !$canApproveEstimate ? 'restricted_estimate' : $systemKey,
-                'CanSelectForNewEntry' => $systemKey === 'estimate_pending'
-                    ? $canManageEstimate
-                    : $systemKey !== 'estimate_approved',
-            ];
-        }
-        $members = [];
         $priorities = [];
-        foreach (MashaFeedlyPriority::get()->sort('Sort ASC, Title ASC') as $priority) {
-            $priorities[] = [
-                'ID' => (int)$priority->ID,
-                'Title' => (string)$priority->Title,
-                'IsDefault' => (int)$priority->ID === (int)MashaFeedlyPriority::defaultPriority()->ID,
-            ];
-        }
-        $allowedMemberIDs = MashaFeedlyConfigExtension::memberIDs();
-        if ($allowedMemberIDs) {
-            foreach (Member::get()->filter('ID', $allowedMemberIDs)->sort('Surname ASC, FirstName ASC') as $member) {
-                $members[] = [
-                    'ID' => (int)$member->ID,
-                    'Name' => (string)$member->getName(),
-                    'Initials' => (string)$member->getMashaFeedlyInitials(),
-                    'Color' => (string)$member->getMashaFeedlyDisplayColor(),
-                    'ImageURL' => (string)$member->getMashaFeedlyAvatarURL(),
-                ];
-            }
-        }
+        $members = [];
         $currentMember = Security::getCurrentUser();
         $canPersonalize = MashaFeedlyConfigExtension::isExplicitlyAllowed($currentMember);
         $onboardingEnabled = $canPersonalize
@@ -135,7 +101,10 @@ class MashaFeedlyWidgetExtension extends Extension
             }
         }
         $markup = $this->owner->renderWith('KW/MashaFeedly/Includes/MashaFeedlyWidget', [
+            'WidgetDataURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'widgetData'),
             'CreateEntryURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'createEntry'),
+            'EntryDetailsURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'entryDetails'),
+            'EntryHistoryURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'entryHistory'),
             'ListEntriesURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'listEntries'),
             'MarkEntryReadURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'markEntryRead'),
             'UpdateEntryURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'updateEntry'),
@@ -362,6 +331,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'EDIT_SAVE_ERROR' => 'Änderungen konnten nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.',
             'CREATE_SAVING' => 'Meldung wird gespeichert …',
             'CREATE_SAVE_ERROR' => 'Die Meldung konnte nicht gespeichert werden.',
+            'CREATE_UNCLEAR_RESULT_ERROR' => 'Der Server hat unerwartet geantwortet. Prüfe bitte die Meldungsliste, bevor du es erneut versuchst.',
             'CREATE_ENTRY_FALLBACK' => 'Neue Meldung',
             'CLOSE_WIDGET' => 'Masha:Feedly schließen',
             'OPEN_WIDGET' => 'Masha:Feedly öffnen',

@@ -17,7 +17,7 @@ function renderWidget(frameElement = null, captureEvents = false) {
   let ready;
   let inserted = 0;
   let createdElements = 0;
-  const documentListeners = new Map();
+  const rootListeners = new Map();
   const appendedElements = [];
   const classes = new Set();
   const controls = new Map([
@@ -51,7 +51,7 @@ function renderWidget(frameElement = null, captureEvents = false) {
     contains(element) { return element === trigger; },
   };
   const surface = { append(element) { appendedElements.push(element); }, setAttribute() {} };
-  const root = { append() {}, addEventListener() {}, querySelector(selector) {
+  const root = { append() {}, addEventListener(name, callback) { rootListeners.set(name, callback); }, querySelector(selector) {
     return selector === '[data-kw-masha-feedly]' ? widget : surface;
   } };
   const host = { setAttribute() {}, attachShadow(options) { assert.equal(options.mode, 'open'); this.shadowRoot = root; return root; } };
@@ -59,7 +59,7 @@ function renderWidget(frameElement = null, captureEvents = false) {
   const document = {
     addEventListener(name, callback) {
       if (name === 'DOMContentLoaded') ready = callback;
-      else documentListeners.set(name, callback);
+      else assert.fail(`Ereignis ${name} muss an der Widget-Shadow-Root registriert werden`);
     },
     querySelector(selector) { return inserted && selector === '[data-masha-feedly-host]' ? host : null; },
     createElement() {
@@ -86,7 +86,7 @@ function renderWidget(frameElement = null, captureEvents = false) {
     root, surface, stylesheet, host,
     dom: window.KWMashaFeedlyDOM,
     trigger,
-    dispatch(name, event) { documentListeners.get(name)?.(event); },
+    dispatch(name, event) { rootListeners.get(name)?.(event); },
     get tooltip() { return appendedElements.find((element) => element === tooltip); },
     get classes() { return classes; },
   };
@@ -115,6 +115,8 @@ test('zeigt Hover-Hinweise als schwebendes Tooltip außerhalb des scrollenden Pa
     assert.doesNotMatch(css, /--kw-feedly-panel-width:\s*min\(248px, calc\(100vw - 16px\)\)/);
   }
   assert.match(source, /surface\.append\(hoverHint\)/);
+  assert.match(source, /'\[data-tooltip\]'/);
+  assert.match(source, /target\.getAttribute\('data-tooltip'\)/);
   assert.match(source, /aria-describedby/);
   assert.match(source, /\[data-masha-feedly-rainbow\]/);
 });

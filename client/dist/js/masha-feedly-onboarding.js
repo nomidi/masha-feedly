@@ -178,7 +178,10 @@ document.addEventListener('DOMContentLoaded', () => {
       credentials: 'same-origin',
       headers: { 'X-Requested-With': 'XMLHttpRequest' },
       body: data,
-    }).catch(() => {});
+    }).then(async (response) => {
+      const result = await window.KWMashaFeedlyReadJSON(response);
+      if (!response.ok || result.success !== true) throw new Error(result.message || 'Die Einführungseinstellung konnte nicht gespeichert werden.');
+    }).catch((error) => window.KWMashaFeedlyShowError?.(error.message || 'Die Einführungseinstellung konnte nicht gespeichert werden.'));
     if (showThanks) {
       thanksDialog?.querySelector('[data-masha-feedly-avatar-icon-dialog]')?.setAttribute?.('hidden', '');
       thanksDialog?.querySelector('#kw-masha-feedly-thanks-title')?.focus?.();
@@ -249,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: data,
       });
-      const result = await response.json();
+      const result = await window.KWMashaFeedlyReadJSON(response);
       if (!response.ok || result.success !== true) {
         throw new Error(result.message || t('TOUR_PREFERENCES_ERROR'));
       }
@@ -396,7 +399,7 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: data,
       });
-      const result = await response.json();
+      const result = await window.KWMashaFeedlyReadJSON(response);
       if (!response.ok || result.success !== true) throw new Error('Restart rejected');
       const helpModal = widget.querySelector('[data-masha-feedly-help-modal]');
       if (helpModal) helpModal.hidden = true;

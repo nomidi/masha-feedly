@@ -40,6 +40,9 @@ In der Liste kannst du nach Kategorie, Priorität, Seite und Zuständigkeit filt
 
 Der Verlauf hält Status-, Prioritäts- und Zuständigkeitsänderungen, Kommentare, Anhänge und Verknüpfungen mit Person und Zeitpunkt fest. Wenn eine andere Person deinen Eintrag abschließt, kann er auf die erforderliche Freigabe-Kategorie wechseln. Du kannst das Ergebnis anschließend freigeben.
 
+Die Meldungsliste lädt nur die Daten für Karten, Filter, Sortierung und Seitenmarker. Beschreibung, Kommentare, Verlauf, Anhänge und Verknüpfungen werden erst beim Öffnen einer Meldung aktuell nachgeladen. Bei einem Ladefehler bleibt die Liste verfügbar; öffne die Meldung erneut, um es noch einmal zu versuchen.
+Kategorien, Prioritäten und Zuständigkeiten werden erst beim ersten Öffnen des Widgets nachgeladen; der Seitenaufruf rendert dafür nur leere Auswahlfelder. Der geschützte Endpunkt liefert diese Werte nur an freigeschaltete Mitglieder.
+
 ## Zusammenhänge und Duplikate
 
 Im aufklappbaren Bereich **Zusammenhänge** kannst du Einträge als Duplikat, thematisch verwandt oder blockiert durch verknüpfen. Der Zusammenhang wird an beiden Einträgen angezeigt und im Verlauf festgehalten. Wird ein Haupteintrag abgeschlossen, werden seine Duplikate ebenfalls abgeschlossen. Andere Statusänderungen werden nicht automatisch übertragen.

@@ -1069,6 +1069,10 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__history[open] > .kw-masha-feedly__history-list { border-top: 1px solid $masha-color-eadce7; }
 .kw-masha-feedly__history-list { display: grid; gap: 8.8px; margin: 0; padding: 16px; list-style: none; }
 .kw-masha-feedly__history-item { padding: 11.2px 13.6px; border-left: 3px solid $masha-color-9d73c6; border-radius: 4px 10.4px 10.4px 4px; background: $masha-color-faf7fd; }
+.kw-masha-feedly__history-placeholder { display: flex; align-items: center; gap: 10px; min-height: 42px; border: 0; border-radius: 8px; background: transparent; color: $masha-color-746b7b; font-size: calc(14px * var(--masha-font-scale, 1)); font-weight: 500; }
+.kw-masha-feedly__history-placeholder.is-loading::before { width: 15px; height: 15px; flex: 0 0 15px; border: 2px solid $masha-color-e8d6e2; border-top-color: $masha-color-8c245b; border-radius: 50%; content: ''; animation: masha-feedly-history-spin 700ms linear infinite; }
+.kw-masha-feedly__history-placeholder.is-error { color: $masha-color-b11d68; }
+@keyframes masha-feedly-history-spin { to { transform: rotate(360deg); } }
 .kw-masha-feedly__history-item.is-assignees { border-left-color: $masha-color-c66a98; background: $masha-color-fff8fb; }
 .kw-masha-feedly__history-item.is-priority { border-left-color: $masha-color-d97706; background: $masha-color-fffaf2; }
 .kw-masha-feedly__priority { display: inline-flex; align-items: center; justify-content: center; width: 21.6px; height: 21.6px; margin-left: 7.2px; color: var(--masha-feedly-priority-color, $masha-color-64748b); vertical-align: middle; }
@@ -2323,20 +2327,20 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
     z-index: 2147483647;
     display: block;
     width: max-content;
-    max-width: min(18rem, calc(100vw - 1rem));
+    max-width: min(15rem, calc(100vw - 1rem));
     max-height: min(40vh, 9rem);
     box-sizing: border-box;
     overflow: auto;
     overscroll-behavior: contain;
-    padding: 0.72rem 0.9rem;
+    padding: 0.45rem 0.6rem;
     border: 1px solid $masha-color-function-022;
     border-radius: 0.9rem;
     background: linear-gradient(145deg, $masha-color-382638, $masha-color-241d2b);
     color: $masha-color-fff;
     box-shadow: 0 0.8rem 2rem $masha-color-function-023, 0 0 0 1px $masha-color-function-024;
-    font-size: 0.82rem;
+    font-size: 0.62rem;
     font-weight: 650;
-    line-height: 1.4;
+    line-height: 1.35;
     overflow-wrap: anywhere;
     pointer-events: none;
     opacity: 0;

@@ -203,6 +203,7 @@ function createEnvironment(fetchImplementation = async () => ({
     CREATE_SAVE_ERROR: 'Die Meldung konnte nicht gespeichert werden.',
     SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Meldungsliste neu.',
     CREATE_ENTRY_FALLBACK: 'Neue Meldung',
+    CREATE_UNCLEAR_RESULT_ERROR: 'Der Server hat unerwartet geantwortet. Prüfe bitte die Meldungsliste, bevor du es erneut versuchst.',
     SIMILAR_ENTRY_NO_TITLE: 'Meldung ohne Titel', SIMILAR_SCORE: '{score}% ähnlich', SIMILAR_OPEN_ENTRY: 'Meldung ansehen',
     CLOSE_WIDGET: 'Masha:Feedly schließen',
   };
@@ -221,6 +222,7 @@ function createEnvironment(fetchImplementation = async () => ({
       KWMashaFeedlyTranslate(key, values = {}) {
         return Object.entries(values).reduce((message, [name, value]) => message.replaceAll(`{${name}}`, String(value)), textValues[key] || key);
       },
+      KWMashaFeedlyReadJSON: async (response, fallback = 'Der Server hat eine ungültige Antwort gesendet. Bitte versuche es erneut.') => { try { const result = await response.json(); if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error(); return result; } catch (_) { throw new Error(fallback); } },
     },
     CSS: { escape: (value) => value },
     FormData: class { constructor() { return formData; } },
@@ -481,6 +483,16 @@ test('zeigt abgelehnte Uploads beim Erstellen an und meldet keinen falschen Erfo
   assert.equal(env.status.textContent, 'Der Dateityp passt nicht zur Dateiendung.');
   assert.equal(env.toast.hidden, true);
   assert.equal(env.column.children.length, 0);
+  assert.equal(env.submit.disabled, false);
+});
+
+test('zeigt bei ungültigem JSON eine verständliche Meldung und vermeidet einen blinden zweiten Speicherversuch', async () => {
+  const env = createEnvironment(async () => ({ ok: true, json: async () => { throw new SyntaxError('Unexpected token <'); } }));
+  env.startButton.listeners.click();
+  env.documentListeners.click({ target: new TestElement('main', { id: 'main' }), preventDefault() {}, stopPropagation() {} });
+  await env.form.listeners.submit({ preventDefault() {} });
+  assert.equal(env.status.textContent, 'Der Server hat unerwartet geantwortet. Prüfe bitte die Meldungsliste, bevor du es erneut versuchst.');
+  assert.equal(env.toast.hidden, true);
   assert.equal(env.submit.disabled, false);
 });
 

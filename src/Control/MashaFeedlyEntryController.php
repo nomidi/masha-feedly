@@ -22,6 +22,8 @@ use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Control\Controller;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse;
+use SilverStripe\ORM\DataObject;
+use SilverStripe\ORM\DB;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
 use SilverStripe\Security\SecurityToken;
@@ -37,7 +39,62 @@ use SilverStripe\i18n\i18n;
  */
 class MashaFeedlyEntryController extends Controller
 {
-    private static $allowed_actions = ['index', 'createEntry', 'listEntries', 'updateEntry', 'findSimilarEntries', 'completeOnboarding', 'restartOnboarding', 'saveProfilePreferences', 'savedViews', 'saveView', 'deleteView', 'markEntryRead', 'miteOptions', 'startMiteTimer', 'stopMiteTimer'];
+    private static $allowed_actions = ['index', 'widgetData', 'createEntry', 'listEntries', 'entryDetails', 'entryHistory', 'updateEntry', 'findSimilarEntries', 'completeOnboarding', 'restartOnboarding', 'saveProfilePreferences', 'savedViews', 'saveView', 'deleteView', 'markEntryRead', 'miteOptions', 'startMiteTimer', 'stopMiteTimer'];
+
+    /** @var array<int, array{title: string, systemKey: string, isClosed: bool}>|null Kategorien dieses Requests. */
+    private ?array $categorySummaries = null;
+
+    /** @var array<int, array{title: string, description: string, sort: int, color: string, iconType: string, systemKey: string}>|null Prioritäten dieses Requests. */
+    private ?array $prioritySummaries = null;
+
+    /** Liefert die datenabhängigen Widgetoptionen erst beim Öffnen an berechtigte Mitglieder. */
+    public function widgetData(HTTPRequest $request): HTTPResponse
+    {
+        $member = Security::getCurrentUser();
+        if (!MashaFeedlyConfigExtension::canUse($member)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet.')], 403);
+        }
+
+        $canManageEstimate = MashaFeedlyEntry::canManageEstimate($member);
+        $canApproveEstimate = MashaFeedlyEntry::canApproveEstimate($member);
+        $categories = [];
+        foreach (MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC') as $category) {
+            $systemKey = (string)$category->SystemKey;
+            $estimateRole = in_array($systemKey, ['estimate_pending', 'estimate_approved'], true);
+            $categories[] = [
+                'id' => (int)$category->ID,
+                'title' => $estimateRole && !$canApproveEstimate ? i18n::_t('KW\\MashaFeedly\\Translations.ESTIMATE_HIDDEN_CATEGORY', 'In Bearbeitung') : (string)$category->Title,
+                'systemKey' => $estimateRole && !$canApproveEstimate ? 'restricted_estimate' : $systemKey,
+                'canSelectForNewEntry' => $systemKey === 'estimate_pending' ? $canManageEstimate : $systemKey !== 'estimate_approved',
+            ];
+        }
+        $priorities = [];
+        foreach (MashaFeedlyPriority::get()->sort('Sort ASC, Title ASC') as $priority) {
+            $priorities[] = ['id' => (int)$priority->ID, 'title' => (string)$priority->Title, 'isDefault' => (string)$priority->SystemKey === 'normal'];
+        }
+        $members = [];
+        $allowedMemberIDs = MashaFeedlyConfigExtension::memberIDs();
+        if ($allowedMemberIDs) {
+            foreach (Member::get()->filter('ID', $allowedMemberIDs)->sort('Surname ASC, FirstName ASC') as $allowedMember) {
+                $members[] = [
+                    'id' => (int)$allowedMember->ID,
+                    'name' => (string)$allowedMember->getName(),
+                    'initials' => (string)$allowedMember->getMashaFeedlyInitials(),
+                    'color' => (string)$allowedMember->getMashaFeedlyDisplayColor(),
+                    'imageURL' => (string)$allowedMember->getMashaFeedlyAvatarURL(),
+                ];
+            }
+        }
+
+        $response = $this->respond([
+            'success' => true,
+            'categories' => $categories,
+            'priorities' => $priorities,
+            'members' => $members,
+        ])->addHeader('Cache-Control', 'private, no-store');
+
+        return $response;
+    }
 
     /** Liefert Mite-Projekte, Leistungen und den Timer nur für die freigegebene Manager-Adresse. */
     public function miteOptions(HTTPRequest $request): HTTPResponse
@@ -684,6 +741,152 @@ class MashaFeedlyEntryController extends Controller
         return $this->respond(['success' => true, 'matches' => array_slice($matches, 0, 3)]);
     }
 
+    /**
+     * Lädt vollständige Meldungsdetails erst beim Öffnen, mit derselben Modulfreigabe wie die Liste.
+     *
+     * @param HTTPRequest $request GET-Anfrage mit der Meldungs-ID in EntryID.
+     * @return HTTPResponse Geschützte Details oder eine verständliche Fehlermeldung.
+     */
+    public function entryDetails(HTTPRequest $request): HTTPResponse
+    {
+        $member = Security::getCurrentUser();
+        if (!MashaFeedlyConfigExtension::canUse($member)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
+        }
+        if (!$request->isGET()) {
+            return $this->respond(['success' => false, 'message' => 'Ungültige Anfrage.'], 405);
+        }
+        $entry = MashaFeedlyEntry::get()->byID((int)$request->getVar('EntryID'));
+        if (!$entry) {
+            return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Die Meldung wurde nicht gefunden.')], 404);
+        }
+        if (!$entry->canView($member)) {
+            return $this->respond(['success' => false], 403);
+        }
+        return $this->respond(['success' => true, 'entry' => $this->entryData($entry, $member)])
+            ->addHeader('Cache-Control', 'private, no-store');
+    }
+
+    /** Liefert den Verlauf erst auf ausdrückliche Anfrage für eine berechtigte Person. */
+    public function entryHistory(HTTPRequest $request): HTTPResponse
+    {
+        $member = Security::getCurrentUser();
+        if (!MashaFeedlyConfigExtension::canUse($member)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
+        }
+        if (!$request->isGET()) {
+            return $this->respond(['success' => false, 'message' => 'Ungültige Anfrage.'], 405);
+        }
+        $entry = MashaFeedlyEntry::get()->byID((int)$request->getVar('EntryID'));
+        if (!$entry) {
+            return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Die Meldung wurde nicht gefunden.')], 404);
+        }
+        if (!$entry->canView($member)) {
+            return $this->respond(['success' => false], 403);
+        }
+
+        return $this->respond([
+            'success' => true,
+            'history' => $this->historyForMember($entry, $member),
+        ])->addHeader('Cache-Control', 'private, no-store');
+    }
+
+    /**
+     * Liefert nur Karten-, Sortier- und Markerdaten ohne vollständige Detailrelationen.
+     *
+     * @param MashaFeedlyEntry $entry Meldung der Übersicht.
+     * @param Member $member Berechtigtes Mitglied für die sichtbare Statusrolle.
+     * @return array<string, mixed> Schlanke Daten für Liste und Seitenmarker.
+     */
+    private function entrySummaryData(MashaFeedlyEntry $entry, Member $member, string $activityAt, array $assignees): array
+    {
+        return [
+            'id' => (int)$entry->ID,
+            'title' => (string)$entry->Title,
+            'entryDate' => (string)$entry->EntryDate,
+            'dueDate' => (string)$entry->DueDate,
+            'loggedAt' => (string)$entry->Created,
+            'activityAt' => (new \DateTimeImmutable((string)$activityAt, new \DateTimeZone('UTC')))->format('Y-m-d\\TH:i:s\\Z'),
+            'pageURL' => (string)$entry->PageURL,
+            'selector' => (string)$entry->ElementSelector,
+            'elementText' => (string)$entry->ElementText,
+            'elementPositionX' => (string)$entry->ElementPositionX,
+            'elementPositionY' => (string)$entry->ElementPositionY,
+            'categoryID' => (int)$entry->CategoryID,
+            'categoryTitle' => $this->visibleCategoryTitle($entry, $member),
+            'categoryRole' => $this->visibleCategoryRole($entry, $member),
+            'isClosed' => $this->categorySummary((int)$entry->CategoryID)['isClosed'] ?? false,
+            'sort' => (int)$entry->Sort,
+            'priorityID' => (int)$entry->PriorityID,
+            'priorityTitle' => $this->prioritySummary((int)$entry->PriorityID)['title'] ?? '',
+            'priorityColor' => $this->prioritySummary((int)$entry->PriorityID)['color'] ?? '',
+            'priorityIconType' => $this->prioritySummary((int)$entry->PriorityID)['iconType'] ?? '',
+            'assignees' => $assignees,
+        ];
+    }
+
+    /**
+     * Lädt Zuständigkeiten gesammelt für alle Meldungen der Übersicht.
+     *
+     * @param int[] $entryIDs IDs der Meldungen in der Übersicht.
+     * @return array<int, array<int, array<string, mixed>>> Sortierte Avatar-Daten je Meldung.
+     */
+    private function summaryRelations(array $entryIDs): array
+    {
+        if (!$entryIDs) {
+            return [];
+        }
+        $schema = DataObject::getSchema();
+        $connection = DB::get_conn();
+        $assigneeIDsByEntry = [];
+        $relation = $schema->manyManyComponent(MashaFeedlyEntry::class, 'AssignedMembers');
+        foreach (array_chunk(array_values(array_unique($entryIDs)), 500) as $entryIDChunk) {
+            $placeholders = implode(', ', array_fill(0, count($entryIDChunk), '?'));
+            if (!$relation) {
+                continue;
+            }
+            [$relationClass, $parentClass, $childClass, $parentField, $childField, $join] = array_values($relation);
+            $joinTable = $connection->escapeIdentifier($join);
+            $parentFieldSQL = $connection->escapeIdentifier($parentField);
+            $childFieldSQL = $connection->escapeIdentifier($childField);
+            $memberRows = DB::prepared_query(
+                "SELECT {$parentFieldSQL} AS EntryID, {$childFieldSQL} AS MemberID FROM {$joinTable} WHERE {$parentFieldSQL} IN ({$placeholders}) ORDER BY {$parentFieldSQL} ASC, {$childFieldSQL} ASC",
+                $entryIDChunk
+            );
+            foreach ($memberRows as $row) {
+                $assigneeIDsByEntry[(int)$row['EntryID']][] = (int)$row['MemberID'];
+            }
+        }
+
+        $memberIDs = [];
+        foreach ($assigneeIDsByEntry as $assignedIDs) {
+            array_push($memberIDs, ...$assignedIDs);
+        }
+        $membersByID = [];
+        foreach (array_chunk(array_values(array_unique($memberIDs)), 500) as $memberIDChunk) {
+            foreach (Member::get()->byIDs($memberIDChunk) as $assignee) {
+                $membersByID[(int)$assignee->ID] = $assignee;
+            }
+        }
+        $assigneesByEntry = [];
+        foreach ($assigneeIDsByEntry as $entryID => $memberIDsForEntry) {
+            foreach ($memberIDsForEntry as $memberID) {
+                $assignee = $membersByID[$memberID] ?? null;
+                if (!$assignee) {
+                    continue;
+                }
+                $assigneesByEntry[$entryID][] = [
+                    'id' => (int)$assignee->ID,
+                    'name' => (string)$assignee->getName(),
+                    'initials' => (string)$assignee->getMashaFeedlyInitials(),
+                    'color' => (string)$assignee->getMashaFeedlyDisplayColor(),
+                    'imageURL' => (string)$assignee->getMashaFeedlyAvatarURL(),
+                ];
+            }
+        }
+        return $assigneesByEntry;
+    }
+
     /** Liefert freigegebene Einträge für die aktuelle Seite oder alle persönlichen Zuweisungen. */
     public function listEntries(HTTPRequest $request): HTTPResponse
     {
@@ -692,9 +895,6 @@ class MashaFeedlyEntryController extends Controller
             return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
 
-        MashaFeedlyCategory::ensureDefaultCategories();
-        MashaFeedlyPriority::ensureDefaultPriorities();
-
         $requestedPageURL = trim((string)$request->getVar('PageURL'));
         $pageURL = $this->safePageURL($requestedPageURL);
         $pageURLs = array_values(array_unique(array_filter([$pageURL, $requestedPageURL])));
@@ -702,12 +902,20 @@ class MashaFeedlyEntryController extends Controller
             ? MashaFeedlyEntry::get()->filter('PageURL', $pageURLs)
             : MashaFeedlyEntry::get()->filter('ID', 0);
         $allEntries = MashaFeedlyEntry::get();
+        $allEntryRecords = $allEntries->toArray();
         $mineEntries = MashaFeedlyEntry::get()->filter('AssignedMembers.ID', (int)$member->ID);
         $categories = [];
+        $this->categorySummaries = [];
         $closedCategoryIDs = [];
         $openCategoryIDs = [];
         foreach (MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC') as $category) {
             $isClosed = (bool)$category->IsClosed;
+            $categoryID = (int)$category->ID;
+            $this->categorySummaries[$categoryID] = [
+                'title' => (string)$category->Title,
+                'systemKey' => (string)$category->SystemKey,
+                'isClosed' => $isClosed,
+            ];
             $estimateRole = in_array((string)$category->SystemKey, ['estimate_pending', 'estimate_approved'], true);
             $categories[] = [
                 'id' => (int)$category->ID,
@@ -720,15 +928,15 @@ class MashaFeedlyEntryController extends Controller
                     : (string)$category->SystemKey,
             ];
             if ($isClosed) {
-                $closedCategoryIDs[] = (int)$category->ID;
+                $closedCategoryIDs[] = $categoryID;
             } else {
-                $openCategoryIDs[] = (int)$category->ID;
+                $openCategoryIDs[] = $categoryID;
             }
         }
         $pageOpenEntries = $openCategoryIDs
             ? $pageEntries->filter('CategoryID', $openCategoryIDs)
             : MashaFeedlyEntry::get()->filter('ID', 0);
-        $unreadEntryIDs = MashaFeedlyEntryRead::unreadEntryIDs($member);
+        $unreadEntryIDs = MashaFeedlyEntryRead::unreadEntryIDs($member, $allEntryRecords);
         $requestedMode = (string)$request->getVar('mode');
         $estimateModes = ['estimate-pending', 'estimate-approved'];
         if (in_array($requestedMode, $estimateModes, true) && !MashaFeedlyEntry::canApproveEstimate($member)) {
@@ -757,16 +965,23 @@ class MashaFeedlyEntryController extends Controller
             'unread' => MashaFeedlyEntry::get()->filter('ID', $unreadEntryIDs ?: [0]),
             default => $pageEntries,
         };
+        $summaryEntries = $entries->sort(['Category.Sort' => 'ASC', 'Priority.Sort' => 'ASC', 'EntryDate' => 'DESC', 'ID' => 'DESC'])->toArray();
+        $entryIDs = array_map(static fn(MashaFeedlyEntry $entry): int => (int)$entry->ID, $summaryEntries);
+        $assigneesByEntry = $this->summaryRelations($entryIDs);
         $payload = [];
-        foreach ($entries->sort(['Category.Sort' => 'ASC', 'Priority.Sort' => 'ASC', 'EntryDate' => 'DESC', 'ID' => 'DESC']) as $entry) {
-            $entryData = $this->entryData($entry, $member);
-            $entryData['isUnread'] = in_array((int)$entry->ID, $unreadEntryIDs, true);
+        foreach ($summaryEntries as $entry) {
+            $entryID = (int)$entry->ID;
+            $activityAt = (string)($entry->LastActivityAt ?: $entry->Created);
+            $entryData = $this->entrySummaryData($entry, $member, $activityAt, $assigneesByEntry[$entryID] ?? []);
+            $entryData['isUnread'] = in_array($entryID, $unreadEntryIDs, true);
             $payload[] = $entryData;
         }
 
         // Erledigte und archivierte Einträge zählen nicht mehr als offene Fehler.
         $openCount = 0;
         $pageOpenCount = 0;
+        $pageCount = 0;
+        $pageURLLookup = array_fill_keys($pageURLs, true);
         $feedbackCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first();
         $feedbackCount = $feedbackCategory && !(bool)$feedbackCategory->IsClosed
             ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$feedbackCategory->ID)->count()
@@ -779,23 +994,26 @@ class MashaFeedlyEntryController extends Controller
         $estimateApprovedCount = MashaFeedlyEntry::canApproveEstimate($member) && $estimateApprovedCategory
             ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimateApprovedCategory->ID)->count()
             : 0;
-        $pageEntryIDs = array_fill_keys(array_map('intval', $pageEntries->column('ID')), true);
-        foreach ($allEntries as $entry) {
+        foreach ($allEntryRecords as $entry) {
+            $isOnPage = isset($pageURLLookup[(string)$entry->PageURL]);
+            if ($isOnPage) {
+                $pageCount++;
+            }
             if (in_array((int)$entry->CategoryID, $closedCategoryIDs, true)) {
                 continue;
             }
             $openCount++;
-            if (isset($pageEntryIDs[(int)$entry->ID])) {
+            if ($isOnPage) {
                 $pageOpenCount++;
             }
         }
 
-        $activityCounts = MashaFeedlyEntryRead::unreadActivityCounts($member);
+        $activityCounts = MashaFeedlyEntryRead::unreadActivityCounts($member, $unreadEntryIDs);
         return $this->respond([
             'success' => true,
             'mode' => $mode,
-            'pageCount' => (int)$pageEntries->count(),
-            'totalCount' => (int)$allEntries->count(),
+            'pageCount' => $pageCount,
+            'totalCount' => count($allEntryRecords),
             'mineCount' => (int)$mineEntries->count(),
             'openCount' => $openCount,
             'feedbackCount' => $feedbackCount,
@@ -808,14 +1026,7 @@ class MashaFeedlyEntryController extends Controller
             'canManageEstimate' => MashaFeedlyEntry::canManageEstimate($member),
             'canApproveEstimate' => MashaFeedlyEntry::canApproveEstimate($member),
             'estimateHourlyRate' => MashaFeedlyEntry::canManageEstimate($member) ? MashaFeedlyConfigExtension::hourlyRate() : null,
-            'priorities' => array_map(static fn(MashaFeedlyPriority $priority): array => [
-                'id' => (int)$priority->ID,
-                'title' => (string)$priority->Title,
-                'description' => (string)$priority->Description,
-                'sort' => (int)$priority->Sort,
-                'color' => (string)$priority->Color,
-                'iconType' => (string)$priority->IconType,
-            ], MashaFeedlyPriority::get()->sort('Sort ASC, Title ASC')->toArray()),
+            'priorities' => $this->prioritySummariesForResponse(),
             'entries' => $payload,
         ]);
     }
@@ -990,19 +1201,79 @@ class MashaFeedlyEntryController extends Controller
     {
         // Der konkrete Status bleibt am Eintrag sichtbar. Die geschützten Kategorien
         // bleiben separat aus Kategorieauswahl und Filtern ausgeschlossen.
-        return (string)$entry->Category()->Title;
+        return $this->categorySummary((int)$entry->CategoryID)['title'] ?? '';
     }
 
     private function visibleCategoryRole(MashaFeedlyEntry $entry, Member $member): string
     {
         return $this->isEstimateCategory($entry) && !MashaFeedlyEntry::canApproveEstimate($member)
             ? 'restricted_estimate'
-            : (string)$entry->Category()->SystemKey;
+            : ($this->categorySummary((int)$entry->CategoryID)['systemKey'] ?? '');
     }
 
     private function isEstimateCategory(MashaFeedlyEntry $entry): bool
     {
-        return in_array((string)$entry->Category()->SystemKey, ['estimate_pending', 'estimate_approved'], true);
+        return in_array($this->categorySummary((int)$entry->CategoryID)['systemKey'] ?? '', ['estimate_pending', 'estimate_approved'], true);
+    }
+
+    /** Liefert die Kategorie aus dem Request-Cache und lädt ihn bei Bedarf gesammelt. */
+    private function categorySummary(int $categoryID): ?array
+    {
+        if ($this->categorySummaries === null) {
+            $this->categorySummaries = [];
+            foreach (MashaFeedlyCategory::get() as $category) {
+                $this->categorySummaries[(int)$category->ID] = [
+                    'title' => (string)$category->Title,
+                    'systemKey' => (string)$category->SystemKey,
+                    'isClosed' => (bool)$category->IsClosed,
+                ];
+            }
+        }
+        return $this->categorySummaries[$categoryID] ?? null;
+    }
+
+    /** Liefert die Priorität aus dem Request-Cache und lädt ihn bei Bedarf gesammelt. */
+    private function prioritySummary(int $priorityID): ?array
+    {
+        $this->loadPrioritySummaries();
+        return $this->prioritySummaries[$priorityID] ?? null;
+    }
+
+    /** Liefert die für die Widgetauswahl benötigten Prioritätsdaten sortiert aus dem Request-Cache. */
+    private function prioritySummariesForResponse(): array
+    {
+        $this->loadPrioritySummaries();
+        $priorities = [];
+        foreach ($this->prioritySummaries as $priorityID => $priority) {
+            $priorities[] = [
+                'id' => (int)$priorityID,
+                'title' => $priority['title'],
+                'description' => $priority['description'],
+                'sort' => $priority['sort'],
+                'color' => $priority['color'],
+                'iconType' => $priority['iconType'],
+            ];
+        }
+        return $priorities;
+    }
+
+    /** Lädt alle Prioritäten einmal und behält die Daten in der Reihenfolge der Widgetauswahl. */
+    private function loadPrioritySummaries(): void
+    {
+        if ($this->prioritySummaries !== null) {
+            return;
+        }
+        $this->prioritySummaries = [];
+        foreach (MashaFeedlyPriority::get()->sort('Sort ASC, Title ASC') as $priority) {
+            $this->prioritySummaries[(int)$priority->ID] = [
+                'title' => (string)$priority->Title,
+                'description' => (string)$priority->Description,
+                'sort' => (int)$priority->Sort,
+                'color' => (string)$priority->Color,
+                'iconType' => (string)$priority->IconType,
+                'systemKey' => (string)$priority->SystemKey,
+            ];
+        }
     }
 
     /** Blendet Änderungsdetails aus dem Verlauf für nicht berechtigte Personen aus. */
@@ -1155,17 +1426,23 @@ class MashaFeedlyEntryController extends Controller
     /** Bereitet einen Eintrag ohne ungeprüftes HTML für die Widget-Ausgabe auf. */
     private function entryData(MashaFeedlyEntry $entry, Member $currentMember): array
     {
-        $history = MashaFeedlyEntryHistory::dataForEntry($entry);
-        $creationEvent = null;
-        foreach ($history as $historyItem) {
-            if (($historyItem['type'] ?? '') === 'created') {
-                $creationEvent = $historyItem;
-                break;
-            }
+        $creationEvent = MashaFeedlyEntryHistory::get()
+            ->filter(['EntryID' => (int)$entry->ID, 'ChangeType' => 'created'])
+            ->sort('Created ASC, ID ASC')
+            ->first();
+        $creatorID = (int)($creationEvent?->ActorMemberID ?? 0);
+        $reportedByID = (int)$entry->ReportedByID;
+        $memberIDs = array_values(array_unique(array_filter([$reportedByID, $creatorID])));
+        $membersByID = [];
+        foreach ($memberIDs ? Member::get()->byIDs($memberIDs) : [] as $entryMember) {
+            $membersByID[(int)$entryMember->ID] = $entryMember;
         }
-        $creator = $entry->creatorMemberID() > 0 ? Member::get()->byID($entry->creatorMemberID()) : null;
-        $reporter = $entry->reportedByMember();
-        $reportedBy = $entry->reportedByName() ?: (string)($creationEvent['actor'] ?? '');
+        $creator = $membersByID[$creatorID] ?? null;
+        $reporter = $membersByID[$reportedByID] ?? $creator;
+        $reportedBy = (string)($reporter?->getName() ?: $creationEvent?->ActorName ?: '');
+        $createdAt = $creationEvent
+            ? (new \DateTimeImmutable((string)$creationEvent->Created, new \DateTimeZone('UTC')))->format('Y-m-d\\TH:i:s\\Z')
+            : '';
         $reporterImageURL = $reporter ? (string)$reporter->getMashaFeedlyAvatarURL() : '';
         $creatorImageURL = $creator ? (string)$creator->getMashaFeedlyAvatarURL() : '';
         $assignees = [];
@@ -1196,7 +1473,7 @@ class MashaFeedlyEntryController extends Controller
             'elementPositionY' => (string)$entry->ElementPositionY,
             'loggedAt' => (string)$entry->Created,
             'createdBy' => $reportedBy,
-            'createdAt' => (string)($creationEvent['created'] ?? ''),
+            'createdAt' => $createdAt,
             'reportedByName' => $reportedBy,
             'createdByInitials' => $reporter ? (string)$reporter->getMashaFeedlyInitials() : ($creator ? (string)$creator->getMashaFeedlyInitials() : ''),
             'createdByColor' => $reporter ? (string)$reporter->getMashaFeedlyDisplayColor() : ($creator ? (string)$creator->getMashaFeedlyDisplayColor() : ''),
@@ -1230,7 +1507,6 @@ class MashaFeedlyEntryController extends Controller
             'assignees' => $assignees,
             'assignedMemberIDs' => $assigneeIDs,
             'comments' => array_map(fn (MashaFeedlyComment $comment): array => $this->commentData($comment, $currentMember), $entry->Comments()->filter('IsApproved', true)->sort('Created ASC')->toArray()),
-            'history' => $this->historyForMember($entry, $currentMember),
             'relations' => $this->relationsData($entry),
         ];
     }
