@@ -46,10 +46,10 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
     }
 
     /**
-     * Öffnet die gelisteten Meldungen für bestehende fachliche Detailprüfungen.
+     * Ergänzt Listenmeldungen in Tests um Details und separat geladenen Verlauf.
      *
      * @param string $url Listenadresse mit Filtern.
-     * @return \SilverStripe\Control\HTTPResponse Listenmetadaten mit separat abgerufenen Details.
+     * @return \SilverStripe\Control\HTTPResponse Listenmetadaten mit separat abgerufenen Details und Verlauf.
      */
     private function getListWithDetails(string $url): \SilverStripe\Control\HTTPResponse
     {
@@ -62,6 +62,9 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             $details = $this->get('/__masha-feedly/entryDetails?EntryID=' . $summary['id']);
             $this->assertSame(200, $details->getStatusCode());
             $summary = array_merge($summary, json_decode($details->getBody(), true)['entry']);
+            $history = $this->get('/__masha-feedly/entryHistory?EntryID=' . $summary['id']);
+            $this->assertSame(200, $history->getStatusCode());
+            $summary['history'] = json_decode($history->getBody(), true)['history'];
         }
         unset($summary);
         $response->setBody(json_encode($data));
@@ -113,14 +116,23 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNotEmpty($entry->LastActivityAt, 'Der Verlauf pflegt den Aktivitätszeitpunkt am Eintrag.');
         $details = json_decode($this->get('/__masha-feedly/entryDetails?EntryID=' . $entry->ID)->getBody(), true)['entry'];
         $this->assertSame('Beschreibung nur im Detail', $details['content']);
-        foreach (['comments', 'history', 'attachments', 'relations'] as $field) {
+        foreach (['comments', 'attachments', 'relations'] as $field) {
             $this->assertArrayHasKey($field, $details);
         }
+        $this->assertArrayNotHasKey('history', $details, 'Der Detailabruf lässt den Verlauf für den eigenen Endpunkt offen.');
+        $historyResponse = $this->get('/__masha-feedly/entryHistory?EntryID=' . $entry->ID);
+        $this->assertSame(200, $historyResponse->getStatusCode());
+        $history = json_decode($historyResponse->getBody(), true);
+        $this->assertArrayHasKey('history', $history);
+        $this->assertNotEmpty($history['history']);
         $this->assertSame(404, $this->get('/__masha-feedly/entryDetails?EntryID=0')->getStatusCode());
+        $this->assertSame(404, $this->get('/__masha-feedly/entryHistory?EntryID=0')->getStatusCode());
         $this->logInAs($this->objFromFixture(Member::class, 'notAllowed'));
         $this->assertSame(403, $this->get('/__masha-feedly/entryDetails?EntryID=' . $entry->ID)->getStatusCode());
+        $this->assertSame(403, $this->get('/__masha-feedly/entryHistory?EntryID=' . $entry->ID)->getStatusCode());
         $this->logOut();
         $this->assertSame(403, $this->get('/__masha-feedly/entryDetails?EntryID=' . $entry->ID)->getStatusCode());
+        $this->assertSame(403, $this->get('/__masha-feedly/entryHistory?EntryID=' . $entry->ID)->getStatusCode());
     }
 
     /** Nur Schätzungsmanager erhalten Warteschlangen-Zähler und dürfen ihre gefilterten Listen abrufen. */

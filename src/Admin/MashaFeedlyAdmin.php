@@ -36,6 +36,7 @@ use SilverStripe\Forms\NumericField;
 use SilverStripe\Forms\ToggleCompositeField;
 use SilverStripe\Forms\TextField;
 use SilverStripe\Forms\TextareaField;
+use SilverStripe\Forms\HTMLEditor\HTMLEditorField;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\Security\Security;
@@ -63,6 +64,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         MashaFeedlyPriority::class => ['title' => 'Prioritäten'],
         MashaFeedlyComment::class => ['title' => 'Kommentare'],
         SiteConfig::class => ['title' => 'Konfiguration'],
+        'email-texts' => ['dataClass' => SiteConfig::class, 'title' => 'E-Mail-Texte'],
         'mite' => ['dataClass' => SiteConfig::class, 'title' => 'Mite'],
     ];
 
@@ -72,6 +74,9 @@ class MashaFeedlyAdmin extends ModelAdmin
     private static $allowed_actions = [
         'saveConfiguration',
         'sendTestEmail',
+        'importEffectNotificationTexts',
+        'saveEmailTexts',
+        'sendEmailTextTest',
         'moveEntry',
         'moveCategory',
         'createCategory',
@@ -115,6 +120,9 @@ class MashaFeedlyAdmin extends ModelAdmin
         ) {
             $this->httpError(403);
         }
+        if ($requestedModel === 'email-texts' && !MashaFeedlyEntry::canManageReporter($member)) {
+            $this->httpError(403);
+        }
         parent::init();
         MashaFeedlyCategory::ensureDefaultCategories();
     }
@@ -143,6 +151,9 @@ class MashaFeedlyAdmin extends ModelAdmin
      */
     public function getEditForm($id = null, $fields = null)
     {
+        if ($this->modelTab === 'email-texts') {
+            return $this->getEmailTextsForm();
+        }
         if ($this->modelTab === 'mite') {
             return $this->getMiteConfigurationForm();
         }
@@ -206,14 +217,6 @@ class MashaFeedlyAdmin extends ModelAdmin
             ));
         }
         if ($canManageSensitiveSettings) {
-            $fields->insertBefore('AllowedMemberIDs', TextareaField::create(
-                'MashaFeedlyEmailFooter',
-                self::translate('CONFIG_EMAIL_FOOTER', 'Footer in allen Masha:Feedly-E-Mails'),
-                MashaFeedlyConfigExtension::emailFooter()
-            )->setRows(5)->setDescription(self::translate(
-                'CONFIG_EMAIL_FOOTER_DESCRIPTION',
-                'Dieser Text erscheint klein am Ende jeder E-Mail. Eine Zeile wird jeweils als eigene Zeile angezeigt. Der Text ist mit den Angaben aus dem Kooperative-Web-Impressum vorausgefüllt.'
-            )));
             $fields->insertBefore('AllowedMemberIDs', DropdownField::create('MashaFeedlyDueDateReminderMode', self::translate('CONFIG_DUE_DATE_REMINDER_MODE', 'Fälligkeitserinnerungen ausführen'), [
                 'cron' => self::translate('CONFIG_DUE_DATE_REMINDER_CRON', 'Serverseitig per Cronjob'),
                 'visitor' => self::translate('CONFIG_DUE_DATE_REMINDER_VISITOR', 'Bei Websitebesuchen'),
@@ -281,14 +284,11 @@ class MashaFeedlyAdmin extends ModelAdmin
         ];
         if ($canManageSensitiveSettings) {
             $operationsFields = $takeFields(['MashaFeedlyDueDateReminderMode', 'MashaFeedlyHourlyRate']);
-            $emailFooterFields = $takeFields(['MashaFeedlyEmailFooter']);
             $resetFields = $takeFields(['MashaFeedlyResetHeading', 'ResetConfirmation']);
             $sections[] = ToggleCompositeField::create('OperationsSettings', self::translate('CONFIG_SECTION_OPERATIONS', 'Erinnerungen & Schätzungen'), $operationsFields)
                 ->addExtraClass('masha-feedly-config-section masha-feedly-config-section--operations');
             $sections[] = ToggleCompositeField::create('ResetSettings', self::translate('CONFIG_SECTION_RESET', 'Daten zurücksetzen'), $resetFields)
                 ->addExtraClass('masha-feedly-config-section masha-feedly-config-section--reset');
-            $sections[] = ToggleCompositeField::create('EmailFooterSettings', self::translate('CONFIG_SECTION_EMAIL_FOOTER', 'E-Mail-Footer'), $emailFooterFields)
-                ->setStartClosed(true)->addExtraClass('masha-feedly-config-section masha-feedly-config-section--email-footer');
         }
         $fields = FieldList::create(...$sections);
         Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly-admin.css');
@@ -318,6 +318,143 @@ class MashaFeedlyAdmin extends ModelAdmin
         $form->setFormAction(Controller::join_links($this->getLinkForModelTab($this->modelTab), 'EditForm'));
         $form->setAttribute('data-pjax-fragment', 'CurrentForm');
         return $form;
+    }
+
+    /** Erstellt das ausschließlich für Reporter-Manager sichtbare Formular für E-Mail-Texte. */
+    private function getEmailTextsForm(): Form
+    {
+        if (!MashaFeedlyEntry::canManageReporter()) {
+            $this->httpError(403);
+        }
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $labels = [
+            'welcome' => 'Willkommen',
+            'newEntry' => 'Neue Meldung',
+            'updatedEntry' => 'Meldung geändert',
+            'newComment' => 'Neuer Kommentar',
+            'dueDate' => 'Heute fällig',
+            'costEstimate' => 'Kostenschätzung angefragt',
+        ];
+        $fields = FieldList::create(
+            LiteralField::create('NotificationTextHelp', '<p>' . self::translate(
+                'CONFIG_NOTIFICATION_TEXT_HELP',
+                'Für jede Nachricht gibt es einen Text in Du- und Sie-Anrede. Verwendet wird die persönliche Einstellung der empfangenden Person. Variablen wie {siteTitle} werden beim Versand ersetzt.'
+            ) . '</p>')
+        );
+        foreach (MashaFeedlyConfigExtension::notificationFieldMap() as $type => $addresses) {
+            foreach ($addresses as $address => $fieldName) {
+                $fields->push(CompositeField::create(
+                    HTMLEditorField::create(
+                    $fieldName,
+                    self::translate('CONFIG_NOTIFICATION_' . strtoupper($type), $labels[$type]) . ' (' . ($address === 'sie' ? 'Sie' : 'Du') . ')',
+                    (string)$config->$fieldName
+                    )->setDescription(self::translate(
+                         $type === 'welcome' ? 'CONFIG_WELCOME_TEXT_DESCRIPTION' : 'CONFIG_NOTIFICATION_TEXT_DESCRIPTION',
+                        $type === 'welcome'
+                            ? 'Dieser Text erklärt neuen Personen Masha:Feedly. {siteTitle} wird durch den Website-Namen ersetzt. Der Website-Link und der Footer werden ergänzt.'
+                            : 'Dieser Text steht am Anfang der E-Mail. Meldungsdaten und Link ergänzt Masha:Feedly automatisch.'
+                    )),
+                    // Das CMS sendet Aktionswerte immer als 1; der Feldname gehört deshalb in den Aktionsparameter.
+                    CompositeField::create(FormAction::create('sendEmailTextTest?EmailTextField=' . $fieldName, '')
+                        ->setUseButtonTag(true)
+                        ->setButtonContent(
+                            '<svg class="masha-feedly-email-action-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><rect x="2.5" y="4.5" width="15" height="11" rx="1.5"/><path d="m3 5 7 5.5L17 5"/></svg>'
+                            . '<span>' . $this->escapeBoardValue(self::translate('CONFIG_TEST_THIS_EMAIL', 'Test-E-Mail an {email} senden', [
+                                'email' => (string)(Security::getCurrentUser()?->Email ?? ''),
+                            ])) . '</span>'
+                        )
+                        ->setAttribute('id', 'Form_EditForm_TestEmail_' . $fieldName)
+                        ->addExtraClass('btn-primary masha-feedly-email-text-test'))->addExtraClass('btn-toolbar')
+                )->setName('EmailTextGroup_' . $fieldName));
+            }
+        }
+        $fields->push(TextareaField::create(
+            'MashaFeedlyEmailFooter',
+            self::translate('CONFIG_EMAIL_FOOTER', 'Footer in allen Masha:Feedly-E-Mails'),
+            MashaFeedlyConfigExtension::emailFooter()
+        )->setRows(4)->setDescription(self::translate(
+            'CONFIG_EMAIL_FOOTER_DESCRIPTION',
+            'Dieser gemeinsame Text erscheint am Ende aller Masha:Feedly-E-Mails.'
+        )));
+        $importAction = FormAction::create(
+            'importEffectNotificationTexts',
+            self::translate('CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS', 'Texte aus Masha:Effects übernehmen')
+        )->setUseButtonTag(true)
+            ->setButtonContent(
+                '<svg class="masha-feedly-email-action-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M16.5 8a6.5 6.5 0 1 0 1 4"/><path d="M16.5 3.5V8H12"/></svg>'
+                . '<span>' . $this->escapeBoardValue(self::translate('CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS', 'Texte aus Masha:Effects übernehmen')) . '</span>'
+            )->addExtraClass('btn-primary masha-feedly-email-text-import');
+        $form = Form::create($this, 'EditForm', $fields, FieldList::create(
+            FormAction::create('saveEmailTexts', self::translate('CONFIG_SAVE', 'E-Mail-Texte speichern'))->addExtraClass('btn-primary'),
+            $importAction
+        ))->setHTMLID('Form_EditForm')->setTemplate($this->getTemplatesWithSuffix('_EditForm'));
+        $form->addExtraClass('cms-edit-form cms-panel-padded center flexbox-area-grow');
+        $form->setFormAction(Controller::join_links($this->getLinkForModelTab('email-texts'), 'EditForm'));
+        $form->setAttribute('data-pjax-fragment', 'CurrentForm');
+        return $form;
+    }
+
+    /** Speichert ausschließlich die E-Mail-Texte nach erneuter Berechtigungs- und CSRF-Prüfung. */
+    public function saveEmailTexts(array $data, Form $form): HTTPResponse
+    {
+        $request = $this->getRequest();
+        if (!MashaFeedlyEntry::canManageReporter(Security::getCurrentUser())) {
+            $this->httpError(403);
+        }
+        if (!$request->isPOST() || !SecurityToken::inst()->checkRequest($request)) {
+            $this->httpError(400);
+        }
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailFooter = mb_substr(trim((string)($data['MashaFeedlyEmailFooter'] ?? '')), 0, 10000);
+        foreach (MashaFeedlyConfigExtension::notificationFieldMap() as $addresses) {
+            foreach ($addresses as $fieldName) {
+                if (!array_key_exists($fieldName, $data)) continue;
+                HTMLEditorField::create($fieldName, $fieldName)->setValue((string)$data[$fieldName])->saveInto($config);
+            }
+        }
+        $config->write();
+        $form->sessionMessage(self::translate('CONFIG_EMAIL_TEXTS_SAVED', 'Die E-Mail-Texte wurden gespeichert.'), 'good');
+        return $this->getResponseNegotiator()->respond($request, [
+            'CurrentForm' => fn(): string => $this->getEmailTextsForm()->forTemplate(),
+        ]);
+    }
+
+    /** Sendet den ausgewählten, aktuellen Formulartext als Vorschau ausschließlich an das Betreiberkonto. */
+    public function sendEmailTextTest(array $data, Form $form): HTTPResponse
+    {
+        $request = $this->getRequest();
+        $member = Security::getCurrentUser();
+        if (!MashaFeedlyEntry::canManageReporter($member)) {
+            $this->httpError(403);
+        }
+        if (!$request->isPOST() || !SecurityToken::inst()->checkRequest($request)) {
+            $this->httpError(400);
+        }
+        $fieldName = (string)($data['EmailTextField'] ?? '');
+        $text = $data[$fieldName] ?? null;
+        if (!is_string($text) || !array_filter(
+            MashaFeedlyConfigExtension::notificationFieldMap(),
+            static fn(array $addresses): bool => in_array($fieldName, $addresses, true)
+        )) {
+            $this->httpError(400);
+        }
+        try {
+            MashaFeedlyNotificationService::sendEmailTextPreview($member, $fieldName, $text);
+            $form->sessionMessage(self::translate(
+                'CONFIG_TEST_THIS_EMAIL_SENT',
+                'Die Test-E-Mail wurde an {email} gesendet.',
+                ['email' => (string)$member->Email]
+            ), 'good');
+        } catch (\Throwable $exception) {
+            error_log('[Masha:Feedly] Test-E-Mail für Benachrichtigungstext fehlgeschlagen (' . get_class($exception) . '): ' . $exception->getMessage());
+            $form->sessionMessage(self::translate(
+                'CONFIG_TEST_THIS_EMAIL_FAILED',
+                'Die Test-E-Mail konnte nicht gesendet werden. Prüfe die Mailserver-Konfiguration.'
+            ), 'bad');
+        }
+        return $this->getResponseNegotiator()->respond($request, [
+            'CurrentForm' => fn(): string => $this->getEmailTextsForm()->forTemplate(),
+        ]);
     }
 
     /** Liefert Aktivierung, Projekt und Mehrfachauswahl der Startkategorien ohne Ausgabe des API-Schlüssels. */
@@ -1196,8 +1333,6 @@ class MashaFeedlyAdmin extends ModelAdmin
         $siteConfig->MashaFeedlyTheme = preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $theme) ? $theme : 'playful';
         $canManageSensitiveSettings = MashaFeedlyEntry::canManageReporter($member);
         if ($canManageSensitiveSettings) {
-            $footer = trim((string)($data['MashaFeedlyEmailFooter'] ?? MashaFeedlyConfigExtension::emailFooter()));
-            $siteConfig->MashaFeedlyEmailFooter = mb_substr($footer, 0, 10000);
             $reminderMode = strtolower((string)($data['MashaFeedlyDueDateReminderMode'] ?? MashaFeedlyConfigExtension::dueDateReminderMode()));
             $siteConfig->MashaFeedlyDueDateReminderMode = in_array($reminderMode, ['cron', 'visitor'], true) ? $reminderMode : 'cron';
             $hourlyRate = str_replace(',', '.', trim((string)($data['MashaFeedlyHourlyRate'] ?? MashaFeedlyConfigExtension::hourlyRate())));
@@ -1270,6 +1405,47 @@ class MashaFeedlyAdmin extends ModelAdmin
             ), 'bad');
         }
         return $this->getResponseNegotiator()->respond($request, [
+            'CurrentForm' => fn(): string => $this->getEmailTextsForm()->forTemplate(),
+        ]);
+    }
+
+    /** Überschreibt Benachrichtigungstexte nur nach ausdrücklichem Klick und nur durch das Betreiberkonto. */
+    public function importEffectNotificationTexts(array $data, Form $form): HTTPResponse
+    {
+        $request = $this->getRequest();
+        $member = Security::getCurrentUser();
+        if (!MashaFeedlyEntry::canManageReporter($member)) {
+            $this->httpError(403);
+        }
+        if (!$request->isPOST() || !SecurityToken::inst()->checkRequest($request)) {
+            $this->httpError(400);
+        }
+
+        try {
+            $providerTexts = Injector::inst()->get(MashaFeedlyEffectClient::class)->emailDefaults(true);
+            $defaults = ['welcome' => $providerTexts['welcome']] + $providerTexts['notifications'];
+            $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
+            foreach (MashaFeedlyConfigExtension::notificationFieldMap() as $type => $addresses) {
+                foreach ($addresses as $address => $fieldName) {
+                    $field = HTMLEditorField::create($fieldName, $fieldName)
+                        ->setValue((string)($defaults[$type][$address] ?? ''));
+                    $field->saveInto($siteConfig);
+                }
+            }
+            $siteConfig->write();
+            $form->sessionMessage(self::translate(
+                'CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS_DONE',
+                'Die Benachrichtigungstexte aus Masha:Effects wurden übernommen.'
+            ), 'good');
+        } catch (\Throwable $exception) {
+            error_log('[Masha:Feedly] Texte aus Masha:Effects konnten nicht übernommen werden (' . get_class($exception) . '): ' . $exception->getMessage());
+            $form->sessionMessage(self::translate(
+                'CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS_FAILED',
+                'Die Texte konnten nicht geladen werden. Prüfe die Verbindung zu Masha:Effects und versuche es erneut.'
+            ), 'bad');
+        }
+
+        return $this->getResponseNegotiator()->respond($request, [
             'CurrentForm' => fn(): string => $this->getEditForm()->forTemplate(),
         ]);
     }
@@ -1303,6 +1479,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             MashaFeedlyCategory::class => ['ADMIN_CATEGORIES', 'Kategorien'],
             MashaFeedlyComment::class => ['ADMIN_COMMENTS', 'Kommentare'],
             SiteConfig::class => ['ADMIN_CONFIGURATION', 'Konfiguration'],
+            'email-texts' => ['ADMIN_EMAIL_TEXTS', 'E-Mail-Texte'],
             'mite' => ['MITE_TAB', 'Mite'],
         ];
         foreach ($titles as $class => [$key, $fallback]) {
@@ -1316,6 +1493,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         }
         if (!MashaFeedlyEntry::canManageReporter($member)) {
             unset($models['mite']);
+            unset($models['email-texts']);
         }
         return $models;
     }

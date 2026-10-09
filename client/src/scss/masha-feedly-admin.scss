@@ -42,6 +42,21 @@
   p { margin: 0.25rem 0 0; color: #762323; font-size: 0.95rem; line-height: 1.5; }
 }
 
+/* Aktionen für E-Mail-Texte */
+.masha-feedly-email-text-test,
+.masha-feedly-email-text-import {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  font-weight: 650 !important;
+}
+
+.masha-feedly-email-text-test { margin-top: 0.35rem; }
+.masha-feedly-email-text-import { margin-right: 0.5rem; }
+.masha-feedly-email-action-icon { display: block; flex: 0 0 auto; }
+
 .masha-feedly-animation-previews {
   margin: 0 0 1.25rem;
   padding: 1rem 1.1rem;

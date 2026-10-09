@@ -3,7 +3,10 @@
 namespace KW\MashaFeedly\Tests\Unit\Extension;
 
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
+use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
+use SilverStripe\Core\Environment;
 use SilverStripe\Dev\SapphireTest;
+use SilverStripe\Core\Injector\Injector;
 use SilverStripe\ORM\DB;
 use SilverStripe\Security\Member;
 use SilverStripe\SiteConfig\SiteConfig;
@@ -30,6 +33,9 @@ class MashaFeedlyConfigExtensionTest extends SapphireTest
         $this->assertArrayHasKey('MashaFeedlyDueDateReminderMode', $fields);
         $this->assertArrayHasKey('MashaFeedlyDueDateReminderLastRunDate', $fields);
         $this->assertArrayHasKey('MashaFeedlyEmailTestSucceeded', $fields);
+        foreach (array_merge(...array_values(MashaFeedlyConfigExtension::notificationFieldMap())) as $notificationField) {
+            $this->assertArrayHasKey($notificationField, $fields);
+        }
         $this->assertFalse(MashaFeedlyConfigExtension::emailTestSucceeded());
 
         // Eine echte ORM-Abfrage deckt fehlende Spalten auf, die eine reine Config-Prüfung übersieht.
@@ -39,6 +45,86 @@ class MashaFeedlyConfigExtensionTest extends SapphireTest
         $reloaded = SiteConfig::get()->byID($siteConfig->ID);
         $this->assertNotNull($reloaded);
         $this->assertSame('serious', $reloaded->MashaFeedlyTheme);
+    }
+
+    /** Übernimmt Anbietervorlagen nur in leere Felder und erhält lokale Anpassungen. */
+    public function testEffectNotificationDefaultsFillOnlyEmptyFields(): void
+    {
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyNotificationNewEntryDu = '<p>Eigener Text</p>';
+        $config->MashaFeedlyNotificationNewEntrySie = '';
+        $config->write();
+        $defaults = [
+            'newEntry' => ['du' => '<p>Provider Du</p>', 'sie' => '<p>Provider Sie</p>'],
+            'updatedEntry' => ['du' => '<p>Update Du</p>', 'sie' => '<p>Update Sie</p>'],
+        ];
+
+        $this->assertTrue(MashaFeedlyConfigExtension::fillEmptyNotificationTexts($config, $defaults));
+        $this->assertSame('<p>Eigener Text</p>', $config->MashaFeedlyNotificationNewEntryDu);
+        $this->assertSame('<p>Provider Sie</p>', $config->MashaFeedlyNotificationNewEntrySie);
+        $this->assertSame('<p>Update Du</p>', $config->MashaFeedlyNotificationUpdatedEntryDu);
+        $this->assertSame('<p>Update Sie</p>', $config->MashaFeedlyNotificationUpdatedEntrySie);
+    }
+
+    /** Der dev/build-Hook übernimmt Anbietertexte nach dem Schemaaufbau in leere Felder. */
+    public function testBuildHookImportsProviderTextsIntoEmptyFields(): void
+    {
+        $previousBase = Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL');
+        $previousKey = Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY');
+        $providerConfig = \KW\MashaFeedly\Service\MashaFeedlyEffectProvider::config();
+        $previousLocalBase = $providerConfig->get('local_provider_base_url');
+        Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', '');
+        Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', str_repeat('a', 64));
+        $providerConfig->set('local_provider_base_url', rtrim(\SilverStripe\Control\Director::absoluteURL('/'), '/'));
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        foreach (array_merge(...array_values(MashaFeedlyConfigExtension::notificationFieldMap())) as $field) {
+            $config->$field = '';
+        }
+        $config->write();
+
+        $texts = [];
+        foreach (MashaFeedlyConfigExtension::notificationFieldMap() as $type => $addresses) {
+            foreach ($addresses as $address => $_field) {
+                $texts[$type][$address] = '<p>' . $type . ' ' . $address . '</p>';
+            }
+        }
+        $injector = Injector::inst();
+        $originalClient = $injector->get(MashaFeedlyEffectClient::class);
+        $client = new class($texts) extends MashaFeedlyEffectClient {
+            public function __construct(private array $texts) {}
+            public function emailDefaults(bool $refresh = false): array
+            {
+                return ['version' => 1, 'footer' => '', 'welcome' => $this->texts['welcome'], 'notifications' => $this->texts];
+            }
+        };
+        $injector->registerService($client, MashaFeedlyEffectClient::class);
+        try {
+            $config->requireDefaultRecords();
+            $saved = SiteConfig::get()->byID($config->ID);
+            foreach (MashaFeedlyConfigExtension::notificationFieldMap() as $type => $addresses) {
+                foreach ($addresses as $address => $field) {
+                    $this->assertSame('<p>' . $type . ' ' . $address . '</p>', (string)$saved->$field);
+                }
+            }
+        } finally {
+            $injector->registerService($originalClient, MashaFeedlyEffectClient::class);
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', $previousBase);
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', $previousKey);
+            $providerConfig->set('local_provider_base_url', $previousLocalBase);
+        }
+    }
+
+    /** Benachrichtigungstexte werden passend zur persönlichen Du-/Sie-Auswahl gelesen. */
+    public function testNotificationTextUsesRequestedAddressVariant(): void
+    {
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyNotificationNewCommentDu = '<p>Du-Version</p>';
+        $config->MashaFeedlyNotificationNewCommentSie = '<p>Sie-Version</p>';
+        $config->write();
+
+        $this->assertSame('<p>Du-Version</p>', MashaFeedlyConfigExtension::notificationEmailText('newComment', 'du'));
+        $this->assertSame('<p>Sie-Version</p>', MashaFeedlyConfigExtension::notificationEmailText('newComment', 'sie'));
+        $this->assertSame('', MashaFeedlyConfigExtension::notificationEmailText('unknown', 'du'));
     }
 
     /** Prüft, dass Auswahl Zugriff erteilt und Entfernen ihn wieder entzieht. */

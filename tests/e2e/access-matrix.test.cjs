@@ -107,7 +107,7 @@ test('Nicht zugeordneter CMS-Admin sieht keinen Feedly-Menüpunkt und erhält be
     await expect(page.locator('.cms-menu')).toBeVisible();
     await expect(page.locator('#Menu-KW-MashaFeedly-Admin-MashaFeedlyAdmin')).toHaveCount(0);
     await page.goto(new URL('/admin/myprofile#Root_MashaFeedly', config.baseURL).href);
-    await expect(page.locator('form')).toBeVisible();
+    await expect(page.locator('#Form_EditForm')).toBeVisible();
     await expect(page.locator('a[href="#Root_MashaFeedly"]')).toHaveCount(0);
     await expect(page.locator('#Root_MashaFeedly')).toHaveCount(0);
     await expect(page.locator('[name="MashaFeedlyColor"], [name="MashaFeedlyAvatarIcon"]')).toHaveCount(0);

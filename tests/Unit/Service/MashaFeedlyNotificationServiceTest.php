@@ -121,7 +121,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertSame(1, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
             $this->assertSame('allowed@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
             $this->assertSame('Projekt Wolke: Heute fällig – Termin für den Regressionstest.', $mailer->messages[0]->getSubject());
-            $this->assertStringContainsString('2026-10-04', (string)$mailer->messages[0]->getTextBody());
+            $this->assertStringContainsString('04.10.2026', (string)$mailer->messages[0]->getTextBody());
             $this->assertNotEmpty($entry->DueDateReminderSentAt);
             $this->assertSame(0, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
             $this->assertCount(1, $mailer->messages);
@@ -163,6 +163,20 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertStringContainsString('So erstellst du eine Meldung', (string)$message->getTextBody());
             $this->assertStringContainsString('Dein Profil und deine E-Mails', (string)$message->getTextBody());
             $this->assertStringContainsString('freigeschaltet sind', (string)$message->getTextBody());
+
+            $config->MashaFeedlyAddress = 'sie';
+            $config->MashaFeedlyWelcomeTextDu = '<p>Hallo Du-Version</p>';
+            $config->MashaFeedlyWelcomeTextSie = '<h2>Willkommen auf {siteTitle}</h2><p>So können Sie mitmachen.</p>';
+            $config->write();
+            $member->MashaFeedlyAddress = 'du';
+            $member->write();
+            MashaFeedlyNotificationService::notifyAccessGranted($member);
+            $customMessage = $mailer->messages[1];
+            $this->assertStringContainsString('<h2>Willkommen auf Projekt Wolke</h2>', (string)$customMessage->getHtmlBody());
+            $this->assertStringContainsString('So können Sie mitmachen.', (string)$customMessage->getTextBody());
+            $this->assertStringNotContainsString('Hallo Du-Version', (string)$customMessage->getTextBody());
+            $this->assertStringNotContainsString('So erstellst du eine Meldung', (string)$customMessage->getTextBody());
+
         } finally {
             $injector->registerService($originalMailer, MailerInterface::class);
         }
@@ -207,6 +221,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $disabledMember = $this->objFromFixture(Member::class, 'normalize');
         $allowedMember->MashaFeedlyEmailNotifications = true;
         $allowedMember->MashaFeedlyNotifyNewEntries = true;
+        $allowedMember->MashaFeedlyAddress = 'sie';
         $disabledMember->MashaFeedlyNotifyNewEntries = false;
         $disabledMember->MashaFeedlyNotifyEntryUpdates = false;
         $allowedMember->MashaFeedlyNotifyEntryUpdates = false;
@@ -215,6 +230,9 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
 
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->Title = 'Projekt Wolke';
+        $config->MashaFeedlyAddress = 'du';
+        $config->MashaFeedlyNotificationNewEntryDu = '<p>Du-Text {siteTitle}</p>';
+        $config->MashaFeedlyNotificationNewEntrySie = '<p>Sie-Text {siteTitle}</p>';
         $config->MashaFeedlyAllowedMemberIDs = json_encode([
             (int)$allowedMember->ID,
             (int)$disabledMember->ID,
@@ -255,7 +273,8 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             );
             $this->assertSame(1, substr_count((string)$message->getTextBody(), 'Der Speichern-Button löst einen Fehler aus.'));
             $this->assertStringContainsString('Neue Meldung', (string)$message->getTextBody());
-            $this->assertStringContainsString('Auf Projekt Wolke wurde eine neue Meldung erstellt.', (string)$message->getTextBody());
+            $this->assertStringContainsString('Sie-Text Projekt Wolke', (string)$message->getTextBody());
+            $this->assertStringNotContainsString('Du-Text Projekt Wolke', (string)$message->getTextBody());
             $this->assertStringContainsString('Vollständige Beschreibung:', (string)$message->getTextBody());
             $this->assertStringContainsString('Gemeldet von:', (string)$message->getTextBody());
             $this->assertStringContainsString((string)$allowedMember->getName(), (string)$message->getTextBody());

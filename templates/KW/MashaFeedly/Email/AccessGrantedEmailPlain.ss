@@ -1,3 +1,6 @@
+<% if $NotificationIntroHTML %>
+$NotificationIntroPlain
+<% else %>
 <%t KW\MashaFeedly\Translations.EMAIL_ACCESS_TITLE "Willkommen bei Masha:Feedly" %>
 
 <%t KW\MashaFeedly\Translations.EMAIL_ACCESS_INTRO "Schön, dass du dabei bist! Auf der Website {siteTitle} kannst du jetzt Meldungen erstellen und ihren Stand verfolgen." siteTitle=$SiteTitle %>
@@ -18,6 +21,7 @@
 
 <%t KW\MashaFeedly\Translations.EMAIL_ACCESS_PRIVACY "Deine Meldungen und Dateien können nur angemeldete Personen sehen, die für Masha:Feedly freigeschaltet sind." %>
 
+<% end_if %>
 <%t KW\MashaFeedly\Translations.EMAIL_ACCESS_OPEN "Website öffnen" %>:
 $WidgetURL
 
