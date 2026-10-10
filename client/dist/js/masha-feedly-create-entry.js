@@ -64,41 +64,29 @@ window.KWMashaFeedlyEnvironment = (() => {
   return { collect, elementPosition, getElementSelector };
 })();
 
-document.addEventListener('DOMContentLoaded', () => {
-  const widget = (window.KWMashaFeedlyDOM?.widget() || document.querySelector('[data-kw-masha-feedly]'));
-  if (!widget) return;
-
-  const startButton = widget.querySelector('[data-masha-feedly-start-selection]');
-  const toggleButton = widget.querySelector('.kw-masha-feedly__toggle');
-  const banner = widget.querySelector('[data-masha-feedly-selection-banner]');
-  const modal = widget.querySelector('[data-masha-feedly-modal]');
-  const form = widget.querySelector('[data-masha-feedly-entry-form]');
-  const context = widget.querySelector('[data-masha-feedly-selected-context]');
-  const status = widget.querySelector('[data-masha-feedly-form-status]');
-  const dialog = modal?.querySelector('[role="dialog"]');
-  const toast = widget.querySelector('[data-masha-feedly-save-toast]');
-  const toastMessage = widget.querySelector('[data-masha-feedly-save-message]');
-  const contentField = form?.querySelector('[name="Content"]');
-  const createCategory = form?.querySelector('[data-masha-feedly-create-category]');
-  const diagnosticsSection = form?.querySelector('[data-masha-feedly-diagnostics]');
-  const diagnosticsFields = ['StepsToReproduce', 'ExpectedResult', 'ActualResult'].map((name) => form?.elements[name]).filter(Boolean);
-  const estimateSection = form?.querySelector('[data-masha-feedly-create-estimate]');
-  const estimateDuration = form?.elements.EstimatedCostDuration;
-  const estimateNote = form?.elements.EstimatedCostNote;
-  const estimatePrice = estimateSection?.querySelector('[data-masha-feedly-estimate-price]');
-  const screenshotButton = form?.querySelector('[data-masha-feedly-screenshot-capture]');
-  const screenshotStatus = form?.querySelector('[data-masha-feedly-screenshot-status]');
-  const screenshotPreview = form?.querySelector('[data-masha-feedly-screenshot-preview]');
-  const screenshotImage = form?.querySelector('[data-masha-feedly-screenshot-image]');
-  const screenshotCropper = form?.querySelector('[data-masha-feedly-screenshot-cropper]');
-  const screenshotCrop = form?.querySelector('[data-masha-feedly-screenshot-crop]');
-  const screenshotApplyCrop = form?.querySelector('[data-masha-feedly-screenshot-apply]');
-  const screenshotRemove = form?.querySelector('[data-masha-feedly-screenshot-remove]');
+/**
+ * Richtet dieselbe Bildschirmaufnahme für neue und bearbeitete Meldungen ein.
+ * @param {HTMLFormElement|null} screenshotForm Formular, dem der Screenshot angehängt wird.
+ * @param {HTMLElement} widget Widget, das vor dem Browserdialog ausgeblendet wird.
+ * @param {Document} document Dokument für Video- und Canvas-Elemente.
+ * @param {Window} window Browser-APIs für Bildschirmfreigabe und Bild-URLs.
+ * @param {(key: string) => string} t Übersetzungsfunktion.
+ * @return {{file: () => File|null, clear: () => void}|null} Screenshot-Datei und Rücksetzfunktion.
+ */
+window.KWMashaFeedlyScreenshot = (screenshotForm, widget, document, window, t) => {
+  if (!screenshotForm || screenshotForm.__mashaFeedlyScreenshot) return screenshotForm?.__mashaFeedlyScreenshot || null;
+  const screenshotButton = screenshotForm?.querySelector('[data-masha-feedly-screenshot-capture]');
+  const screenshotStatus = screenshotForm?.querySelector('[data-masha-feedly-screenshot-status]');
+  const screenshotPreview = screenshotForm?.querySelector('[data-masha-feedly-screenshot-preview]');
+  const screenshotImage = screenshotForm?.querySelector('[data-masha-feedly-screenshot-image]');
+  const screenshotCropper = screenshotForm?.querySelector('[data-masha-feedly-screenshot-cropper]');
+  const screenshotCrop = screenshotForm?.querySelector('[data-masha-feedly-screenshot-crop]');
+  const screenshotApplyCrop = screenshotForm?.querySelector('[data-masha-feedly-screenshot-apply]');
+  const screenshotRemove = screenshotForm?.querySelector('[data-masha-feedly-screenshot-remove]');
   let screenshotFile = null;
   let screenshotPreviewURL = '';
   let screenshotSourceURL = '';
   let screenshotSelection = null;
-  const t = (key, values = {}) => window.KWMashaFeedlyTranslate(key, values);
   const clearScreenshot = () => {
     screenshotFile = null;
     if (screenshotPreviewURL) URL.revokeObjectURL(screenshotPreviewURL);
@@ -226,6 +214,37 @@ document.addEventListener('DOMContentLoaded', () => {
     screenshotStatus.textContent = t('SCREENSHOT_READY');
   });
   screenshotRemove?.addEventListener('click', clearScreenshot);
+  const controller = { file: () => screenshotFile, clear: clearScreenshot };
+  screenshotForm.__mashaFeedlyScreenshot = controller;
+  return controller;
+
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+  const widget = (window.KWMashaFeedlyDOM?.widget() || document.querySelector('[data-kw-masha-feedly]'));
+  if (!widget) return;
+
+  const startButton = widget.querySelector('[data-masha-feedly-start-selection]');
+  const toggleButton = widget.querySelector('.kw-masha-feedly__toggle');
+  const banner = widget.querySelector('[data-masha-feedly-selection-banner]');
+  const modal = widget.querySelector('[data-masha-feedly-modal]');
+  const form = widget.querySelector('[data-masha-feedly-entry-form]');
+  const context = widget.querySelector('[data-masha-feedly-selected-context]');
+  const status = widget.querySelector('[data-masha-feedly-form-status]');
+  const dialog = modal?.querySelector('[role="dialog"]');
+  const toast = widget.querySelector('[data-masha-feedly-save-toast]');
+  const toastMessage = widget.querySelector('[data-masha-feedly-save-message]');
+  const contentField = form?.querySelector('[name="Content"]');
+  const createCategory = form?.querySelector('[data-masha-feedly-create-category]');
+  const diagnosticsSection = form?.querySelector('[data-masha-feedly-diagnostics]');
+  const diagnosticsFields = ['StepsToReproduce', 'ExpectedResult', 'ActualResult'].map((name) => form?.elements[name]).filter(Boolean);
+  const estimateSection = form?.querySelector('[data-masha-feedly-create-estimate]');
+  const estimateDuration = form?.elements.EstimatedCostDuration;
+  const estimateNote = form?.elements.EstimatedCostNote;
+  const estimatePrice = estimateSection?.querySelector('[data-masha-feedly-estimate-price]');
+  const t = (key, values = {}) => window.KWMashaFeedlyTranslate(key, values);
+  const createScreenshot = window.KWMashaFeedlyScreenshot(form, widget, document, window, t);
+  const editScreenshot = window.KWMashaFeedlyScreenshot(widget.querySelector('[data-masha-feedly-edit-form]'), widget, document, window, t);
   const calculatePreview = (text) => {
     const match = String(text).trim().match(/^([0-9]+(?:[.,][0-9]+)?)(?:\s*(?:-|–|bis)\s*([0-9]+(?:[.,][0-9]+)?))?\s*(stunden?|std\.?|h|minuten?|min)$/i);
     if (!match) return '';
@@ -262,6 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
   updateDiagnostics();
   let selecting = false;
   let highlighted = null;
+  let pendingFaqQuestion = '';
   const getElementSelector = window.KWMashaFeedlyEnvironment.getElementSelector;
 
   const stopSelection = () => {
@@ -274,6 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const cancelSelection = () => {
     if (!selecting) return;
+    pendingFaqQuestion = '';
     stopSelection();
     const panel = widget.querySelector('.kw-masha-feedly__panel');
     const toggle = widget.querySelector('.kw-masha-feedly__toggle');
@@ -317,7 +338,17 @@ document.addEventListener('DOMContentLoaded', () => {
       form.append(input);
     });
     modal.hidden = false;
-    form.querySelector('[name="Content"]').focus();
+    const hasFaqPrefill = Boolean(pendingFaqQuestion);
+    if (pendingFaqQuestion) {
+      contentField.value = t('FAQ_REPORT_CONTENT', { query: pendingFaqQuestion });
+      pendingFaqQuestion = '';
+      updateDiagnostics();
+    }
+    contentField.focus();
+    if (hasFaqPrefill && contentField.setSelectionRange) {
+      const cursorPosition = contentField.value.length;
+      contentField.setSelectionRange(cursorPosition, cursorPosition);
+    }
     if (options.dispatchOnboarding !== false) {
       document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-target-selected'));
     }
@@ -332,6 +363,13 @@ document.addEventListener('DOMContentLoaded', () => {
     widget.querySelector('.kw-masha-feedly__toggle').setAttribute('aria-expanded', 'false');
     document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-selection-started'));
     document.dispatchEvent(new CustomEvent('kw-masha-feedly:closed'));
+  });
+
+  document.addEventListener('kw-masha-feedly:create-from-faq', (event) => {
+    const question = String(event.detail?.question || '').trim();
+    if (!question || !startButton) return;
+    pendingFaqQuestion = question;
+    startButton.click();
   });
 
   document.addEventListener('keydown', (event) => {
@@ -408,6 +446,7 @@ document.addEventListener('DOMContentLoaded', () => {
     submit.disabled = true;
     status.textContent = t('CREATE_SAVING');
     const data = new FormData(form);
+    const screenshotFile = createScreenshot?.file();
     if (screenshotFile) data.append('Attachments[]', screenshotFile);
     data.set('SecurityID', form.dataset.securityId);
     let saveConfirmed = false;
@@ -429,10 +468,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (toastIcon) { toastIcon.textContent = '✓'; toastIcon.style.backgroundColor = ''; }
       toastMessage.textContent = result.message;
       toast.hidden = false;
-      const confirmation = document.createElement('article');
-      confirmation.className = 'kw-masha-feedly__entry-confirmation';
-      confirmation.textContent = result.title || t('CREATE_ENTRY_FALLBACK');
-      widget.querySelector('.kw-masha-feedly__column')?.append(confirmation);
       const panel = widget.querySelector('.kw-masha-feedly__panel');
       const toggle = widget.querySelector('.kw-masha-feedly__toggle');
       panel.hidden = false;
@@ -444,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
         detail: { entryID: Number(result.entryID) },
       }));
       form.reset();
-      clearScreenshot();
+      createScreenshot?.clear();
       setTimeout(() => { modal.hidden = true; toggleButton?.focus?.(); }, 500);
       setTimeout(() => { toast.hidden = true; }, 6000);
     } catch (error) {

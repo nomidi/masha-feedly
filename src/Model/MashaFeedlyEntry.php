@@ -33,6 +33,7 @@ use SilverStripe\i18n\i18n;
  * @property string $ActualResult Optionales tatsächliches Ergebnis.
  * @property string $EntryDate Datum und Uhrzeit des Eintrags.
  * @property string $DueDate Fälligkeitstermin des Eintrags.
+ * @property string $DeferredUntil Datum, bis zu dem automatische Fälligkeitserinnerungen pausieren.
  * @property string $DueDateReminderSentAt Zeitpunkt der letzten Fälligkeitserinnerung.
  * @property string $LastActivityAt Zeitpunkt der letzten Neuigkeit zu diesem Eintrag.
  * @property int $ActivityVersion Anzahl der protokollierten Aktivitäten dieses Eintrags.
@@ -83,6 +84,7 @@ class MashaFeedlyEntry extends DataObject
         'ActualResult' => 'Text',
         'EntryDate' => 'Datetime',
         'DueDate' => 'Date',
+        'DeferredUntil' => 'Date',
         'DueDateReminderSentAt' => 'Datetime',
         'LastActivityAt' => 'Datetime',
         'ActivityVersion' => 'Int',
@@ -192,6 +194,10 @@ class MashaFeedlyEntry extends DataObject
             'DueDate',
             $this->translate('FIELD_DUE_DATE', 'Fällig am')
         ));
+        $fields->replaceField('DeferredUntil', \SilverStripe\Forms\DateField::create(
+            'DeferredUntil',
+            $this->translate('FIELD_DEFERRED_UNTIL', 'Erinnerung zurückstellen bis')
+        )->setDescription($this->translate('FIELD_DEFERRED_UNTIL_DESCRIPTION', 'Pausiert nur automatische Fälligkeitserinnerungen. Kommentare und Änderungs-E-Mails laufen weiter.')));
         $member = Security::getCurrentUser();
         if (self::canManageReporter($member)) {
             $reporterOptions = ['0' => $this->translate('REPORTER_USE_CREATOR', 'Technischen Ersteller verwenden')];

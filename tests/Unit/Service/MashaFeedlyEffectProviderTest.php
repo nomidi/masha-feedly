@@ -15,6 +15,29 @@ use SilverStripe\View\Requirements_Backend;
 /** Prüft die Anbieter-Konfiguration ohne Änderungen an der Projektdatenbank. */
 class MashaFeedlyEffectProviderTest extends SapphireTest
 {
+    /** Ohne Anbieter erhält der Browser keine Abrufadresse und behält den lokalen Effekt-Loader. */
+    public function testLoaderDoesNotAdvertiseManifestWithoutProvider(): void
+    {
+        $previousBase = Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL');
+        $previousKey = Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY');
+        $previousRequirements = Requirements::backend();
+        Requirements::set_backend(new Requirements_Backend());
+        try {
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', '');
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', '');
+            Config::modify()->set(MashaFeedlyEffectProvider::class, 'base_url', '');
+            Config::modify()->set(MashaFeedlyEffectProvider::class, 'local_provider_base_url', '');
+            MashaFeedlyEffectProvider::requireLoader();
+            $script = Requirements::get_custom_scripts()['masha-feedly-effects-provider'];
+            $this->assertStringContainsString('window.KWMashaFeedlyEffectsManifestURL = "";', $script);
+            $this->assertStringContainsString('/client/dist/js/masha-feedly-effects.js', implode('\n', array_keys(Requirements::backend()->getJavascript())));
+        } finally {
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', $previousBase);
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', $previousKey);
+            Requirements::set_backend($previousRequirements);
+        }
+    }
+
     /** CMS-Vorschauen erhalten die gespeicherte Tonwahl unabhängig vom Widget-Markup. */
     public function testLoaderIncludesPersonalSoundPreference(): void
     {

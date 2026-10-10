@@ -591,6 +591,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
     public function testConfigurationShowsEditableColorsForAllowedMembers(): void
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
+        $otherMemberInitialColor = (string)$this->objFromFixture(Member::class, 'notAllowed')->MashaFeedlyColor;
         $this->allowMember($member);
         $this->logInAsAllowedAdmin();
         $superAdmin = Security::getCurrentUser();
@@ -666,7 +667,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertSame('#B5A0E0', (string)Member::get()->byID($member->ID)->MashaFeedlyColor);
         $automaticallyColoredMember = Member::get()->byID((int)$this->objFromFixture(Member::class, 'notAllowed')->ID);
         $this->assertNotSame('', (string)$automaticallyColoredMember->MashaFeedlyColor);
-        $this->assertNotSame('#B5A0E0', (string)$automaticallyColoredMember->MashaFeedlyColor);
+        // Zufällig vergebene Farben dürfen übereinstimmen; eine bestehende Farbe bleibt beim Freigeben erhalten.
+        $this->assertSame($otherMemberInitialColor, (string)$automaticallyColoredMember->MashaFeedlyColor);
     }
 
     /** Nur das konfigurierte Betreiberkonto kann Anbietertexte ausdrücklich in die SiteConfig übernehmen. */
@@ -762,7 +764,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             $this->assertSame('Masha:Feedly – Test: Neue Meldung (Du)', $newEntryMessage->getSubject());
             $this->assertStringContainsString('Alex Beispiel', (string)$newEntryMessage->getHtmlBody());
             $this->assertStringContainsString('In Bearbeitung', (string)$newEntryMessage->getHtmlBody());
-            $this->assertStringContainsString('11.10.2026', (string)$newEntryMessage->getHtmlBody());
+            $this->assertStringContainsString(date('d.m.Y', strtotime('+2 days')), (string)$newEntryMessage->getHtmlBody());
             $this->assertStringContainsString('Kontaktformular zeigt', (string)$newEntryMessage->getHtmlBody());
 
             $updatedField = MashaFeedlyConfigExtension::notificationFieldMap()['updatedEntry']['du'];

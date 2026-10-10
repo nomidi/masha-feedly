@@ -19,6 +19,7 @@
   const active = new Set();
   const effectPools = new Map();
   const EFFECT_BATCH_SIZE = 10;
+  const PLAYED_EFFECTS_STORAGE_PREFIX = 'kw-masha-feedly:played-effects:';
   let idlePreloadScheduled = false;
   let generation = 0;
   const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -183,12 +184,38 @@
     }
     return batch;
   };
+  const playedStorageKey = (theme) => `${PLAYED_EFFECTS_STORAGE_PREFIX}${theme}`;
+  const playedIDsFor = (theme) => {
+    try {
+      const stored = window.sessionStorage?.getItem(playedStorageKey(theme));
+      const ids = stored ? JSON.parse(stored) : [];
+      return new Set(Array.isArray(ids) ? ids.filter((id) => typeof id === 'string') : []);
+    } catch (_) {
+      return new Set();
+    }
+  };
+  const storePlayedIDs = (theme, ids) => {
+    try {
+      if (!ids.size) window.sessionStorage?.removeItem(playedStorageKey(theme));
+      else window.sessionStorage?.setItem(playedStorageKey(theme), JSON.stringify([...ids]));
+    } catch (_) { /* Private Browsing kann sessionStorage deaktivieren; dann bleibt die Merkliste im Seitenspeicher. */ }
+  };
   const refillPool = (document, theme, state, random = Math.random) => {
     if (state.refillPromise) return state.refillPromise;
     state.refillPromise = (async () => {
       const candidates = candidatesFor(await refresh(), theme);
       const excludedIDs = new Set(state.effects.map((effect) => effect.id));
-      const batch = chooseBatch(candidates, excludedIDs, random);
+      const playedIDs = playedIDsFor(theme);
+      for (const id of playedIDs) {
+        if (!candidates.some((effect) => effect.id === id)) playedIDs.delete(id);
+      }
+      storePlayedIDs(theme, playedIDs);
+      let batch = chooseBatch(candidates.filter((effect) => !playedIDs.has(effect.id)), excludedIDs, random);
+      if (!batch.length && !state.effects.length && candidates.length) {
+        playedIDs.clear();
+        storePlayedIDs(theme, playedIDs);
+        batch = chooseBatch(candidates, excludedIDs, random);
+      }
       await Promise.allSettled(batch.map((effect) => load(effect, document)));
       state.effects.push(...batch);
       return batch;
@@ -211,6 +238,9 @@
     const effect = choose(state.effects, random);
     if (!effect) return null;
     state.effects.splice(state.effects.indexOf(effect), 1);
+    const playedIDs = playedIDsFor(theme);
+    playedIDs.add(effect.id);
+    storePlayedIDs(theme, playedIDs);
     if (state.effects.length <= 1) {
       void refillPool(document, theme, state).catch((error) => {
         console.warn('[Masha:Feedly] Effekte konnten nicht nachgeladen werden:', error.message);

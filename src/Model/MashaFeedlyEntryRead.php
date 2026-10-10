@@ -138,7 +138,9 @@ class MashaFeedlyEntryRead extends DataObject
 
         $unreadIDs = [];
         $assignedByEntry = self::assignedMemberIDsByEntry();
-        foreach ($entries ?? MashaFeedlyEntry::get() as $entry) {
+        $entries ??= MashaFeedlyEntry::get()->toArray();
+        $creatorMemberIDs = self::creatorMemberIDsByEntry($entries);
+        foreach ($entries as $entry) {
             $entryID = (int)$entry->ID;
             $assignedMemberIDs = $assignedByEntry[$entryID] ?? [];
             $read = $seenReads[$entryID] ?? null;
@@ -148,12 +150,34 @@ class MashaFeedlyEntryRead extends DataObject
             }
             $isRecipient = !$assignedMemberIDs
                 || in_array((int)$member->ID, $assignedMemberIDs, true)
-                || (int)$member->ID === $entry->creatorMemberID();
+                || (int)$member->ID === ($creatorMemberIDs[$entryID] ?? 0);
             if ($isRecipient) {
                 $unreadIDs[] = (int)$entry->ID;
             }
         }
         return $unreadIDs;
+    }
+
+    /** Lädt die ursprünglichen Ersteller aller Einträge gemeinsam aus dem Verlauf. */
+    private static function creatorMemberIDsByEntry(array $entries): array
+    {
+        $entryIDs = array_values(array_unique(array_filter(array_map(
+            static fn(MashaFeedlyEntry $entry): int => (int)$entry->ID,
+            $entries
+        ))));
+        if (!$entryIDs) {
+            return [];
+        }
+
+        $creatorIDsByEntry = [];
+        foreach (MashaFeedlyEntryHistory::get()
+            ->filter(['EntryID' => $entryIDs, 'ChangeType' => 'created'])
+            ->sort('EntryID ASC, Created ASC, ID ASC') as $event) {
+            $entryID = (int)$event->EntryID;
+            $creatorIDsByEntry[$entryID] ??= (int)$event->ActorMemberID;
+        }
+
+        return $creatorIDsByEntry;
     }
 
     /** Bildet den relevanten Stand aus Eintragsdaten, Zuständigkeit und letzter Aktivität. */

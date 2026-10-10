@@ -33,9 +33,12 @@ test('Screenshot-Aktion fragt Browserfreigabe ab und hängt das Bild optional an
     assert.match(script, /revokeObjectURL/);
   }
   assert.match(widgetTemplate, /Screenshot hinzufügen/);
+  assert.equal((widgetTemplate.match(/data-masha-feedly-screenshot>/g) || []).length, 2, 'Erstellen und Bearbeiten bieten dieselbe Screenshot-Steuerung.');
+  assert.match(widgetTemplate, /data-masha-feedly-edit-form[\s\S]*?data-masha-feedly-screenshot-capture/);
   assert.match(widgetTemplate, /Screenshot entfernen/);
   assert.match(widgetTemplate, /Ausschnitt übernehmen/);
   assert.match(widgetTemplate, /Klicke ein zweites Mal auf die gegenüberliegende Ecke/);
+  assert.match(source, /KWMashaFeedlyScreenshot\(widget\.querySelector\('\[data-masha-feedly-edit-form\]'\)/);
 });
 
 /** Simuliert die für Auswahl und Dialog benötigten DOM-Klassen. */
@@ -89,6 +92,8 @@ class TestElement {
     return this.children.some((child) => child.contains(element));
   }
   focus() { this.focused = true; }
+  setSelectionRange(start, end) { this.selectionStart = start; this.selectionEnd = end; }
+  click() { this.listeners.click?.({ target: this, preventDefault() {}, stopPropagation() {} }); }
 }
 
 /** Erzeugt das Widget mit Formularfeldern und lädt das produktive Skript. */
@@ -199,6 +204,7 @@ function createEnvironment(fetchImplementation = async () => ({
     UNKNOWN_BROWSER: 'Unbekannter Browser',
     ENTRY_SELECTED_CONTEXT: 'Ausgewählter Bereich: „{text}“',
     ENTRY_CONTEXT_EMPTY: 'Bereich auf der Seite ausgewählt.',
+    FAQ_REPORT_CONTENT: 'Ich habe in der FAQ nach „{query}“ gesucht. Meine Frage dazu: ',
     CREATE_SAVING: 'Meldung wird gespeichert …',
     CREATE_SAVE_ERROR: 'Die Meldung konnte nicht gespeichert werden.',
     SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Meldungsliste neu.',
@@ -227,7 +233,7 @@ function createEnvironment(fetchImplementation = async () => ({
     CSS: { escape: (value) => value },
     FormData: class { constructor() { return formData; } },
     Event: class { constructor(type, options) { this.type = type; this.bubbles = options.bubbles; } },
-    CustomEvent: class { constructor(type) { this.type = type; } },
+    CustomEvent: class { constructor(type, options = {}) { this.type = type; this.detail = options.detail; } },
     fetch: async (...args) => { calls.fetch = args; return fetchImplementation(...args); },
     setTimeout: (callback, delay) => { (calls.timeouts ||= []).push({ callback, delay }); },
     clearTimeout: () => {},
@@ -388,6 +394,22 @@ test('startet die Bereichsauswahl, übernimmt Seitenelement und Browserdaten', (
   assert.equal(env.date.value, '', 'Der automatisch gesetzte Erstellungszeitpunkt wird nicht als editierbares Feld angezeigt.');
 });
 
+test('übernimmt eine unbeantwortete FAQ-Suche in die Beschreibung einer neuen Meldung', () => {
+  const env = createEnvironment();
+  const question = 'Wie ändere ich die Zuständigkeit?';
+  env.documentListeners['kw-masha-feedly:create-from-faq']({ detail: { question } });
+  assert.equal(env.banner.hidden, false, 'Nach der FAQ-Suche startet die normale Seitenauswahl.');
+
+  const target = new TestElement('main', { id: 'content', text: 'Inhalt' });
+  env.documentListeners.click({ target, clientX: 30, clientY: 40, preventDefault() {}, stopPropagation() {} });
+
+  assert.equal(env.modal.hidden, false);
+  assert.equal(env.content.value, `Ich habe in der FAQ nach „${question}“ gesucht. Meine Frage dazu: `);
+  assert.equal(env.content.selectionStart, env.content.value.length, 'Der Cursor steht direkt hinter dem vorbefüllten Satz.');
+  assert.equal(env.content.selectionEnd, env.content.value.length);
+  assert.equal(env.calls.fetch, null, 'Die Meldung wird erst nach ausdrücklichem Speichern gesendet.');
+});
+
 test('bricht die Bereichsauswahl mit Escape ab und stellt das Widget wieder her', () => {
   const env = createEnvironment();
   env.startButton.listeners.click();
@@ -407,7 +429,7 @@ test('bricht die Bereichsauswahl mit Escape ab und stellt das Widget wieder her'
   assert.deepEqual(env.dispatchedEvents, ['kw-masha-feedly:onboarding-selection-started', 'kw-masha-feedly:closed', 'kw-masha-feedly:onboarding-selection-cancelled', 'kw-masha-feedly:opened']);
 });
 
-test('sendet das Formular mit CSRF-Token und zeigt die erfolgreiche Anlage', async () => {
+test('zeigt nach dem Anlegen den kurzen Toast und keine Titelkarte im schmalen Panel', async () => {
   const env = createEnvironment();
   assert.equal(env.form.querySelector('[type="submit"]'), null, 'der Submit-Button befindet sich außerhalb des Formulars');
   env.startButton.listeners.click();
@@ -429,10 +451,10 @@ test('sendet das Formular mit CSRF-Token und zeigt die erfolgreiche Anlage', asy
   assert.ok(env.dispatchedEvents.includes('kw-masha-feedly:refresh'));
   assert.equal(env.toast.hidden, false);
   assert.equal(env.toastMessage.textContent, 'Eintrag gespeichert.');
+  assert.equal(env.column.children.length, 0, 'Der lange Meldungstitel erscheint nicht als schmale Karte im Panel.');
   assert.deepEqual(env.calls.timeouts.map(({ delay }) => delay), [500, 6000]);
   env.calls.timeouts[1].callback();
   assert.equal(env.toast.hidden, true);
-  assert.equal(env.column.children.at(-1).textContent, 'Button wird abgeschnitten');
   assert.equal(env.submit.disabled, false);
 });
 
@@ -440,7 +462,11 @@ test('meldet bestätigtes Erstellen auch bei einem Fehler in der Erfolgsanzeige 
   const env = createEnvironment();
   env.startButton.listeners.click();
   env.documentListeners.click({ target: new TestElement('main', { id: 'main' }), preventDefault() {}, stopPropagation() {} });
-  env.column.append = () => { throw new Error('Bestätigung konnte nicht dargestellt werden.'); };
+  Object.defineProperty(env.toastMessage, 'textContent', {
+    configurable: true,
+    get() { return ''; },
+    set() { throw new Error('Bestätigung konnte nicht dargestellt werden.'); },
+  });
 
   await env.form.listeners.submit({ preventDefault() {} });
 

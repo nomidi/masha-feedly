@@ -35,7 +35,9 @@ class MashaFeedlyEffectProvider
     /** Bindet den universellen Loader ein; Effekt-Dateien kommen vom Anbieter. @return void */
     public static function requireLoader(): void
     {
-        $url = Director::absoluteURL('__masha-feedly-effects/manifest');
+        $url = MashaFeedlyEffectClient::hasConfiguredProvider()
+            ? Director::absoluteURL('__masha-feedly-effects/manifest')
+            : '';
         // CMS-Vorschauen benötigen die persönliche Tonwahl auch ohne eingeblendetes Widget.
         $disableSound = (bool)Security::getCurrentUser()?->MashaFeedlyDisableSoundEffects;
         Requirements::customScript(

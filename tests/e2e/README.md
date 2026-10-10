@@ -1,6 +1,6 @@
 # Masha:Feedly Browsertests
 
-Die opt-in Playwright-Tests prüfen Tooltips, Kommentaraktivität, Onboarding, Kostenschätzungen, Zugriffsschutz, Screenshot-Zuschnitt und den Effekt-Anbieter. Die Suite muss seriell laufen, weil alle Browserläufe dieselbe Website und Datenbank verwenden.
+Die opt-in Playwright-Tests prüfen die Desktop-FAQ, Tooltips, Kommentaraktivität, Onboarding, Kostenschätzungen, Zugriffsschutz, Screenshot-Zuschnitt und den Effekt-Anbieter. Die Suite muss seriell laufen, weil alle Browserläufe dieselbe Website und Datenbank verwenden.
 
 ## Konfiguration
 
@@ -40,6 +40,7 @@ Vom Projekt-Hauptverzeichnis aus:
 ```sh
 node --test masha-feedly/tests/e2e/comment-activity.test.cjs
 node --test masha-feedly/tests/e2e/tooltip.test.cjs
+node --test masha-feedly/tests/e2e/faq.test.cjs
 node --test masha-feedly/tests/e2e/onboarding.test.cjs
 node --test masha-feedly/tests/e2e/estimate-workflow.test.cjs
 node --test masha-feedly/tests/e2e/access-matrix.test.cjs
@@ -50,6 +51,21 @@ node --test --test-concurrency=1 masha-feedly/tests/e2e/*.test.cjs
 Ohne vollständige Konfiguration überspringt Node die jeweils betroffenen Tests. Zugangsdaten gehören nur in die ignorierte lokale Datei oder einen Secret Store, niemals in Git. Die Suite legt Testeinträge und Kommentare in der konfigurierten Datenbank an; nur gegen eine lokale oder dafür vorgesehene Testinstanz ausführen.
 
 Der separate **Test-E-Mail senden**-Knopf ist kein Teil der E2E-Tests. Er sendet an die Adresse des angemeldeten Masha:Feedly-Superadmins und setzt einen passend konfigurierten und erreichbaren SMTP-Dienst voraus.
+
+## Kleine Browserlast auf einer lokalen Testinstanz
+
+`browser-load.cjs` öffnet parallele Chromium-Sitzungen mit jeweils eigenem Browser-Kontext. Jede Sitzung meldet sich mit dem Creator-Testkonto an, öffnet das Widget und lädt wiederholt die Meldungsliste. Dabei werden keine Einträge, Kommentare oder Einstellungen gespeichert. Der Test erfasst die Antwortzeiten des Listen-Endpunkts, HTTP-Fehler und fehlgeschlagene Anfragen. Im Silverstripe-Development-Modus misst der Endpunkt zusätzlich seine eigene Laufzeit über `Server-Timing`; dieser Header wird in Live-Modi nicht ausgegeben.
+
+Der Test ist absichtlich auf höchstens 20 Sitzungen begrenzt und startet nur nach einer ausdrücklichen lokalen Freigabe. Er akzeptiert ausschließlich `localhost`, `*.localhost`, `*.test` und den lokalen Host `feedly`; Produktions- und andere externe Hosts werden abgewiesen. Nur mit lokaler oder eigens dafür vorgesehener Testdatenbank starten. Andere E2E-Tests laufen währenddessen nicht parallel.
+
+Im Projekt-Root:
+
+```sh
+MASHA_FEEDLY_LOAD_TEST=LOCAL_ONLY node masha-feedly/tests/e2e/browser-load.cjs
+MASHA_FEEDLY_LOAD_TEST=LOCAL_ONLY MASHA_FEEDLY_LOAD_USERS=10 MASHA_FEEDLY_LOAD_SECONDS=90 node masha-feedly/tests/e2e/browser-load.cjs
+```
+
+Standardwerte sind fünf Sitzungen, 60 Sekunden Last und zehn Sekunden Anlauf. Die optionale Variable `MASHA_FEEDLY_LOAD_RAMP_SECONDS` ändert die Anlaufzeit; `MASHA_FEEDLY_LOAD_USERS` darf höchstens 20 und `MASHA_FEEDLY_LOAD_SECONDS` höchstens 300 sein. Ein Testkonto wird parallel in mehreren getrennten Sitzungen verwendet. Für einen realistischen Lasttest mit vielen verschiedenen Personen sollten dafür eigens mehrere freigeschaltete Testkonten eingerichtet werden. Die PHP-Handlerzeit umfasst den Listen-Controller samt Datenbankarbeit und Antwortaufbau, aber nicht die vorherige Wartezeit im Webserver; die Differenz zur Browserzeit enthält außerdem Middleware und Netzwerk. Der Test ersetzt keine größere HTTP-Lastmessung mit k6 und misst nicht direkt PHP-, Datenbank- oder Systemauslastung.
 
 ## Externer Effekt-Anbieter
 

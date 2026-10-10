@@ -25,6 +25,8 @@ window.KWMashaFeedlyDOM = {
   overlayRoot: () => window.KWMashaFeedlyDOM.root().querySelector('[data-masha-feedly-surface]') || document.body,
   activeElement: () => window.KWMashaFeedlyDOM.root().activeElement || document.activeElement,
   eventTarget: (event) => event.composedPath?.()[0] || event.target,
+  panelPullProgress: (distance, width) => Math.max(0, Math.min(1, ((Number(distance) || 0) - 24) / (Number(width) || 368))),
+  shouldOpenPulledPanel: (distance) => Number(distance) >= 72,
 };
 
 /** Zeigt unerwartete Serverantworten als zugängliche Meldung im Widget an. */
@@ -291,9 +293,62 @@ document.addEventListener('DOMContentLoaded', () => {
     document.dispatchEvent(new CustomEvent(open ? 'kw-masha-feedly:opened' : 'kw-masha-feedly:closed'));
   };
   toggle.addEventListener('click', () => {
+    if (toggle.dataset.skipClickAfterPull === 'true') {
+      delete toggle.dataset.skipClickAfterPull;
+      return;
+    }
     const expanded = toggle.getAttribute('aria-expanded') === 'true';
     if (!expanded) loadWidgetData();
     setOpen(!expanded);
   });
+  let pullStart = null;
+  let pullDistance = 0;
+  const resetPull = () => {
+    widget.removeAttribute('data-panel-pulling');
+    widget.style.removeProperty('--masha-panel-pull');
+    widget.style.removeProperty('--masha-panel-pull-distance');
+    panel.hidden = true;
+    pullStart = null;
+    pullDistance = 0;
+  };
+  toggle.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'touch' || event.button !== 0 || toggle.getAttribute('aria-expanded') === 'true') return;
+    pullStart = { pointerID: event.pointerId, x: event.clientX };
+    pullDistance = 0;
+    toggle.setPointerCapture?.(event.pointerId);
+  });
+  toggle.addEventListener('pointermove', (event) => {
+    if (!pullStart || event.pointerId !== pullStart.pointerID) return;
+    const panelWidth = panel.getBoundingClientRect().width || 368;
+    pullDistance = Math.min(panelWidth + 24, Math.max(0, pullStart.x - event.clientX));
+    if (pullDistance < 5) return;
+
+    const progress = window.KWMashaFeedlyDOM.panelPullProgress(pullDistance, panelWidth);
+    panel.hidden = false;
+    widget.setAttribute('data-panel-pulling', 'true');
+    widget.style.setProperty('--masha-panel-pull', String(progress));
+    widget.style.setProperty('--masha-panel-pull-distance', `${pullDistance}px`);
+    event.preventDefault();
+  });
+  const finishPull = (event, cancelled = false) => {
+    if (!pullStart || event.pointerId !== pullStart.pointerID) return;
+    const didPull = pullDistance >= 5;
+    const shouldOpen = !cancelled && didPull && window.KWMashaFeedlyDOM.shouldOpenPulledPanel(pullDistance);
+    pullStart = null;
+    if (!didPull) return;
+
+    toggle.dataset.skipClickAfterPull = 'true';
+    if (shouldOpen) {
+      widget.removeAttribute('data-panel-pulling');
+      widget.style.removeProperty('--masha-panel-pull');
+      widget.style.removeProperty('--masha-panel-pull-distance');
+      loadWidgetData();
+      setOpen(true);
+    } else {
+      resetPull();
+    }
+  };
+  toggle.addEventListener('pointerup', (event) => finishPull(event));
+  toggle.addEventListener('pointercancel', (event) => finishPull(event, true));
   close.addEventListener('click', () => setOpen(false));
 });
