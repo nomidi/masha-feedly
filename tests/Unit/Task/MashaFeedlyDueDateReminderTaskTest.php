@@ -21,6 +21,11 @@ class MashaFeedlyDueDateReminderTaskTest extends SapphireTest
         $today->write();
         $future = MashaFeedlyEntry::create(['Content' => 'Noch Zeit', 'EntryDate' => '2026-10-01', 'DueDate' => '2026-10-05']);
         $future->write();
+        $deferred = MashaFeedlyEntry::create([
+            'Content' => 'Zurückgestellt', 'EntryDate' => '2026-10-01', 'DueDate' => '2026-10-03',
+            'DeferredUntil' => '2026-10-06',
+        ]);
+        $deferred->write();
         $alreadyReminded = MashaFeedlyEntry::create([
             'Content' => 'Schon erinnert', 'EntryDate' => '2026-10-01', 'DueDate' => '2026-10-02',
             'DueDateReminderSentAt' => '2026-10-02 07:00:00',
@@ -31,7 +36,10 @@ class MashaFeedlyDueDateReminderTaskTest extends SapphireTest
         $this->assertContains((int)$overdue->ID, $ids);
         $this->assertContains((int)$today->ID, $ids);
         $this->assertNotContains((int)$future->ID, $ids);
+        $this->assertNotContains((int)$deferred->ID, $ids);
         $this->assertNotContains((int)$alreadyReminded->ID, $ids);
+        $resumedIDs = array_map('intval', MashaFeedlyDueDateReminderTask::entriesDueOnOrBefore('2026-10-06')->column('ID'));
+        $this->assertContains((int)$deferred->ID, $resumedIDs);
     }
 
     /** Websitebesuche lösen pro Tag höchstens einen Prüfungslauf aus; Cron-Modus bleibt davon unberührt. */

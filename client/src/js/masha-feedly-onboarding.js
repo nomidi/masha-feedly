@@ -9,9 +9,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const skip = widget.querySelector('[data-masha-feedly-tour-skip]');
   const mobileClose = widget.querySelector('[data-masha-feedly-tour-mobile-close]');
   const restart = widget.querySelector('[data-masha-feedly-restart-onboarding]');
+  const restartFromThanks = widget.querySelector('[data-masha-feedly-tour-restart]');
+  const openHelpFromThanks = widget.querySelector('[data-masha-feedly-tour-open-help]');
+  const openFaqFromThanks = widget.querySelector('[data-masha-feedly-tour-open-faq]');
   const restartStatus = widget.querySelector('[data-masha-feedly-restart-status]');
   const tip = widget.querySelector('[data-masha-feedly-onboarding-tip]');
   const thanks = widget.querySelector('[data-masha-feedly-onboarding-thanks]');
+  const openers = {
+    help: widget.querySelector('[data-masha-feedly-open-help]'),
+    faq: widget.querySelector('[data-masha-feedly-open-faq]'),
+  };
   const thanksDialog = thanks?.querySelector('[role="dialog"]');
   const tipText = widget.querySelector('[data-masha-feedly-onboarding-text]');
   const selectionMessage = widget.querySelector('[data-masha-feedly-selection-message]');
@@ -192,8 +199,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const preferencesForm = widget.querySelector('[data-masha-feedly-profile-preferences]');
   preferencesForm?.querySelector('input[name="MashaFeedlyDisableSoundEffects"]')?.addEventListener('change', () => window.KWMashaFeedlyEffects?.cancelActive());
   const emailMaster = preferencesForm?.querySelector('[data-masha-feedly-email-master]');
-  const updateEmailOptionsState = () => preferencesForm?.querySelectorAll('[data-masha-feedly-email-option]')
-    .forEach((option) => { option.disabled = !emailMaster?.checked; });
+  const updateEmailOptionsState = () => {
+    preferencesForm?.querySelectorAll('[data-masha-feedly-email-option], [data-masha-feedly-email-scope-option]')
+      .forEach((option) => { option.disabled = !emailMaster?.checked; });
+    preferencesForm?.querySelectorAll('[data-masha-feedly-email-dependent]')
+      .forEach((group) => { group.hidden = !emailMaster?.checked; });
+  };
   emailMaster?.addEventListener('change', updateEmailOptionsState);
   updateEmailOptionsState();
 
@@ -243,8 +254,12 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const data = new FormData(form);
       data.set('SecurityID', form.dataset.securityId || widget.dataset.securityId || '');
-      form.querySelectorAll('[data-masha-feedly-email-master], [data-masha-feedly-email-option]').forEach((checkbox) => {
-        data.set(checkbox.name, checkbox.checked ? '1' : '0');
+      form.querySelectorAll('[data-masha-feedly-email-master], [data-masha-feedly-email-option], [data-masha-feedly-email-scope-option]').forEach((checkbox) => {
+        if (checkbox.type === 'radio') {
+          if (checkbox.checked) data.set(checkbox.name, checkbox.value);
+        } else {
+          data.set(checkbox.name, checkbox.checked ? '1' : '0');
+        }
       });
       const response = await fetch(form.dataset.saveUrl, {
         method: 'POST',
@@ -409,6 +424,18 @@ document.addEventListener('DOMContentLoaded', () => {
     } finally {
       restart.disabled = false;
     }
+  });
+  openHelpFromThanks?.addEventListener('click', () => {
+    if (thanks) thanks.hidden = true;
+    openers.help?.click();
+  });
+  openFaqFromThanks?.addEventListener('click', () => {
+    if (thanks) thanks.hidden = true;
+    openers.faq?.click();
+  });
+  restartFromThanks?.addEventListener('click', () => {
+    if (thanks) thanks.hidden = true;
+    restart?.click();
   });
   skip?.addEventListener('click', () => complete(false, true));
   widget.querySelector('[data-masha-feedly-tour-end]')?.addEventListener('click', () => complete());

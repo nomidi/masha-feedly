@@ -20,6 +20,7 @@ use KW\MashaFeedly\Service\MashaFeedlyMiteService;
 use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Control\Controller;
+use SilverStripe\Control\Director;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Control\HTTPResponse;
 use SilverStripe\ORM\DataObject;
@@ -425,14 +426,17 @@ class MashaFeedlyEntryController extends Controller
         if ($emailSettingsSubmitted) {
             $emailPreferences = [
                 'MashaFeedlyEmailNotifications',
+                'MashaFeedlyEmailAssignedOnly',
                 'MashaFeedlyNotifyNewEntries',
                 'MashaFeedlyNotifyEntryUpdates',
-                'MashaFeedlyNotifyOwnEntryChanges',
                 'MashaFeedlyNotifyComments',
                 'MashaFeedlyNotifyDueDateReminders',
                 'MashaFeedlyNotifyCostEstimates',
             ];
             foreach ($emailPreferences as $preference) {
+                if ($preference === 'MashaFeedlyEmailAssignedOnly' && !array_key_exists($preference, $postVars)) {
+                    continue;
+                }
                 $member->{$preference} = !empty($postVars[$preference]);
             }
         }
@@ -535,6 +539,13 @@ class MashaFeedlyEntryController extends Controller
             }
             $entry->DueDate = $dueDate !== '' ? $dueDate : null;
         }
+        if ($request->postVar('DeferredUntil') !== null) {
+            $deferredUntil = trim((string)$request->postVar('DeferredUntil'));
+            if ($deferredUntil !== '' && !$this->isValidDate($deferredUntil)) {
+                return $this->respond(['success' => false, 'message' => $this->translate('INVALID_DEFERRED_UNTIL', 'Bitte prüfe das Datum zum Zurückstellen der Erinnerung.')], 400);
+            }
+            $entry->DeferredUntil = $deferredUntil !== '' ? $deferredUntil : null;
+        }
         $estimateInputPresent = $request->postVar('EstimatedCostDuration') !== null
             || $request->postVar('EstimatedCostNote') !== null;
         if ($estimateInputPresent) {
@@ -577,6 +588,8 @@ class MashaFeedlyEntryController extends Controller
         if ($request->postVar('StepsToReproduce') !== null) $entry->StepsToReproduce = $this->postedText($request, 'StepsToReproduce', 10000);
         if ($request->postVar('ExpectedResult') !== null) $entry->ExpectedResult = $this->postedText($request, 'ExpectedResult', 5000);
         if ($request->postVar('ActualResult') !== null) $entry->ActualResult = $this->postedText($request, 'ActualResult', 5000);
+        // Reine Zuweisungsänderungen haben keine geänderten Datenbankfelder am Eintrag.
+        $entryFieldsChanged = (bool)$entry->getChangedFields(['Content', 'EntryDate', 'DueDate', 'DeferredUntil', 'CategoryID', 'PriorityID'], \SilverStripe\ORM\DataObject::CHANGE_VALUE);
         $entry->AssignedMembers()->setByIDList($newAssigneeIDs);
         $entry->write();
         $oldRelations = $this->relationsSignature($entry);
@@ -632,6 +645,10 @@ class MashaFeedlyEntryController extends Controller
         $sortedNewAssigneeIDs = array_map('intval', $newAssigneeIDs);
         sort($sortedNewAssigneeIDs);
         if ($oldAssigneeIDs !== $sortedNewAssigneeIDs) {
+            if (!$entryFieldsChanged) {
+                MashaFeedlyNotificationService::notifyUpdatedEntry($entry);
+            }
+            MashaFeedlyNotificationService::notifyUpdatedEntry($entry, array_values(array_diff($sortedNewAssigneeIDs, $oldAssigneeIDs)));
             MashaFeedlyEntryHistory::record(
                 $entry,
                 'assignees',
@@ -676,6 +693,7 @@ class MashaFeedlyEntryController extends Controller
             'priorityColor' => (string)$entry->Priority()->Color,
             'priorityIconType' => (string)$entry->Priority()->IconType,
             'dueDate' => (string)$entry->DueDate,
+            'deferredUntil' => (string)$entry->DeferredUntil,
             'attachments' => array_map(static function ($attachment): array {
                 $file = $attachment->File();
                 return [
@@ -805,6 +823,7 @@ class MashaFeedlyEntryController extends Controller
             'title' => (string)$entry->Title,
             'entryDate' => (string)$entry->EntryDate,
             'dueDate' => (string)$entry->DueDate,
+            'deferredUntil' => (string)$entry->DeferredUntil,
             'loggedAt' => (string)$entry->Created,
             'activityAt' => (new \DateTimeImmutable((string)$activityAt, new \DateTimeZone('UTC')))->format('Y-m-d\\TH:i:s\\Z'),
             'pageURL' => (string)$entry->PageURL,
@@ -890,6 +909,21 @@ class MashaFeedlyEntryController extends Controller
     /** Liefert freigegebene Einträge für die aktuelle Seite oder alle persönlichen Zuweisungen. */
     public function listEntries(HTTPRequest $request): HTTPResponse
     {
+        $startedAt = hrtime(true);
+        $response = $this->buildListEntriesResponse($request);
+
+        // Der Diagnosewert hilft bei lokalen Performance-Messungen und bleibt aus Live-Antworten heraus.
+        if (Director::isDev()) {
+            $durationMs = (hrtime(true) - $startedAt) / 1_000_000;
+            $response->addHeader('Server-Timing', sprintf('masha_list;dur=%.2f', $durationMs));
+        }
+
+        return $response;
+    }
+
+    /** Erstellt die Listenantwort; der öffentliche Handler ergänzt bei Bedarf die Laufzeitdiagnose. */
+    private function buildListEntriesResponse(HTTPRequest $request): HTTPResponse
+    {
         $member = Security::getCurrentUser();
         if (!MashaFeedlyConfigExtension::canUse($member)) {
             return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
@@ -898,11 +932,18 @@ class MashaFeedlyEntryController extends Controller
         $requestedPageURL = trim((string)$request->getVar('PageURL'));
         $pageURL = $this->safePageURL($requestedPageURL);
         $pageURLs = array_values(array_unique(array_filter([$pageURL, $requestedPageURL])));
-        $pageEntries = $pageURLs
-            ? MashaFeedlyEntry::get()->filter('PageURL', $pageURLs)
-            : MashaFeedlyEntry::get()->filter('ID', 0);
         $allEntries = MashaFeedlyEntry::get();
         $allEntryRecords = $allEntries->toArray();
+        $pageURLLookup = array_fill_keys($pageURLs, true);
+        $pageEntryIDs = [];
+        foreach ($allEntryRecords as $entry) {
+            if (isset($pageURLLookup[(string)$entry->PageURL]) && trim((string)$entry->ElementSelector) !== '') {
+                $pageEntryIDs[] = (int)$entry->ID;
+            }
+        }
+        $pageEntries = $pageEntryIDs
+            ? MashaFeedlyEntry::get()->filter('ID', $pageEntryIDs)
+            : MashaFeedlyEntry::get()->filter('ID', 0);
         $mineEntries = MashaFeedlyEntry::get()->filter('AssignedMembers.ID', (int)$member->ID);
         $categories = [];
         $this->categorySummaries = [];
@@ -981,7 +1022,6 @@ class MashaFeedlyEntryController extends Controller
         $openCount = 0;
         $pageOpenCount = 0;
         $pageCount = 0;
-        $pageURLLookup = array_fill_keys($pageURLs, true);
         $feedbackCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first();
         $feedbackCount = $feedbackCategory && !(bool)$feedbackCategory->IsClosed
             ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$feedbackCategory->ID)->count()
@@ -995,7 +1035,8 @@ class MashaFeedlyEntryController extends Controller
             ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimateApprovedCategory->ID)->count()
             : 0;
         foreach ($allEntryRecords as $entry) {
-            $isOnPage = isset($pageURLLookup[(string)$entry->PageURL]);
+            $isOnPage = isset($pageURLLookup[(string)$entry->PageURL])
+                && trim((string)$entry->ElementSelector) !== '';
             if ($isOnPage) {
                 $pageCount++;
             }
@@ -1099,6 +1140,11 @@ class MashaFeedlyEntryController extends Controller
             return $this->respond(['success' => false, 'message' => $this->translate('INVALID_DUE_DATE', 'Bitte prüfe den Fälligkeitstermin.')], 400);
         }
         $entry->DueDate = $postedDueDate !== '' ? $postedDueDate : null;
+        $postedDeferredUntil = trim((string)$request->postVar('DeferredUntil'));
+        if ($postedDeferredUntil !== '' && !$this->isValidDate($postedDeferredUntil)) {
+            return $this->respond(['success' => false, 'message' => $this->translate('INVALID_DEFERRED_UNTIL', 'Bitte prüfe das Datum zum Zurückstellen der Erinnerung.')], 400);
+        }
+        $entry->DeferredUntil = $postedDeferredUntil !== '' ? $postedDeferredUntil : null;
         if ($estimateAmounts) {
             $entry->EstimatedCostDuration = $estimateDuration;
             $entry->EstimatedCostAmount = $estimateAmounts['minimum'];
@@ -1147,6 +1193,7 @@ class MashaFeedlyEntryController extends Controller
             'title' => $entry->Title,
             'entryID' => (int)$entry->ID,
             'dueDate' => (string)$entry->DueDate,
+            'deferredUntil' => (string)$entry->DeferredUntil,
             ...(MashaFeedlyEntry::canManageEstimate($member) ? $this->estimatePayload($entry) : []),
             'attachments' => array_map(static function ($attachment): array {
                 $file = $attachment->File();
@@ -1466,6 +1513,7 @@ class MashaFeedlyEntryController extends Controller
             'actualResult' => (string)$entry->ActualResult,
             'entryDate' => (string)$entry->EntryDate,
             'dueDate' => (string)$entry->DueDate,
+            'deferredUntil' => (string)$entry->DeferredUntil,
             'pageURL' => (string)$entry->PageURL,
             'selector' => (string)$entry->ElementSelector,
             'elementText' => (string)$entry->ElementText,
@@ -1503,7 +1551,7 @@ class MashaFeedlyEntryController extends Controller
             'priorityTitle' => (string)$entry->Priority()->Title,
             'priorityColor' => (string)$entry->Priority()->Color,
             'priorityIconType' => (string)$entry->Priority()->IconType,
-            'isClosed' => (bool)$entry->Category()->IsClosed,
+            'isClosed' => $this->categorySummary((int)$entry->CategoryID)['isClosed'] ?? false,
             'assignees' => $assignees,
             'assignedMemberIDs' => $assigneeIDs,
             'comments' => array_map(fn (MashaFeedlyComment $comment): array => $this->commentData($comment, $currentMember), $entry->Comments()->filter('IsApproved', true)->sort('Created ASC')->toArray()),

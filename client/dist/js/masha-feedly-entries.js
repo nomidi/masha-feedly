@@ -228,6 +228,7 @@ window.KWMashaFeedlyEntries = (() => {
     categoryID: Number(entry.categoryID),
     priorityID: Number(entry.priorityID),
     dueDate: entry.dueDate || '',
+    deferredUntil: entry.deferredUntil || '',
     assignedMemberIDs: (entry.assignedMemberIDs || []).map(Number),
     context: t('ENTRY_CONTEXT_STATUS', { status: entry.categoryTitle || t('ENTRY_WITHOUT_CATEGORY') }),
     description: entry.content || t('ENTRY_NO_DESCRIPTION'),
@@ -1013,6 +1014,7 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   const openEntry = async (entry, trigger = (window.KWMashaFeedlyDOM?.activeElement() || document.activeElement)) => {
     if (!entry || !editForm || !editModal) return;
+    editForm.__mashaFeedlyScreenshot?.clear();
     const summaryEntry = entry;
     const requestID = ++detailRequest;
     const url = new URL(widget.dataset.entryDetailsUrl, window.location.href);
@@ -1076,6 +1078,7 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
     if (editForm.elements.DueDate) editForm.elements.DueDate.value = editable.dueDate;
+    if (editForm.elements.DeferredUntil) editForm.elements.DeferredUntil.value = editable.deferredUntil;
     renderEstimate(entry);
     editHeading.textContent = t('ENTRY_NUMBER', { id: editable.id });
     if (createdMeta && createdAvatar && createdBy && createdAt) {
@@ -1396,7 +1399,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const renderMarkers = (pageEntries) => {
     clearMarkers();
-    if (!panelOpen) return;
+    if (!panelOpen) return 0;
     pageEntries.forEach((entry) => {
       if (entry.isClosed) return;
       if (!entry.selector) return;
@@ -1413,6 +1416,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (activeEntry) window.KWMashaFeedlyEntries.setActiveMarker(markers, activeEntry.id);
     stopMarkerTracking = window.KWMashaFeedlyEntries.trackMarkers(markers, window);
+    return markers.length;
   };
 
   const activityBadge = () => {
@@ -1461,6 +1465,24 @@ document.addEventListener('DOMContentLoaded', () => {
   const renderList = (data) => {
     categories = data.categories || categories;
     priorities = data.priorities || priorities;
+    const editCategory = editForm?.elements?.CategoryID;
+    const editPriority = editForm?.elements?.PriorityID;
+    if (editCategory) {
+      const selectedCategory = editCategory.value;
+      editCategory.replaceChildren(...categories
+        .filter((category) => category.systemKey !== 'restricted_estimate')
+        .map((category) => {
+          const option = new Option(category.title, String(category.id));
+          option.dataset.systemKey = category.systemKey || '';
+          return option;
+        }));
+      if ([...editCategory.options].some((option) => option.value === selectedCategory)) editCategory.value = selectedCategory;
+    }
+    if (editPriority) {
+      const selectedPriority = editPriority.value;
+      editPriority.replaceChildren(...priorities.map((priority) => new Option(priority.title, String(priority.id))));
+      if ([...editPriority.options].some((option) => option.value === selectedPriority)) editPriority.value = selectedPriority;
+    }
     const currentCategory = categoryFilter.value;
     const currentPriority = priorityFilter.value;
     categoryFilter.replaceChildren(new Option(t('CATEGORY_ALL'), ''));
@@ -1621,6 +1643,14 @@ document.addEventListener('DOMContentLoaded', () => {
         dueDate.textContent = t('ENTRY_DUE_DATE', { date: new Date(year, month - 1, day, 12).toLocaleDateString('de-DE') });
         metadata.append(dueDate);
       }
+      if (entry.deferredUntil) {
+        const deferredUntil = document.createElement('time');
+        deferredUntil.className = 'kw-masha-feedly__entry-deferred-until';
+        deferredUntil.dateTime = entry.deferredUntil;
+        const [year, month, day] = entry.deferredUntil.split('-').map(Number);
+        deferredUntil.textContent = t('ENTRY_REMINDER_DEFERRED', { date: new Date(year, month - 1, day, 12).toLocaleDateString('de-DE') });
+        metadata.append(deferredUntil);
+      }
       card.append(title);
       if (entry.assignees?.length) {
         const assigned = document.createElement('div');
@@ -1647,7 +1677,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok || !data.success) throw new Error(data.message || t('LIST_LOAD_ERROR'));
       if (requestID !== listRequest) return;
       updateUnreadCount(data.unreadCount, data.unreadCommentCount);
-      const pageOpenCount = Number(data.pageOpenCount ?? data.pageCount ?? 0);
+      let pageOpenCount = Number(data.pageOpenCount ?? data.pageCount ?? 0);
       const openCount = Number(data.openCount ?? data.totalCount ?? 0);
       const feedbackCount = Number(data.feedbackCount || 0);
       const closedCount = Math.max(0, Number(data.totalCount || 0) - openCount);
@@ -1655,6 +1685,7 @@ document.addEventListener('DOMContentLoaded', () => {
         openClosedButton.hidden = closedCount === 0;
         openClosedButton.setAttribute('data-has-closed', String(closedCount > 0));
       }
+      if (mode === 'page') pageOpenCount = renderMarkers(data.entries || []);
       pageCount.textContent = String(pageOpenCount);
       totalCount.textContent = String(openCount);
       if (closedCountDisplay) closedCountDisplay.textContent = String(closedCount);
@@ -1699,9 +1730,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const rainbowLabel = [rainbowTitle?.textContent, rainbowMessage?.textContent].filter(Boolean).join(' ');
         if (rainbowLabel) rainbow.setAttribute('aria-label', rainbowLabel);
-      }
-      if (mode === 'page') {
-        renderMarkers(data.entries || []);
       }
       renderList(data);
       document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-list-rendered'));
@@ -1916,6 +1944,8 @@ document.addEventListener('DOMContentLoaded', () => {
     delete editStatus.dataset.noticeTitle;
     editStatus.textContent = t('EDIT_SAVING');
     const data = new FormData(editForm);
+    const screenshotFile = editForm.__mashaFeedlyScreenshot?.file();
+    if (screenshotFile) data.append('Attachments[]', screenshotFile);
     data.set('SecurityID', editForm.dataset.securityId);
     let saveConfirmed = false;
     try {
@@ -1944,6 +1974,10 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activeEntry && Object.hasOwn(result, 'dueDate')) {
         activeEntry.dueDate = result.dueDate || '';
         if (editForm.elements.DueDate) editForm.elements.DueDate.value = activeEntry.dueDate;
+      }
+      if (activeEntry && Object.hasOwn(result, 'deferredUntil')) {
+        activeEntry.deferredUntil = result.deferredUntil || '';
+        if (editForm.elements.DeferredUntil) editForm.elements.DeferredUntil.value = activeEntry.deferredUntil;
       }
       if (activeEntry) {
         activeEntry.stepsToReproduce = editForm.elements.StepsToReproduce?.value || '';
@@ -1979,6 +2013,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       renderAttachments(activeEntry?.attachments);
       editForm.querySelectorAll('[name="Attachments[]"]').forEach((field) => { field.value = ''; });
+      editForm.__mashaFeedlyScreenshot?.clear();
       document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-entry-updated'));
       const requestedCategoryID = Number(editForm.elements.CategoryID.value);
       const nextCategoryID = Number(result.categoryID ?? requestedCategoryID);

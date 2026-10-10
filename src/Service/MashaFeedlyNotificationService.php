@@ -25,6 +25,19 @@ use SilverStripe\i18n\i18n;
  */
 class MashaFeedlyNotificationService
 {
+    /**
+     * Liefert Ersteller und aktuelle Zuständige für den persönlichen E-Mail-Bereich.
+     * @param MashaFeedlyEntry $entry Betroffene Meldung.
+     * @return int[] Mitglieds-IDs, ohne fehlenden Ersteller und doppelte Zuweisungen.
+     */
+    private static function personalRecipientIDs(MashaFeedlyEntry $entry): array
+    {
+        return array_values(array_unique(array_filter([
+            ...array_map('intval', $entry->AssignedMembers()->column('ID')),
+            $entry->creatorMemberID(),
+        ], static fn(int $id): bool => $id > 0)));
+    }
+
     /** Stellt die gemeinsamen Meldungsdaten für gestaltete Benachrichtigungen bereit. */
     private static function entryEmailDetails(MashaFeedlyEntry $entry): array
     {
@@ -41,10 +54,17 @@ class MashaFeedlyNotificationService
             'ReporterName' => trim($entry->reportedByName()),
             'CategoryTitle' => trim((string)$entry->Category()->Title),
             'PriorityTitle' => trim((string)$entry->Priority()->Title),
-            'DueDate' => $dueDate !== '' ? (string)$entry->dbObject('DueDate')->Nice() : '',
+            'DueDate' => $dueDate !== '' ? self::formatDueDate($dueDate) : '',
             'AssignedNames' => implode(', ', $assignedNames),
             'BugDescription' => trim(html_entity_decode(strip_tags($description), ENT_QUOTES | ENT_HTML5, 'UTF-8')),
         ];
+    }
+
+    /** Formatiert ein reines Kalenderdatum ohne Zeitzonenverschiebung. */
+    private static function formatDueDate(string $date): string
+    {
+        $calendarDate = \DateTimeImmutable::createFromFormat('!Y-m-d', substr($date, 0, 10));
+        return $calendarDate ? $calendarDate->format('d.m.Y') : $date;
     }
 
     /** Ergänzt Maildaten um den zentralen Footer und den direkten Profil-Link. */
@@ -196,19 +216,14 @@ class MashaFeedlyNotificationService
             ->send();
     }
 
-    /** Sendet einmalig eine Erinnerung an freigegebene Verantwortliche und die erstellende Person. */
+    /** Sendet einmalig Fälligkeitserinnerungen gemäß persönlichem Bereich und aktivierter Präferenz. */
     public static function notifyDueDateReminder(MashaFeedlyEntry $entry): int
     {
         if (!$entry->DueDate || $entry->DueDateReminderSentAt) {
             return 0;
         }
-        $allowedIDs = MashaFeedlyConfigExtension::memberIDs();
-        $assignedIDs = array_map('intval', $entry->AssignedMembers()->column('ID'));
-        $creatorID = $entry->creatorMemberID();
-        $recipientIDs = array_values(array_unique(array_intersect(
-            array_filter(array_merge($assignedIDs, [$creatorID]), static fn(int $id): bool => $id > 0),
-            array_map('intval', $allowedIDs)
-        )));
+        $personalIDs = self::personalRecipientIDs($entry);
+        $recipientIDs = MashaFeedlyConfigExtension::memberIDs();
         if (!$recipientIDs) {
             return 0;
         }
@@ -219,6 +234,7 @@ class MashaFeedlyNotificationService
         foreach (Member::get()->filter('ID', $recipientIDs) as $member) {
             if (
                 !(bool)$member->MashaFeedlyEmailNotifications
+                || ((bool)$member->MashaFeedlyEmailAssignedOnly && !in_array((int)$member->ID, $personalIDs, true))
                 || !(bool)$member->MashaFeedlyNotifyDueDateReminders
                 || !Email::is_valid_address((string)$member->Email)
             ) {
@@ -256,7 +272,7 @@ class MashaFeedlyNotificationService
     /** Begrüßt ein neu freigeschaltetes Mitglied per E-Mail. */
     public static function notifyAccessGranted(Member $member): void
     {
-        if (!(bool)$member->MashaFeedlyEmailNotifications || !Email::is_valid_address((string)$member->Email)) {
+        if (!Email::is_valid_address((string)$member->Email)) {
             return;
         }
         $siteTitle = trim((string)SiteConfig::current_site_config()->Title) ?: 'Masha:Feedly';
@@ -290,6 +306,7 @@ class MashaFeedlyNotificationService
         $bugDescription = trim(html_entity_decode(strip_tags($descriptionText), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
         $siteTitle = trim((string)SiteConfig::current_site_config()->Title);
         $assignedMembers = $entry->AssignedMembers()->sort('Surname ASC, FirstName ASC');
+        $personalIDs = self::personalRecipientIDs($entry);
         $assignedNames = [];
         foreach ($assignedMembers as $assignedMember) {
             $assignedNames[] = (string)$assignedMember->getName();
@@ -304,8 +321,9 @@ class MashaFeedlyNotificationService
         foreach (Member::get()->filter('ID', $memberIDs) as $member) {
             if (
                 !(bool)$member->MashaFeedlyEmailNotifications
+                || ((bool)$member->MashaFeedlyEmailAssignedOnly && !in_array((int)$member->ID, $personalIDs, true))
                 || !(bool)$member->MashaFeedlyNotifyNewEntries
-                || ((int)$member->ID === $currentMemberID && !(bool)$member->MashaFeedlyNotifyOwnEntryChanges)
+                || (int)$member->ID === $currentMemberID
                 || !Email::is_valid_address((string)$member->Email)
             ) {
                 continue;
@@ -326,7 +344,7 @@ class MashaFeedlyNotificationService
                     'ReporterName' => $reporterName,
                     'CategoryTitle' => trim((string)$entry->Category()->Title),
                     'PriorityTitle' => trim((string)$entry->Priority()->Title),
-                    'DueDate' => $dueDate !== '' ? (string)$entry->dbObject('DueDate')->Nice() : '',
+                    'DueDate' => $dueDate !== '' ? self::formatDueDate($dueDate) : '',
                     'AssignedNames' => implode(', ', $assignedNames),
                     'EntryURL' => $entryURL,
                 ], $member, 'newEntry', ['siteTitle' => $siteTitle]))
@@ -334,9 +352,19 @@ class MashaFeedlyNotificationService
         }
     }
 
-    /** Sendet eine Änderungsbenachrichtigung an Mitglieder mit passender Einstellung. */
-    public static function notifyUpdatedEntry(MashaFeedlyEntry $entry): void
+    /**
+     * Sendet Änderungen oder zusätzliche Zuweisungshinweise ohne doppelte E-Mail.
+     * @param MashaFeedlyEntry $entry Betroffene Meldung.
+     * @param int[]|null $newAssignmentIDs Bei neuen Zuweisungen nur Empfänger ohne Änderungsabo benachrichtigen.
+     * @return void
+     */
+    public static function notifyUpdatedEntry(MashaFeedlyEntry $entry, ?array $newAssignmentIDs = null): void
     {
+        if ($newAssignmentIDs === []) {
+            return;
+        }
+
+        $personalIDs = self::personalRecipientIDs($entry);
         $memberIDs = MashaFeedlyConfigExtension::memberIDs();
         if (!$memberIDs) {
             return;
@@ -354,8 +382,13 @@ class MashaFeedlyNotificationService
         foreach (Member::get()->filter('ID', $memberIDs) as $member) {
             if (
                 !(bool)$member->MashaFeedlyEmailNotifications
-                || !(bool)$member->MashaFeedlyNotifyEntryUpdates
-                || ((int)$member->ID === $currentMemberID && !(bool)$member->MashaFeedlyNotifyOwnEntryChanges)
+                || ((bool)$member->MashaFeedlyEmailAssignedOnly && !in_array((int)$member->ID, $personalIDs, true))
+                || ($newAssignmentIDs === null
+                    ? !(bool)$member->MashaFeedlyNotifyEntryUpdates
+                    : (!in_array((int)$member->ID, $newAssignmentIDs, true)
+                        || !(bool)$member->MashaFeedlyNotifyNewEntries
+                        || (bool)$member->MashaFeedlyNotifyEntryUpdates))
+                || (int)$member->ID === $currentMemberID
                 || !Email::is_valid_address((string)$member->Email)
             ) {
                 continue;
@@ -380,19 +413,11 @@ class MashaFeedlyNotificationService
         }
     }
 
-    /** Sendet neue Kommentare an freigegebene, zugewiesene Mitglieder mit aktivierter Kommentarpräferenz. */
+    /** Sendet Kommentare an freigegebene Mitglieder gemäß Bereich und Kommentarpräferenz; nie an den Autor. */
     public static function notifyNewComment(MashaFeedlyEntry $entry, MashaFeedlyComment $comment, Member $author): void
     {
-        $allowedIDs = MashaFeedlyConfigExtension::memberIDs();
-        $assignedIDs = array_values(array_intersect(
-            array_map('intval', $entry->AssignedMembers()->column('ID')),
-            array_map('intval', $allowedIDs)
-        ));
-        $creatorID = $entry->creatorMemberID();
-        $recipientIDs = array_values(array_diff(
-            array_intersect(array_values(array_unique(array_merge($assignedIDs, [$creatorID]))), $allowedIDs),
-            [(int)$author->ID]
-        ));
+        $personalIDs = self::personalRecipientIDs($entry);
+        $recipientIDs = array_values(array_diff(MashaFeedlyConfigExtension::memberIDs(), [(int)$author->ID]));
         if (!$recipientIDs) {
             return;
         }
@@ -404,6 +429,7 @@ class MashaFeedlyNotificationService
         foreach (Member::get()->filter('ID', $recipientIDs) as $member) {
             if (
                 !(bool)$member->MashaFeedlyEmailNotifications
+                || ((bool)$member->MashaFeedlyEmailAssignedOnly && !in_array((int)$member->ID, $personalIDs, true))
                 || !(bool)$member->MashaFeedlyNotifyComments
                 || !Email::is_valid_address((string)$member->Email)
             ) {
@@ -450,6 +476,7 @@ class MashaFeedlyNotificationService
         foreach (Member::get()->filter('ID', $recipientIDs) as $member) {
             if (
                 !(bool)$member->MashaFeedlyEmailNotifications
+                || (int)$member->ID === (int)(Security::getCurrentUser()?->ID ?? 0)
                 || !(bool)$member->MashaFeedlyNotifyCostEstimates
                 || !Email::is_valid_address((string)$member->Email)
             ) {

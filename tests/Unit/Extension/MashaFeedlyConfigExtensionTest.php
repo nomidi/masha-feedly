@@ -10,6 +10,9 @@ use SilverStripe\Core\Injector\Injector;
 use SilverStripe\ORM\DB;
 use SilverStripe\Security\Member;
 use SilverStripe\SiteConfig\SiteConfig;
+use Symfony\Component\Mailer\Envelope;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mime\RawMessage;
 
 /**
  * Tests für Freigabeprüfung und Bereinigung der Benutzerliste.
@@ -145,6 +148,95 @@ class MashaFeedlyConfigExtensionTest extends SapphireTest
         $siteConfig->MashaFeedlyAllowedMemberIDs = json_encode([]);
         $siteConfig->write();
         $this->assertFalse(MashaFeedlyConfigExtension::canUse($allowedMember));
+    }
+
+    /** Die Widget-Freigabe vergleicht konfigurierte IDs direkt; erst die vollständige Liste prüft Mitglieder in der Datenbank. */
+    public function testQuickAccessCheckUsesConfiguredIDsAndFullListStillRemovesUnknownMembers(): void
+    {
+        $allowedMember = $this->objFromFixture(Member::class, 'allowed');
+        $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
+        $siteConfig->MashaFeedlyAllowedMemberIDs = json_encode([
+            (int)$allowedMember->ID,
+            999999,
+            (int)$allowedMember->ID,
+            'ungültig',
+        ]);
+        $siteConfig->write();
+
+        $this->assertTrue(MashaFeedlyConfigExtension::canUse($allowedMember));
+        $this->assertTrue(MashaFeedlyConfigExtension::isExplicitlyAllowed($allowedMember));
+        $this->assertSame([(int)$allowedMember->ID], MashaFeedlyConfigExtension::memberIDs());
+    }
+
+    /** Jede neue Freigabe setzt E-Mail-Vorgaben zurück und sendet unabhängig davon die Willkommensmail. */
+    public function testAddingAndReaddingMemberResetsNotificationPreferencesAndWelcomesThem(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'normalize');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = '[]';
+        $config->write();
+        $member->MashaFeedlyEmailNotifications = false;
+        $member->MashaFeedlyEmailAssignedOnly = false;
+        $member->MashaFeedlyNotifyNewEntries = false;
+        $member->MashaFeedlyNotifyEntryUpdates = false;
+        $member->MashaFeedlyNotifyComments = false;
+        $member->MashaFeedlyNotifyDueDateReminders = false;
+        $member->MashaFeedlyNotifyCostEstimates = false;
+        $member->write();
+
+        $mailer = new class implements MailerInterface {
+            /** @var RawMessage[] Gespeicherte Willkommensnachrichten. */
+            public array $messages = [];
+
+            public function send(RawMessage $message, ?Envelope $envelope = null): void
+            {
+                $this->messages[] = $message;
+            }
+        };
+        $injector = Injector::inst();
+        $originalMailer = $injector->get(MailerInterface::class);
+        $injector->registerService($mailer, MailerInterface::class);
+
+        try {
+            foreach ([1, 2] as $attempt) {
+                $config->MashaFeedlyAllowedMemberIDs = json_encode([$member->ID]);
+                $config->write();
+
+                $saved = Member::get()->byID((int)$member->ID);
+                foreach ([
+                    'MashaFeedlyEmailNotifications',
+                    'MashaFeedlyEmailAssignedOnly',
+                    'MashaFeedlyNotifyNewEntries',
+                    'MashaFeedlyNotifyEntryUpdates',
+                    'MashaFeedlyNotifyComments',
+                    'MashaFeedlyNotifyDueDateReminders',
+                    'MashaFeedlyNotifyCostEstimates',
+                ] as $field) {
+                    $this->assertTrue((bool)$saved->$field, $field . ' wird beim Hinzufügen eingeschaltet.');
+                }
+                $this->assertFalse((bool)$saved->MashaFeedlyNotifyOwnEntryChanges);
+                $this->assertCount($attempt, $mailer->messages);
+
+                if ($attempt === 1) {
+                    $config->MashaFeedlyAllowedMemberIDs = '[]';
+                    $config->write();
+                    foreach ([
+                        'MashaFeedlyEmailNotifications',
+                        'MashaFeedlyEmailAssignedOnly',
+                        'MashaFeedlyNotifyNewEntries',
+                        'MashaFeedlyNotifyEntryUpdates',
+                        'MashaFeedlyNotifyComments',
+                        'MashaFeedlyNotifyDueDateReminders',
+                        'MashaFeedlyNotifyCostEstimates',
+                    ] as $field) {
+                        $member->$field = false;
+                    }
+                    $member->write();
+                }
+            }
+        } finally {
+            $injector->registerService($originalMailer, MailerInterface::class);
+        }
     }
 
     /** Prüft, dass doppelte, ungültige und unbekannte IDs entfernt werden. */

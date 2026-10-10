@@ -185,7 +185,8 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     const emailMaster = preferences.locator('[data-masha-feedly-email-master]');
     if (await emailMaster.count()) {
       await expect(emailMaster).toBeEnabled();
-      await expect(preferences.locator('[data-masha-feedly-email-option]')).toHaveCount(6);
+      await expect(preferences.locator('[data-masha-feedly-email-option]')).toHaveCount(5);
+      await expect(preferences.locator('[data-masha-feedly-email-scope-option]')).toHaveCount(2);
     }
     const iconResponse = await context.request.get(new URL('/__masha-feedly-effects/icons', config.baseURL).href);
     if (iconResponse.ok()) {

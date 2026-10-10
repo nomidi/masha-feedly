@@ -53,6 +53,9 @@ class MashaFeedlyConfigExtension extends Extension
     /** @var int[]|null Freigabeliste für den aktuellen Request. */
     private static ?array $memberIDsCache = null;
 
+    /** @var int[]|null Ungeprüfte IDs für schnelle Berechtigungsprüfungen im aktuellen Request. */
+    private static ?array $configuredMemberIDsCache = null;
+
     /** Request-Identität, damit Anfragen in Testläufen nicht dieselbe Cachekopie teilen. */
     private static ?int $memberIDsCacheRequestID = null;
 
@@ -203,8 +206,14 @@ class MashaFeedlyConfigExtension extends Extension
     public static function notificationEmailText(string $type, string $address): string
     {
         $field = self::notificationFieldMap()[$type][$address] ?? null;
-        if (!$field || !self::hasSiteConfigField($field)) return '';
-        return trim((string)self::currentSiteConfig()->$field);
+        if (!$field) return '';
+
+        try {
+            return trim((string)self::currentSiteConfig()->$field);
+        } catch (DatabaseException) {
+            // Während dev/build können neue Textfelder noch nicht angelegt sein.
+            return '';
+        }
     }
 
     /** Liest den optionalen Footer aus der Serverumgebung und decodiert Zeilenumbrüche. */
@@ -248,11 +257,6 @@ class MashaFeedlyConfigExtension extends Extension
     /** Prüft, ob der globale E-Mail-Versand bereits erfolgreich getestet wurde. */
     public static function emailTestSucceeded(): bool
     {
-        // requireDefaultRecords kann während dev/build vor dem Schema-Update laufen.
-        if (!self::hasSiteConfigField('MashaFeedlyEmailTestSucceeded')) {
-            return false;
-        }
-
         try {
             return (bool)self::currentSiteConfig()->MashaFeedlyEmailTestSucceeded;
         } catch (DatabaseException) {
@@ -284,13 +288,14 @@ class MashaFeedlyConfigExtension extends Extension
         $this->newlyAllowedMemberIDs = array_values(array_diff($current, $previous));
     }
 
-    /** Begrüßt Mitglieder nach erfolgreicher Speicherung ihrer neuen Freigabe. */
+    /** Setzt bei jeder neuen Freigabe sinnvolle Mail-Vorgaben und sendet danach die Willkommensmail. */
     protected function onAfterWrite(): void
     {
         self::clearMemberIDsCache();
         foreach ($this->newlyAllowedMemberIDs as $memberID) {
             $member = Member::get()->byID($memberID);
             if ($member) {
+                MashaFeedlyMemberExtension::initializeAccessEmailPreferences($member);
                 MashaFeedlyNotificationService::notifyAccessGranted($member);
             }
         }
@@ -353,13 +358,15 @@ class MashaFeedlyConfigExtension extends Extension
             return false;
         }
 
-        // dev/build initialisiert Controller, bevor neue SiteConfig-Spalten angelegt sind.
-        // In diesem kurzen Zeitraum darf keine ORM-Abfrage alle SiteConfig-Felder auswählen.
-        if (!self::hasSiteConfigField('MashaFeedlyEmailFooter')) {
+        // Während dev/build kann das neue Feld noch fehlen. Der ohnehin nötige Config-Lesezugriff
+        // erkennt das direkt; eine separate Schemaabfrage wäre dafür zusätzliche Datenbankarbeit.
+        try {
+            $allowedIDs = self::configuredMemberIDs();
+        } catch (DatabaseException) {
             return false;
         }
 
-        return in_array((int)$member->ID, self::memberIDs(), true);
+        return in_array((int)$member->ID, $allowedIDs, true);
     }
 
     /** Prüft das während dev/build benötigte Feld einmal pro HTTP-Request. */
@@ -388,9 +395,42 @@ class MashaFeedlyConfigExtension extends Extension
     /** Prüft, ob ein Mitglied ausdrücklich in der Masha-Feedly-Freigabeliste steht. */
     public static function isExplicitlyAllowed(?Member $member): bool
     {
-        return $member instanceof Member
-            && $member->isInDB()
-            && in_array((int)$member->ID, self::memberIDs(), true);
+        if (!$member instanceof Member || !$member->isInDB()) {
+            return false;
+        }
+
+        try {
+            return in_array((int)$member->ID, self::configuredMemberIDs(), true);
+        } catch (DatabaseException) {
+            return false;
+        }
+    }
+
+    /**
+     * Liefert konfigurierte positive IDs ohne zusätzliche Mitgliedertabelle-Abfrage.
+     *
+     * @return int[] Positive und eindeutige IDs aus der Freigabeliste.
+     */
+    private static function configuredMemberIDs(): array
+    {
+        $request = Controller::curr()?->getRequest();
+        $requestID = $request ? spl_object_id($request) : null;
+        if ($requestID !== null && self::$memberIDsCacheRequestID === $requestID && self::$configuredMemberIDsCache !== null) {
+            return self::$configuredMemberIDsCache;
+        }
+
+        $raw = (string)self::currentSiteConfig()->MashaFeedlyAllowedMemberIDs;
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            $decoded = preg_split('/\\s*,\\s*/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        }
+
+        self::$configuredMemberIDsCache = array_values(array_unique(array_filter(
+            array_map(static fn($id): int => is_scalar($id) ? (int)$id : 0, $decoded),
+            static fn(int $id): bool => $id > 0
+        )));
+        self::$memberIDsCacheRequestID = $requestID;
+        return self::$configuredMemberIDsCache;
     }
 
     /**
@@ -406,14 +446,7 @@ class MashaFeedlyConfigExtension extends Extension
             return self::$memberIDsCache;
         }
 
-        $config = self::currentSiteConfig();
-        $raw = (string)$config->MashaFeedlyAllowedMemberIDs;
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            $decoded = preg_split('/\s*,\s*/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        }
-
-        self::$memberIDsCache = self::normalizeMemberIDs($decoded);
+        self::$memberIDsCache = self::normalizeMemberIDs(self::configuredMemberIDs());
         self::$memberIDsCacheRequestID = $requestID;
         return self::$memberIDsCache;
     }
@@ -422,6 +455,7 @@ class MashaFeedlyConfigExtension extends Extension
     private static function clearMemberIDsCache(): void
     {
         self::$memberIDsCache = null;
+        self::$configuredMemberIDsCache = null;
         self::$memberIDsCacheRequestID = null;
     }
 

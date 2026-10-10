@@ -85,6 +85,10 @@ class MashaFeedlyDueDateReminderTask extends BuildTask
         return MashaFeedlyEntry::get()
             ->filter('DueDate:LessThanOrEqual', $date)
             ->filter('DueDateReminderSentAt', null)
+            ->filterAny([
+                'DeferredUntil' => null,
+                'DeferredUntil:LessThanOrEqual' => $date,
+            ])
             ->sort('DueDate ASC, ID ASC');
     }
 }

@@ -7,6 +7,8 @@ use SilverStripe\Assets\Folder;
 use SilverStripe\Assets\Image;
 use SilverStripe\Core\Extension;
 use SilverStripe\Forms\CheckboxField;
+use SilverStripe\Forms\OptionsetField;
+use UncleCheese\DisplayLogic\Forms\Wrapper;
 use SilverStripe\Forms\CompositeField;
 use SilverStripe\Forms\DropdownField;
 use SilverStripe\Forms\FieldList;
@@ -27,9 +29,10 @@ use SilverStripe\View\Requirements;
  * Ergänzt Mitglieder um Profilbild, Avatarfarbe und E-Mail-Einstellungen für Masha Feedly.
  *
  * @property bool $MashaFeedlyEmailNotifications Grundsätzliche Zustimmung zu Masha-Feedly-E-Mails.
+ * @property bool $MashaFeedlyEmailAssignedOnly E-Mails nur für selbst erstellte oder aktuell zugewiesene Meldungen erhalten; Feldname bleibt für vorhandene Profile erhalten.
  * @property bool $MashaFeedlyNotifyNewEntries Benachrichtigung bei neuen Einträgen.
  * @property bool $MashaFeedlyNotifyEntryUpdates Benachrichtigung bei Änderungen an Einträgen.
- * @property bool $MashaFeedlyNotifyOwnEntryChanges Benachrichtigung bei eigenen Einträgen und Änderungen.
+ * @property bool $MashaFeedlyNotifyOwnEntryChanges Frühere Einstellung für eigene Aktionen; wird für den Versand nicht mehr verwendet.
  * @property bool $MashaFeedlyNotifyComments Benachrichtigung bei neuen Kommentaren.
  * @property bool $MashaFeedlyNotifyDueDateReminders Benachrichtigung bei Fälligkeitsterminen.
  * @property bool $MashaFeedlyNotifyCostEstimates Benachrichtigung bei angefragten Kostenschätzungen.
@@ -47,8 +50,12 @@ use SilverStripe\View\Requirements;
  */
 class MashaFeedlyMemberExtension extends Extension
 {
+    /** Erlaubt den internen Erstaufbau der E-Mail-Vorgaben bei einer neuen Modulfreigabe. */
+    private static bool $initializingAccessPreferences = false;
+
     private static $db = [
         'MashaFeedlyEmailNotifications' => 'Boolean',
+        'MashaFeedlyEmailAssignedOnly' => 'Boolean',
         'MashaFeedlyNotifyNewEntries' => 'Boolean',
         'MashaFeedlyNotifyEntryUpdates' => 'Boolean',
         'MashaFeedlyNotifyOwnEntryChanges' => 'Boolean',
@@ -71,6 +78,7 @@ class MashaFeedlyMemberExtension extends Extension
 
     private static $defaults = [
         'MashaFeedlyEmailNotifications' => true,
+        'MashaFeedlyEmailAssignedOnly' => true,
         'MashaFeedlyNotifyNewEntries' => true,
         'MashaFeedlyNotifyEntryUpdates' => true,
         'MashaFeedlyNotifyOwnEntryChanges' => false,
@@ -78,6 +86,26 @@ class MashaFeedlyMemberExtension extends Extension
         'MashaFeedlyNotifyDueDateReminders' => true,
         'MashaFeedlyNotifyCostEstimates' => true,
     ];
+
+    /** Setzt bei einer neuen Modulfreigabe die Startauswahl, auch bevor Testmails freigeschaltet wurden. */
+    public static function initializeAccessEmailPreferences(Member $member): void
+    {
+        $member->MashaFeedlyEmailNotifications = true;
+        $member->MashaFeedlyEmailAssignedOnly = true;
+        $member->MashaFeedlyNotifyNewEntries = true;
+        $member->MashaFeedlyNotifyEntryUpdates = true;
+        $member->MashaFeedlyNotifyOwnEntryChanges = false;
+        $member->MashaFeedlyNotifyComments = true;
+        $member->MashaFeedlyNotifyDueDateReminders = true;
+        $member->MashaFeedlyNotifyCostEstimates = true;
+
+        self::$initializingAccessPreferences = true;
+        try {
+            $member->write();
+        } finally {
+            self::$initializingAccessPreferences = false;
+        }
+    }
 
     /** Liefert die kräftigen, gut unterscheidbaren Farben für Mitglieder-Avatare. */
     public static function colorOptions(): array
@@ -191,9 +219,10 @@ class MashaFeedlyMemberExtension extends Extension
         $colors = array_keys(self::colorOptions());
         $this->owner->MashaFeedlyColor = self::normalizeColor((string)$this->owner->MashaFeedlyColor)
             ?? $colors[random_int(0, count($colors) - 1)];
-        if (!MashaFeedlyConfigExtension::emailTestSucceeded()) {
+        if (!MashaFeedlyConfigExtension::emailTestSucceeded() && !self::$initializingAccessPreferences) {
             $notificationFields = [
                 'MashaFeedlyEmailNotifications',
+                'MashaFeedlyEmailAssignedOnly',
                 'MashaFeedlyNotifyNewEntries',
                 'MashaFeedlyNotifyEntryUpdates',
                 'MashaFeedlyNotifyOwnEntryChanges',
@@ -285,7 +314,7 @@ class MashaFeedlyMemberExtension extends Extension
             . ' data-icon-id="' . $escape((string)$this->owner->MashaFeedlyAvatarIcon) . '"'
             . ' data-upload-url="' . $escape($uploadURL) . '" data-initials="' . $escape($this->getMashaFeedlyInitials()) . '"'
             . ' style="background-color:' . $escape($this->getMashaFeedlyDisplayColor()) . '"'
-            . ' aria-label="' . $escape(self::translate('PROFILE_IMAGE', 'Dein Masha:Feedly-Avatar')) . '">'
+            . ' aria-label="' . $escape(self::translateForAddress($this->owner, 'PROFILE_IMAGE', 'Dein Masha:Feedly-Avatar')) . '">'
             . ($url !== '' ? '<img src="' . $escape($url) . '" alt="">' : $escape($this->getMashaFeedlyInitials())) . '</div>';
     }
 
@@ -307,6 +336,7 @@ class MashaFeedlyMemberExtension extends Extension
     {
         $fields->removeByName([
             'MashaFeedlyEmailNotifications',
+            'MashaFeedlyEmailAssignedOnly',
             'MashaFeedlyNotifyNewEntries',
             'MashaFeedlyNotifyEntryUpdates',
             'MashaFeedlyNotifyOwnEntryChanges',
@@ -362,22 +392,25 @@ class MashaFeedlyMemberExtension extends Extension
             ENT_QUOTES | ENT_SUBSTITUTE,
             'UTF-8'
         );
+        // Die Bedingung gehört zum Wrapper, da Optionset-Felder sonst im CMS doppelt versteckt werden.
+        $emailScope = OptionsetField::create('MashaFeedlyEmailAssignedOnly',
+            self::translateForAddress($this->owner, 'PROFILE_EMAIL_SCOPE', 'Für welche Meldungen möchtest du E-Mails erhalten?'), [
+                0 => self::translate('PROFILE_EMAIL_SCOPE_ALL', 'Alle Meldungen'),
+                1 => self::translate('PROFILE_EMAIL_SCOPE_ASSIGNED', 'Meine Meldungen'),
+            ]
+        )->setDescription(self::translateForAddress($this->owner, 'PROFILE_EMAIL_SCOPE_DESCRIPTION', '„Alle Meldungen“ umfasst auch Kommentare und Fälligkeiten auf der ganzen Website. „Meine Meldungen“ umfasst Meldungen, die du erstellt hast oder die dir zugewiesen sind. Die Häkchen bestimmen, welche Ereignisse du per E-Mail erhältst. Eigene Aktionen erzeugen keine Mail. Kostenschätzungen gehen nur an Zuständige.'));
         $newEntries = CheckboxField::create(
             'MashaFeedlyNotifyNewEntries',
-            self::translate('PROFILE_NOTIFY_NEW_ENTRIES', 'Bei neuen Meldungen benachrichtigen')
-        )->setDescription(self::translate('PROFILE_NOTIFY_NEW_ENTRIES_DESCRIPTION', 'Erhalte eine E-Mail, wenn eine neue Meldung erstellt wird. Für deine eigenen Meldungen gilt zusätzlich die separate Option für eigene Meldungen und Änderungen.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
-        $ownEntryUpdates = CheckboxField::create(
-            'MashaFeedlyNotifyOwnEntryChanges',
-            self::translate('PROFILE_NOTIFY_OWN_CHANGES', 'Auch bei eigenen Meldungen und Änderungen benachrichtigen')
-        )->setDescription(self::translate('PROFILE_NOTIFY_OWN_CHANGES_DESCRIPTION', 'Diese Option ist standardmäßig ausgeschaltet. Schalte sie ein, wenn du E-Mails auch für Meldungen erhalten möchtest, die du selbst erstellst oder änderst.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+            self::translate('PROFILE_NOTIFY_NEW_ENTRIES', 'Neue Meldungen und neue Zuweisungen')
+        )->setDescription(self::translate('PROFILE_NOTIFY_NEW_ENTRIES_DESCRIPTION', 'Erhalte eine E-Mail bei einer neuen Meldung im gewählten Bereich oder wenn dir eine bestehende Meldung neu zugewiesen wird.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $comments = CheckboxField::create(
             'MashaFeedlyNotifyComments',
             self::translate('PROFILE_NOTIFY_COMMENTS', 'Bei neuen Kommentaren benachrichtigen')
-        )->setDescription(self::translate('PROFILE_NOTIFY_COMMENTS_DESCRIPTION', 'Erhalte eine E-Mail, wenn jemand bei einer Meldung kommentiert, für die du zuständig bist oder die du erstellt hast.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        )->setDescription(self::translate('PROFILE_NOTIFY_COMMENTS_DESCRIPTION', 'Erhalte eine E-Mail bei neuen Kommentaren im gewählten Bereich. Deine eigenen Kommentare erzeugen keine Mail.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $dueDateReminders = CheckboxField::create(
             'MashaFeedlyNotifyDueDateReminders',
             self::translate('PROFILE_NOTIFY_DUE_DATE_REMINDERS', 'An Fälligkeitstermine erinnern')
-        )->setDescription(self::translate('PROFILE_NOTIFY_DUE_DATE_REMINDERS_DESCRIPTION', 'Erhalte am Fälligkeitstag eine einmalige Erinnerung für Meldungen, denen du zugewiesen bist oder die du erstellt hast.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        )->setDescription(self::translate('PROFILE_NOTIFY_DUE_DATE_REMINDERS_DESCRIPTION', 'Erhalte am Fälligkeitstag einmalig eine Erinnerung für Meldungen im gewählten Bereich.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
         $costEstimates = CheckboxField::create(
             'MashaFeedlyNotifyCostEstimates',
             self::translate('PROFILE_NOTIFY_COST_ESTIMATES', 'Bei angefragten Kostenschätzungen benachrichtigen')
@@ -385,22 +418,22 @@ class MashaFeedlyMemberExtension extends Extension
         $entryUpdates = CheckboxField::create(
             'MashaFeedlyNotifyEntryUpdates',
             self::translate('PROFILE_NOTIFY_ENTRY_UPDATES', 'Bei Änderungen an Meldungen benachrichtigen')
-        )->setDescription(self::translate('PROFILE_NOTIFY_ENTRY_UPDATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn sich Status, Beschreibung, Zuständigkeit oder andere Meldungsdetails ändern. Für eigene Änderungen gilt zusätzlich die separate Option für eigene Meldungen.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
+        )->setDescription(self::translate('PROFILE_NOTIFY_ENTRY_UPDATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn sich Status, Beschreibung, Zuständigkeit oder andere Meldungsdetails im gewählten Bereich ändern. Deine eigenen Änderungen erzeugen keine Mail.'))->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end();
 
         if (!$emailTestSucceeded) {
-            foreach ([$newEntries, $entryUpdates, $ownEntryUpdates, $comments, $dueDateReminders, $costEstimates] as $field) {
+            foreach ([$emailScope, $newEntries, $entryUpdates, $comments, $dueDateReminders, $costEstimates] as $field) {
                 $field->setDisabled(true);
             }
         }
 
         $avatarFields = [
             LiteralField::create('MashaFeedlyAvatarPreview', $this->renderAvatarPreview()),
-            UploadField::create('MashaFeedlyIconImage', self::translate('PROFILE_IMAGE', 'Dein Masha:Feedly-Avatar'))
+            UploadField::create('MashaFeedlyIconImage', self::translateForAddress($this->owner, 'PROFILE_IMAGE', 'Dein Masha:Feedly-Avatar'))
                 ->setFolderName('masha-feedly/masha-feedly-profile-images')
                 ->setAllowedFileCategories('image/supported')
                 ->setAllowedMaxFileNumber(1)
                 ->setAttachEnabled(false)
-                ->setDescription(self::translate('PROFILE_IMAGE_DESCRIPTION', 'Das Bild ist geschützt und nur für freigegebene Masha-Feedly-Benutzer sichtbar. Ohne Bild werden deine Initialen angezeigt.')),
+                ->setDescription(self::translateForAddress($this->owner, 'PROFILE_IMAGE_DESCRIPTION', 'Das Bild ist geschützt und nur für freigegebene Masha-Feedly-Benutzer sichtbar. Ohne Bild werden deine Initialen angezeigt.')),
         ];
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-avatar-icons.js');
         if ($avatarIconPicker !== '') {
@@ -463,9 +496,9 @@ class MashaFeedlyMemberExtension extends Extension
                     ? self::translate('PROFILE_EMAIL_DESCRIPTION', 'Wenn diese Hauptoption eingeschaltet ist, erhältst du die unten ausgewählten E-Mails. Du kannst einzelne Arten oder alle Benachrichtigungen jederzeit ausschalten.')
                     : self::translate('PROFILE_EMAIL_TEST_REQUIRED', 'E-Mail-Einstellungen sind gesperrt. Ein Masha:Feedly-Administrator muss zuerst unter Masha:Feedly → Konfiguration eine Test-E-Mail erfolgreich versenden.'))
                     ->setDisabled(!$emailTestSucceeded),
+                Wrapper::create($emailScope)->setName('MashaFeedlyEmailScopeWrapper')->displayIf('MashaFeedlyEmailNotifications')->isChecked()->end(),
                 $newEntries,
                 $entryUpdates,
-                $ownEntryUpdates,
                 $comments,
                 $dueDateReminders,
                 $costEstimates
@@ -565,5 +598,14 @@ class MashaFeedlyMemberExtension extends Extension
     private static function translate(string $key, string $fallback): string
     {
         return i18n::_t('KW\\MashaFeedly\\Translations.' . $key, $fallback);
+    }
+
+    /** Liefert für profilbezogene Beschriftungen die zur Person passende Anrede. */
+    private static function translateForAddress(Member $member, string $key, string $fallback): string
+    {
+        if (self::addressFor($member) === 'sie') {
+            return self::translate($key . '_SIE', self::translate($key, $fallback));
+        }
+        return self::translate($key, $fallback);
     }
 }

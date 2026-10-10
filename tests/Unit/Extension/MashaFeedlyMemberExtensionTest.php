@@ -46,6 +46,16 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         i18n::set_locale('de_DE');
     }
 
+    /** Prüft sinnvolle persönliche Vorgaben für neue Benutzerkonten. */
+    public function testNewMemberDefaultsToPersonalNotifications(): void
+    {
+        $member = Member::create();
+        foreach (['MashaFeedlyEmailNotifications', 'MashaFeedlyEmailAssignedOnly', 'MashaFeedlyNotifyNewEntries', 'MashaFeedlyNotifyEntryUpdates', 'MashaFeedlyNotifyComments', 'MashaFeedlyNotifyDueDateReminders', 'MashaFeedlyNotifyCostEstimates'] as $field) {
+            $this->assertTrue((bool)$member->{$field}, $field);
+        }
+        $this->assertFalse((bool)$member->MashaFeedlyNotifyOwnEntryChanges);
+    }
+
     /** Prüft, dass freigegebene Mitglieder die Einstellungen im Profilformular sehen. */
     public function testAllowedMemberSeesEmailPreferencesInProfile(): void
     {
@@ -56,6 +66,13 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $this->allowMember($member);
         $this->logInAs($member);
         $fields = $member->getCMSFields();
+        $scope = $fields->dataFieldByName('MashaFeedlyEmailAssignedOnly');
+        $this->assertInstanceOf(\SilverStripe\Forms\OptionsetField::class, $scope);
+        $this->assertSame([0 => 'Alle Meldungen', 1 => 'Meine Meldungen'], $scope->getSource());
+        $this->assertStringNotContainsString('display-logic-hidden', (string)$scope->FieldHolder(), 'Die Bereichsauswahl selbst erhält keine widersprüchlichen Bedingungen.');
+        $scopeWrapper = $fields->fieldByName('Root.MashaFeedly.MashaFeedlyEmailSettings.MashaFeedlyEmailScopeWrapper');
+        $this->assertInstanceOf(\UncleCheese\DisplayLogic\Forms\Wrapper::class, $scopeWrapper);
+        $this->assertStringContainsString('MashaFeedlyEmailNotifications', (string)$scopeWrapper->FieldHolder());
         $mainTab = $fields->findTab('Root.Main');
         $mashaFeedlyTab = $fields->findTab('Root.MashaFeedly');
 
@@ -126,7 +143,6 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
             'MashaFeedlyEmailNotifications',
             'MashaFeedlyNotifyNewEntries',
             'MashaFeedlyNotifyEntryUpdates',
-            'MashaFeedlyNotifyOwnEntryChanges',
             'MashaFeedlyNotifyComments',
             'MashaFeedlyNotifyDueDateReminders',
         ] as $fieldName) {
@@ -142,18 +158,37 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
             'MashaFeedlyEmailNotifications',
             $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyEntryUpdates')->DisplayLogicDispatchers()
         );
-        $this->assertSame(
-            'MashaFeedlyEmailNotifications',
-            $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyOwnEntryChanges')->DisplayLogicDispatchers()
-        );
+        $this->assertNull($fields->dataFieldByName('MashaFeedlyNotifyOwnEntryChanges'));
         $this->assertSame(
             'MashaFeedlyEmailNotifications',
             $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyComments')->DisplayLogicDispatchers()
         );
         $this->assertStringContainsString('Erhalte eine E-Mail', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyNewEntries')->getDescription());
-        $this->assertStringContainsString('selbst erstellst oder änderst', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyOwnEntryChanges')->getDescription());
-        $this->assertStringContainsString('oder die du erstellt hast', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyComments')->getDescription());
+        $this->assertStringContainsString('gewählten Bereich', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyComments')->getDescription());
         $this->assertStringContainsString('Status, Beschreibung, Zuständigkeit', $mashaFeedlyTab->Fields()->dataFieldByName('MashaFeedlyNotifyEntryUpdates')->getDescription());
+    }
+
+    /** Prüft, dass Profilbeschriftungen die gespeicherte Sie-Anrede verwenden. */
+    public function testProfileEmailScopeUsesFormalAddress(): void
+    {
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $member->MashaFeedlyAddress = 'sie';
+        $member->write();
+        $this->allowMember($member);
+        $this->logInAs($member);
+
+        $fields = $member->getCMSFields();
+        $scope = $fields->dataFieldByName('MashaFeedlyEmailAssignedOnly');
+        $profileGroup = $fields->findTab('Root.MashaFeedly')->Fields()->fieldByName('MashaFeedlyProfileSettings');
+        $image = $profileGroup->getChildren()->dataFieldByName('MashaFeedlyIconImage');
+
+        $this->assertSame('Für welche Meldungen möchten Sie E-Mails erhalten?', $scope->Title());
+        $this->assertStringContainsString('die Ihnen zugewiesen sind', $scope->getDescription());
+        $this->assertSame('Ihr Masha:Feedly-Avatar', $image->Title());
+        $this->assertStringContainsString('Ihre Initialen', $image->getDescription());
     }
 
     /** Prüft, dass eigene Icon- und Farbschaltflächen bei der Sudo-Schreibsperre stillgelegt werden. */

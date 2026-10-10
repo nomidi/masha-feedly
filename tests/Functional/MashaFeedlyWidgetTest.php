@@ -86,7 +86,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $germanHelpTitle = i18n::with_locale('de_DE', static fn (): string =>
             i18n::_t('KW\\MashaFeedly\\Translations.HELP_TITLE', 'Übersetzungsdatei fehlt')
         );
-        $this->assertSame('Masha:Feedly verwenden', $germanHelpTitle);
+        $this->assertSame('Kurzhilfe zu Masha:Feedly', $germanHelpTitle);
         $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
         $page->publishRecursive();
         $allowedMember = $this->objFromFixture(Member::class, 'allowed');
@@ -118,7 +118,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('data-masha-feedly-restart-onboarding', $allowedResponse->getBody());
         $this->assertStringContainsString('Einführung erneut starten', $allowedResponse->getBody());
         $this->assertStringContainsString('data-onboarding-restart-url="/__masha-feedly/restartOnboarding"', $this->widgetMarkup($allowedResponse->getBody()));
-        $this->assertStringContainsString('Masha:Feedly verwenden', $allowedResponse->getBody());
+        $this->assertStringContainsString('Kurzhilfe zu Masha:Feedly', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-total-count', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-open-page-list', $allowedResponse->getBody());
         $this->assertStringContainsString('class="kw-masha-feedly__page-icon" aria-hidden="true" viewBox="0 0 512 512"', $this->widgetMarkup($allowedResponse->getBody()));

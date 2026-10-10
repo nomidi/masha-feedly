@@ -12,6 +12,19 @@ const compiledStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dis
 const compiledAdminStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly-admin.css'), 'utf8');
 const widgetTemplate = fs.readFileSync(path.resolve(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
 const germanTranslations = fs.readFileSync(path.resolve(__dirname, '../../lang/de.yml'), 'utf8');
+test('setzt das Plus als abgetrennte Hauptaktion und hängt Screenshots auch beim Bearbeiten an', () => {
+  const createSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-create-entry.js'), 'utf8');
+  assert.match(widgetTemplate, /kw-masha-feedly__primary-action[\s\S]*?data-masha-feedly-start-selection/);
+  assert.match(scss, /kw-masha-feedly__primary-action::before[\s\S]*?kw-masha-feedly__primary-action::after/);
+  assert.match(widgetTemplate, /data-masha-feedly-edit-form[\s\S]*?data-masha-feedly-screenshot-capture/);
+  assert.match(widgetTemplate, /class="kw-masha-feedly__date-field"><%t KW\\MashaFeedly\\Translations\.FIELD_DUE_DATE[\s\S]*?name="DueDate" type="date"><\/label><label class="kw-masha-feedly__date-field"><%t KW\\MashaFeedly\\Translations\.FIELD_DEFERRED_UNTIL[\s\S]*?name="DeferredUntil" type="date">/);
+  assert.match(scss, /\.kw-masha-feedly__create-modal \.kw-masha-feedly__form-grid label:last-child \{ grid-column: auto; \}/);
+  assert.match(scss, /\.kw-masha-feedly__form-grid \.kw-masha-feedly__date-field \{ align-content: start; \}/);
+  assert.match(createSource, /const editScreenshot = window\.KWMashaFeedlyScreenshot\(widget\.querySelector\('\[data-masha-feedly-edit-form\]'\)/);
+  assert.match(source, /const screenshotFile = editForm\.__mashaFeedlyScreenshot\?\.file\(\)/);
+  assert.match(source, /data\.append\('Attachments\[\]'\s*,\s*screenshotFile\)/);
+  assert.match(source, /editForm\.__mashaFeedlyScreenshot\?\.clear\(\)/);
+});
 const messages = {
   ENTRY_CONTEXT_STATUS: 'Status: {status}', ENTRY_WITHOUT_CATEGORY: 'Ohne Kategorie',
   ENTRY_NO_DESCRIPTION: 'Keine Beschreibung vorhanden.', ENV_LOGGED_AT: 'Erfasst am', ENV_PAGE: 'Seite',
@@ -28,7 +41,7 @@ const messages = {
   HISTORY_COMMENT_DELETED: 'Kommentar gelöscht: {text}',
   HISTORY_COMMENT_REACTION: 'Reaktion auf Kommentar geändert: {oldValue} → {newValue}', HISTORY_NO_REACTION: 'Keine Reaktion',
   HISTORY_NOBODY: 'Niemand', HISTORY_META: '{actor} · {when}', HISTORY_PRIORITY_CHANGE: 'Priorität: {oldValue} → {newValue}',
-  HISTORY_DUE_DATE_CHANGE: 'Fälligkeit: {oldValue} → {newValue}', NO_DUE_DATE: 'Kein Termin', ENTRY_DUE_DATE: 'Fällig am {date}',
+  HISTORY_DUE_DATE_CHANGE: 'Fälligkeit: {oldValue} → {newValue}', NO_DUE_DATE: 'Kein Termin', ENTRY_DUE_DATE: 'Fällig am {date}', ENTRY_REMINDER_DEFERRED: 'Erinnerung pausiert bis {date}',
   ENTRY_NUMBER: 'Meldung #{id}', ENTRY_REPORTED_BY: 'Gemeldet von {author}', ENTRY_CREATED_UNKNOWN: 'Unbekannt', CATEGORY_ALL: 'Alle Kategorien', LIST_COUNT_MINE_DU: 'für dich',
   LIST_COUNT_MINE_SIE: 'für Sie', LIST_COUNT_ALL: 'insgesamt', LIST_COUNT_PAGE: 'auf dieser Seite',
   LIST_COUNT_UNREAD: 'mit neuen Aktivitäten', NEWS_BUTTON_DU: 'Neu seit deinem letzten Besuch',
@@ -605,7 +618,8 @@ test('bereitet die Bugbeschreibung nur zum Lesen sowie Status und Avatar-Zustän
 });
 
 test('übernimmt den Fälligkeitstermin in die Bearbeitungsdaten und rendert ihn in der Verlaufshistorie', () => {
-  const editable = entriesUI.editableEntryData({ id: 71, categoryID: 1, priorityID: 3, dueDate: '2026-10-10' });
+  const editable = entriesUI.editableEntryData({ id: 71, categoryID: 1, priorityID: 3, dueDate: '2026-10-10', deferredUntil: '2026-10-15' });
+  assert.equal(editable.deferredUntil, '2026-10-15');
   assert.equal(editable.dueDate, '2026-10-10');
   const container = { children: [], replaceChildren() { this.children = []; }, append(child) { this.children.push(child); } };
   const doc = { createElement(tagName) { return { tagName, children: [], append(...children) { this.children.push(...children); } }; } };
@@ -858,12 +872,14 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(widgetTemplate, /saved-view-select[\s\S]*?<details class="kw-masha-feedly__saved-views-details">[\s\S]*?SAVED_VIEW_DETAILS[\s\S]*?data-masha-feedly-saved-views/);
   assert.match(scss, /&__comment-form textarea \{ font-size: 18px; line-height: 1\.5; \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__comment-form textarea\{font-size:18px;line-height:1\.5\}/);
-  assert.match(scss, /\.kw-masha-feedly__toggle\s*\{\s*right: 0;\s*bottom: 28px;[\s\S]*?width: var\(--kw-feedly-panel-width, 64px\);\s*max-width: 100vw;\s*margin-right: 0;\s*height: 64px;[\s\S]*?border-radius: 16px 0 0 16px;/);
-  assert.match(scss, /\.kw-masha-feedly__toggle:hover,[\s\S]*?\.kw-masha-feedly__toggle:focus-visible\s*\{\s*animation: kw-masha-feedly-toggle-sway 460ms ease-in-out; transform-origin: right center;/);
-  assert.match(scss, /@keyframes kw-masha-feedly-toggle-sway \{ 0%, 100% \{ transform: rotate\(0\); \} 25% \{ transform: rotate\(-3deg\); \} 55% \{ transform: rotate\(2deg\); \} 78% \{ transform: rotate\(-1deg\); \} \}/);
+  assert.match(scss, /\.kw-masha-feedly__toggle\s*\{\s*right: 0;\s*bottom: 28px;[\s\S]*?width: 80px;\s*max-width: 100vw;\s*margin-right: 0;\s*height: 64px;[\s\S]*?border-radius: 16px 0 0 16px;/);
+  assert.match(scss, /\.kw-masha-feedly__toggle:hover \{ animation: none; width: 112px; transform: translateX\(0\);/);
+  assert.match(scss, /\.kw-masha-feedly__entry-card \{[^}]*transition: transform 180ms/);
+  assert.match(scss, /\.kw-masha-feedly__entry-card:hover,[\s\S]*?\.kw-masha-feedly__entry-card:focus-visible \{ z-index: 1; transform: translateY\(-3px\) scale\(1\.008\);/);
+  assert.match(scss, /prefers-reduced-motion: reduce\)\s*\{\s*\.kw-masha-feedly__entry-card \{ transition: none; \}\s*\.kw-masha-feedly__entry-card:hover \{ transform: none;/);
   assert.match(scss, /\.kw-masha-feedly\[data-panel-open="true"\] \.kw-masha-feedly__toggle \.kw-masha-feedly__logo\s*\{\s*transform: rotate\(-12deg\) scale\(\.94\);/);
-  assert.match(compiledStyles, /\.kw-masha-feedly__toggle\{right:0;bottom:28px;[\s\S]*?width:var\(--kw-feedly-panel-width, 64px\);max-width:100vw;margin-right:0;height:64px;[\s\S]*?border-radius:16px 0 0 16px/);
-  assert.match(compiledStyles, /@keyframes kw-masha-feedly-toggle-sway/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__toggle\{right:0;bottom:28px;[\s\S]*?width:80px;max-width:100vw;margin-right:0;height:64px;[\s\S]*?border-radius:16px 0 0 16px/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__entry-card:hover,\.kw-masha-feedly__entry-card:focus-visible\{z-index:1;transform:translateY\(-3px\) scale\(1\.008\)/);
   assert.match(scss, /\.kw-masha-feedly__saved-views-details > summary \{[^}]*cursor: pointer;/);
   assert.match(scss, /\.kw-masha-feedly__entries-count \{ padding-top: 4px; padding-bottom: 6\.4px; \}/);
   assert.match(compiledStyles, /\.kw-masha-feedly__saved-views-details>summary\{[^}]*cursor:pointer/);
@@ -874,7 +890,7 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(compiledStyles, /\.kw-masha-feedly__entry-description a,\.kw-masha-feedly__entry-card p a,\.kw-masha-feedly__comment p a\{color:#9e1c60/);
   assert.match(scss, /\.kw-masha-feedly__entry-description\s*\{[^}]*font-size:\s*calc\(24px \* var\(--masha-font-scale, 1\)\)/s);
   assert.match(scss, /kw-masha-feedly-fan-from-under/);
-  assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button \{ box-sizing: border-box; width: 56px; min-width: 56px; height: 56px; min-height: 56px; flex: 0 0 56px; align-self: flex-start; margin: 0; padding: 6px; border-radius: 14px;/);
+  assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button \{ box-sizing: border-box; width: 56px; min-width: 56px; height: 56px; min-height: 56px; flex: 0 0 56px; align-self: center; margin: 0; padding: 6px; border-radius: 14px;/);
   for (const button of ['news-button', 'mite-button', 'rainbow', 'help-button', 'feedback-button', 'closed-button', 'estimate-queue-button']) {
     assert.match(widgetTemplate, new RegExp(`kw-masha-feedly__${button}[^\"]*kw-masha-feedly__action-icon-button`));
   }
@@ -892,7 +908,7 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__help-button:hover,[\s\S]*?\.kw-masha-feedly__help-button:focus-visible \{ z-index: 7; transform: translateY\(-3px\);/);
   assert.match(scss, /\.kw-masha-feedly__rainbow-copy \{ position: absolute; z-index: 3;/);
   assert.match(scss, /\.kw-masha-feedly__rainbow \{ overflow: visible; \}/);
-  assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button \{[^}]*align-self: flex-start; margin: 0;/);
+  assert.match(scss, /\.kw-masha-feedly \.kw-masha-feedly__action-icon-button \{[^}]*align-self: center; margin: 0;/);
   assert.match(scss, /\.kw-masha-feedly__entry-environment \{ display: grid; grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(scss, /\.kw-masha-feedly__entry-environment dd \{ min-width: 0; margin: 0 0 6\.4px;[\s\S]*?overflow-wrap: anywhere;/);
   assert.match(scss, /\.kw-masha-feedly__priority \{ display: inline-flex; align-items: center; justify-content: center;/);
@@ -989,6 +1005,11 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-logo--welcome\{width:clamp\(72px,5vw,84px\);height:clamp\(72px,5vw,84px\)\}/);
   assert.match(scss, /(?:\.kw-masha-feedly__onboarding|&)-modal a\.kw-masha-feedly__submit \{ display: inline-flex;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__onboarding-modal a\.kw-masha-feedly__submit\{display:inline-flex/);
+});
+
+test('zeigt Erfolgs- und Fehlermeldungen links oben im Browserfenster', () => {
+  assert.match(scss, /\.kw-masha-feedly__toast \{[^}]*top: max\(24px, env\(safe-area-inset-top\)\); right: auto; bottom: auto; left: max\(24px, env\(safe-area-inset-left\)\);/);
+  assert.match(compiledStyles, /\.kw-masha-feedly__toast\{position:fixed;z-index:10012;top:max\(24px,env\(safe-area-inset-top\)\);right:auto;bottom:auto;left:max\(24px,env\(safe-area-inset-left\)\)/);
 });
 
 test('liefert beide auswählbaren Erscheinungsbilder mit sachlicher Gestaltung aus', () => {
@@ -1156,7 +1177,7 @@ test('sendet entfernte Verknüpfungen und zeigt die bestätigte Entfernung im Ve
 });
 
 /** Simuliert die Widget-Oberfläche, um Seitenabfrage und Eintragsblasen im echten Ablauf zu prüfen. */
-function createWidgetEnvironment(locationHref = 'https://feedly:8890/about-us?preview=1', address = 'du', priorityIconType = 'warning', entryDueDate = '') {
+function createWidgetEnvironment(locationHref = 'https://feedly:8890/about-us?preview=1', address = 'du', priorityIconType = 'warning', entryDueDate = '', entryDeferredUntil = '') {
   const listeners = {};
   const requests = [];
   const detailRequests = [];
@@ -1287,7 +1308,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
   commentForm.submitButton = new Element();
   commentForm.querySelector = (selector) => selector === '[type="submit"]' ? commentForm.submitButton : null;
   const editForm = new Element({ updateUrl: '/__masha-feedly/updateEntry', securityId: 'test-token' });
-  editForm.elements = { EntryID: new Element(), CategoryID: new Element(), PriorityID: new Element(), DueDate: new Element() };
+  editForm.elements = { EntryID: new Element(), CategoryID: new Element(), PriorityID: new Element(), DueDate: new Element(), DeferredUntil: new Element() };
   const editAttachmentInput = new Element();
   editAttachmentInput.name = 'Attachments[]';
   editAttachmentInput.files = [];
@@ -1430,6 +1451,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
       relations: entryRelations,
       entryDate: '2026-10-01 10:00:00',
       dueDate: entryDueDate,
+      deferredUntil: entryDeferredUntil,
       pageURL: entryPageURL,
       selector: '#about-title',
       elementText: 'Über uns',
@@ -1491,7 +1513,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
       });
       return { ok: true, json: async () => result };
     },
-    Option: class { constructor(text, value) { this.text = text; this.value = value; } },
+    Option: class { constructor(text, value) { this.text = text; this.value = value; this.dataset = {}; } },
     URL,
     CustomEvent: class { constructor(type) { this.type = type; } },
     FormData: class {
@@ -1513,6 +1535,10 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
         };
       }
       set(name, value) { this.values[name] = value; }
+      append(name, value) {
+        if (name !== 'Attachments[]') return;
+        this.values.Attachments.push(value);
+      }
     },
     console,
   };
@@ -1546,6 +1572,13 @@ test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedbac
   await env.listeners['kw-masha-feedly:refresh']();
   assert.equal(env.feedbackButton.hidden, true);
   assert.equal(env.feedbackCountDisplay.textContent, '0');
+});
+
+test('füllt Status und Priorität nach dem verzögerten Laden des Katalogs auch im Bearbeitungsformular', async () => {
+  const env = createWidgetEnvironment();
+  await env.listeners['kw-masha-feedly:opened']();
+  assert.deepEqual(env.editForm.elements.CategoryID.options.map((option) => option.value), ['1', '4', '5', '6']);
+  assert.deepEqual(env.editForm.elements.PriorityID.options.map((option) => option.value), ['1', '2', '3', '4', '5']);
 });
 
 test('zeigt Neuigkeiten im ersten Panel und öffnet die Liste ungelesener Einträge und Kommentare', async () => {
@@ -1959,7 +1992,7 @@ test('zeigt den Neustart der Einführung unten in der Hilfe als gestalteten Butt
 });
 
 test('erklärt Einträge in einfacher Sprache mit einem Markierungsbeispiel', () => {
-  assert.match(germanTranslations, /HELP_CREATE_DU: .*Klicke auf \+ und danach auf die Stelle/);
+  assert.match(germanTranslations, /HELP_CREATE_DU: .*Plus zwischen den Linien und danach auf die Stelle/);
   assert.match(germanTranslations, /HELP_EDIT_DU: .*nummerierte Markierung zeigt.*Klicke auf die Markierung.*ändern und speichern/);
   assert.match(germanTranslations, /HELP_MARKER_EXAMPLE_TEXT: .*sitzt an der gemeldeten Stelle.*Klicke darauf/);
   assert.match(widgetTemplate, /kw-masha-feedly__help-marker-example[\s\S]*?class="kw-masha-feedly__page-marker-icon" viewBox="0 0 612\.001 612\.001"[\s\S]*?HELP_MARKER_EXAMPLE_TEXT/);
@@ -1975,7 +2008,7 @@ test('Hilfe zeigt echte Widget-Symbole mit einfachen Erklärungen', () => {
   assert.match(widgetTemplate, /kw-masha-feedly__help-actions[\s\S]*?viewBox="0 0 512 512"[\s\S]*?HELP_ALL_TITLE/);
   assert.match(widgetTemplate, /viewBox="0 0 177800 177800"[\s\S]*?HELP_NEWS_TITLE/);
   assert.match(widgetTemplate, /viewBox="0 0 512 512"[\s\S]*?HELP_FEEDBACK_TITLE/);
-  assert.match(germanTranslations, /HELP_ADD_TEXT_DU: .*Klicke auf \+.*Stelle/);
+  assert.match(germanTranslations, /HELP_ADD_TEXT_DU: .*Plus zwischen den Linien.*Stelle/);
   assert.match(germanTranslations, /HELP_ALL_TEXT_DU: .*ganzen Website/);
   assert.match(germanTranslations, /HELP_PAGE_TEXT: .*nur offene Meldungen auf der Seite/);
   assert.match(germanTranslations, /HELP_NEWS_TEXT: .*neue Meldungen und Kommentare/);
@@ -2007,6 +2040,7 @@ test('zeigt den Seitenerfolg nur ohne offene Fehler und unterscheidet den global
   const env = createWidgetEnvironment();
   await env.listeners['kw-masha-feedly:opened']();
   assert.equal(env.rainbow.hidden, true);
+  env.setEntryClosed(true);
   env.setPageOpenEntryCount(0);
   await env.listeners['kw-masha-feedly:opened']();
   assert.equal(env.rainbow.hidden, false);
@@ -2037,6 +2071,18 @@ test('lädt Einträge für die aktuelle URL und setzt eine Blase am gespeicherte
   assert.equal(env.document.body.children[0].dataset.entryId, '71');
   assert.equal(env.document.body.children[0].title, 'Backlog · Fehler auf About us');
   assert.equal(env.listContainer.children[0].textContent, 'Backlog');
+});
+
+test('zählt auf der Seite nur offene Meldungen, deren gespeicherter Bereich noch gefunden wird', async () => {
+  const env = createWidgetEnvironment();
+  env.setPageOpenEntryCount(1);
+  env.document.querySelector = (selector) => selector === '[data-kw-masha-feedly]' ? env.widget : null;
+
+  await env.listeners['kw-masha-feedly:opened']();
+
+  assert.equal(env.document.body.children.length, 0, 'Ohne auffindbaren Seitenbereich wird keine Bubble angelegt.');
+  assert.equal(env.pageCount.textContent, '0', 'Der Seitenzähler entspricht der Zahl tatsächlich sichtbarer Bubbles.');
+  assert.equal(env.rainbow.hidden, false, 'Ohne auffindbare offene Seitenmeldung erscheint der Seitenerfolg.');
 });
 
 test('öffnet den dritten Bereich direkt hinter dem ersten, wenn eine Seitenblase angeklickt wird', async () => {
@@ -2227,7 +2273,7 @@ test('zeigt nach erfolgreichem Speichern die Bestätigung und lädt den aktualis
 });
 
 test('zeigt eine gesetzte Fälligkeit auf der Karte und übernimmt sie ins Bearbeitungsformular', async () => {
-  const env = createWidgetEnvironment(undefined, undefined, undefined, '2026-10-10');
+  const env = createWidgetEnvironment(undefined, undefined, undefined, '2026-10-10', '2026-10-15');
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
@@ -2235,8 +2281,12 @@ test('zeigt eine gesetzte Fälligkeit auf der Karte und übernimmt sie ins Bearb
   const dueDate = metadata.children.find((child) => child.className === 'kw-masha-feedly__entry-due-date');
   assert.equal(dueDate.dateTime, '2026-10-10');
   assert.equal(dueDate.textContent, 'Fällig am 10.10.2026');
+  const deferredUntil = metadata.children.find((child) => child.className === 'kw-masha-feedly__entry-deferred-until');
+  assert.equal(deferredUntil.dateTime, '2026-10-15');
+  assert.equal(deferredUntil.textContent, 'Erinnerung pausiert bis 15.10.2026');
   await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   assert.equal(env.editForm.elements.DueDate.value, '2026-10-10');
+  assert.equal(env.editForm.elements.DeferredUntil.value, '2026-10-15');
 });
 
 test('zeigt die bestätigte automatische Duplikat-Schließung nach dem Speichern an', async () => {
@@ -2290,13 +2340,19 @@ test('übernimmt den vom Server erzwungenen Feedback-Status statt Done vorzutäu
   assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__unicorn-runner'), false);
 });
 
-test('sendet zusätzliche Dateien beim Bearbeiten und zeigt sie nach dem Speichern an', async () => {
+test('sendet zusätzliche Dateien und den zugeschnittenen Screenshot beim Bearbeiten und zeigt Anhänge nach dem Speichern an', async () => {
   const env = createWidgetEnvironment();
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   const selectedFile = { name: 'plan.pdf' };
+  const screenshotFile = { name: 'seiten-ausschnitt.png', type: 'image/png' };
+  let screenshotCleared = false;
+  env.editForm.__mashaFeedlyScreenshot = {
+    file: () => screenshotFile,
+    clear: () => { screenshotCleared = true; },
+  };
   env.editAttachmentInput.files = [selectedFile];
   env.editAttachmentInput.value = 'C:\\fakepath\\plan.pdf';
   env.postResponses.push({
@@ -2308,7 +2364,8 @@ test('sendet zusätzliche Dateien beim Bearbeiten und zeigt sie nach dem Speiche
     }),
   });
   await env.editForm.listeners.submit({ preventDefault() {} });
-  assert.deepEqual(Array.from(env.postCalls[0].options.body.values.Attachments), [selectedFile]);
+  assert.deepEqual(Array.from(env.postCalls[0].options.body.values.Attachments), [selectedFile, screenshotFile]);
+  assert.equal(screenshotCleared, true, 'Nach bestätigtem Speichern wird der Screenshotzustand zurückgesetzt.');
   assert.equal(env.editAttachmentInput.value, '');
   assert.equal(env.editAttachments.children[0].href, '/assets/private/plan.pdf');
   assert.equal(env.editAttachments.children[0].textContent, 'plan.pdf');

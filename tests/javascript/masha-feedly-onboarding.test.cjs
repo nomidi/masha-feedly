@@ -7,6 +7,9 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-onboarding.js'), 'utf8');
 const dist = fs.readFileSync(path.resolve(__dirname, '../../client/dist/js/masha-feedly-onboarding.js'), 'utf8');
 const e2eOnboardingSource = fs.readFileSync(path.resolve(__dirname, '../e2e/onboarding.test.cjs'), 'utf8');
+const widgetExtensionSource = fs.readFileSync(path.resolve(__dirname, '../../src/Extension/MashaFeedlyWidgetExtension.php'), 'utf8');
+const widgetTemplate = fs.readFileSync(path.resolve(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
+const germanTranslations = fs.readFileSync(path.resolve(__dirname, '../../lang/de.yml'), 'utf8');
 
 class Element {
   constructor(dataset = {}, selector = '') {
@@ -39,6 +42,8 @@ function setup(enabled = '1', fetchResult = { ok: true, json: async () => ({ suc
     '[data-masha-feedly-onboarding-escape-hint]',
     '[data-masha-feedly-tour-cancel]', '[data-masha-feedly-cancel-selection]',
     '[data-masha-feedly-restart-onboarding]', '[data-masha-feedly-restart-status]', '[data-masha-feedly-help-modal]',
+    '[data-masha-feedly-tour-restart]', '[data-masha-feedly-tour-open-help]', '[data-masha-feedly-tour-open-faq]',
+    '[data-masha-feedly-open-help]', '[data-masha-feedly-open-faq]',
     '[data-masha-feedly-modal]', '[data-masha-feedly-entry-form]', '[data-masha-feedly-onboarding-thanks]', '[data-masha-feedly-thanks-close]',
     '[data-masha-feedly-entry-form] [name="Content"]', '[type="submit"][form="kw-masha-feedly-create-form"]',
     '[data-masha-feedly-comment-form] textarea',
@@ -79,6 +84,9 @@ function setup(enabled = '1', fetchResult = { ok: true, json: async () => ({ suc
   nodes.set('thanksEmailDetails', emailDetails);
   nodes.set('thanksAvatarDialog', avatarDialog);
   const widget = new Element({ onboardingEnabled: enabled, onboardingUrl: '/complete', onboardingRestartUrl: '/restart', securityId: 'csrf', address });
+  const openedResources = { help: 0, faq: 0 };
+  nodes.get('[data-masha-feedly-open-help]').click = () => { openedResources.help++; };
+  nodes.get('[data-masha-feedly-open-faq]').click = () => { openedResources.faq++; };
   const welcomeCopy = new Element({ mashaFeedlyAddressCopy: 'TOUR_WELCOME_TEXT' });
   const commentTextarea = nodes.get('[data-masha-feedly-comment-form] textarea');
   commentTextarea.scrollIntoView = (options) => { commentTextarea.scrollOptions = options; };
@@ -136,7 +144,7 @@ function setup(enabled = '1', fetchResult = { ok: true, json: async () => ({ suc
   vm.runInNewContext(source, { document, window, FormData: FormDataStub, fetch: (...args) => { requests.push(args); return fetchResult instanceof Error ? Promise.reject(fetchResult) : Promise.resolve(fetchResult); } });
   documentListeners.DOMContentLoaded();
   nodes.set('themePreviewStatus', themePreviewStatus);
-  return { nodes, document, window, requests, appended, timers, documentListeners, scopedControls, entryDescription, entrySubmit, commentTextarea, manageStatusField, welcomeCopy };
+  return { nodes, document, window, requests, appended, timers, documentListeners, scopedControls, entryDescription, entrySubmit, commentTextarea, manageStatusField, welcomeCopy, openedResources };
 }
 
 test('verwendet für Tour-Schritte und Profiltexte die formelle Übersetzungsvariante', () => {
@@ -144,6 +152,29 @@ test('verwendet für Tour-Schritte und Profiltexte die formelle Übersetzungsvar
   state.nodes.get('[data-masha-feedly-tour-start]').click();
   assert.equal(state.nodes.get('[data-masha-feedly-onboarding-text]').textContent, 'TOUR_STEP_ICON_SIE');
   assert.equal(state.welcomeCopy.textContent, 'TOUR_WELCOME_TEXT_SIE');
+});
+
+test('öffnet aus dem Abschlussdialog Kurzhilfe und FAQ oder startet die Einführung erneut', async () => {
+  const state = setup();
+  const thanks = state.nodes.get('[data-masha-feedly-onboarding-thanks]');
+  thanks.hidden = false;
+
+  state.nodes.get('[data-masha-feedly-tour-open-help]').click();
+  assert.equal(thanks.hidden, true);
+  assert.equal(state.openedResources.help, 1);
+
+  thanks.hidden = false;
+  state.nodes.get('[data-masha-feedly-tour-open-faq]').click();
+  assert.equal(thanks.hidden, true);
+  assert.equal(state.openedResources.faq, 1);
+
+  thanks.hidden = false;
+  state.nodes.get('[data-masha-feedly-tour-restart]').click();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(thanks.hidden, true);
+  assert.equal(state.nodes.get('[data-masha-feedly-onboarding-welcome]').hidden, false);
+  assert.equal(state.requests.at(-1)[0], '/restart');
 });
 
 test('führt beim ersten Besuch durch Plus, Bereichsauswahl und Formular bis zum erfolgreichen Speichern', () => {
@@ -530,6 +561,18 @@ test('beschriftet den Ausstieg in Begrüßung, Tour und Abschluss einheitlich', 
   assert.match(template, /Translations\.TOUR_CANCEL 'Einführung beenden'/);
 });
 
+test('liefert adressabhängige Onboarding-Texte vollständig aus und hält die Sie-Anrede konsistent', () => {
+  for (const key of ['TOUR_THEME_SETTINGS', 'TOUR_OPEN_HELP', 'TOUR_OPEN_FAQ', 'TOUR_RESTART']) {
+    assert.match(widgetExtensionSource, new RegExp(`'${key}' =>`));
+    assert.match(germanTranslations, new RegExp(`${key}_SIE:`));
+  }
+  assert.match(widgetTemplate, /PROFILE_EMAIL_SCOPE_SIE/);
+  assert.match(widgetTemplate, /PROFILE_EMAIL_SCOPE_DESCRIPTION_SIE/);
+  assert.match(widgetTemplate, /HELP_NEWS_TEXT_SIE/);
+  assert.match(widgetTemplate, /HELP_MARKER_EXAMPLE_TEXT_SIE/);
+  assert.match(germanTranslations, /PROFILE_EMAIL_SCOPE_DESCRIPTION_SIE: '[^\n]*Ihnen zugewiesen sind[^\n]*Sie per E-Mail/);
+});
+
 test('zeigt den Profilbutton erst im Abschluss statt über der Einführung', () => {
   const template = fs.readFileSync(path.join(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
   const welcome = template.match(/data-masha-feedly-onboarding-welcome[\s\S]*?<\/section>/)?.[0] || '';
@@ -547,6 +590,8 @@ test('erklärt die persönlichen Einstellungen am Ende der Einführung einfach',
   const styles = fs.readFileSync(path.join(__dirname, '../../client/dist/css/masha-feedly.css'), 'utf8');
   const thanks = template.match(/data-masha-feedly-onboarding-thanks[\s\S]*?\n        <\/section>/)?.[0] || '';
   assert.match(translations, /TOUR_THANKS_TEXT: 'Deine erste Meldung ist gespeichert\.[^\n]*„Auswahl speichern“/);
+  assert.match(translations, /TOUR_THANKS_TEXT: '[^\n]*Kurzhilfe[^\n]*FAQ[^\n]*Computer/);
+  assert.match(translations, /TOUR_THANKS_TEXT_SIE: '[^\n]*finden Sie[^\n]*Kurzhilfe[^\n]*FAQ/);
   assert.match(translations, /PROFILE_ADDRESS_DESCRIPTION: 'Wähle Du oder Sie\./);
   assert.match(thanks, /Translations\.TOUR_THANKS_EFFECTS_LABEL 'Danke-Animation auswählen'/);
   assert.match(thanks, /Translations\.TOUR_THANKS_EFFECTS_HELP 'Wenn du eine Meldung als erledigt markierst/);
@@ -576,6 +621,9 @@ test('ordnet Profilvorschau, Farbe, Symbol, Danke-Animation und E-Mail-Auswahl v
   assert.match(thanks, /<details class="kw-masha-feedly__onboarding-email-details" open>[\s\S]*?data-masha-feedly-email-option/);
   assert.match(thanks, /<details class="kw-masha-feedly__onboarding-effects-details" data-masha-feedly-theme-details open>/);
   assert.match(thanks, /TOUR_THANKS_FORM_INTRO/);
+  assert.match(thanks, /data-masha-feedly-tour-open-help/);
+  assert.match(thanks, /data-masha-feedly-tour-open-faq/);
+  assert.match(thanks, /data-masha-feedly-tour-restart/);
   assert.match(thanks, /<details class="kw-masha-feedly__onboarding-colors" data-masha-feedly-onboarding-colors open>/);
   assert.match(thanks, /id="kw-masha-feedly-thanks-title" tabindex="-1"/);
   assert.match(thanks, /ProfileEmailTestSucceeded/);
@@ -738,5 +786,24 @@ test('OK und Abbrechen nach dem Variantenwechsel hinterlassen keine Tour-Sperren
     state.window.listeners.resize();
     assert.equal(state.nodes.get('[data-masha-feedly-onboarding-welcome]').hidden, true);
     assert.equal(state.scopedControls[5].disabled, false);
+  }
+});
+
+
+test('speichert genau den gewählten E-Mail-Bereich unabhängig von der Reihenfolge der Radiofelder', async () => {
+  for (const assignedOnly of [false, true]) {
+    const { nodes, requests } = setup();
+    const form = nodes.get('[data-masha-feedly-profile-preferences]');
+    form.dataset.saveUrl = '/saveProfilePreferences';
+    const status = new Element();
+    const submit = new Element();
+    const radios = [
+      { type: 'radio', name: 'MashaFeedlyEmailAssignedOnly', value: '0', checked: !assignedOnly },
+      { type: 'radio', name: 'MashaFeedlyEmailAssignedOnly', value: '1', checked: assignedOnly },
+    ];
+    form.querySelector = (selector) => selector === '[data-masha-feedly-profile-preferences-status]' ? status : selector === '[type="submit"]' ? submit : null;
+    form.querySelectorAll = () => radios;
+    await form.listeners.submit({ preventDefault() {}, currentTarget: form });
+    assert.equal(requests.at(-1)[1].body.MashaFeedlyEmailAssignedOnly, assignedOnly ? '1' : '0');
   }
 });

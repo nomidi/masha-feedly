@@ -26,9 +26,9 @@ class MashaFeedlyEffectClient
             'serious' => i18n::_t('KW\\MashaFeedly\\Translations.CONFIG_THEME_SERIOUS', 'Sachlich'),
         ];
         try {
-            $client = new self();
             $options = [];
-            foreach ($client->catalogue()['categories'] as $category) $options[$category['id']] = $category['name'];
+            $categories = self::hasConfiguredProvider() ? (new self())->catalogue()['categories'] : [];
+            foreach ($categories as $category) $options[$category['id']] = $category['name'];
             if (!$options) $options = [
                 'playful' => i18n::_t('KW\\MashaFeedly\\Translations.CONFIG_THEME_PLAYFUL', 'Verspielt'),
                 'serious' => i18n::_t('KW\\MashaFeedly\\Translations.CONFIG_THEME_SERIOUS', 'Sachlich'),
