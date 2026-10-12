@@ -11,14 +11,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const restart = widget.querySelector('[data-masha-feedly-restart-onboarding]');
   const restartFromThanks = widget.querySelector('[data-masha-feedly-tour-restart]');
   const openHelpFromThanks = widget.querySelector('[data-masha-feedly-tour-open-help]');
-  const openFaqFromThanks = widget.querySelector('[data-masha-feedly-tour-open-faq]');
+  const openHelplyFromThanks = widget.querySelector('[data-masha-feedly-tour-open-helply]');
   const restartStatus = widget.querySelector('[data-masha-feedly-restart-status]');
   const tip = widget.querySelector('[data-masha-feedly-onboarding-tip]');
   const thanks = widget.querySelector('[data-masha-feedly-onboarding-thanks]');
-  const openers = {
-    help: widget.querySelector('[data-masha-feedly-open-help]'),
-    faq: widget.querySelector('[data-masha-feedly-open-faq]'),
+  let helplyAvailable = false;
+  const openHelply = () => {
+    if (helplyAvailable) document.dispatchEvent(new CustomEvent('kw-masha-helply:open', { detail: { collectionID: 'feedly' } }));
   };
+  // Die Verfügbarkeit stammt von Helply selbst und berücksichtigt auch die Sammlungsberechtigung.
+  document.addEventListener('kw-masha-helply:availability', (event) => {
+    helplyAvailable = Array.isArray(event.detail?.collectionIDs) && event.detail.collectionIDs.includes('feedly');
+    widget.querySelectorAll('[data-masha-feedly-helply-feature]').forEach((element) => { element.hidden = !helplyAvailable; });
+  });
+  document.dispatchEvent(new CustomEvent('kw-masha-helply:request-availability'));
   const thanksDialog = thanks?.querySelector('[role="dialog"]');
   const tipText = widget.querySelector('[data-masha-feedly-onboarding-text]');
   const selectionMessage = widget.querySelector('[data-masha-feedly-selection-message]');
@@ -427,11 +433,16 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   openHelpFromThanks?.addEventListener('click', () => {
     if (thanks) thanks.hidden = true;
-    openers.help?.click();
+    widget.querySelector('[data-masha-feedly-open-help]')?.click();
   });
-  openFaqFromThanks?.addEventListener('click', () => {
+  widget.addEventListener('click', (event) => {
+    if (!event.target.closest('[data-masha-feedly-open-helply]')) return;
+    openHelply();
+  });
+  openHelplyFromThanks?.addEventListener('click', () => {
+    if (!helplyAvailable) return;
     if (thanks) thanks.hidden = true;
-    openers.faq?.click();
+    openHelply();
   });
   restartFromThanks?.addEventListener('click', () => {
     if (thanks) thanks.hidden = true;

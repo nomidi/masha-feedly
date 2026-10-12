@@ -40,7 +40,7 @@ Vom Projekt-Hauptverzeichnis aus:
 ```sh
 node --test masha-feedly/tests/e2e/comment-activity.test.cjs
 node --test masha-feedly/tests/e2e/tooltip.test.cjs
-node --test masha-feedly/tests/e2e/faq.test.cjs
+node --test masha-feedly/tests/e2e/faq.test.cjs  # Helply-Anbindung
 node --test masha-feedly/tests/e2e/onboarding.test.cjs
 node --test masha-feedly/tests/e2e/estimate-workflow.test.cjs
 node --test masha-feedly/tests/e2e/access-matrix.test.cjs

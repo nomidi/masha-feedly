@@ -33,7 +33,7 @@ Beim Erstellen einer Meldung kannst du unter **Schritte zum Nachstellen (optiona
 
 Auf dem Smartphone öffnest du Masha:Feedly mit demselben Button unten rechts wie am Computer. Das seitliche Startpanel zeigt nur Plus und Hilfe. Die mobile Hilfe erklärt das Erstellen einer Meldung und weist darauf hin, dass alle Werkzeuge nur am Computer mit größerem Bildschirm verfügbar sind. Der Hilfetext lässt sich auch in kleinen Fenstern scrollen; der Kopf mit dem Schließen-Knopf bleibt sichtbar. Die Einführung benötigt einen größeren Bildschirm: **OK** verschiebt sie, **Einführung abbrechen** beendet sie dauerhaft. Seitenmarker bleiben im geöffneten Widget sichtbar und anklickbar. Der Zähler für die aktuelle Seite berücksichtigt nur offene Meldungen mit gespeichertem Seitenbereich, der sich auf der aktuellen Seite finden lässt. Meldungen ohne Seitenbereich oder mit nicht mehr auffindbarem Bereich erscheinen weder als Seitenmarker noch im Seitenzähler.
 
-Am Computer sitzt direkt unter dem Hilfe-Button im ersten Panel ein **FAQ**-Button mit Buchsymbol. Die Kurzhilfe verweist auf die ausführliche FAQ und bietet einen direkten Button dorthin. Er öffnet die ausführliche Hilfe zu allen Funktionen: Meldungen und Markierungen, Bilder und Screenshots, Listen und Filter, Bearbeitung und Freigabe, Kommentare und Verlauf, Profil und E-Mails. Themenbuttons und eine Suche helfen beim Finden; jede Antwort lässt sich einzeln aufklappen. Die FAQ funktioniert ohne zusätzlichen Datenabruf. Mit Esc oder dem Schließen-Button geht es zurück zum Einstieg. Auf der mobilen Variante bleibt die Kurzhilfe verfügbar; der FAQ-Button ist dort ausgeblendet.
+Die ausführlichen Antworten zu Masha:Feedly liegen in Masha:Helply. Helply stellt den eigenen Hilfe-Einstieg und den durchsuchbaren Dialog bereit. In der Kurzhilfe und am Ende der Einführung kann Helply direkt geöffnet werden. Wenn die Suche keine passende Antwort findet, kann die Frage mit einem Klick an Feedly übergeben und dort als Meldung weiterbearbeitet werden. Feedly prüft beim Erstellen der Meldung weiterhin die Zugriffsberechtigung.
 
 ## Screenshot hinzufügen
 
@@ -60,7 +60,7 @@ Im aufklappbaren Bereich **Zusammenhänge** kannst du Einträge als Duplikat, th
 
 ## Profil und Benachrichtigungen
 
-Wenn eine Person zu Masha:Feedly hinzugefügt wird, auch erneut, werden ihre E-Mail-Einstellungen auf „Meine Meldungen“ und alle Ereignisarten eingeschaltet gesetzt. Die Willkommensmail wird unabhängig von den Benachrichtigungseinstellungen versendet. Am Ende der Einführung kannst du die Kurzhilfe oder die ausführliche Desktop-FAQ direkt öffnen. Von dort aus kannst du auch die Einführung erneut starten.
+Wenn eine Person zu Masha:Feedly hinzugefügt wird, auch erneut, werden ihre E-Mail-Einstellungen auf „Meine Meldungen“ und alle Ereignisarten eingeschaltet gesetzt. Die Willkommensmail wird unabhängig von den Benachrichtigungseinstellungen versendet. Am Ende der Einführung kannst du die Kurzhilfe oder Masha:Helply öffnen. Von dort aus kannst du auch die Einführung erneut starten.
 
 „Alle Meldungen“ bedeutet: E-Mails zu allen freigegebenen Meldungen der Website, einschließlich Kommentaren und Fälligkeiten. „Meine Meldungen“ bedeutet: nur selbst erstellte oder aktuell zugewiesene Meldungen. Für beide Bereiche gelten die ausgewählten Ereignis-Häkchen. Neue Zuweisungen zählen zu „Neue Meldungen und neue Zuweisungen“. Nach dem Entfernen einer Zuweisung gehört die Meldung nur noch dann zu „Meine Meldungen“, wenn sie selbst erstellt wurde. Eigene Meldungen, Änderungen und Kommentare lösen keine E-Mail an die handelnde Person aus. Kostenschätzungen zur Freigabe gehen ausschließlich an Zuständige mit aktivierter Benachrichtigung. Die Hauptoption schaltet alle Benachrichtigungen aus und blendet die Auswahl aus; beim Einschalten erscheint die gespeicherte Auswahl wieder. Willkommens- und ausdrücklich angeforderte Test-E-Mails bleiben unabhängig vom Bereich.
 
@@ -183,3 +183,5 @@ Beim Wechsel zwischen mobiler und Desktop-Ansicht schließen sich die Feedly-Fen
 ### Abschluss bestätigen
 
 Wenn eine andere Person „Erledigt“ auswählt, bleibt die Meldung offen im Status „Feedback“. Ein hervorgehobener Hinweis erklärt die nächste Aktion. Der ursprüngliche Ersteller oder die unter „Angezeigte Meldeperson“ eingetragene Person prüft das Ergebnis und bestätigt den Abschluss mit „Erledigt“ und „Änderungen speichern“. Eine Zuständigkeitszuweisung allein berechtigt nicht zur endgültigen Bestätigung. Ein Kommentar ist freiwillig. Die Regel gilt auch beim Verschieben und Speichern im CMS.
+
+Helply-Verweise werden nur angezeigt, wenn Helply die berechtigte Feedly-Hilfe auf der aktuellen Seite bereitstellt. Ohne Helply bleiben Buttons und Hinweise ausgeblendet.

@@ -48,7 +48,6 @@ class MashaFeedlyWidgetExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-colors.js');
         \KW\MashaFeedly\Service\MashaFeedlyEffectProvider::requireLoader();
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-entries.js');
-        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-faq.js');
         $canManageEstimate = \KW\MashaFeedly\Model\MashaFeedlyEntry::canManageEstimate(Security::getCurrentUser());
         $canApproveEstimate = \KW\MashaFeedly\Model\MashaFeedlyEntry::canApproveEstimate(Security::getCurrentUser());
         // Kategorien, Prioritäten und Mitglieder werden erst beim ersten Öffnen geladen.
@@ -353,7 +352,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'TOUR_WELCOME_WORKFLOW' => 'Meldung, Rückfragen und Fortschritt bleiben an einem Ort. Ihr könnt Verantwortliche festlegen, direkt zur Meldung kommentieren und sehen, was noch offen oder bereits erledigt ist. Die kurze Einführung zeigt dir die ersten Schritte.',
             'TOUR_THEME_SETTINGS' => 'Das Erscheinungsbild kannst du später in deinen Masha:Feedly-Profileinstellungen ändern.',
             'TOUR_OPEN_HELP' => 'Kurzhilfe öffnen',
-            'TOUR_OPEN_FAQ' => 'Ausführliche FAQ öffnen',
+            'TOUR_OPEN_HELPLY' => 'Helply öffnen',
             'TOUR_RESTART' => 'Einführung erneut starten',
             'TOUR_MOBILE_NOTICE' => 'Die Einführung benötigt einen größeren Bildschirm, zum Beispiel einen Laptop oder Computer. Mit OK können Sie die Einführung später starten. Einführung abbrechen beendet sie dauerhaft.',
             'TOUR_START' => 'Einführung starten',
@@ -376,7 +375,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'TOUR_BLOCKED_MANAGE' => 'Klicke auf „Änderungen speichern“, um diesen Schritt abzuschließen. Mit „Einführung beenden“ kannst du jederzeit aufhören.',
             'TOUR_CANCEL' => 'Einführung beenden',
             'TOUR_THANKS_TITLE' => 'Danke fürs Mitmachen!',
-            'TOUR_THANKS_TEXT' => 'Deine erste Meldung ist gespeichert. Hier kannst du dein Profil und deine E-Mail-Benachrichtigungen einstellen. Speichere deine Auswahl anschließend mit „Auswahl speichern“. Nach der Einführung findest du im ersten Panel unter „?“ die Kurzhilfe. Direkt darunter erklärt die FAQ alle Funktionen Schritt für Schritt. Die FAQ steht auf dem Computer zur Verfügung.',
+            'TOUR_THANKS_TEXT' => 'Deine erste Meldung ist gespeichert. Hier kannst du dein Profil und deine E-Mail-Benachrichtigungen einstellen. Speichere deine Auswahl anschließend mit „Auswahl speichern“.',
             'TOUR_THANKS_FORM_INTRO' => 'Wähle, wie dein Profil aussieht und welche Nachrichten du erhalten möchtest.',
             'PROFILE_ADDRESS' => 'Wie möchtest du angesprochen werden?',
             'PROFILE_ADDRESS_DEFAULT' => 'Einstellung der Website übernehmen',
@@ -431,7 +430,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'ENTRY_CONTEXT_STATUS' => 'Status: {status}',
             'ENTRY_CONTEXT_AREA' => 'Bereich: {text}',
             'ENTRY_SELECTED_CONTEXT' => 'Ausgewählter Bereich: „{text}“',
-            'FAQ_REPORT_CONTENT' => 'Ich habe in der FAQ nach „{query}“ gesucht. Meine Frage dazu: ',
+            'HELPY_REPORT_CONTENT' => 'Ich habe in Helply nach „{query}“ gesucht. Meine Frage dazu: ',
             'ENTRY_OPEN_ARIA' => 'Meldung öffnen: {title}',
             'ENTRY_MARKER_ARIA' => 'Meldung {number}: {title}',
             'ENTRY_PAGE_LINK' => 'Zur Seite wechseln',

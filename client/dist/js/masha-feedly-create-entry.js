@@ -340,7 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
     modal.hidden = false;
     const hasFaqPrefill = Boolean(pendingFaqQuestion);
     if (pendingFaqQuestion) {
-      contentField.value = t('FAQ_REPORT_CONTENT', { query: pendingFaqQuestion });
+      contentField.value = t('HELPY_REPORT_CONTENT', { query: pendingFaqQuestion });
       pendingFaqQuestion = '';
       updateDiagnostics();
     }
@@ -365,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.dispatchEvent(new CustomEvent('kw-masha-feedly:closed'));
   });
 
-  document.addEventListener('kw-masha-feedly:create-from-faq', (event) => {
+  document.addEventListener('kw-masha-feedly:create-from-helply', (event) => {
     const question = String(event.detail?.question || '').trim();
     if (!question || !startButton) return;
     pendingFaqQuestion = question;
