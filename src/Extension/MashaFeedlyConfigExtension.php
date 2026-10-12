@@ -127,6 +127,12 @@ class MashaFeedlyConfigExtension extends Extension
         ]);
     }
 
+    /** Führt die Vorlagenübernahme über den Erweiterungshook von Silverstripe 5 aus. */
+    public function requireDefaultRecords(): void
+    {
+        $this->onRequireDefaultRecords();
+    }
+
     /** Ergänzt Footer und leere Benachrichtigungstexte bei dev/build, ohne eigene Inhalte zu überschreiben. */
     public function onRequireDefaultRecords(): void
     {

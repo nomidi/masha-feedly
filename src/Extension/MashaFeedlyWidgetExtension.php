@@ -119,7 +119,8 @@ class MashaFeedlyWidgetExtension extends Extension
             'MiteStopURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'stopMiteTimer'),
             'ProfileURL' => CMSProfileController::singleton()->Link() . '#Root_MashaFeedly',
             'ProfilePreferencesURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'saveProfilePreferences'),
-            'ProfileThemeOptions' => $profileThemeOptions,
+            // Silverstripe 5 benötigt Listenobjekte auch für die persönlichen Auswahlfelder.
+            'ProfileThemeOptions' => ArrayList::create($profileThemeOptions),
             'ProfileDisableSoundEffects' => (bool)$currentMember?->MashaFeedlyDisableSoundEffects,
             'ProfileTheme' => (string)($currentMember?->MashaFeedlyTheme ?? ''),
             'ProfileAddress' => (string)($currentMember?->MashaFeedlyAddress ?? ''),
@@ -129,7 +130,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'ProfileEmailAssignedOnly' => (bool)($currentMember?->MashaFeedlyEmailAssignedOnly ?? false),
             'ProfileEmailNotifications' => (bool)($currentMember?->MashaFeedlyEmailNotifications ?? false),
             'ProfileEmailTestSucceeded' => $emailTestSucceeded,
-            'ProfileEmailOptions' => $profileEmailOptions,
+            'ProfileEmailOptions' => ArrayList::create($profileEmailOptions),
             'AvatarColorPaletteHTML' => $canPersonalize
                 ? MashaFeedlyMemberExtension::renderColorPalette('MashaFeedlyColor', (string)$currentMember?->MashaFeedlyColor)
                 : '',

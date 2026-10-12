@@ -911,7 +911,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringNotContainsString('action_resetAllMashaFeedlyData', $body);
         $this->assertStringNotContainsString('action_sendTestEmail', $body);
         $this->assertStringNotContainsString('MashaFeedlyMemberColor_' . (int)$allowed->ID, $body);
-        $this->assertStringNotContainsString('masha-feedly-color-palette__swatch', $body);
+        // Die persönliche Farbauswahl im Frontend-Widget bleibt erlaubt; geschützt ist das CMS-Konfigurationsformular.
+        $this->assertSame(1, preg_match('/<form\b(?=[^>]*\bid="Form_EditForm")[^>]*>.*?<\/form>/s', $body, $configurationForm));
+        $this->assertStringNotContainsString('masha-feedly-color-palette__swatch', $configurationForm[0]);
         $this->assertSame(1, preg_match('/<form\b(?=[^>]*\bid="Form_EditForm")(?=[^>]*\baction="([^"]+)")[^>]*>/s', $body, $matches));
         $editFormAction = html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $this->autoFollowRedirection = false;

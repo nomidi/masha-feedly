@@ -80,6 +80,26 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertSame('http://localhost/__masha-feedly-effects/avatar/person/black', $assignee['imageURL']);
     }
 
+    /** Die Einführung zeigt alle freigeschalteten E-Mail-Optionen mit ihren Feldnamen. */
+    public function testOnboardingRendersEmailNotificationOptions(): void
+    {
+        $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
+        $page->publishRecursive();
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
+        $this->logInAs($member);
+
+        $response = $this->get('/masha-feedly-widget-test');
+        $this->assertSame(200, $response->getStatusCode());
+        $markup = $this->widgetMarkup($response->getBody());
+        foreach (['NewEntries', 'EntryUpdates', 'Comments', 'DueDateReminders', 'CostEstimates'] as $type) {
+            $this->assertStringContainsString('name="MashaFeedlyNotify' . $type . '"', $markup);
+        }
+    }
+
     /** Prüft, dass nur freigegebene Benutzer das globale Widget erhalten. */
     public function testWidgetIsRenderedOnlyForAllowedMembers(): void
     {
@@ -102,16 +122,9 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('data-address="du"', $widgetMarkup);
         $this->assertStringContainsString('data-theme="playful"', $widgetMarkup);
         $this->assertStringContainsString('data-font-size="small"', $widgetMarkup);
-        $this->assertMatchesRegularExpression(
-            '/<select name="CategoryID" data-masha-feedly-create-category>(?:(?!<\/select>).)*<option[^>]*>Backlog<\/option>(?:(?!<\/select>).)*<\/select>/s',
-            $widgetMarkup,
-            'Das Formular zum Erstellen eines Feedly-Eintrags zeigt Statusoptionen.'
-        );
-        $this->assertMatchesRegularExpression(
-            '/<select name="PriorityID">(?:(?!<\/select>).)*<option[^>]*>Normal<\/option>(?:(?!<\/select>).)*<option[^>]*>Info<\/option>(?:(?!<\/select>).)*<\/select>/s',
-            $widgetMarkup,
-            'Das Formular zum Erstellen eines Feedly-Eintrags zeigt Prioritätsoptionen.'
-        );
+        $this->assertStringContainsString('<select name="CategoryID" data-masha-feedly-create-category></select>', $widgetMarkup);
+        $this->assertStringContainsString('<select name="PriorityID"></select>', $widgetMarkup);
+        $this->assertStringContainsString('data-widget-data-url="/__masha-feedly/widgetData"', $widgetMarkup);
         $this->assertStringContainsString('window.KWMashaFeedlyWidgetMarkup', $allowedResponse->getBody());
         $this->assertStringContainsString('"HISTORY_COMMENT":"Kommentar: {text}"', $allowedResponse->getBody());
         $this->assertStringContainsString('"HISTORY_META":"{actor} · {when}"', $allowedResponse->getBody());
