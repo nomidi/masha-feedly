@@ -1,6 +1,6 @@
 # Masha:Feedly Browsertests
 
-Die opt-in Playwright-Tests prüfen Kommentaraktivität, Onboarding, Kostenschätzungen, Zugriffsschutz, Screenshot-Zuschnitt und den Effekt-Anbieter. Die Suite muss seriell laufen, weil alle Browserläufe dieselbe Website und Datenbank verwenden.
+Die opt-in Playwright-Tests prüfen die Desktop-FAQ, Tooltips, Kommentaraktivität, Onboarding, Kostenschätzungen, Zugriffsschutz, Screenshot-Zuschnitt und den Effekt-Anbieter. Die Suite muss seriell laufen, weil alle Browserläufe dieselbe Website und Datenbank verwenden.
 
 ## Konfiguration
 
@@ -39,6 +39,8 @@ Vom Projekt-Hauptverzeichnis aus:
 
 ```sh
 node --test masha-feedly/tests/e2e/comment-activity.test.cjs
+node --test masha-feedly/tests/e2e/tooltip.test.cjs
+node --test masha-feedly/tests/e2e/faq.test.cjs  # Helply-Anbindung
 node --test masha-feedly/tests/e2e/onboarding.test.cjs
 node --test masha-feedly/tests/e2e/estimate-workflow.test.cjs
 node --test masha-feedly/tests/e2e/access-matrix.test.cjs
@@ -50,20 +52,32 @@ Ohne vollständige Konfiguration überspringt Node die jeweils betroffenen Tests
 
 Der separate **Test-E-Mail senden**-Knopf ist kein Teil der E2E-Tests. Er sendet an die Adresse des angemeldeten Masha:Feedly-Superadmins und setzt einen passend konfigurierten und erreichbaren SMTP-Dienst voraus.
 
-## Effekt-Anbieter
+## Kleine Browserlast auf einer lokalen Testinstanz
 
-Das separate Modul `masha-effects/` liegt im Projekt-Root. Einrichtung, CMS-Berechtigungen, saisonale Freigaben und Dateiformat stehen in [der Effekt-Dokumentation](../../../masha-effects/docs/de/README.md). Die lokale Anbieter-URL `https://feedly:8890` ist in `app/_config/masha-effects.yml` gesetzt. Nach dem Einspielen `vendor/bin/sake dev/build flush=1` ausführen.
+`browser-load.cjs` öffnet parallele Chromium-Sitzungen mit jeweils eigenem Browser-Kontext. Jede Sitzung meldet sich mit dem Creator-Testkonto an, öffnet das Widget und lädt wiederholt die Meldungsliste. Dabei werden keine Einträge, Kommentare oder Einstellungen gespeichert. Der Test erfasst die Antwortzeiten des Listen-Endpunkts, HTTP-Fehler und fehlgeschlagene Anfragen. Im Silverstripe-Development-Modus misst der Endpunkt zusätzlich seine eigene Laufzeit über `Server-Timing`; dieser Header wird in Live-Modi nicht ausgegeben.
 
-Der zusätzliche Browserfall `effects-provider.test.cjs` verwendet das vorhandene SUPERADMIN-Konto (CMS-ADMIN und Feedly-Freigabe), prüft Katalog, versionierte Dateien, Shadow-Root-CSS und CMS-Vorschauen. Mindestens ein Effekt muss für das aktive Theme freigegeben sein. Dafür wird kein weiteres Konto benötigt.
+Der Test ist absichtlich auf höchstens 20 Sitzungen begrenzt und startet nur nach einer ausdrücklichen lokalen Freigabe. Er akzeptiert ausschließlich `localhost`, `*.localhost`, `*.test` und den lokalen Host `feedly`; Produktions- und andere externe Hosts werden abgewiesen. Nur mit lokaler oder eigens dafür vorgesehener Testdatenbank starten. Andere E2E-Tests laufen währenddessen nicht parallel.
+
+Im Projekt-Root:
+
+```sh
+MASHA_FEEDLY_LOAD_TEST=LOCAL_ONLY node masha-feedly/tests/e2e/browser-load.cjs
+MASHA_FEEDLY_LOAD_TEST=LOCAL_ONLY MASHA_FEEDLY_LOAD_USERS=10 MASHA_FEEDLY_LOAD_SECONDS=90 node masha-feedly/tests/e2e/browser-load.cjs
+```
+
+Standardwerte sind fünf Sitzungen, 60 Sekunden Last und zehn Sekunden Anlauf. Die optionale Variable `MASHA_FEEDLY_LOAD_RAMP_SECONDS` ändert die Anlaufzeit; `MASHA_FEEDLY_LOAD_USERS` darf höchstens 20 und `MASHA_FEEDLY_LOAD_SECONDS` höchstens 300 sein. Ein Testkonto wird parallel in mehreren getrennten Sitzungen verwendet. Für einen realistischen Lasttest mit vielen verschiedenen Personen sollten dafür eigens mehrere freigeschaltete Testkonten eingerichtet werden. Die PHP-Handlerzeit umfasst den Listen-Controller samt Datenbankarbeit und Antwortaufbau, aber nicht die vorherige Wartezeit im Webserver; die Differenz zur Browserzeit enthält außerdem Middleware und Netzwerk. Der Test ersetzt keine größere HTTP-Lastmessung mit k6 und misst nicht direkt PHP-, Datenbank- oder Systemauslastung.
+
+## Externer Effekt-Anbieter
+
+Masha:Effects kann auf einem getrennten Server laufen. Feedly verbindet sich mit der serverseitig konfigurierten Anbieter-URL und gibt die Effekte über seinen eigenen, zugriffsgeschützten Proxy an den Browser weiter. Adresse und Zugangsschlüssel bleiben auf dem Feedly-Server und gehören weder in `.env.e2e` noch in den Browser.
+
+`effects-provider.test.cjs` prüft ausschließlich Feedlys Proxy, dessen Zugriffsschutz, den Icon-Katalog und die Wiedergabe im Widget. Der Test ruft keine Masha:Effects-Routen oder CMS-Seiten auf dem Feedly-Host auf. CMS-, Schlüssel- und Dateizugriffstests des Anbieters gehören in dessen eigenes Repository und müssen gegen dessen Testinstanz laufen.
 
 Vom Projekt-Root:
 
 ```sh
-SS_DATABASE_SOCKET=/Applications/MAMP/tmp/mysql/mysql.sock SS_PHPUNIT_FLUSH=1 vendor/bin/phpunit -c masha-effects/tests/phpunit.xml.dist
 node --test masha-feedly/tests/e2e/effects-provider.test.cjs
 ```
-
-Der Effekt-Anbieter benötigt serverseitig die Schlüssel aus der [Anbieter-Dokumentation](../../../masha-effects/docs/de/README.md). Sie gehören in die Projekt-`.env`, niemals in `.env.e2e` oder den Browser. Der Effekt-Test prüft auch, dass Gäste weder API- noch Proxy-Dateien abrufen können und dass alte statische Ressourcen-URLs gesperrt sind.
 
 Der mobile Ablauf in `onboarding.test.cjs` prüft die Feedly-Lasche, das Seitenpanel, den mobilen Hilfetext und beide Onboarding-Auswege in Chromium, Firefox und WebKit (Safari-Engine). In Fenstern mit 320 × 400 und 390 × 280 Pixeln wird geprüft, dass der Hilfetext tatsächlich scrollt und der Schließen-Knopf erreichbar bleibt. Dafür müssen die drei Playwright-Browser installiert sein.
 

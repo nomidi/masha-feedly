@@ -8,7 +8,16 @@ The plus and save buttons stay pink in both appearances. The news button has a l
 
 ## Access and setup
 
-Administrators open **Masha:Feedly → Configuration** in the CMS. Settings are grouped on one page into **General**, **Access & appearance**, **Reminders & estimates**, **Reset data**, and **Email footer**. Operator settings are visible only to the explicitly configured operator account; the email footer section starts collapsed. Only that account also sees the test email and reset actions; regular CMS administrators do not. Select the people allowed to use the module under **Access & appearance**. Administrators also need explicit access to see the widget. Under **General**, set the form of address, font size, and website default effect category. New installations default to **Playful**. Each allowed member can choose a different category in their profile. The categories for initial status, completion, and approval are required; their names can be customised.
+Administrators open **Masha:Feedly → Configuration** in the CMS. Settings are grouped on one page into **General**, **Access & appearance**, **Reminders & estimates**, and **Reset data**. Email templates and the footer are in the separate **Email texts** tab. Only the CMS administrator configured through `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` can see and use that tab and its actions. Select the people allowed to use the module under **Access & appearance**. Administrators also need explicit access to see the widget. Under **General**, set the form of address, font size, and website default effect category. New installations default to **Playful**. Each allowed member can choose a different category in their profile. The categories for initial status, completion, and approval are required; their names can be customised.
+
+Under **Email texts**, the operator can edit introductions for new reports, updates, comments, due-date reminders, and estimate requests, each in Du and Sie versions. The two welcome texts are at the top. A test email button under each text sends the current editor contents to the operator account, including unsaved edits.
+
+Test messages show sample content in the email layout: new reports include the reporter, category, priority, due date, assignees, and description; comments show the report, comment, and author; due-date reminders include the due date and report details; estimate requests show sample effort, cost, and explanation. The update preview illustrates changes to status, priority, due date, and assignee. These are sample values, not real report data.
+
+For normal notifications, each recipient’s personal form of address in their profile selects Du or Sie. The website setting under **Masha:Feedly → Configuration** controls the welcome email. Feedly adds report details and links automatically. Edit the shared footer in this tab.
+
+If `MASHA_FEEDLY_EFFECTS_BASE_URL` and its API key are configured, `dev/build` copies Masha:Effects texts into empty fields only. **Replace with Masha:Effects texts** fetches them again after an explicit click and replaces the saved welcome and notification texts. This button does not import the footer. Masha:Effects provides protected defaults at `GET /__masha-effects/email-defaults`; Feedly calls it server-side with `Authorization: Bearer …`. The response contains `version`, `footer`, `welcome.du`/`welcome.sie`, and the variants under `notifications`. The provider configuration and website-key setup are documented in Masha:Effects.
+
 
 The CMS view and its menu item also require explicit module access. The only exception is the CMS administrator whose email is configured through `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL`; this account can open the module configuration without being selected.
 
@@ -22,7 +31,9 @@ When selecting assignees, a compact name label appears above the avatar on hover
 
 When creating a report, you can optionally add **Steps to reproduce** and describe what you expected and what actually happened. The section starts collapsed and opens automatically when the description contains common error terms such as “error”, “bug” or “does not work”. You can also open it yourself at any time. Saved details remain separate in the report and can be edited later.
 
-On a phone, open Masha:Feedly using the same button at the bottom right as on a computer. The side panel shows only the plus and help buttons. Mobile help explains how to create a report and states that all tools are available only on a computer with a larger screen. The help text scrolls in small windows while the header and close button stay visible. The tour needs a larger screen: **OK** postpones it, while **Cancel tour** ends it permanently. Page markers remain visible and clickable while the widget is open.
+On a phone, open Masha:Feedly using the same button at the bottom right as on a computer. The side panel shows only the plus and help buttons. Mobile help explains how to create a report and states that all tools are available only on a computer with a larger screen. The help text scrolls in small windows while the header and close button stay visible. The tour needs a larger screen: **OK** postpones it, while **Cancel tour** ends it permanently. Page markers remain visible and clickable while the widget is open. The current-page count includes only open reports whose saved page area can still be found on the current page. Reports without an area or with an area that cannot be found appear neither as page markers nor in the current-page count.
+
+Detailed answers about Masha:Feedly live in Masha:Helply. Helply provides its own entry point and searchable dialog. Quick help and the end of the onboarding tour can open Helply directly. When a search finds no answer, the question can be sent to Feedly and continued as a report. Feedly still checks access when the report is created.
 
 ## Add a screenshot
 
@@ -40,30 +51,40 @@ Filter the list by category, priority, page, and assignee. Expand **Filters** to
 
 History records status, priority, and assignment changes, comments, attachments, and relationships with the person and timestamp. When another person completes your entry, it can move to the required approval category so you can review and approve the result.
 
+The report list loads only the data needed for cards, filters, sorting, and page markers. Descriptions, comments, history, attachments, and relationships are fetched when you open a report. If loading fails, the list remains available; open the report again to retry.
+
 ## Relationships and duplicates
 
 In the expandable **Relationships** section, link entries as duplicates, thematically related, or blocked by. The relationship appears on both entries and is recorded in history. Completing a primary entry also completes its duplicates. Other status changes are not copied automatically.
 
 ## Profile and notifications
 
+Whenever a person is added to Masha:Feedly, including when re-added, their email preferences are set to “My reports” with all event types enabled. A welcome email is sent independently of notification preferences. At the end of the tour, you can open quick help or Masha:Helply. You can also restart the tour there.
+
+“All reports” means emails about all accessible reports on the website, including comments and due dates. “My reports” means reports you created or are currently assigned to. The event checkboxes apply to both scopes. New assignments are covered by “New reports and new assignments”. After an assignment is removed, the report remains in “My reports” only if you created it. Creating or changing reports and posting comments never emails the person taking that action. Cost estimates for approval go only to assignees with that notification enabled. The master option disables all notifications and hides these choices; turning it on shows your saved choices again. Welcome emails and explicitly requested test emails remain independent of the scope.
+
 The avatar preview in your profile uses the same icon and color as entries and assignees. When the color is empty, saving assigns and stores a random palette color once. You or the responsible administrator can change it later. Dark backgrounds, emerald and forest green use the light icon; the other light backgrounds use the dark icon. Only the selected icon and its two variants are stored locally in the project, so displaying it does not require repeated requests to the provider.
 
-In the Masha:Feedly section of your profile, set your avatar and color, choose your personal appearance, manage each type of email notification, and restart the onboarding tour. Available effect categories come from the configured Masha:Effects provider. Administrators set the website default under **Masha:Feedly → Configuration**; the local check effect remains available without a provider or during an outage. New installations default to **Playful**. You can separately choose emails for new entries, entry updates, comments on entries assigned to you or created by you, due dates, and cost estimate requests. Emails about your own entries and changes are optional and off by default. News in the widget shows activity regardless of email notification settings. Personal email settings stay locked until the configured Masha:Feedly administrator has successfully sent at least one test email from Configuration; a notice in the profile explains this. Every Masha:Feedly email includes the footer text from **Masha:Feedly → Configuration → Email footer**, an imprint link, and a direct link to your email settings. If the text field is empty, `MASHA_FEEDLY_EMAIL_FOOTER` from the server `.env` is used. This keeps operator details outside the Git repository. Write line breaks as `\n`. `dev/build` copies the value if no footer has been saved yet.
+In the Masha:Feedly section of your profile, set your avatar and color, choose your personal appearance, manage each type of email notification, and restart the onboarding tour. Available effect categories come from the configured Masha:Effects provider. Administrators set the website default under **Masha:Feedly → Configuration**; the local check effect remains available without a provider or during an outage. New installations default to **Playful**. You can separately choose emails for new entries, entry updates, comments within the selected scope, due dates, and cost estimate requests. Your own actions never generate notification emails. News in the widget shows activity regardless of email notification settings. Personal email settings stay locked until the configured Masha:Feedly administrator has successfully sent at least one test email from Configuration; a notice in the profile explains this. Every Masha:Feedly email includes the footer text from **Masha:Feedly → Configuration → Email footer**, an imprint link, and a direct link to your email settings. If the text field is empty, `MASHA_FEEDLY_EMAIL_FOOTER` from the server `.env` is used. This keeps operator details outside the Git repository. Write line breaks as `\n`. `dev/build` copies the value if no footer has been saved yet.
 
 The footer also explains that the message was sent automatically based on your notification settings. Use its link to change those settings at any time.
 New report emails name the website and, when available, show who reported the issue, its category, priority, due date, and assigned people. The full description follows; its automatically generated short title is not repeated separately.
+
+Formatted introductions for new reports, updates, comments, due-date reminders, and estimate requests come from the Masha:Effects provider when configured. Each type has Du and Sie variants. Placeholders such as `{title}` and `{date}` are replaced safely. Report details and links remain part of the email. Masha:Feedly uses its built-in welcome or notification text if no provider is available or the corresponding text field is empty. The footer is configured separately in Feedly, or comes from `MASHA_FEEDLY_EMAIL_FOOTER` when the CMS field is empty.
 
 When `MASHA_FEEDLY_EFFECTS_BASE_URL` and `MASHA_FEEDLY_EFFECTS_API_KEY` are set on the server and Masha:Effects returns a valid icon catalogue, you can also choose a profile icon. The icon catalogue is loaded from the provider through Feedly's protected proxy. The selected SVG icon and its light and dark variants are stored locally. They are grouped into people, animals, nature, everyday, hobbies and technology, fruit and vegetables, food and drink, aliens and UFOs, space, spooky, and dinosaurs. Icon color switches between black and white to contrast with your avatar color. The picker stays hidden without provider configuration. If a configured provider is unavailable, a notice is shown; your saved avatar and profile image upload remain available.
 
 The CMS administrator configured through `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` can use **Send test email** under **Masha:Feedly → Configuration** to check delivery to the email address on their account. On failure, Configuration also displays the specific cause, with credentials in connection URLs redacted. Full technical details remain in the PHP error log. If a notification fails, the entry is still saved.
 
-Entries can have an optional due date. In Masha:Feedly settings, choose under **Run due-date reminders** whether checks run via cron or on the first website visit of each day. Visitor mode sends no reminders until someone visits the site. The check sends one email on the due date (or after it, if it did not run on time) to approved assignees and the entry creator. Changing the date resets the reminder.
+Entries can have an optional due date. Use **Postpone reminder until** to pause only the automatic due-date reminder; comment and update emails continue. On the selected date, an entry is considered again if it is still open and due. In Masha:Feedly settings, choose under **Run due-date reminders** whether checks run via cron or on the first website visit of each day. Visitor mode sends no reminders until someone visits the site. The check sends one email on the due date (or after it, if it did not run on time) to approved members with due date notifications enabled and a matching email scope. Changing the due date resets the reminder.
 
 For cron mode, schedule this command to run daily in your Silverstripe project:
 
 ```sh
-vendor/bin/sake dev/tasks/MashaFeedlyDueDateReminderTask
+vendor/bin/sake tasks:MashaFeedlyDueDateReminderTask
 ```
+
+For ALL-INKL HTTP cron jobs, see the `masha-cronjob/` folder in the project root for instructions and example files. If you cannot run a shell cron job, select **On website visits** instead.
 
 ## Managing entries in the CMS
 
@@ -109,7 +130,7 @@ Effect delivery is optional. Without a reachable provider, Feedly plays a subtle
 
 For centrally managed animations, install the standalone Silverstripe **Masha:Effects** module on the same or another website. It manages categories, effects, files, and seasonal rules. Files stay private on the provider server. Feedly contains only the loader and fetches matching effects through a protected server proxy. Provider failure never blocks saving.
 
-Set `MASHA_FEEDLY_EFFECTS_BASE_URL` in the Feedly website's server `.env` to the provider base address, for example `https://effects.example.org`; Feedly appends `/__masha-effects/manifest`. Without this setting, Feedly looks on the same website, where Masha:Effects must be installed and configured. Otherwise, the local fallback plays. Provider outages and empty catalogues do not block saving.
+Set `MASHA_FEEDLY_EFFECTS_BASE_URL` in the Feedly website's server `.env` to the provider base address, for example `https://effects.example.org`; Feedly appends `/__masha-effects/manifest`. Without a fully configured provider, Feedly does not request an effect catalogue and uses the local checkmark effect. This also applies to CMS previews. Provider outages and empty catalogues do not block saving.
 
 For an external provider, set `MASHA_FEEDLY_EFFECTS_API_KEY` in the Feedly website's server `.env`. Generate the key in the provider CMS and keep it server-side. Browsers receive only local proxy URLs; the proxy checks login and Feedly access.
 
@@ -131,6 +152,8 @@ Example manifest:
     {
       "id": "myEffect",
       "name": "My effect",
+      "text": "Done!",
+      "detail": "The entry is completed.",
       "categories": ["serious"],
       "weight": 1,
       "files": {
@@ -158,3 +181,7 @@ When switching between mobile and desktop layouts, Feedly closes its windows. Ac
 ### Confirm completion
 
 When another person selects “Done”, the report remains open as “Feedback”. A prominent notice explains the next action. The original creator or designated reporter reviews the result and confirms completion with “Done” and “Save changes”. Assignment alone does not grant final approval. A comment is optional. This rule also applies when moving or saving reports in the CMS.
+
+Categories, priorities and assignees are fetched when the widget is first opened; the page initially renders empty selection fields. The protected endpoint only returns these values to members with access.
+
+Helply links are shown only when Helply provides the authorised Feedly help collection on the current page. Without Helply, its buttons and hints remain hidden.

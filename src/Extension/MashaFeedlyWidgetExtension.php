@@ -49,46 +49,12 @@ class MashaFeedlyWidgetExtension extends Extension
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-colors.js');
         \KW\MashaFeedly\Service\MashaFeedlyEffectProvider::requireLoader();
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-entries.js');
-        MashaFeedlyCategory::ensureDefaultCategories();
-        MashaFeedlyPriority::ensureDefaultPriorities();
         $canManageEstimate = \KW\MashaFeedly\Model\MashaFeedlyEntry::canManageEstimate(Security::getCurrentUser());
         $canApproveEstimate = \KW\MashaFeedly\Model\MashaFeedlyEntry::canApproveEstimate(Security::getCurrentUser());
+        // Kategorien, Prioritäten und Mitglieder werden erst beim ersten Öffnen geladen.
         $categories = [];
-        foreach (MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC') as $category) {
-            $systemKey = (string)$category->SystemKey;
-            $estimateRole = in_array($systemKey, ['estimate_pending', 'estimate_approved'], true);
-            $categories[] = [
-                'ID' => (int)$category->ID,
-                'Title' => $estimateRole && !$canApproveEstimate
-                    ? i18n::_t('KW\\MashaFeedly\\Translations.ESTIMATE_HIDDEN_CATEGORY', 'In Bearbeitung')
-                    : (string)$category->Title,
-                'SystemKey' => $estimateRole && !$canApproveEstimate ? 'restricted_estimate' : $systemKey,
-                'CanSelectForNewEntry' => $systemKey === 'estimate_pending'
-                    ? $canManageEstimate
-                    : $systemKey !== 'estimate_approved',
-            ];
-        }
-        $members = [];
         $priorities = [];
-        foreach (MashaFeedlyPriority::get()->sort('Sort ASC, Title ASC') as $priority) {
-            $priorities[] = [
-                'ID' => (int)$priority->ID,
-                'Title' => (string)$priority->Title,
-                'IsDefault' => (int)$priority->ID === (int)MashaFeedlyPriority::defaultPriority()->ID,
-            ];
-        }
-        $allowedMemberIDs = MashaFeedlyConfigExtension::memberIDs();
-        if ($allowedMemberIDs) {
-            foreach (Member::get()->filter('ID', $allowedMemberIDs)->sort('Surname ASC, FirstName ASC') as $member) {
-                $members[] = [
-                    'ID' => (int)$member->ID,
-                    'Name' => (string)$member->getName(),
-                    'Initials' => (string)$member->getMashaFeedlyInitials(),
-                    'Color' => (string)$member->getMashaFeedlyDisplayColor(),
-                    'ImageURL' => (string)$member->getMashaFeedlyAvatarURL(),
-                ];
-            }
-        }
+        $members = [];
         $currentMember = Security::getCurrentUser();
         $canPersonalize = MashaFeedlyConfigExtension::isExplicitlyAllowed($currentMember);
         $onboardingEnabled = $canPersonalize
@@ -119,11 +85,10 @@ class MashaFeedlyWidgetExtension extends Extension
         $profileEmailOptions = [];
         if ($emailTestSucceeded) {
             foreach ([
-                'MashaFeedlyNotifyNewEntries' => ['PROFILE_NOTIFY_NEW_ENTRIES', 'Bei neuen Meldungen benachrichtigen', 'PROFILE_NOTIFY_NEW_ENTRIES_DESCRIPTION', 'Erhalte eine E-Mail, wenn eine neue Meldung erstellt wird.'],
-                'MashaFeedlyNotifyEntryUpdates' => ['PROFILE_NOTIFY_ENTRY_UPDATES', 'Bei Änderungen benachrichtigen', 'PROFILE_NOTIFY_ENTRY_UPDATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn sich eine Meldung ändert.'],
-                'MashaFeedlyNotifyOwnEntryChanges' => ['PROFILE_NOTIFY_OWN_CHANGES', 'Auch bei eigenen Meldungen benachrichtigen', 'PROFILE_NOTIFY_OWN_CHANGES_DESCRIPTION', 'Erhalte auch E-Mails für Meldungen, die du selbst erstellst oder änderst.'],
-                'MashaFeedlyNotifyComments' => ['PROFILE_NOTIFY_COMMENTS', 'Bei Kommentaren benachrichtigen', 'PROFILE_NOTIFY_COMMENTS_DESCRIPTION', 'Erhalte eine E-Mail, wenn jemand bei einer deiner Meldungen kommentiert.'],
-                'MashaFeedlyNotifyDueDateReminders' => ['PROFILE_NOTIFY_DUE_DATE_REMINDERS', 'An Fälligkeitstermine erinnern', 'PROFILE_NOTIFY_DUE_DATE_REMINDERS_DESCRIPTION', 'Erhalte am Fälligkeitstag eine Erinnerung für deine Meldungen.'],
+                'MashaFeedlyNotifyNewEntries' => ['PROFILE_NOTIFY_NEW_ENTRIES', 'Neue Meldungen und neue Zuweisungen', 'PROFILE_NOTIFY_NEW_ENTRIES_DESCRIPTION', 'Erhalte eine E-Mail bei einer neuen Meldung im gewählten Bereich oder wenn dir eine bestehende Meldung neu zugewiesen wird.'],
+                'MashaFeedlyNotifyEntryUpdates' => ['PROFILE_NOTIFY_ENTRY_UPDATES', 'Bei Änderungen benachrichtigen', 'PROFILE_NOTIFY_ENTRY_UPDATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn sich Status, Beschreibung, Zuständigkeit oder andere Meldungsdetails im gewählten Bereich ändern. Deine eigenen Änderungen erzeugen keine Mail.'],
+                'MashaFeedlyNotifyComments' => ['PROFILE_NOTIFY_COMMENTS', 'Bei Kommentaren benachrichtigen', 'PROFILE_NOTIFY_COMMENTS_DESCRIPTION', 'Erhalte eine E-Mail bei neuen Kommentaren im gewählten Bereich. Deine eigenen Kommentare erzeugen keine Mail.'],
+                'MashaFeedlyNotifyDueDateReminders' => ['PROFILE_NOTIFY_DUE_DATE_REMINDERS', 'An Fälligkeitstermine erinnern', 'PROFILE_NOTIFY_DUE_DATE_REMINDERS_DESCRIPTION', 'Erhalte am Fälligkeitstag einmalig eine Erinnerung für Meldungen im gewählten Bereich.'],
                 'MashaFeedlyNotifyCostEstimates' => ['PROFILE_NOTIFY_COST_ESTIMATES', 'Bei Kostenschätzungen benachrichtigen', 'PROFILE_NOTIFY_COST_ESTIMATES_DESCRIPTION', 'Erhalte eine E-Mail, wenn eine Kostenschätzung zur Freigabe bereitsteht.'],
             ] as $name => [$labelKey, $labelFallback, $descriptionKey, $descriptionFallback]) {
                 $profileEmailOptions[] = [
@@ -135,7 +100,10 @@ class MashaFeedlyWidgetExtension extends Extension
             }
         }
         $markup = $this->owner->renderWith('KW/MashaFeedly/Includes/MashaFeedlyWidget', [
+            'WidgetDataURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'widgetData'),
             'CreateEntryURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'createEntry'),
+            'EntryDetailsURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'entryDetails'),
+            'EntryHistoryURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'entryHistory'),
             'ListEntriesURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'listEntries'),
             'MarkEntryReadURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'markEntryRead'),
             'UpdateEntryURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'updateEntry'),
@@ -151,6 +119,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'MiteStopURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'stopMiteTimer'),
             'ProfileURL' => CMSProfileController::singleton()->Link() . '#Root_MashaFeedly',
             'ProfilePreferencesURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'saveProfilePreferences'),
+            // Silverstripe 5 benötigt Listenobjekte auch für die persönlichen Auswahlfelder.
             'ProfileThemeOptions' => ArrayList::create($profileThemeOptions),
             'ProfileDisableSoundEffects' => (bool)$currentMember?->MashaFeedlyDisableSoundEffects,
             'ProfileTheme' => (string)($currentMember?->MashaFeedlyTheme ?? ''),
@@ -158,6 +127,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'ProfileColor' => (string)($currentMember?->MashaFeedlyColor ?? ''),
             'ProfileAvatarIcon' => (string)($currentMember?->MashaFeedlyAvatarIcon ?? ''),
             'ProfileAvatarPreviewHTML' => $canPersonalize ? $currentMember->renderAvatarPreview() : '',
+            'ProfileEmailAssignedOnly' => (bool)($currentMember?->MashaFeedlyEmailAssignedOnly ?? false),
             'ProfileEmailNotifications' => (bool)($currentMember?->MashaFeedlyEmailNotifications ?? false),
             'ProfileEmailTestSucceeded' => $emailTestSucceeded,
             'ProfileEmailOptions' => ArrayList::create($profileEmailOptions),
@@ -362,6 +332,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'EDIT_SAVE_ERROR' => 'Änderungen konnten nicht gespeichert werden. Bitte prüfe deine Verbindung und versuche es erneut.',
             'CREATE_SAVING' => 'Meldung wird gespeichert …',
             'CREATE_SAVE_ERROR' => 'Die Meldung konnte nicht gespeichert werden.',
+            'CREATE_UNCLEAR_RESULT_ERROR' => 'Der Server hat unerwartet geantwortet. Prüfe bitte die Meldungsliste, bevor du es erneut versuchst.',
             'CREATE_ENTRY_FALLBACK' => 'Neue Meldung',
             'CLOSE_WIDGET' => 'Masha:Feedly schließen',
             'OPEN_WIDGET' => 'Masha:Feedly öffnen',
@@ -382,6 +353,10 @@ class MashaFeedlyWidgetExtension extends Extension
             'TOUR_WELCOME_TITLE' => 'Willkommen bei Masha:Feedly',
             'TOUR_WELCOME_TEXT' => 'Wenn dir ein Fehler auffällt, kannst du ihn direkt auf der Website melden. Die kurze Einführung zeigt dir, wie es geht.',
             'TOUR_WELCOME_WORKFLOW' => 'Meldung, Rückfragen und Fortschritt bleiben an einem Ort. Ihr könnt Verantwortliche festlegen, direkt zur Meldung kommentieren und sehen, was noch offen oder bereits erledigt ist. Die kurze Einführung zeigt dir die ersten Schritte.',
+            'TOUR_THEME_SETTINGS' => 'Das Erscheinungsbild kannst du später in deinen Masha:Feedly-Profileinstellungen ändern.',
+            'TOUR_OPEN_HELP' => 'Kurzhilfe öffnen',
+            'TOUR_OPEN_HELPLY' => 'Helply öffnen',
+            'TOUR_RESTART' => 'Einführung erneut starten',
             'TOUR_MOBILE_NOTICE' => 'Die Einführung benötigt einen größeren Bildschirm, zum Beispiel einen Laptop oder Computer. Mit OK können Sie die Einführung später starten. Einführung abbrechen beendet sie dauerhaft.',
             'TOUR_START' => 'Einführung starten',
             'TOUR_SKIP' => 'Später',
@@ -458,6 +433,7 @@ class MashaFeedlyWidgetExtension extends Extension
             'ENTRY_CONTEXT_STATUS' => 'Status: {status}',
             'ENTRY_CONTEXT_AREA' => 'Bereich: {text}',
             'ENTRY_SELECTED_CONTEXT' => 'Ausgewählter Bereich: „{text}“',
+            'HELPY_REPORT_CONTENT' => 'Ich habe in Helply nach „{query}“ gesucht. Meine Frage dazu: ',
             'ENTRY_OPEN_ARIA' => 'Meldung öffnen: {title}',
             'ENTRY_MARKER_ARIA' => 'Meldung {number}: {title}',
             'ENTRY_PAGE_LINK' => 'Zur Seite wechseln',

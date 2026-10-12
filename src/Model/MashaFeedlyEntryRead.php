@@ -3,6 +3,7 @@
 namespace KW\MashaFeedly\Model;
 
 use SilverStripe\ORM\DataObject;
+use SilverStripe\ORM\DB;
 use SilverStripe\Security\Member;
 
 /**
@@ -67,27 +68,35 @@ class MashaFeedlyEntryRead extends DataObject
     }
 
     /** Liefert die Zahl ungelesener Einträge sowie Kommentare seit dem letzten Öffnen je Eintrag. */
-    public static function unreadActivityCounts(Member $member): array
+    public static function unreadActivityCounts(Member $member, ?array $unreadIDs = null): array
     {
-        $unreadIDs = self::unreadEntryIDs($member);
+        $unreadIDs ??= self::unreadEntryIDs($member);
         $commentCount = 0;
-        foreach ($unreadIDs as $entryID) {
-            $entry = MashaFeedlyEntry::get()->byID($entryID);
-            if (!$entry) {
-                continue;
+        if ($unreadIDs) {
+            $schema = DataObject::getSchema();
+            $connection = DB::get_conn();
+            $historyTable = $connection->escapeIdentifier($schema->tableName(MashaFeedlyEntryHistory::class));
+            $readTable = $connection->escapeIdentifier($schema->tableName(self::class));
+            $entryTable = $connection->escapeIdentifier($schema->tableName(MashaFeedlyEntry::class));
+            foreach (array_chunk($unreadIDs, 500) as $entryIDChunk) {
+                $placeholders = implode(', ', array_fill(0, count($entryIDChunk), '?'));
+                $commentRows = DB::prepared_query(
+                    "SELECT history.\"EntryID\", COUNT(*) AS \"Count\" "
+                        . "FROM {$historyTable} AS history "
+                        . "INNER JOIN {$entryTable} AS entry ON entry.\"ID\" = history.\"EntryID\" "
+                        . "LEFT JOIN {$readTable} AS read_state "
+                        . "ON read_state.\"EntryID\" = history.\"EntryID\" AND read_state.\"MemberID\" = ? "
+                        . "WHERE history.\"EntryID\" IN ({$placeholders}) "
+                        . "AND history.\"ChangeType\" IN (?, ?) "
+                        // Für bereits geöffnete Einträge gilt der Lesestand, sonst die Erstellungszeit.
+                        . "AND history.\"Created\" > COALESCE(read_state.\"LastEdited\", entry.\"Created\") "
+                        . "GROUP BY history.\"EntryID\"",
+                    [(int)$member->ID, ...$entryIDChunk, 'comment', 'comment_edited']
+                );
+                foreach ($commentRows as $row) {
+                    $commentCount += (int)$row['Count'];
+                }
             }
-            $read = self::get()->filter([
-                'MemberID' => (int)$member->ID,
-                'EntryID' => $entryID,
-            ])->first();
-            // LastEdited wird beim Markieren als gelesen aktualisiert. Für erstmals ungelesene
-            // Einträge zählt nur Aktivität nach ihrer Anlage, nicht die Erstellung selbst.
-            $cutoff = $read ? (string)$read->LastEdited : (string)$entry->Created;
-            $commentCount += MashaFeedlyEntryHistory::get()->filter([
-                'EntryID' => $entryID,
-                'ChangeType' => ['comment', 'comment_edited'],
-                'Created:GreaterThan' => $cutoff,
-            ])->count();
         }
 
         return ['entries' => count($unreadIDs), 'comments' => $commentCount];
@@ -115,24 +124,33 @@ class MashaFeedlyEntryRead extends DataObject
         return $counts;
     }
 
-    /** Liefert die IDs aller Einträge, deren aktueller Stand für ein Mitglied ungelesen ist. */
-    public static function unreadEntryIDs(Member $member): array
+    /**
+     * Liefert die IDs aller Einträge, deren aktueller Stand für ein Mitglied ungelesen ist.
+     * @param list<MashaFeedlyEntry>|null $entries Bereits geladene Einträge zur Wiederverwendung.
+     * @return list<int> IDs ungelesener Einträge.
+     */
+    public static function unreadEntryIDs(Member $member, ?array $entries = null): array
     {
-        $seenHashes = [];
+        $seenReads = [];
         foreach (self::get()->filter('MemberID', (int)$member->ID) as $read) {
-            $seenHashes[(int)$read->EntryID] = (string)$read->StateHash;
+            $seenReads[(int)$read->EntryID] = $read;
         }
 
         $unreadIDs = [];
-        foreach (MashaFeedlyEntry::get() as $entry) {
-            $currentHash = self::stateHash($entry);
-            if (($seenHashes[(int)$entry->ID] ?? null) === $currentHash) {
+        $assignedByEntry = self::assignedMemberIDsByEntry();
+        $entries ??= MashaFeedlyEntry::get()->toArray();
+        $creatorMemberIDs = self::creatorMemberIDsByEntry($entries);
+        foreach ($entries as $entry) {
+            $entryID = (int)$entry->ID;
+            $assignedMemberIDs = $assignedByEntry[$entryID] ?? [];
+            $read = $seenReads[$entryID] ?? null;
+            $currentHash = self::stateHash($entry, $assignedMemberIDs);
+            if ($read && (string)$read->StateHash === $currentHash) {
                 continue;
             }
-            $assignedMemberIDs = self::assignedMemberIDs($entry);
             $isRecipient = !$assignedMemberIDs
                 || in_array((int)$member->ID, $assignedMemberIDs, true)
-                || (int)$member->ID === $entry->creatorMemberID();
+                || (int)$member->ID === ($creatorMemberIDs[$entryID] ?? 0);
             if ($isRecipient) {
                 $unreadIDs[] = (int)$entry->ID;
             }
@@ -140,20 +158,52 @@ class MashaFeedlyEntryRead extends DataObject
         return $unreadIDs;
     }
 
-    /** Bildet den relevanten Stand aus Inhalt, Datum, Status, Zuständigkeit und Kommentarverlauf. */
-    private static function stateHash(MashaFeedlyEntry $entry): string
+    /** Lädt die ursprünglichen Ersteller aller Einträge gemeinsam aus dem Verlauf. */
+    private static function creatorMemberIDsByEntry(array $entries): array
     {
+        $entryIDs = array_values(array_unique(array_filter(array_map(
+            static fn(MashaFeedlyEntry $entry): int => (int)$entry->ID,
+            $entries
+        ))));
+        if (!$entryIDs) {
+            return [];
+        }
+
+        $creatorIDsByEntry = [];
+        foreach (MashaFeedlyEntryHistory::get()
+            ->filter(['EntryID' => $entryIDs, 'ChangeType' => 'created'])
+            ->sort('EntryID ASC, Created ASC, ID ASC') as $event) {
+            $entryID = (int)$event->EntryID;
+            $creatorIDsByEntry[$entryID] ??= (int)$event->ActorMemberID;
+        }
+
+        return $creatorIDsByEntry;
+    }
+
+    /** Bildet den relevanten Stand aus Eintragsdaten, Zuständigkeit und letzter Aktivität. */
+    private static function stateHash(MashaFeedlyEntry $entry, ?array $assignedMemberIDs = null): string
+    {
+        $assignedMemberIDs ??= self::assignedMemberIDs($entry);
         return hash('sha256', json_encode([
             'Content' => (string)$entry->Content,
             'EntryDate' => (string)$entry->EntryDate,
             'CategoryID' => (int)$entry->CategoryID,
             'PriorityID' => (int)$entry->PriorityID,
-            'AssignedMemberIDs' => self::assignedMemberIDs($entry),
-            'CommentHistoryID' => (int)MashaFeedlyEntryHistory::get()->filter([
-                'EntryID' => (int)$entry->ID,
-                'ChangeType' => ['comment', 'comment_edited', 'comment_deleted'],
-            ])->max('ID'),
+            'AssignedMemberIDs' => $assignedMemberIDs,
+            // Der Zähler erfasst Aktivitäten auch dann, wenn der Zeitstempel gleich bleibt.
+            'ActivityVersion' => (int)$entry->ActivityVersion,
+            'LastActivityAt' => (string)($entry->LastActivityAt ?: $entry->Created),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    /** Lädt alle Zuständigkeiten gesammelt für die Ungelesen-Prüfung. */
+    private static function assignedMemberIDsByEntry(): array
+    {
+        $assignedByEntry = [];
+        foreach (DB::query('SELECT "MashaFeedlyEntryID", "MemberID" FROM "MashaFeedlyEntry_AssignedMembers" ORDER BY "MashaFeedlyEntryID" ASC, "MemberID" ASC') as $row) {
+            $assignedByEntry[(int)$row['MashaFeedlyEntryID']][] = (int)$row['MemberID'];
+        }
+        return $assignedByEntry;
     }
 
     /** Liefert die stabil sortierten IDs aller zugeordneten Mitglieder für den Eintragshash. */

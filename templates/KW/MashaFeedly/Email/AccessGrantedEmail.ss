@@ -1,3 +1,6 @@
+<% if $NotificationIntroHTML %>
+$NotificationIntroHTML.RAW
+<% else %>
 <h1><%t KW\MashaFeedly\Translations.EMAIL_ACCESS_TITLE "Willkommen bei Masha:Feedly" %></h1>
 <p><%t KW\MashaFeedly\Translations.EMAIL_ACCESS_INTRO "Schön, dass du dabei bist! Auf der Website {siteTitle} kannst du jetzt Meldungen erstellen und ihren Stand verfolgen." siteTitle=$SiteTitle %></p>
 <h2><%t KW\MashaFeedly\Translations.EMAIL_ACCESS_REPORT_TITLE "So erstellst du eine Meldung" %></h2>
@@ -8,5 +11,6 @@
 <h2><%t KW\MashaFeedly\Translations.EMAIL_ACCESS_SETTINGS_TITLE "Dein Profil und deine E-Mails" %></h2>
 <p><%t KW\MashaFeedly\Translations.EMAIL_ACCESS_SETTINGS "In deinem Profil kannst du dein Profilbild ändern und auswählen, welche E-Mails du erhalten möchtest. Den kurzen Rundgang durch Masha:Feedly kannst du dort jederzeit erneut starten." %></p>
 <p><%t KW\MashaFeedly\Translations.EMAIL_ACCESS_PRIVACY "Deine Meldungen und Dateien können nur angemeldete Personen sehen, die für Masha:Feedly freigeschaltet sind." %></p>
+<% end_if %>
 <p><a href="$WidgetURL.XML"><%t KW\MashaFeedly\Translations.EMAIL_ACCESS_OPEN "Website öffnen" %></a></p>
 <% include KW/MashaFeedly/Email/EmailFooter %>

@@ -45,6 +45,98 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         i18n::set_locale('de_DE');
     }
 
+    /**
+     * Ergänzt Listenmeldungen in Tests um Details und separat geladenen Verlauf.
+     *
+     * @param string $url Listenadresse mit Filtern.
+     * @return \SilverStripe\Control\HTTPResponse Listenmetadaten mit separat abgerufenen Details und Verlauf.
+     */
+    private function getListWithDetails(string $url): \SilverStripe\Control\HTTPResponse
+    {
+        $response = $this->get($url);
+        $data = json_decode($response->getBody(), true);
+        if ($response->getStatusCode() !== 200 || !isset($data['entries'])) {
+            return $response;
+        }
+        foreach ($data['entries'] as &$summary) {
+            $details = $this->get('/__masha-feedly/entryDetails?EntryID=' . $summary['id']);
+            $this->assertSame(200, $details->getStatusCode());
+            $summary = array_merge($summary, json_decode($details->getBody(), true)['entry']);
+            $history = $this->get('/__masha-feedly/entryHistory?EntryID=' . $summary['id']);
+            $this->assertSame(200, $history->getStatusCode());
+            $summary['history'] = json_decode($history->getBody(), true)['history'];
+        }
+        unset($summary);
+        $response->setBody(json_encode($data));
+        return $response;
+    }
+
+    /** Das Widget lädt seine Auswahlwerte geschützt und erst über den separaten Endpunkt. */
+    public function testWidgetDataLoadsOptionsOnlyForAllowedMembers(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($member);
+        MashaFeedlyCategory::ensureDefaultCategories();
+        MashaFeedlyPriority::ensureDefaultPriorities();
+        $this->logInAs($member);
+
+        $response = $this->get('/__masha-feedly/widgetData');
+        $data = json_decode($response->getBody(), true);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('private, no-store', $response->getHeader('Cache-Control'));
+        $this->assertNotEmpty($data['categories']);
+        $this->assertNotEmpty($data['priorities']);
+        $this->assertArrayHasKey('members', $data);
+
+        $this->logInAs($this->objFromFixture(Member::class, 'notAllowed'));
+        $this->assertSame(403, $this->get('/__masha-feedly/widgetData')->getStatusCode());
+        $this->logOut();
+        $this->assertSame(403, $this->get('/__masha-feedly/widgetData')->getStatusCode());
+    }
+
+    /** Die Übersicht enthält keine Detaildaten; nur freigegebene Personen können sie nachladen. */
+    public function testListLoadsDetailsOnlyOnDemand(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($member);
+        $this->logInAs($member);
+        $entry = MashaFeedlyEntry::create([
+            'Content' => 'Beschreibung nur im Detail',
+            'PageURL' => 'https://example.test/performance',
+            'ElementSelector' => '#test',
+        ]);
+        $entry->write();
+        $listResponse = $this->get('/__masha-feedly/listEntries?mode=all');
+        $this->assertMatchesRegularExpression('/^masha_list;dur=\d+(?:\.\d+)?$/', (string)$listResponse->getHeader('Server-Timing'));
+        $list = json_decode($listResponse->getBody(), true);
+        $summary = array_values(array_filter($list['entries'], static fn(array $item): bool => $item['id'] === (int)$entry->ID))[0];
+        foreach (['content', 'comments', 'history', 'attachments', 'relations', 'userAgent', 'estimateAmount'] as $field) {
+            $this->assertArrayNotHasKey($field, $summary);
+        }
+        $this->assertSame('#test', $summary['selector']);
+        $this->assertNotEmpty($summary['activityAt']);
+        $this->assertNotEmpty($entry->LastActivityAt, 'Der Verlauf pflegt den Aktivitätszeitpunkt am Eintrag.');
+        $details = json_decode($this->get('/__masha-feedly/entryDetails?EntryID=' . $entry->ID)->getBody(), true)['entry'];
+        $this->assertSame('Beschreibung nur im Detail', $details['content']);
+        foreach (['comments', 'attachments', 'relations'] as $field) {
+            $this->assertArrayHasKey($field, $details);
+        }
+        $this->assertArrayNotHasKey('history', $details, 'Der Detailabruf lässt den Verlauf für den eigenen Endpunkt offen.');
+        $historyResponse = $this->get('/__masha-feedly/entryHistory?EntryID=' . $entry->ID);
+        $this->assertSame(200, $historyResponse->getStatusCode());
+        $history = json_decode($historyResponse->getBody(), true);
+        $this->assertArrayHasKey('history', $history);
+        $this->assertNotEmpty($history['history']);
+        $this->assertSame(404, $this->get('/__masha-feedly/entryDetails?EntryID=0')->getStatusCode());
+        $this->assertSame(404, $this->get('/__masha-feedly/entryHistory?EntryID=0')->getStatusCode());
+        $this->logInAs($this->objFromFixture(Member::class, 'notAllowed'));
+        $this->assertSame(403, $this->get('/__masha-feedly/entryDetails?EntryID=' . $entry->ID)->getStatusCode());
+        $this->assertSame(403, $this->get('/__masha-feedly/entryHistory?EntryID=' . $entry->ID)->getStatusCode());
+        $this->logOut();
+        $this->assertSame(403, $this->get('/__masha-feedly/entryDetails?EntryID=' . $entry->ID)->getStatusCode());
+        $this->assertSame(403, $this->get('/__masha-feedly/entryHistory?EntryID=' . $entry->ID)->getStatusCode());
+    }
+
     /** Nur Schätzungsmanager erhalten Warteschlangen-Zähler und dürfen ihre gefilterten Listen abrufen. */
     public function testEstimateQueuesAreCountedAndRestrictedToEstimateManagers(): void
     {
@@ -78,7 +170,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         ]);
         $approvedEntry->write();
 
-        $pendingResponse = $this->get('/__masha-feedly/listEntries?mode=estimate-pending');
+        $pendingResponse = $this->getListWithDetails('/__masha-feedly/listEntries?mode=estimate-pending');
         $pendingData = json_decode($pendingResponse->getBody(), true);
         $this->assertSame(200, $pendingResponse->getStatusCode());
         $this->assertSame(1, $pendingData['estimatePendingCount']);
@@ -86,7 +178,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame('estimate-pending', $pendingData['mode']);
         $this->assertSame([(int)$pendingEntry->ID], array_map('intval', array_column($pendingData['entries'], 'id')));
 
-        $approvedResponse = $this->get('/__masha-feedly/listEntries?mode=estimate-approved');
+        $approvedResponse = $this->getListWithDetails('/__masha-feedly/listEntries?mode=estimate-approved');
         $approvedData = json_decode($approvedResponse->getBody(), true);
         $this->assertSame(200, $approvedResponse->getStatusCode());
         $this->assertSame('estimate-approved', $approvedData['mode']);
@@ -98,7 +190,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $approver->MashaFeedlyCanManageEstimates = true;
         $approver->write();
         $this->logInAs($approver);
-        $approverQueue = json_decode($this->get('/__masha-feedly/listEntries?mode=estimate-pending')->getBody(), true);
+        $approverQueue = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=estimate-pending')->getBody(), true);
         $this->assertSame('estimate-pending', $approverQueue['mode']);
         $this->assertSame(1, $approverQueue['estimatePendingCount']);
         $this->assertFalse($approverQueue['canManageEstimate']);
@@ -106,9 +198,9 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
 
         $this->allowMember($ordinaryMember);
         $this->logInAs($ordinaryMember);
-        $denied = $this->get('/__masha-feedly/listEntries?mode=estimate-pending');
+        $denied = $this->getListWithDetails('/__masha-feedly/listEntries?mode=estimate-pending');
         $this->assertSame(403, $denied->getStatusCode());
-        $ordinaryData = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $ordinaryData = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $this->assertSame(0, $ordinaryData['estimatePendingCount']);
         $this->assertSame(0, $ordinaryData['estimateApprovedCount']);
     }
@@ -147,7 +239,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         MashaFeedlyEntryHistory::record($entry, 'estimate', '1 Stunde · 120 €', '2 Stunden · 240 €', $superadmin);
 
         $this->logInAs($unapprovedMember);
-        $response = $this->get('/__masha-feedly/listEntries?mode=all');
+        $response = $this->getListWithDetails('/__masha-feedly/listEntries?mode=all');
         $data = json_decode($response->getBody(), true);
         $listed = array_values(array_filter($data['entries'], static fn(array $item): bool => (int)$item['id'] === (int)$entry->ID))[0];
         $this->assertFalse($data['canManageEstimate']);
@@ -182,7 +274,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertFalse((bool)$unapprovedMember->MashaFeedlyCanManageEstimates, 'A member cannot grant estimate permissions to themselves with a forged CMS field.');
 
         $this->logInAs($approvedMember);
-        $allowedData = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $allowedData = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $allowedEntry = array_values(array_filter($allowedData['entries'], static fn(array $item): bool => (int)$item['id'] === (int)$entry->ID))[0];
         $this->assertFalse($allowedData['canManageEstimate'], 'Eine Freigabeperson darf die Schätzung nicht bearbeiten.');
         $this->assertTrue($allowedData['canApproveEstimate']);
@@ -297,7 +389,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $entry->ReportedByID = (int)$reporter->ID;
         $entry->write();
 
-        $response = $this->get('/__masha-feedly/listEntries?mode=all');
+        $response = $this->getListWithDetails('/__masha-feedly/listEntries?mode=all');
         $data = json_decode($response->getBody(), true);
         $listedEntry = array_values(array_filter($data['entries'], static fn(array $item): bool => (int)$item['id'] === (int)$entry->ID))[0];
 
@@ -341,8 +433,14 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->allowMember($member);
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->MashaFeedlyEmailTestSucceeded = true;
+        $recipient = $this->objFromFixture(Member::class, 'normalize');
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID, (int)$recipient->ID]);
         $config->Title = 'Projekt Zuständigkeitstest';
         $config->write();
+        $recipient->MashaFeedlyEmailNotifications = true;
+        $recipient->MashaFeedlyNotifyNewEntries = true;
+        $recipient->MashaFeedlyEmailAssignedOnly = false;
+        $recipient->write();
         $member->MashaFeedlyEmailNotifications = true;
         $member->MashaFeedlyNotifyNewEntries = true;
         $member->MashaFeedlyNotifyOwnEntryChanges = true;
@@ -372,6 +470,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             'CategoryID' => (int)$category->ID,
             'EntryDate' => '2026-10-01T10:30',
             'DueDate' => '2026-10-10',
+            'DeferredUntil' => '2026-10-12',
             'PageURL' => 'https://example.test/kontakt/?campaign=mailing#formular',
             'ElementSelector' => 'main > button.primary',
             'ElementText' => 'Absenden',
@@ -388,6 +487,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertCount(1, $mailer->messages);
+        $this->assertSame((string)$recipient->Email, $mailer->messages[0]->getTo()[0]->getAddress());
         $mailBody = (string)$mailer->messages[0]->getTextBody();
         $this->assertStringContainsString('Verantwortlich: ' . $member->getName(), $mailBody);
         $this->assertStringNotContainsString('Noch niemand zugeordnet', $mailBody);
@@ -395,6 +495,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $data = json_decode($response->getBody(), true);
         $this->assertTrue($data['success']);
         $this->assertSame('2026-10-10', $data['dueDate']);
+        $this->assertSame('2026-10-12', $data['deferredUntil']);
         $this->assertSame([], $data['attachments']);
         $entry = MashaFeedlyEntry::get()->byID((int)$data['entryID']);
         $this->assertNotNull($entry);
@@ -419,9 +520,10 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(24, (int)$entry->ColorDepth);
         $this->assertSame((int)$category->ID, (int)$entry->CategoryID);
         $this->assertSame('2026-10-10', (string)$entry->DueDate);
+        $this->assertSame('2026-10-12', (string)$entry->DeferredUntil);
         $this->assertSame([(int)$member->ID], array_map('intval', $entry->AssignedMembers()->column('ID')));
 
-        $listResponse = $this->get('/__masha-feedly/listEntries?mode=all&PageURL=' . rawurlencode('https://example.test/kontakt'));
+        $listResponse = $this->getListWithDetails('/__masha-feedly/listEntries?mode=all&PageURL=' . rawurlencode('https://example.test/kontakt'));
         $listData = json_decode($listResponse->getBody(), true);
         $listedEntry = $listData['entries'][0];
         $this->assertSame('Mac OS 10.15.7', $listedEntry['operatingSystem']);
@@ -435,6 +537,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNotEmpty($listedEntry['loggedAt']);
         $this->assertSame([], $listedEntry['attachments']);
         $this->assertSame('2026-10-10', $listedEntry['dueDate']);
+        $this->assertSame('2026-10-12', $listedEntry['deferredUntil']);
         $this->assertSame("1. Kontaktseite öffnen\n2. Formular absenden", $listedEntry['stepsToReproduce']);
         $this->assertSame('Das Formular wird bestätigt.', $listedEntry['expectedResult']);
         $this->assertSame('Der Ladeindikator läuft weiter.', $listedEntry['actualResult']);
@@ -444,6 +547,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             'EntryID' => (int)$entry->ID,
             'CategoryID' => (int)$category->ID,
             'DueDate' => '2026-10-12',
+            'DeferredUntil' => '2026-10-15',
             'StepsToReproduce' => '1. Erneut absenden',
             'ExpectedResult' => 'Bestätigung erscheint.',
             'ActualResult' => 'Fehlermeldung erscheint.',
@@ -457,6 +561,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNotNull($history);
         $this->assertSame('2026-10-10', (string)$history->OldValue);
         $this->assertSame('2026-10-12', (string)$history->NewValue);
+        $this->assertSame('2026-10-15', (string)$reloaded->DeferredUntil);
     }
 
     /** Ungültige Kalenderdaten dürfen nicht als Fälligkeit gespeichert werden. */
@@ -477,6 +582,24 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame($before, MashaFeedlyEntry::get()->count());
     }
 
+    /** Ungültige Zurückstelldaten dürfen nicht gespeichert werden. */
+    public function testInvalidDeferredUntilIsRejected(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($member);
+        MashaFeedlyCategory::ensureDefaultCategories();
+        $this->logInAs($member);
+        $before = MashaFeedlyEntry::get()->count();
+        $response = $this->post('/__masha-feedly/createEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'Content' => 'Ungültiges Zurückstelldatum',
+            'DeferredUntil' => '2026-02-30',
+        ]);
+        $this->assertSame(400, $response->getStatusCode());
+        $this->assertFalse(json_decode($response->getBody(), true)['success']);
+        $this->assertSame($before, MashaFeedlyEntry::get()->count());
+    }
+
     /** Prüft, dass der Feedback-Filter nur wartende Einträge liefert und die Anzahl berechnet. */
     public function testFeedbackModeListsOnlyEntriesWaitingForFeedback(): void
     {
@@ -487,8 +610,10 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
         $entry->CategoryID = (int)$feedback->ID;
         $entry->PageURL = 'https://example.test/feedback';
-        $entry->write();
+        $entry->ElementSelector = '#feedback-area';
         MashaFeedlyPriority::ensureDefaultPriorities();
+        $entry->PriorityID = (int)MashaFeedlyPriority::defaultPriority()->ID;
+        $entry->write();
         $done = MashaFeedlyCategory::get()->filter('Title', 'Done')->first();
         $closedEntry = MashaFeedlyEntry::create([
             'Content' => 'Bereits erledigt',
@@ -499,7 +624,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $closedEntry->write();
         $this->logInAs($member);
 
-        $response = $this->get('/__masha-feedly/listEntries?mode=feedback');
+        $response = $this->getListWithDetails('/__masha-feedly/listEntries?mode=feedback');
         $data = json_decode($response->getBody(), true);
 
         $this->assertSame(200, $response->getStatusCode());
@@ -507,12 +632,12 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(1, $data['feedbackCount']);
         $this->assertSame([(int)$entry->ID], array_column($data['entries'], 'id'));
 
-        $pageOpen = json_decode($this->get('/__masha-feedly/listEntries?mode=page-open&PageURL=' . rawurlencode('https://example.test/feedback'))->getBody(), true);
+        $pageOpen = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=page-open&PageURL=' . rawurlencode('https://example.test/feedback'))->getBody(), true);
         $this->assertSame('page-open', $pageOpen['mode']);
         $this->assertSame([(int)$entry->ID], array_column($pageOpen['entries'], 'id'));
 
         $this->logOut();
-        $forbidden = $this->get('/__masha-feedly/listEntries?mode=feedback');
+        $forbidden = $this->getListWithDetails('/__masha-feedly/listEntries?mode=feedback');
         $this->assertSame(403, $forbidden->getStatusCode());
     }
 
@@ -530,11 +655,11 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         ]);
 
         $this->assertSame(403, $response->getStatusCode());
-        $listResponse = $this->get('/__masha-feedly/listEntries?mode=page&PageURL=' . rawurlencode('https://example.test/kontakt'));
+        $listResponse = $this->getListWithDetails('/__masha-feedly/listEntries?mode=page&PageURL=' . rawurlencode('https://example.test/kontakt'));
         $this->assertSame(403, $listResponse->getStatusCode());
         $baseResponse = $this->get('/__masha-feedly');
         $this->assertSame(403, $baseResponse->getStatusCode());
-        $allEntriesResponse = $this->get('/__masha-feedly/listEntries?mode=all');
+        $allEntriesResponse = $this->getListWithDetails('/__masha-feedly/listEntries?mode=all');
         $this->assertSame(403, $allEntriesResponse->getStatusCode());
         $this->assertStringNotContainsString('Sichtbarer Testeintrag', $allEntriesResponse->getBody());
         $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
@@ -571,7 +696,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertStringNotContainsString('<img', (string)$entry->Content);
         $this->assertStringContainsString('&lt;script&gt;', (string)$entry->Content);
 
-        $list = $this->get('/__masha-feedly/listEntries?mode=all');
+        $list = $this->getListWithDetails('/__masha-feedly/listEntries?mode=all');
         $data = json_decode($list->getBody(), true);
         $listed = array_values(array_filter($data['entries'], static fn(array $item): bool => (int)$item['id'] === $entryID))[0];
         $this->assertSame($payload, $listed['content']);
@@ -618,6 +743,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             'SecurityID' => SecurityToken::getSecurityID(),
             'Content' => 'Suche liefert keine Ergebnisse.',
             'PageURL' => 'https://example.test/priorities',
+            'ElementSelector' => '#priority-first',
         ]);
         $this->assertSame(200, $created->getStatusCode());
         $entryID = (int)json_decode($created->getBody(), true)['entryID'];
@@ -642,7 +768,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $data = json_decode($updated->getBody(), true);
         $this->assertSame('Sofort bearbeiten', $data['history'][0]['newValue']);
 
-        $listed = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $listed = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $payload = array_values(array_filter($listed['entries'], static fn(array $item): bool => (int)$item['id'] === $entryID))[0];
         $this->assertSame((int)$critical->ID, $payload['priorityID']);
         $this->assertSame('Sofort bearbeiten', $payload['priorityTitle']);
@@ -655,10 +781,11 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             'SecurityID' => SecurityToken::getSecurityID(),
             'Content' => 'Ein wichtiger Fehler mit Umgehung.',
             'PageURL' => 'https://example.test/priorities',
+            'ElementSelector' => '#priority-second',
             'PriorityID' => (int)MashaFeedlyPriority::get()->filter('Title', 'Zeitnah bearbeiten')->first()->ID,
         ]);
         $highID = (int)json_decode($highCreated->getBody(), true)['entryID'];
-        $ordered = json_decode($this->get('/__masha-feedly/listEntries?mode=page&PageURL=' . rawurlencode('https://example.test/priorities'))->getBody(), true);
+        $ordered = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=page&PageURL=' . rawurlencode('https://example.test/priorities'))->getBody(), true);
         $this->assertSame([$entryID, $highID], array_column($ordered['entries'], 'id'));
 
         $invalid = $this->post('/__masha-feedly/updateEntry', [
@@ -718,7 +845,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             'CommentAction' => 'delete',
             'CommentID' => (int)$comment->ID,
         ]);
-        $privateList = $this->get('/__masha-feedly/listEntries?mode=all');
+        $privateList = $this->getListWithDetails('/__masha-feedly/listEntries?mode=all');
 
         foreach ([$create, $update, $commentCreate, $commentEdit, $commentDelete, $privateList] as $response) {
             $this->assertSame(403, $response->getStatusCode());
@@ -773,6 +900,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $getRoutes = [
             '/__masha-feedly',
             '/__masha-feedly/savedViews',
+            '/__masha-feedly/widgetData',
             '/__masha-feedly/createEntry',
             '/__masha-feedly/updateEntry',
             '/__masha-feedly/findSimilarEntries?Content=GESCHUETZTER-MATRIX-EINTRAG',
@@ -1065,6 +1193,11 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $blocked = $this->objFromFixture(Member::class, 'notAllowed');
         $entry = $this->objFromFixture(MashaFeedlyEntry::class, 'visibleEntry');
         $entry->PageURL = 'https://example.test/kontakt';
+        MashaFeedlyCategory::ensureDefaultCategories();
+        MashaFeedlyPriority::ensureDefaultPriorities();
+        $entry->CategoryID = (int)MashaFeedlyCategory::defaultCategory()->ID;
+        $entry->PriorityID = (int)MashaFeedlyPriority::defaultPriority()->ID;
+        $entry->ElementSelector = '#shared-link';
         $entry->write();
         $this->allowMember($allowed);
         $sharedPath = '/__masha-feedly/listEntries?mode=page&PageURL=' . rawurlencode((string)$entry->PageURL)
@@ -1115,7 +1248,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             ]);
             $data = json_decode($response->getBody(), true);
             $this->logInAs($otherAllowedMember);
-            $otherUserList = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+            $otherUserList = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         } finally {
             $_FILES = $originalFiles;
             TestAssetStore::reset();
@@ -1239,7 +1372,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $file = File::get()->byID((int)$savedEntry->Attachments()->first()->FileID);
         $this->assertTrue($file->canView($member));
         $this->assertFalse($file->canView($blockedMember));
-        $listData = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $listData = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $listedEntry = array_values(array_filter($listData['entries'], static fn(array $item): bool => (int)$item['id'] === (int)$entry->ID))[0];
         $attachmentEvents = array_values(array_filter($listedEntry['history'], static fn(array $item): bool => $item['type'] === 'attachment'));
         $this->assertCount(1, $attachmentEvents);
@@ -1273,9 +1406,18 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             'Content' => 'Noch nicht zugewiesen',
             'CategoryID' => (int)$category->ID,
             'PageURL' => 'https://example.test/kontakt',
+            'ElementSelector' => '#contact-description',
             'EntryDate' => '2026-10-01 09:00:00',
         ]);
         $onPageUnassigned->write();
+        $onPageWithoutArea = MashaFeedlyEntry::create([
+            'Content' => 'Eintrag ohne gespeicherten Seitenbereich',
+            'CategoryID' => (int)$category->ID,
+            'PageURL' => 'https://example.test/kontakt',
+            'ElementSelector' => '',
+            'EntryDate' => '2026-10-01 08:00:00',
+        ]);
+        $onPageWithoutArea->write();
         $elsewhereAssigned = MashaFeedlyEntry::create([
             'Content' => 'Eintrag von einer anderen Seite',
             'CategoryID' => (int)$category->ID,
@@ -1286,11 +1428,12 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $elsewhereAssigned->AssignedMembers()->setByIDList([(int)$member->ID]);
         $this->logInAs($member);
 
-        $pageResponse = $this->get('/__masha-feedly/listEntries?mode=page&PageURL=' . rawurlencode('https://example.test/kontakt/?campaign=mailing#formular'));
+        $pageResponse = $this->getListWithDetails('/__masha-feedly/listEntries?mode=page&PageURL=' . rawurlencode('https://example.test/kontakt/?campaign=mailing#formular'));
         $pageData = json_decode($pageResponse->getBody(), true);
         $this->assertSame(200, $pageResponse->getStatusCode());
         $this->assertSame(2, $pageData['pageCount']);
         $this->assertSame(2, $pageData['pageOpenCount']);
+        $this->assertNotContains((int)$onPageWithoutArea->ID, array_column($pageData['entries'], 'id'), 'Ohne gespeicherten Seitenbereich gehört ein Eintrag nicht zur aktuellen Seite.');
         $this->assertSame((int)$pageData['totalCount'], $pageData['openCount']);
         $this->assertSame((int)MashaFeedlyEntry::get()->count(), $pageData['totalCount']);
         $this->assertCount(2, $pageData['entries']);
@@ -1319,7 +1462,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNotEmpty($pageData['entries'][0]['assignees'][0]['color']);
         $this->assertStringContainsString('/__masha-feedly-effects/avatar/person/black', $pageData['entries'][0]['assignees'][0]['imageURL']);
 
-        $mineResponse = $this->get('/__masha-feedly/listEntries?mode=mine&PageURL=' . rawurlencode('https://example.test/kontakt/?campaign=mailing#formular'));
+        $mineResponse = $this->getListWithDetails('/__masha-feedly/listEntries?mode=mine&PageURL=' . rawurlencode('https://example.test/kontakt/?campaign=mailing#formular'));
         $mineData = json_decode($mineResponse->getBody(), true);
         $this->assertSame(200, $mineResponse->getStatusCode());
         $this->assertSame(2, $mineData['mineCount']);
@@ -1347,7 +1490,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $doneCategory = MashaFeedlyCategory::get()->filter('Title', 'Done')->first();
         $onPageUnassigned->CategoryID = (int)$doneCategory->ID;
         $onPageUnassigned->write();
-        $updatedResponse = $this->get('/__masha-feedly/listEntries?mode=page&PageURL=' . rawurlencode('https://example.test/kontakt'));
+        $updatedResponse = $this->getListWithDetails('/__masha-feedly/listEntries?mode=page&PageURL=' . rawurlencode('https://example.test/kontakt'));
         $updatedData = json_decode($updatedResponse->getBody(), true);
         $this->assertSame(1, $updatedData['pageOpenCount']);
         $this->assertSame((int)$updatedData['totalCount'] - 1, $updatedData['openCount']);
@@ -1357,13 +1500,13 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         ))[0];
         $this->assertTrue($updatedEntryData['isClosed']);
 
-        $allResponse = $this->get('/__masha-feedly/listEntries?mode=all&PageURL=' . rawurlencode('https://example.test/kontakt'));
+        $allResponse = $this->getListWithDetails('/__masha-feedly/listEntries?mode=all&PageURL=' . rawurlencode('https://example.test/kontakt'));
         $allData = json_decode($allResponse->getBody(), true);
         $this->assertSame(200, $allResponse->getStatusCode());
         $this->assertSame('all', $allData['mode']);
         $this->assertSame((int)MashaFeedlyEntry::get()->count(), count($allData['entries']));
 
-        $openResponse = $this->get('/__masha-feedly/listEntries?mode=open&PageURL=' . rawurlencode('https://example.test/kontakt'));
+        $openResponse = $this->getListWithDetails('/__masha-feedly/listEntries?mode=open&PageURL=' . rawurlencode('https://example.test/kontakt'));
         $openData = json_decode($openResponse->getBody(), true);
         $this->assertSame(200, $openResponse->getStatusCode());
         $this->assertSame('open', $openData['mode']);
@@ -1371,7 +1514,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNotEmpty($openData['entries']);
         $this->assertNotContains(true, array_column($openData['entries'], 'isClosed'), 'Der Offen-Filter darf keine abgeschlossenen Einträge ausliefern.');
 
-        $closedResponse = $this->get('/__masha-feedly/listEntries?mode=closed&PageURL=' . rawurlencode('https://example.test/kontakt'));
+        $closedResponse = $this->getListWithDetails('/__masha-feedly/listEntries?mode=closed&PageURL=' . rawurlencode('https://example.test/kontakt'));
         $closedData = json_decode($closedResponse->getBody(), true);
         $this->assertSame(200, $closedResponse->getStatusCode());
         $this->assertSame('closed', $closedData['mode']);
@@ -1379,6 +1522,65 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNotEmpty($closedData['entries']);
         $this->assertNotContains(false, array_column($closedData['entries'], 'isClosed'), 'Der Filter für abgeschlossene Meldungen darf keine offenen Einträge ausliefern.');
         $this->assertSame([], array_intersect(array_column($openData['entries'], 'id'), array_column($closedData['entries'], 'id')));
+    }
+
+    /** Neue Zuständigkeit meldet genau eine Änderung; entfernte Zuständigkeit erhält keine Mail. */
+    public function testAssignmentOnlyUpdateNotifiesCurrentAssigneeExactlyOnce(): void
+    {
+        $editor = $this->objFromFixture(Member::class, 'allowed');
+        $recipient = $this->objFromFixture(Member::class, 'normalize');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$editor->ID, (int)$recipient->ID]);
+        $config->write();
+        $editor->MashaFeedlyEmailNotifications = false;
+        $editor->write();
+        $recipient->MashaFeedlyEmailNotifications = true;
+        $recipient->MashaFeedlyEmailAssignedOnly = true;
+        $recipient->MashaFeedlyNotifyEntryUpdates = true;
+        $recipient->write();
+        $this->logInAs($editor);
+        $entry = MashaFeedlyEntry::create(['Content' => 'Reine Zuständigkeitsänderung']);
+        $entry->write();
+        $mailer = new class implements MailerInterface {
+            /** @var RawMessage[] Im Test gesammelte Nachrichten. */
+            public array $messages = [];
+            public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
+        };
+        $injector = Injector::inst();
+        $originalMailer = $injector->get(MailerInterface::class);
+        $injector->registerService($mailer, MailerInterface::class);
+        try {
+            $post = ['SecurityID' => SecurityToken::getSecurityID(), 'EntryID' => (int)$entry->ID, 'CategoryID' => (int)$entry->CategoryID];
+            $response = $this->post('/__masha-feedly/updateEntry', $post + ['AssignedMemberIDs' => [(int)$recipient->ID]]);
+            $this->assertSame(200, $response->getStatusCode(), $response->getBody());
+            $this->assertCount(1, $mailer->messages);
+            $this->assertSame((string)$recipient->Email, $mailer->messages[0]->getTo()[0]->getAddress());
+            $mailer->messages = [];
+            $response = $this->post('/__masha-feedly/updateEntry', $post + ['AssignedMemberIDs' => []]);
+            $this->assertSame(200, $response->getStatusCode());
+            $this->assertCount(0, $mailer->messages);
+            $response = $this->post('/__masha-feedly/updateEntry', $post + ['AssignedMemberIDs' => [(int)$recipient->ID], 'DueDate' => '2026-10-15']);
+            $this->assertSame(200, $response->getStatusCode());
+            $this->assertCount(1, $mailer->messages, 'Gleichzeitige Feldänderung verursacht keine doppelte Mail.');
+            $recipient->MashaFeedlyNotifyEntryUpdates = false;
+            $recipient->MashaFeedlyNotifyNewEntries = true;
+            $recipient->write();
+            $mailer->messages = [];
+            $this->post('/__masha-feedly/updateEntry', $post + ['AssignedMemberIDs' => []]);
+            $response = $this->post('/__masha-feedly/updateEntry', $post + ['AssignedMemberIDs' => [(int)$recipient->ID]]);
+            $this->assertSame(200, $response->getStatusCode());
+            $this->assertCount(1, $mailer->messages, 'Eine Zuweisung zählt zum Neu-Abo, auch ohne Änderungsabo.');
+            $recipient->MashaFeedlyNotifyNewEntries = false;
+            $recipient->write();
+            $mailer->messages = [];
+            $this->post('/__masha-feedly/updateEntry', $post + ['AssignedMemberIDs' => []]);
+            $this->post('/__masha-feedly/updateEntry', $post + ['AssignedMemberIDs' => [(int)$recipient->ID]]);
+            $this->assertCount(0, $mailer->messages);
+
+        } finally {
+            $injector->registerService($originalMailer, MailerInterface::class);
+        }
     }
 
     /** Prüft, dass Status und Zuständigkeit änderbar sind, während der Meldungstext erhalten bleibt. */
@@ -1413,7 +1615,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame((int)$doneCategory->ID, (int)$entry->CategoryID);
         $this->assertSame('Originaler Fehlertext bleibt unverändert.', strip_tags((string)$entry->Content));
         $this->assertSame([(int)$member->ID], array_map('intval', $entry->AssignedMembers()->column('ID')));
-        $listData = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $listData = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $entryPayload = array_values(array_filter(
             $listData['entries'],
             fn(array $item): bool => (int)$item['id'] === (int)$entry->ID
@@ -1609,7 +1811,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNotContains((int)$entry->ID, MashaFeedlyEntryRead::unreadEntryIDs($member), 'Der Kommentator hat die eigene Aktivität bereits gesehen.');
         $this->assertContains((int)$entry->ID, MashaFeedlyEntryRead::unreadEntryIDs($other), 'Der andere freigegebene Benutzer soll den neuen Kommentar als ungelesene Aktivität sehen.');
 
-        $list = $this->get('/__masha-feedly/listEntries?mode=all');
+        $list = $this->getListWithDetails('/__masha-feedly/listEntries?mode=all');
         $listedEntry = json_decode($list->getBody(), true)['entries'][0];
         $this->assertCount(1, $listedEntry['comments']);
         $this->assertSame($data['comment']['id'], $listedEntry['comments'][0]['id']);
@@ -1644,7 +1846,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $legacyComment->Created = date('Y-m-d H:i:s', time() - 120);
         $legacyComment->LastEdited = date('Y-m-d H:i:s');
         $legacyComment->write();
-        $reloadedEntries = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true)['entries'];
+        $reloadedEntries = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true)['entries'];
         $reloadedComment = $reloadedEntries[0]['comments'][0];
         $this->assertTrue($reloadedComment['edited']);
 
@@ -1731,7 +1933,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(400, $invalid->getStatusCode());
 
         $this->logInAs($author);
-        $visible = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true)['entries'];
+        $visible = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true)['entries'];
         $listed = array_values(array_filter($visible, static fn(array $item): bool => $item['id'] === (int)$entry->ID))[0]['comments'][0];
         $this->assertCount(6, $listed['reactions']);
         $authorHeart = array_values(array_filter($listed['reactions'], static fn(array $item): bool => $item['emoji'] === '❤️'))[0];
@@ -1781,10 +1983,10 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $commentHistory->write();
         $this->logInAs($member);
 
-        $listed = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $listed = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $entryData = array_values(array_filter($listed['entries'], static fn(array $item): bool => $item['id'] === (int)$entry->ID))[0];
         $this->assertTrue($entryData['isUnread'], 'Das rechte Frontend-Panel braucht ein sichtbares Aktivitätskennzeichen.');
-        $unreadList = json_decode($this->get('/__masha-feedly/listEntries?mode=unread')->getBody(), true);
+        $unreadList = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=unread')->getBody(), true);
         $this->assertSame(1, $unreadList['unreadCount']);
         $this->assertSame(1, $unreadList['unreadCommentCount'], 'Das Neuigkeiten-Summary muss neue Kommentare separat zählen.');
         $this->assertSame([(int)$entry->ID], array_map(static fn(array $item): int => (int)$item['id'], $unreadList['entries']));
@@ -1797,10 +1999,10 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertTrue(json_decode($readResponse->getBody(), true)['success']);
         $this->assertSame(0, json_decode($readResponse->getBody(), true)['unreadCount']);
         $this->assertSame(0, json_decode($readResponse->getBody(), true)['unreadCommentCount']);
-        $reloaded = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $reloaded = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $entryData = array_values(array_filter($reloaded['entries'], static fn(array $item): bool => $item['id'] === (int)$entry->ID))[0];
         $this->assertFalse($entryData['isUnread'], 'Nach dem Öffnen muss der Hinweis verschwinden.');
-        $unreadAfterRead = json_decode($this->get('/__masha-feedly/listEntries?mode=unread')->getBody(), true);
+        $unreadAfterRead = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=unread')->getBody(), true);
         $this->assertSame([], $unreadAfterRead['entries']);
     }
 
@@ -1846,7 +2048,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNotContains($entryID, MashaFeedlyEntryRead::unreadEntryIDs($commenter), 'Die kommentierende Person soll den eigenen Kommentar nicht als ungelesen sehen.');
 
         $this->logInAs($creator);
-        $list = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $list = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $entryData = array_values(array_filter($list['entries'], static fn(array $item): bool => (int)$item['id'] === $entryID))[0];
         $this->assertTrue($entryData['isUnread'], 'Der Ersteller muss die neue Kommentaraktivität trotz fehlender Zuständigkeit sehen.');
         $this->assertStringContainsString('/__masha-feedly-effects/avatar/person/black', $entryData['createdByImageURL']);
@@ -1854,12 +2056,12 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame('User 1 hat einen Kommentar ergänzt.', $entryData['comments'][0]['text']);
         $this->assertNotSame('', $entryData['comments'][0]['authorInitials']);
         $this->assertStringContainsString('/__masha-feedly-effects/avatar/person/black', $entryData['comments'][0]['authorImageURL']);
-        $news = json_decode($this->get('/__masha-feedly/listEntries?mode=unread')->getBody(), true);
+        $news = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=unread')->getBody(), true);
         $this->assertContains($entryID, array_map(static fn(array $item): int => (int)$item['id'], $news['entries']));
         // Auch ältere Einträge zeigen die aktuelle Profilfarbe und die dazu passende lokale Icon-Variante.
         $creator->MashaFeedlyColor = '#C05CC8';
         $creator->write();
-        $updatedList = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $updatedList = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $updatedEntry = array_values(array_filter($updatedList['entries'], static fn(array $item): bool => (int)$item['id'] === $entryID))[0];
         $this->assertSame('#C05CC8', $updatedEntry['createdByColor']);
         $this->assertStringContainsString('/__masha-feedly-effects/avatar/person/white', $updatedEntry['createdByImageURL']);
@@ -2020,7 +2222,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             $this->assertCount(1, $mailer->messages);
             $this->assertSame('normalize@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
             $this->assertStringContainsString('Die Suche findet keine Ergebnisse.', (string)$mailer->messages[0]->getTextBody());
-            $listData = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+            $listData = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
             $entryPayload = array_values(array_filter(
                 $listData['entries'],
                 fn(array $item): bool => (int)$item['id'] === (int)$entry->ID
@@ -2241,12 +2443,21 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             'SecurityID' => SecurityToken::getSecurityID(),
             'EmailSettingsSubmitted' => '1',
             'MashaFeedlyEmailNotifications' => '1',
+            'MashaFeedlyEmailAssignedOnly' => '1',
             'MashaFeedlyNotifyNewEntries' => '1',
             'MashaFeedlyNotifyComments' => '0',
         ]);
         $this->assertSame(200, $saved->getStatusCode());
         $reloaded = Member::get()->byID((int)$member->ID);
         $this->assertTrue((bool)$reloaded->MashaFeedlyEmailNotifications);
+        $this->assertTrue((bool)$reloaded->MashaFeedlyEmailAssignedOnly);
+        $this->post('/__masha-feedly/saveProfilePreferences', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EmailSettingsSubmitted' => '1',
+            'MashaFeedlyEmailNotifications' => '1',
+            'MashaFeedlyEmailAssignedOnly' => '0',
+        ]);
+        $this->assertFalse((bool)Member::get()->byID((int)$member->ID)->MashaFeedlyEmailAssignedOnly);
         $this->assertTrue((bool)$reloaded->MashaFeedlyNotifyNewEntries);
         $this->assertFalse((bool)$reloaded->MashaFeedlyNotifyComments);
         $this->assertFalse((bool)$reloaded->MashaFeedlyNotifyOwnEntryChanges, 'Nicht markierte Auswahlfelder werden als ausgeschaltet gespeichert.');
@@ -2418,7 +2629,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertStringContainsString('#' . (int)$samePage->ID, (string)$history->NewValue);
         $this->assertStringContainsString('#' . (int)$otherPage->ID, (string)$history->NewValue);
 
-        $listData = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $listData = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $listedEntry = array_values(array_filter($listData['entries'], static fn(array $item): bool => $item['id'] === (int)$entry->ID))[0];
         $this->assertSame($data['relations'], $listedEntry['relations'], 'Verknüpfungen müssen nach einem neuen Request erneut erscheinen.');
         $listedTarget = array_values(array_filter($listData['entries'], static fn(array $item): bool => $item['id'] === (int)$samePage->ID))[0];
@@ -2443,7 +2654,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             $this->assertSame(200, $typedResponse->getStatusCode());
             $this->assertSame($relationType, $typedData['relations'][0]['type']);
             $this->assertSame($relationType, (string)$entry->Relations()->first()->LinkType);
-            $listedData = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+            $listedData = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
             $listedTarget = array_values(array_filter($listedData['entries'], static fn(array $item): bool => $item['id'] === (int)$samePage->ID))[0];
             $incomingType = $relationType === 'blocked_by' ? 'blocks' : 'related_to';
             $this->assertContains([
@@ -2547,7 +2758,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertNotEmpty($events[2]->Created);
         $this->assertSame([], $removedData['relations']);
 
-        $listed = json_decode($this->get('/__masha-feedly/listEntries?mode=all')->getBody(), true);
+        $listed = json_decode($this->getListWithDetails('/__masha-feedly/listEntries?mode=all')->getBody(), true);
         $listedTarget = array_values(array_filter($listed['entries'], static fn(array $item): bool => (int)$item['id'] === (int)$firstTarget->ID))[0];
         $this->assertSame([], $listedTarget['relations'], 'Entfernte Beziehungen dürfen auch beim Ziel nicht mehr als eingehend erscheinen.');
         $listedSource = array_values(array_filter($listed['entries'], static fn(array $item): bool => (int)$item['id'] === (int)$entry->ID))[0];

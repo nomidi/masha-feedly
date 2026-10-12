@@ -26,9 +26,9 @@ class MashaFeedlyEffectClient
             'serious' => i18n::_t('KW\\MashaFeedly\\Translations.CONFIG_THEME_SERIOUS', 'Sachlich'),
         ];
         try {
-            $client = new self();
             $options = [];
-            foreach ($client->catalogue()['categories'] as $category) $options[$category['id']] = $category['name'];
+            $categories = self::hasConfiguredProvider() ? (new self())->catalogue()['categories'] : [];
+            foreach ($categories as $category) $options[$category['id']] = $category['name'];
             if (!$options) $options = [
                 'playful' => i18n::_t('KW\\MashaFeedly\\Translations.CONFIG_THEME_PLAYFUL', 'Verspielt'),
                 'serious' => i18n::_t('KW\\MashaFeedly\\Translations.CONFIG_THEME_SERIOUS', 'Sachlich'),
@@ -149,6 +149,54 @@ class MashaFeedlyEffectClient
         return $result;
     }
 
+    /**
+     * Liefert gemeinsame Mailtexte aus dem Effekt-Anbieter und cached sie kurzzeitig.
+     * @return array{version: int, footer: string, welcome: array{du: string, sie: string}, notifications: array<string, array{du: string, sie: string}>} Geprüfte Mailtexte.
+     * @throws RuntimeException Bei ungültiger Anbieterantwort.
+     */
+    public function emailDefaults(bool $refresh = false): array
+    {
+        $this->requireConfiguredProvider();
+        $key = $this->cachePrefix() . '_email_defaults_v1';
+        $cached = $refresh ? null : $this->cache->get($key);
+        if (is_array($cached) && ($cached['expires'] ?? 0) > time()) return $cached['data'];
+
+        $response = $this->request('email-defaults');
+        try {
+            $data = json_decode($response['body'], true, 32, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            throw new RuntimeException('Die E-Mail-Texte des Effekt-Anbieters sind kein gültiges JSON.', 502);
+        }
+        $requiredTypes = ['newEntry', 'updatedEntry', 'newComment', 'dueDate', 'costEstimate'];
+        if (!is_array($data) || ($data['version'] ?? null) !== 1 || !is_string($data['footer'] ?? null)
+            || !is_array($data['welcome'] ?? null) || !is_array($data['notifications'] ?? null)) {
+            throw new RuntimeException('Die Struktur der E-Mail-Texte des Effekt-Anbieters ist ungültig.', 502);
+        }
+        foreach (['du', 'sie'] as $address) {
+            if (!is_string($data['welcome'][$address] ?? null) || strlen($data['welcome'][$address]) > 20000) {
+                throw new RuntimeException('Ein Willkommenstext des Effekt-Anbieters ist ungültig.', 502);
+            }
+        }
+        $notifications = [];
+        foreach ($requiredTypes as $type) {
+            $notification = $data['notifications'][$type] ?? [];
+            if (!is_array($notification)) throw new RuntimeException('Ein Benachrichtigungstext des Effekt-Anbieters ist ungültig.', 502);
+            foreach (['du', 'sie'] as $address) {
+                $text = $notification[$address] ?? '';
+                if (!is_string($text) || strlen($text) > 20000) throw new RuntimeException('Ein Benachrichtigungstext des Effekt-Anbieters ist ungültig.', 502);
+                $notifications[$type][$address] = $text;
+            }
+        }
+        $result = [
+            'version' => 1,
+            'footer' => substr($data['footer'], 0, 20000),
+            'welcome' => ['du' => $data['welcome']['du'], 'sie' => $data['welcome']['sie']],
+            'notifications' => $notifications,
+        ];
+        $this->cache->set($key, ['expires' => time() + 300, 'data' => $result], 300);
+        return $result;
+    }
+
     /** Liefert nur die zum aktuellen Icon-Katalog gehörende Farbvariante. @return array{body: string, mime: string} Versionierte SVG-Datei. */
     public function avatarIcon(string $id, string $version, string $color): array
     {
@@ -255,9 +303,22 @@ class MashaFeedlyEffectClient
     {
         $base = trim((string)(Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL') ?: MashaFeedlyEffectProvider::config()->get('base_url')));
         $key = trim((string)Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY'));
+        $localProvider = false;
+        if ($base === '') {
+            $localBase = rtrim(trim((string)MashaFeedlyEffectProvider::config()->get('local_provider_base_url')), '/');
+            $manifestURL = MashaFeedlyEffectProvider::manifestURL();
+            if ($localBase !== '' && str_starts_with($manifestURL, $localBase . '/__masha-effects/')) {
+                $base = $localBase;
+                $localProvider = true;
+            }
+        }
         $parts = $base !== '' ? parse_url($base) : false;
-        return (bool)($parts && ($parts['scheme'] ?? '') === 'https' && !empty($parts['host']) && !isset($parts['user']) && !isset($parts['pass'])
-            && !isset($parts['query']) && !isset($parts['fragment']) && preg_match('/^[A-Za-z0-9_-]{32,256}$/D', $key));
+        $secureExternalProvider = $parts && ($parts['scheme'] ?? '') === 'https' && !empty($parts['host'])
+            && !isset($parts['user']) && !isset($parts['pass']) && !isset($parts['query']) && !isset($parts['fragment']);
+        $trustedLocalProvider = $localProvider && $parts && in_array($parts['scheme'] ?? '', ['https', 'http'], true)
+            && !empty($parts['host']) && !isset($parts['user']) && !isset($parts['pass'])
+            && !isset($parts['query']) && !isset($parts['fragment']);
+        return (bool)(($secureExternalProvider || $trustedLocalProvider) && preg_match('/^[A-Za-z0-9_-]{32,256}$/D', $key));
     }
 
     /** @return array<string, mixed> Gültiger Anbieter-Katalog; die Restlaufzeit begrenzt den Browsercache. */
@@ -294,7 +355,13 @@ class MashaFeedlyEffectClient
                 if (!in_array($type, ['js', 'css', 'image'], true) || !is_string($url) || $this->fileParameters($url)[2] !== $type) throw new RuntimeException('Ungültige Effekt-Datei.', 502);
             }
             if (array_key_exists('hasSound', $effect) && !is_bool($effect['hasSound'])) throw new RuntimeException('Ungültige Sound-Kennzeichnung.', 502);
-            $effects[] = array_intersect_key($effect, array_flip(['id', 'name', 'categories', 'weight', 'files', 'hasSound']));
+            // Ältere Anbieter liefern keine Texte; vorhandene Texte bleiben als Klartext erhalten.
+            foreach (['text', 'detail'] as $field) {
+                if (array_key_exists($field, $effect) && !is_string($effect[$field])) {
+                    throw new RuntimeException('Ungültiger Effekt-Text.', 502);
+                }
+            }
+            $effects[] = array_intersect_key($effect, array_flip(['id', 'name', 'categories', 'weight', 'files', 'hasSound', 'text', 'detail']));
         }
         $ttl = min(300, max(1, (int)($data['maxAge'] ?? 60)));
         $result = ['version' => 2, 'maxAge' => $ttl, 'categories' => array_values($categories), 'effects' => $effects];
@@ -347,6 +414,7 @@ class MashaFeedlyEffectClient
                 $controller = \KW\MashaEffects\Control\EffectsController::create();
                 if ($endpoint === 'manifest') $response = $controller->manifest($request);
                 elseif ($endpoint === 'icons') $response = $controller->icons($request);
+                elseif ($endpoint === 'email-defaults') $response = $controller->emailDefaults($request);
                 elseif (str_starts_with($endpoint, 'icon/')) {
                     [$id, $version, $color] = explode('/', substr($endpoint, strlen('icon/')));
                     $request->setRouteParams(['ID' => $id, 'Version' => $version, 'Color' => $color]);

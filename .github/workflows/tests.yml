@@ -1,8 +1,7 @@
 name: Tests
 
 on:
-  push:
-  pull_request:
+  # Automatische Läufe sind vorübergehend pausiert, bis die CI-Einrichtung korrigiert ist.
   workflow_dispatch:
 
 permissions:

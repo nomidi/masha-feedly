@@ -16,10 +16,16 @@ function environment(effects = [definition()], options = {}) {
   const played = [];
   const timers = new Map();
   const listeners = {};
+  const sessionStorage = options.sessionStorage || new Map();
   const window = {
     location: { href: 'https://site.test/' },
     KWMashaFeedlyEffectsManifestURL: 'https://effects.test/__masha-effects/manifest',
     KWMashaFeedlyEffectModules: {},
+    sessionStorage: {
+      getItem: (key) => sessionStorage.has(key) ? sessionStorage.get(key) : null,
+      setItem: (key, value) => sessionStorage.set(key, value),
+      removeItem: (key) => sessionStorage.delete(key),
+    },
     matchMedia: () => ({ matches: !!options.reduced }),
     setTimeout: (callback) => { const key = {}; timers.set(key, callback); return key; },
     clearTimeout: (key) => timers.delete(key),
@@ -59,8 +65,18 @@ function environment(effects = [definition()], options = {}) {
   };
   window.KWMashaFeedlyDOM = { root: () => shadow, widget: () => options.widget || null };
   vm.runInNewContext(source, { window, document, URL, AbortSignal, Date: class extends Date { static now() { return now; } }, console: { warn() {} } });
-  return { api: window.KWMashaFeedlyEffects, window, document, appended, played, listeners, timers, requests: () => requests, expire: () => { now += 301000; } };
+  return { api: window.KWMashaFeedlyEffects, window, document, appended, played, listeners, timers, sessionStorage, requests: () => requests, expire: () => { now += 301000; } };
 }
+
+test('fragt ohne konfigurierte Manifest-Adresse keinen Anbieter ab', async () => {
+  const env = environment();
+  env.window.KWMashaFeedlyEffectsManifestURL = '';
+  const catalogue = await env.api.refreshCatalogue();
+  assert.equal(catalogue.categories.length, 0);
+  assert.equal(catalogue.effects.length, 0);
+  await env.api.refresh();
+  assert.equal(env.requests(), 0);
+});
 
 test('führt parallele Manifest-Anfragen zusammen und aktualisiert nach fünf Minuten', async () => {
   const env = environment();
@@ -98,6 +114,58 @@ test('lädt CSS im Shadow Root und JS nur einmal pro Version im Dokument', async
   assert.equal(env.played.length, 2);
   assert.equal(env.listeners.pointerdown(), 2);
   assert.ok(env.played.every(item => item.layer.removed));
+});
+
+test('startet das Vorladen erst nach dem Listen-Rendern in der Leerlaufzeit', async () => {
+  const env = environment();
+  assert.equal(env.requests(), 0);
+  env.listeners['kw-masha-feedly:onboarding-list-rendered']();
+  assert.equal(env.requests(), 0);
+  const idleCallback = [...env.timers.values()][0];
+  assert.equal(typeof idleCallback, 'function');
+  idleCallback();
+  await new Promise(setImmediate);
+  assert.equal(env.requests(), 1);
+  assert.deepEqual(env.appended.map(({ element }) => element.tag).sort(), ['link', 'script']);
+});
+
+test('lädt höchstens zehn Effekte vor und füllt den Pool bei einem verbleibenden Effekt nach', async () => {
+  const effects = Array.from({ length: 12 }, (_, index) => definition(`effect${index}`));
+  const env = environment(effects);
+  await env.api.preload(env.document, 'playful');
+  const loadedBeforePlayback = new Set(env.appended
+    .filter(({ element }) => element.tag === 'script')
+    .map(({ element }) => new URL(element.src).pathname));
+  assert.equal(loadedBeforePlayback.size, 10);
+
+  for (let index = 0; index < 9; index++) {
+    await env.api.playOnDone(env.document, env.window, '', 'playful', () => 0);
+  }
+  await new Promise(setImmediate);
+  const loadedAfterRefill = new Set(env.appended
+    .filter(({ element }) => element.tag === 'script')
+    .map(({ element }) => new URL(element.src).pathname));
+  assert.ok(loadedAfterRefill.size >= 11);
+  assert.equal(new Set(env.played.slice(0, 9).map(item => item.id)).size, 9);
+});
+
+test('merkt gespielte Effekte pro Theme im sessionStorage und beginnt nach vollständigem Durchlauf neu', async () => {
+  const env = environment([definition('ducks'), definition('confetti')]);
+  await env.api.preload(env.document, 'playful');
+  await env.api.playOnDone(env.document, env.window, '', 'playful', () => 0);
+  const firstID = env.played[0].id;
+  const storageKey = 'kw-masha-feedly:played-effects:playful';
+  assert.deepEqual(JSON.parse(env.sessionStorage.get(storageKey)), [firstID]);
+
+  await env.api.playOnDone(env.document, env.window, '', 'playful', () => 0);
+  assert.notEqual(env.played[1].id, firstID);
+  await new Promise(setImmediate);
+  assert.equal(env.sessionStorage.has(storageKey), false);
+
+  await env.api.playOnDone(env.document, env.window, '', 'playful', () => 0);
+  const nextCycleID = env.played[2].id;
+  assert.ok(['ducks', 'confetti'].includes(nextCycleID));
+  assert.deepEqual(JSON.parse(env.sessionStorage.get(storageKey)), [nextCycleID]);
 });
 
 test('spielt nach einem Abbruch auch eine noch wartende Manifest-Anfrage nicht ab', async () => {

@@ -50,6 +50,78 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         }
     }
 
+    /** Der Bereich wirkt für alle Eintragsbenachrichtigungen und folgt aktuellen Zuweisungen. */
+    public function testAssignedOnlyScopeFollowsCurrentAssignments(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $author = $this->objFromFixture(Member::class, 'normalize');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
+        $config->write();
+        $this->assertFalse((bool)$member->MashaFeedlyEmailAssignedOnly, 'Alle Meldungen bleibt die Voreinstellung.');
+        foreach (['EmailNotifications', 'NotifyNewEntries', 'NotifyEntryUpdates', 'NotifyComments', 'NotifyDueDateReminders'] as $option) {
+            $member->{'MashaFeedly' . $option} = true;
+        }
+        $member->MashaFeedlyEmailAssignedOnly = true;
+        $member->write();
+        $mailer = new class implements MailerInterface {
+            /** @var RawMessage[] Im Test gesammelte E-Mails. */
+            public array $messages = [];
+            public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
+        };
+        $injector = Injector::inst();
+        $originalMailer = $injector->get(MailerInterface::class);
+        $previousMember = Security::getCurrentUser();
+        $injector->registerService($mailer, MailerInterface::class);
+        Security::setCurrentUser($author);
+        try {
+            $entry = MashaFeedlyEntry::create(['Content' => 'Bereichstest', 'DueDate' => '2026-10-09']);
+            $entry->write();
+            Security::setCurrentUser($author);
+            $comment = MashaFeedlyComment::create(['EntryID' => $entry->ID, 'AuthorName' => 'Andere Person', 'CommentText' => 'Neu']);
+            $comment->write();
+            $mailer->messages = [];
+            MashaFeedlyNotificationService::notifyNewEntry($entry);
+            MashaFeedlyNotificationService::notifyUpdatedEntry($entry);
+            MashaFeedlyNotificationService::notifyNewComment($entry, $comment, $author);
+            $this->assertSame(0, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
+            $this->assertCount(0, $mailer->messages, 'Unbeteiligte erhalten im persönlichen Bereich keine Mail.');
+
+            $entry->AssignedMembers()->add($member);
+            MashaFeedlyNotificationService::notifyNewEntry($entry);
+            MashaFeedlyNotificationService::notifyUpdatedEntry($entry);
+            MashaFeedlyNotificationService::notifyNewComment($entry, $comment, $author);
+            $this->assertSame(1, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
+            $this->assertCount(4, $mailer->messages);
+            foreach ($mailer->messages as $message) {
+                $this->assertSame((string)$member->Email, $message->getTo()[0]->getAddress());
+            }
+            $entry->AssignedMembers()->removeAll();
+            $mailer->messages = [];
+            MashaFeedlyNotificationService::notifyUpdatedEntry($entry);
+            MashaFeedlyNotificationService::notifyNewComment($entry, $comment, $author);
+            $this->assertCount(0, $mailer->messages);
+
+            $member->MashaFeedlyEmailAssignedOnly = false;
+            $member->write();
+            MashaFeedlyNotificationService::notifyNewEntry($entry);
+            MashaFeedlyNotificationService::notifyUpdatedEntry($entry);
+            MashaFeedlyNotificationService::notifyNewComment($entry, $comment, $author);
+            $entry->DueDateReminderSentAt = null;
+            $this->assertSame(1, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
+            $this->assertCount(4, $mailer->messages, 'Alle Meldungen umfasst auch fremde Kommentare und Fälligkeiten.');
+            $member->MashaFeedlyEmailNotifications = false;
+            $member->write();
+            $mailer->messages = [];
+            MashaFeedlyNotificationService::notifyNewEntry($entry);
+            MashaFeedlyNotificationService::notifyUpdatedEntry($entry);
+            $this->assertCount(0, $mailer->messages, 'Die Hauptoption hat Vorrang.');
+        } finally {
+            Security::setCurrentUser($previousMember);
+            $injector->registerService($originalMailer, MailerInterface::class);
+        }
+    }
+
     /** Der allgemeine Testversand adressiert das Konto und enthält eine einfache Zustellbestätigung. */
     public function testTestEmailUsesMemberAddressAndIdentifiesTheSite(): void
     {
@@ -132,7 +204,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertSame(1, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
             $this->assertSame('allowed@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
             $this->assertSame('Projekt Wolke: Heute fällig – Termin für den Regressionstest.', $mailer->messages[0]->getSubject());
-            $this->assertStringContainsString('2026-10-04', (string)$mailer->messages[0]->getTextBody());
+            $this->assertStringContainsString('04.10.2026', (string)$mailer->messages[0]->getTextBody());
             $this->assertNotEmpty($entry->DueDateReminderSentAt);
             $this->assertSame(0, MashaFeedlyNotificationService::notifyDueDateReminder($entry));
             $this->assertCount(1, $mailer->messages);
@@ -174,6 +246,20 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertStringContainsString('So erstellst du eine Meldung', (string)$message->getTextBody());
             $this->assertStringContainsString('Dein Profil und deine E-Mails', (string)$message->getTextBody());
             $this->assertStringContainsString('freigeschaltet sind', (string)$message->getTextBody());
+
+            $config->MashaFeedlyAddress = 'sie';
+            $config->MashaFeedlyWelcomeTextDu = '<p>Hallo Du-Version</p>';
+            $config->MashaFeedlyWelcomeTextSie = '<h2>Willkommen auf {siteTitle}</h2><p>So können Sie mitmachen.</p>';
+            $config->write();
+            $member->MashaFeedlyAddress = 'du';
+            $member->write();
+            MashaFeedlyNotificationService::notifyAccessGranted($member);
+            $customMessage = $mailer->messages[1];
+            $this->assertStringContainsString('<h2>Willkommen auf Projekt Wolke</h2>', (string)$customMessage->getHtmlBody());
+            $this->assertStringContainsString('So können Sie mitmachen.', (string)$customMessage->getTextBody());
+            $this->assertStringNotContainsString('Hallo Du-Version', (string)$customMessage->getTextBody());
+            $this->assertStringNotContainsString('So erstellst du eine Meldung', (string)$customMessage->getTextBody());
+
         } finally {
             $injector->registerService($originalMailer, MailerInterface::class);
         }
@@ -183,12 +269,12 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
     public function testDueDateReminderCanBeDisabledPerMember(): void
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
-        $member->MashaFeedlyEmailNotifications = true;
-        $member->MashaFeedlyNotifyDueDateReminders = false;
-        $member->write();
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
         $config->write();
+        $member->MashaFeedlyEmailNotifications = true;
+        $member->MashaFeedlyNotifyDueDateReminders = false;
+        $member->write();
         $mailer = new class implements MailerInterface {
             public array $messages = [];
             public function send(RawMessage $message, ?Envelope $envelope = null): void { $this->messages[] = $message; }
@@ -217,21 +303,25 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $allowedMember = $this->objFromFixture(Member::class, 'allowed');
         $notAllowedMember = $this->objFromFixture(Member::class, 'notAllowed');
         $disabledMember = $this->objFromFixture(Member::class, 'normalize');
-        $allowedMember->MashaFeedlyEmailNotifications = true;
-        $allowedMember->MashaFeedlyNotifyNewEntries = true;
-        $disabledMember->MashaFeedlyNotifyNewEntries = false;
-        $disabledMember->MashaFeedlyNotifyEntryUpdates = false;
-        $allowedMember->MashaFeedlyNotifyEntryUpdates = false;
-        $disabledMember->write();
-        $allowedMember->write();
-
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->Title = 'Projekt Wolke';
+        $config->MashaFeedlyAddress = 'du';
+        $config->MashaFeedlyNotificationNewEntryDu = '<p>Du-Text {siteTitle}</p>';
+        $config->MashaFeedlyNotificationNewEntrySie = '<p>Sie-Text {siteTitle}</p>';
         $config->MashaFeedlyAllowedMemberIDs = json_encode([
             (int)$allowedMember->ID,
             (int)$disabledMember->ID,
         ]);
         $config->write();
+
+        $allowedMember->MashaFeedlyEmailNotifications = true;
+        $allowedMember->MashaFeedlyNotifyNewEntries = true;
+        $allowedMember->MashaFeedlyAddress = 'sie';
+        $allowedMember->MashaFeedlyNotifyEntryUpdates = false;
+        $disabledMember->MashaFeedlyNotifyNewEntries = false;
+        $disabledMember->MashaFeedlyNotifyEntryUpdates = false;
+        $disabledMember->write();
+        $allowedMember->write();
 
         $mailer = new class implements MailerInterface {
             /** @var RawMessage[] Gespeicherte Testnachrichten. */
@@ -267,7 +357,8 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             );
             $this->assertSame(1, substr_count((string)$message->getTextBody(), 'Der Speichern-Button löst einen Fehler aus.'));
             $this->assertStringContainsString('Neue Meldung', (string)$message->getTextBody());
-            $this->assertStringContainsString('Auf Projekt Wolke wurde eine neue Meldung erstellt.', (string)$message->getTextBody());
+            $this->assertStringContainsString('Sie-Text Projekt Wolke', (string)$message->getTextBody());
+            $this->assertStringNotContainsString('Du-Text Projekt Wolke', (string)$message->getTextBody());
             $this->assertStringContainsString('Vollständige Beschreibung:', (string)$message->getTextBody());
             $this->assertStringContainsString('Gemeldet von:', (string)$message->getTextBody());
             $this->assertStringContainsString((string)$allowedMember->getName(), (string)$message->getTextBody());
@@ -331,13 +422,6 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
     {
         $allowedMember = $this->objFromFixture(Member::class, 'allowed');
         $disabledMember = $this->objFromFixture(Member::class, 'normalize');
-        $allowedMember->MashaFeedlyEmailNotifications = true;
-        $allowedMember->MashaFeedlyNotifyEntryUpdates = true;
-        $allowedMember->write();
-        $disabledMember->MashaFeedlyNotifyEntryUpdates = false;
-        $disabledMember->MashaFeedlyNotifyNewEntries = false;
-        $disabledMember->write();
-
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->Title = 'Masha Feedly';
         $config->MashaFeedlyAllowedMemberIDs = json_encode([
@@ -345,6 +429,14 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             (int)$disabledMember->ID,
         ]);
         $config->write();
+
+        $allowedMember->MashaFeedlyEmailNotifications = true;
+        $allowedMember->MashaFeedlyNotifyEntryUpdates = true;
+        $allowedMember->MashaFeedlyEmailAssignedOnly = false;
+        $allowedMember->write();
+        $disabledMember->MashaFeedlyNotifyEntryUpdates = false;
+        $disabledMember->MashaFeedlyNotifyNewEntries = false;
+        $disabledMember->write();
 
         $mailer = new class implements MailerInterface {
             /** @var RawMessage[] Gespeicherte Testnachrichten. */
@@ -393,7 +485,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
     }
 
     /** Prüft, dass Mitglieder mit aktivierten Präferenzen E-Mails auch für eigene Einträge erhalten. */
-    public function testOwnEntryAndUpdateEmailsAreConfigurable(): void
+    public function testOwnActionsNeverSendEmailsEvenWithLegacyPreference(): void
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
         $member->MashaFeedlyEmailNotifications = true;
@@ -437,13 +529,12 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
                 'EntryDate' => '2026-10-01',
             ]);
             $newEntry->write();
-            $this->assertCount(1, $mailer->messages);
+            $this->assertCount(0, $mailer->messages);
 
             $newEntry->Content = 'Eigener geänderter Eintrag mit Benachrichtigung.';
             $newEntry->write();
 
-            $this->assertCount(2, $mailer->messages);
-            $this->assertSame('allowed@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
+            $this->assertCount(0, $mailer->messages, 'Auch die frühere Einstellung für eigene Aktionen wird ignoriert.');
         } finally {
             $injector->registerService($originalMailer, MailerInterface::class);
         }
@@ -525,6 +616,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         }
         $creator->MashaFeedlyEmailNotifications = true;
         $creator->MashaFeedlyNotifyComments = true;
+        $creator->MashaFeedlyEmailAssignedOnly = true;
         $creator->write();
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->Title = 'Projekt Wolke';
@@ -562,10 +654,18 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertSame('normalize@example.test', $mailer->messages[0]->getTo()[0]->getAddress());
             $this->assertSame('Projekt Wolke: Neuer Kommentar zu Fehler der Erstellerin.', $mailer->messages[0]->getSubject());
 
+            $mailer->messages = [];
+            $creator->MashaFeedlyNotifyNewEntries = true;
+            $creator->MashaFeedlyNotifyEntryUpdates = true;
+            $creator->write();
+            MashaFeedlyNotificationService::notifyNewEntry($entry);
+            MashaFeedlyNotificationService::notifyUpdatedEntry($entry);
+            $this->assertCount(2, $mailer->messages, 'Meine Meldungen umfasst den Ersteller ohne Zuweisung.');
+            $mailer->messages = [];
             $creator->MashaFeedlyNotifyComments = false;
             $creator->write();
             MashaFeedlyNotificationService::notifyNewComment($entry, $comment, $author);
-            $this->assertCount(1, $mailer->messages, 'Abgewählte Kommentar-Mails müssen auch beim Ersteller respektiert werden.');
+            $this->assertCount(0, $mailer->messages, 'Abgewählte Kommentar-Mails müssen auch beim Ersteller respektiert werden.');
         } finally {
             Security::setCurrentUser($previousMember);
             $injector->registerService($originalMailer, MailerInterface::class);
@@ -576,7 +676,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
     public function testNewlyAllowedMemberReceivesWelcomeEmailOnlyOnce(): void
     {
         $member = $this->objFromFixture(Member::class, 'allowed');
-        $member->MashaFeedlyEmailNotifications = true;
+        $member->MashaFeedlyEmailNotifications = false;
         $member->write();
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->Title = 'Projekt Wolke';

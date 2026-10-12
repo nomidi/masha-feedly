@@ -53,7 +53,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('masha-feedly-color-palette__grid', $body, 'Die Farbauswahl wird auf der Profilseite gerendert.');
     }
 
-    /** Zuständigkeitsfelder rendern das ausgewählte lokale Symbol statt nur Initialen. */
+    /** Nachgeladene Zuständigkeiten enthalten das ausgewählte lokale Symbol. */
     public function testAssigneeChoiceRendersSelectedAvatarIcon(): void
     {
         $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
@@ -70,8 +70,34 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $response = $this->get('/masha-feedly-widget-test');
         $this->assertSame(200, $response->getStatusCode());
         $markup = $this->widgetMarkup($response->getBody());
-        $this->assertStringContainsString('data-avatar-initials="EM"', $markup);
-        $this->assertStringContainsString('src="http://localhost/__masha-feedly-effects/avatar/person/black"', $markup);
+        $this->assertStringNotContainsString('data-avatar-initials="EM"', $markup);
+        $widgetData = json_decode($this->get('/__masha-feedly/widgetData')->getBody(), true);
+        $assignee = array_values(array_filter(
+            $widgetData['members'],
+            static fn(array $item): bool => $item['id'] === (int)$member->ID
+        ))[0];
+        $this->assertSame('EM', $assignee['initials']);
+        $this->assertSame('http://localhost/__masha-feedly-effects/avatar/person/black', $assignee['imageURL']);
+    }
+
+    /** Die Einführung zeigt alle freigeschalteten E-Mail-Optionen mit ihren Feldnamen. */
+    public function testOnboardingRendersEmailNotificationOptions(): void
+    {
+        $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
+        $page->publishRecursive();
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
+        $config->MashaFeedlyEmailTestSucceeded = true;
+        $config->write();
+        $this->logInAs($member);
+
+        $response = $this->get('/masha-feedly-widget-test');
+        $this->assertSame(200, $response->getStatusCode());
+        $markup = $this->widgetMarkup($response->getBody());
+        foreach (['NewEntries', 'EntryUpdates', 'Comments', 'DueDateReminders', 'CostEstimates'] as $type) {
+            $this->assertStringContainsString('name="MashaFeedlyNotify' . $type . '"', $markup);
+        }
     }
 
     /** Prüft, dass nur freigegebene Benutzer das globale Widget erhalten. */
@@ -80,7 +106,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $germanHelpTitle = i18n::with_locale('de_DE', static fn (): string =>
             i18n::_t('KW\\MashaFeedly\\Translations.HELP_TITLE', 'Übersetzungsdatei fehlt')
         );
-        $this->assertSame('Masha:Feedly verwenden', $germanHelpTitle);
+        $this->assertSame('Kurzhilfe zu Masha:Feedly', $germanHelpTitle);
         $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
         $page->publishRecursive();
         $allowedMember = $this->objFromFixture(Member::class, 'allowed');
@@ -96,16 +122,9 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('data-address="du"', $widgetMarkup);
         $this->assertStringContainsString('data-theme="playful"', $widgetMarkup);
         $this->assertStringContainsString('data-font-size="small"', $widgetMarkup);
-        $this->assertMatchesRegularExpression(
-            '/<select name="CategoryID" data-masha-feedly-create-category>(?:(?!<\/select>).)*<option[^>]*>Backlog<\/option>(?:(?!<\/select>).)*<\/select>/s',
-            $widgetMarkup,
-            'Das Formular zum Erstellen eines Feedly-Eintrags zeigt Statusoptionen.'
-        );
-        $this->assertMatchesRegularExpression(
-            '/<select name="PriorityID">(?:(?!<\/select>).)*<option[^>]*>Normal<\/option>(?:(?!<\/select>).)*<option[^>]*>Info<\/option>(?:(?!<\/select>).)*<\/select>/s',
-            $widgetMarkup,
-            'Das Formular zum Erstellen eines Feedly-Eintrags zeigt Prioritätsoptionen.'
-        );
+        $this->assertStringContainsString('<select name="CategoryID" data-masha-feedly-create-category></select>', $widgetMarkup);
+        $this->assertStringContainsString('<select name="PriorityID"></select>', $widgetMarkup);
+        $this->assertStringContainsString('data-widget-data-url="/__masha-feedly/widgetData"', $widgetMarkup);
         $this->assertStringContainsString('window.KWMashaFeedlyWidgetMarkup', $allowedResponse->getBody());
         $this->assertStringContainsString('"HISTORY_COMMENT":"Kommentar: {text}"', $allowedResponse->getBody());
         $this->assertStringContainsString('"HISTORY_META":"{actor} · {when}"', $allowedResponse->getBody());
@@ -123,7 +142,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringContainsString('data-masha-feedly-restart-onboarding', $allowedResponse->getBody());
         $this->assertStringContainsString('Einführung erneut starten', $allowedResponse->getBody());
         $this->assertStringContainsString('data-onboarding-restart-url="/__masha-feedly/restartOnboarding"', $this->widgetMarkup($allowedResponse->getBody()));
-        $this->assertStringContainsString('Masha:Feedly verwenden', $allowedResponse->getBody());
+        $this->assertStringContainsString('Kurzhilfe zu Masha:Feedly', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-total-count', $allowedResponse->getBody());
         $this->assertStringContainsString('data-masha-feedly-open-page-list', $allowedResponse->getBody());
         $this->assertStringContainsString('class="kw-masha-feedly__page-icon" aria-hidden="true" viewBox="0 0 512 512"', $this->widgetMarkup($allowedResponse->getBody()));
@@ -365,7 +384,12 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $superAdminMarkup = $this->widgetMarkup($superAdminResponse->getBody());
         $this->assertStringContainsString('data-can-manage-estimate="1"', $superAdminMarkup);
         $this->assertStringContainsString('data-masha-feedly-create-estimate hidden', $superAdminMarkup);
-        $this->assertStringContainsString('data-system-key="estimate_pending"', $superAdminMarkup);
+        $widgetData = json_decode($this->get('/__masha-feedly/widgetData')->getBody(), true);
+        $pendingCategory = array_values(array_filter(
+            $widgetData['categories'],
+            static fn(array $item): bool => $item['systemKey'] === 'estimate_pending'
+        ))[0];
+        $this->assertTrue($pendingCategory['canSelectForNewEntry']);
 
         Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', ['someone-else@example.test']);
         $ordinaryAdminResponse = $this->get('/masha-feedly-widget-test');
@@ -375,6 +399,12 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         $this->assertStringNotContainsString('data-masha-feedly-create-estimate', $ordinaryAdminMarkup);
         $this->assertStringNotContainsString('name="EstimatedCostDuration"', $ordinaryAdminMarkup);
         $this->assertStringNotContainsString('name="EstimatedCostNote"', $ordinaryAdminMarkup);
+        $widgetData = json_decode($this->get('/__masha-feedly/widgetData')->getBody(), true);
+        $pendingCategory = array_values(array_filter(
+            $widgetData['categories'],
+            static fn(array $item): bool => $item['systemKey'] === 'restricted_estimate'
+        ))[0];
+        $this->assertFalse($pendingCategory['canSelectForNewEntry']);
     }
 
     /** Admins benötigen eine ausdrückliche Freigabe, um das Widget zu sehen. */

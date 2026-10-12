@@ -3,13 +3,17 @@
 namespace KW\MashaFeedly\Extension;
 
 use SilverStripe\Core\Extension;
+use SilverStripe\Control\Controller;
+use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Permission;
 use SilverStripe\SiteConfig\SiteConfig;
 use SilverStripe\ORM\DB;
 use SilverStripe\Core\Environment;
+use SilverStripe\Core\Injector\Injector;
 use SilverStripe\ORM\Connect\DatabaseException;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
+use KW\MashaFeedly\Service\MashaFeedlyEffectClient;
 use KW\MashaFeedly\Model\MashaFeedlyMiteTrigger;
 
 /**
@@ -20,7 +24,19 @@ use KW\MashaFeedly\Model\MashaFeedlyMiteTrigger;
  * @property string $MashaFeedlyAllowedMemberIDs JSON-Liste freigegebener Mitglieds-IDs.
  * @property bool $MashaFeedlyClosedCategoriesMigrated Kennzeichnet die einmalige Übernahme abgeschlossener Kategorien.
  * @property bool $MashaFeedlyEmailTestSucceeded Kennzeichnet einen erfolgreichen globalen E-Mail-Test.
+ * @property string $MashaFeedlyWelcomeTextDu Willkommenstext in Du-Anrede.
+ * @property string $MashaFeedlyWelcomeTextSie Willkommenstext in Sie-Anrede.
  * @property string $MashaFeedlyEmailFooter Inhalt des zentralen E-Mail-Footers.
+ * @property string $MashaFeedlyNotificationNewEntryDu Text für Benachrichtigungen über neue Meldungen in Du-Anrede.
+ * @property string $MashaFeedlyNotificationNewEntrySie Text für Benachrichtigungen über neue Meldungen in Sie-Anrede.
+ * @property string $MashaFeedlyNotificationUpdatedEntryDu Text für Änderungsbenachrichtigungen in Du-Anrede.
+ * @property string $MashaFeedlyNotificationUpdatedEntrySie Text für Änderungsbenachrichtigungen in Sie-Anrede.
+ * @property string $MashaFeedlyNotificationNewCommentDu Text für Kommentarbenachrichtigungen in Du-Anrede.
+ * @property string $MashaFeedlyNotificationNewCommentSie Text für Kommentarbenachrichtigungen in Sie-Anrede.
+ * @property string $MashaFeedlyNotificationDueDateDu Text für Fälligkeitserinnerungen in Du-Anrede.
+ * @property string $MashaFeedlyNotificationDueDateSie Text für Fälligkeitserinnerungen in Sie-Anrede.
+ * @property string $MashaFeedlyNotificationCostEstimateDu Text für Kostenschätzungsbenachrichtigungen in Du-Anrede.
+ * @property string $MashaFeedlyNotificationCostEstimateSie Text für Kostenschätzungsbenachrichtigungen in Sie-Anrede.
  * @property int $MashaFeedlyMiteProjectID Standardprojekt für den persönlichen Mite-Timer.
  * @property bool $MashaFeedlyMiteEnabled Aktiviert die Mite-Timerfunktion für diese Website.
  * @method \SilverStripe\ORM\HasManyList<MashaFeedlyMiteTrigger> MashaFeedlyMiteTriggers() Auslösende Statuskategorien.
@@ -33,6 +49,21 @@ class MashaFeedlyConfigExtension extends Extension
 {
     /** @var int[] */
     private array $newlyAllowedMemberIDs = [];
+
+    /** @var int[]|null Freigabeliste für den aktuellen Request. */
+    private static ?array $memberIDsCache = null;
+
+    /** @var int[]|null Ungeprüfte IDs für schnelle Berechtigungsprüfungen im aktuellen Request. */
+    private static ?array $configuredMemberIDsCache = null;
+
+    /** Request-Identität, damit Anfragen in Testläufen nicht dieselbe Cachekopie teilen. */
+    private static ?int $memberIDsCacheRequestID = null;
+
+    /** Schema-Prüfung für den aktuellen Request. */
+    private static ?HTTPRequest $schemaCheckRequest = null;
+
+    /** @var array<string, true>|null Vorhandene SiteConfig-Felder für den aktuellen Request. */
+    private static ?array $siteConfigFieldNamesCache = null;
 
     private static $db = [
         'MashaFeedlyAllowedMemberIDs' => 'Text',
@@ -48,6 +79,18 @@ class MashaFeedlyConfigExtension extends Extension
         'MashaFeedlyClosedCategoriesMigrated' => 'Boolean',
         'MashaFeedlyEmailTestSucceeded' => 'Boolean',
         'MashaFeedlyEmailFooter' => 'Text',
+        'MashaFeedlyWelcomeTextDu' => 'HTMLText',
+        'MashaFeedlyWelcomeTextSie' => 'HTMLText',
+        'MashaFeedlyNotificationNewEntryDu' => 'HTMLText',
+        'MashaFeedlyNotificationNewEntrySie' => 'HTMLText',
+        'MashaFeedlyNotificationUpdatedEntryDu' => 'HTMLText',
+        'MashaFeedlyNotificationUpdatedEntrySie' => 'HTMLText',
+        'MashaFeedlyNotificationNewCommentDu' => 'HTMLText',
+        'MashaFeedlyNotificationNewCommentSie' => 'HTMLText',
+        'MashaFeedlyNotificationDueDateDu' => 'HTMLText',
+        'MashaFeedlyNotificationDueDateSie' => 'HTMLText',
+        'MashaFeedlyNotificationCostEstimateDu' => 'HTMLText',
+        'MashaFeedlyNotificationCostEstimateSie' => 'HTMLText',
     ];
 
     private static $defaults = [
@@ -69,25 +112,114 @@ class MashaFeedlyConfigExtension extends Extension
             'MashaFeedlyMiteEnabled',
             'MashaFeedlyMiteTriggers',
             'MashaFeedlyEmailFooter',
+            'MashaFeedlyWelcomeTextDu',
+            'MashaFeedlyWelcomeTextSie',
+            'MashaFeedlyNotificationNewEntryDu',
+            'MashaFeedlyNotificationNewEntrySie',
+            'MashaFeedlyNotificationUpdatedEntryDu',
+            'MashaFeedlyNotificationUpdatedEntrySie',
+            'MashaFeedlyNotificationNewCommentDu',
+            'MashaFeedlyNotificationNewCommentSie',
+            'MashaFeedlyNotificationDueDateDu',
+            'MashaFeedlyNotificationDueDateSie',
+            'MashaFeedlyNotificationCostEstimateDu',
+            'MashaFeedlyNotificationCostEstimateSie',
         ]);
     }
 
-    /** Ergänzt den E-Mail-Footer bei dev/build, solange noch kein eigener Text gespeichert wurde. */
+    /** Führt die Vorlagenübernahme über den Erweiterungshook von Silverstripe 5 aus. */
     public function requireDefaultRecords(): void
     {
-        if (!DB::get_schema()->hasField('SiteConfig', 'MashaFeedlyEmailFooter')) {
-            return;
+        $this->onRequireDefaultRecords();
+    }
+
+    /** Ergänzt Footer und leere Benachrichtigungstexte bei dev/build, ohne eigene Inhalte zu überschreiben. */
+    public function onRequireDefaultRecords(): void
+    {
+        // Während des ersten dev/build darf SiteConfig nicht gelesen werden, solange die neuen Spalten fehlen.
+        $fieldsToCheck = ['MashaFeedlyEmailFooter'];
+        foreach (self::notificationFieldMap() as $addresses) {
+            array_push($fieldsToCheck, ...array_values($addresses));
         }
+        foreach ($fieldsToCheck as $field) {
+            if (!self::hasSiteConfigField($field)) return;
+        }
+
         $config = self::currentSiteConfig();
-        if (trim((string)$config->MashaFeedlyEmailFooter) !== '') {
-            return;
+        $changed = false;
+        $footer = trim((string)$config->MashaFeedlyEmailFooter);
+        if ($footer === '' && ($defaultFooter = self::defaultEmailFooter()) !== '') {
+            $config->MashaFeedlyEmailFooter = $defaultFooter;
+            $changed = true;
         }
-        $footer = self::defaultEmailFooter();
-        if ($footer === '') {
-            return;
+
+        $emptyFields = self::emptyNotificationFields($config);
+        if ($emptyFields && MashaFeedlyEffectClient::hasConfiguredProvider()) {
+            try {
+                $providerTexts = Injector::inst()->get(MashaFeedlyEffectClient::class)->emailDefaults(true);
+                $defaults = ['welcome' => $providerTexts['welcome']] + $providerTexts['notifications'];
+                $changed = self::fillEmptyNotificationTexts($config, $defaults) || $changed;
+            } catch (\Throwable $exception) {
+                error_log('[Masha:Feedly] Benachrichtigungstexte konnten beim dev/build nicht vom Effekt-Anbieter geladen werden (' . get_class($exception) . ').');
+            }
         }
-        $config->MashaFeedlyEmailFooter = $footer;
-        $config->write();
+
+        if ($changed) $config->write();
+    }
+
+    /** Liefert die Feldnamen für die Willkommen und die fünf Benachrichtigungstypen in beiden Anreden. @return array<string, array<string, string>> Zuordnung Typ/Anrede zu SiteConfig-Feld. */
+    public static function notificationFieldMap(): array
+    {
+        return [
+            'welcome' => ['du' => 'MashaFeedlyWelcomeTextDu', 'sie' => 'MashaFeedlyWelcomeTextSie'],
+            'newEntry' => ['du' => 'MashaFeedlyNotificationNewEntryDu', 'sie' => 'MashaFeedlyNotificationNewEntrySie'],
+            'updatedEntry' => ['du' => 'MashaFeedlyNotificationUpdatedEntryDu', 'sie' => 'MashaFeedlyNotificationUpdatedEntrySie'],
+            'newComment' => ['du' => 'MashaFeedlyNotificationNewCommentDu', 'sie' => 'MashaFeedlyNotificationNewCommentSie'],
+            'dueDate' => ['du' => 'MashaFeedlyNotificationDueDateDu', 'sie' => 'MashaFeedlyNotificationDueDateSie'],
+            'costEstimate' => ['du' => 'MashaFeedlyNotificationCostEstimateDu', 'sie' => 'MashaFeedlyNotificationCostEstimateSie'],
+        ];
+    }
+
+    /** Ergänzt ausschließlich leere Textfelder aus einer geprüften Anbieterantwort. @param SiteConfig $config Website-Konfiguration. @param array<string, mixed> $defaults Texte nach Typ und Anrede. @return bool Gibt zurück, ob ein Feld geändert wurde. */
+    public static function fillEmptyNotificationTexts(SiteConfig $config, array $defaults): bool
+    {
+        $changed = false;
+        foreach (self::notificationFieldMap() as $type => $addresses) {
+            foreach ($addresses as $address => $field) {
+                if (trim((string)$config->$field) !== '') continue;
+                $text = $defaults[$type][$address] ?? '';
+                if (!is_string($text) || trim($text) === '') continue;
+                $config->$field = $text;
+                $changed = true;
+            }
+        }
+        return $changed;
+    }
+
+    /** Liefert alle derzeit leeren Benachrichtigungsfelder für dev/build. @param SiteConfig $config Website-Konfiguration. @return list<string> Leere Feldnamen. */
+    private static function emptyNotificationFields(SiteConfig $config): array
+    {
+        $emptyFields = [];
+        foreach (self::notificationFieldMap() as $addresses) {
+            foreach ($addresses as $field) {
+                if (trim((string)$config->$field) === '') $emptyFields[] = $field;
+            }
+        }
+        return $emptyFields;
+    }
+
+    /** Liefert den gespeicherten Text der persönlichen Anrede. @param string $type Benachrichtigungstyp. @param string $address Persönliche Profilanrede. @return string Formatierte Einleitung oder leer für die bisherige Mailvorlage. */
+    public static function notificationEmailText(string $type, string $address): string
+    {
+        $field = self::notificationFieldMap()[$type][$address] ?? null;
+        if (!$field) return '';
+
+        try {
+            return trim((string)self::currentSiteConfig()->$field);
+        } catch (DatabaseException) {
+            // Während dev/build können neue Textfelder noch nicht angelegt sein.
+            return '';
+        }
     }
 
     /** Liest den optionalen Footer aus der Serverumgebung und decodiert Zeilenumbrüche. */
@@ -131,11 +263,6 @@ class MashaFeedlyConfigExtension extends Extension
     /** Prüft, ob der globale E-Mail-Versand bereits erfolgreich getestet wurde. */
     public static function emailTestSucceeded(): bool
     {
-        // requireDefaultRecords kann während dev/build vor dem Schema-Update laufen.
-        if (!DB::get_schema()->hasField('SiteConfig', 'MashaFeedlyEmailTestSucceeded')) {
-            return false;
-        }
-
         try {
             return (bool)self::currentSiteConfig()->MashaFeedlyEmailTestSucceeded;
         } catch (DatabaseException) {
@@ -167,12 +294,14 @@ class MashaFeedlyConfigExtension extends Extension
         $this->newlyAllowedMemberIDs = array_values(array_diff($current, $previous));
     }
 
-    /** Begrüßt Mitglieder nach erfolgreicher Speicherung ihrer neuen Freigabe. */
+    /** Setzt bei jeder neuen Freigabe sinnvolle Mail-Vorgaben und sendet danach die Willkommensmail. */
     protected function onAfterWrite(): void
     {
+        self::clearMemberIDsCache();
         foreach ($this->newlyAllowedMemberIDs as $memberID) {
             $member = Member::get()->byID($memberID);
             if ($member) {
+                MashaFeedlyMemberExtension::initializeAccessEmailPreferences($member);
                 MashaFeedlyNotificationService::notifyAccessGranted($member);
             }
         }
@@ -235,21 +364,79 @@ class MashaFeedlyConfigExtension extends Extension
             return false;
         }
 
-        // dev/build initialisiert Controller, bevor neue SiteConfig-Spalten angelegt sind.
-        // In diesem kurzen Zeitraum darf keine ORM-Abfrage alle SiteConfig-Felder auswählen.
-        if (!DB::get_schema()->hasField('SiteConfig', 'MashaFeedlyEmailFooter')) {
+        // Während dev/build kann das neue Feld noch fehlen. Der ohnehin nötige Config-Lesezugriff
+        // erkennt das direkt; eine separate Schemaabfrage wäre dafür zusätzliche Datenbankarbeit.
+        try {
+            $allowedIDs = self::configuredMemberIDs();
+        } catch (DatabaseException) {
             return false;
         }
 
-        return in_array((int)$member->ID, self::memberIDs(), true);
+        return in_array((int)$member->ID, $allowedIDs, true);
+    }
+
+    /** Prüft das während dev/build benötigte Feld einmal pro HTTP-Request. */
+    private static function hasSiteConfigField(string $fieldName): bool
+    {
+        $request = Controller::curr()?->getRequest();
+        if (!$request) {
+            return DB::get_schema()->hasField('SiteConfig', $fieldName);
+        }
+
+        if (self::$schemaCheckRequest !== $request) {
+            self::$schemaCheckRequest = $request;
+            self::$siteConfigFieldNamesCache = null;
+        }
+
+        if (self::$siteConfigFieldNamesCache === null) {
+            $schema = DB::get_schema();
+            self::$siteConfigFieldNamesCache = $schema->hasTable('SiteConfig')
+                ? array_fill_keys(array_keys($schema->fieldList('SiteConfig')), true)
+                : [];
+        }
+
+        return isset(self::$siteConfigFieldNamesCache[$fieldName]);
     }
 
     /** Prüft, ob ein Mitglied ausdrücklich in der Masha-Feedly-Freigabeliste steht. */
     public static function isExplicitlyAllowed(?Member $member): bool
     {
-        return $member instanceof Member
-            && $member->isInDB()
-            && in_array((int)$member->ID, self::memberIDs(), true);
+        if (!$member instanceof Member || !$member->isInDB()) {
+            return false;
+        }
+
+        try {
+            return in_array((int)$member->ID, self::configuredMemberIDs(), true);
+        } catch (DatabaseException) {
+            return false;
+        }
+    }
+
+    /**
+     * Liefert konfigurierte positive IDs ohne zusätzliche Mitgliedertabelle-Abfrage.
+     *
+     * @return int[] Positive und eindeutige IDs aus der Freigabeliste.
+     */
+    private static function configuredMemberIDs(): array
+    {
+        $request = Controller::curr()?->getRequest();
+        $requestID = $request ? spl_object_id($request) : null;
+        if ($requestID !== null && self::$memberIDsCacheRequestID === $requestID && self::$configuredMemberIDsCache !== null) {
+            return self::$configuredMemberIDsCache;
+        }
+
+        $raw = (string)self::currentSiteConfig()->MashaFeedlyAllowedMemberIDs;
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            $decoded = preg_split('/\\s*,\\s*/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        }
+
+        self::$configuredMemberIDsCache = array_values(array_unique(array_filter(
+            array_map(static fn($id): int => is_scalar($id) ? (int)$id : 0, $decoded),
+            static fn(int $id): bool => $id > 0
+        )));
+        self::$memberIDsCacheRequestID = $requestID;
+        return self::$configuredMemberIDsCache;
     }
 
     /**
@@ -259,14 +446,23 @@ class MashaFeedlyConfigExtension extends Extension
      */
     public static function memberIDs(): array
     {
-        $config = self::currentSiteConfig();
-        $raw = (string)$config->MashaFeedlyAllowedMemberIDs;
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            $decoded = preg_split('/\s*,\s*/', $raw, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $request = Controller::curr()?->getRequest();
+        $requestID = $request ? spl_object_id($request) : null;
+        if ($requestID !== null && self::$memberIDsCacheRequestID === $requestID && self::$memberIDsCache !== null) {
+            return self::$memberIDsCache;
         }
 
-        return self::normalizeMemberIDs($decoded);
+        self::$memberIDsCache = self::normalizeMemberIDs(self::configuredMemberIDs());
+        self::$memberIDsCacheRequestID = $requestID;
+        return self::$memberIDsCache;
+    }
+
+    /** Verwirft die Request-Zwischenspeicherung nach Änderungen an der Freigabeliste. */
+    private static function clearMemberIDsCache(): void
+    {
+        self::$memberIDsCache = null;
+        self::$configuredMemberIDsCache = null;
+        self::$memberIDsCacheRequestID = null;
     }
 
     /**
