@@ -204,7 +204,7 @@ function createEnvironment(fetchImplementation = async () => ({
     UNKNOWN_BROWSER: 'Unbekannter Browser',
     ENTRY_SELECTED_CONTEXT: 'Ausgewählter Bereich: „{text}“',
     ENTRY_CONTEXT_EMPTY: 'Bereich auf der Seite ausgewählt.',
-    FAQ_REPORT_CONTENT: 'Ich habe in der FAQ nach „{query}“ gesucht. Meine Frage dazu: ',
+    HELPY_REPORT_CONTENT: 'Ich habe in Helply nach „{query}“ gesucht. Meine Frage dazu: ',
     CREATE_SAVING: 'Meldung wird gespeichert …',
     CREATE_SAVE_ERROR: 'Die Meldung konnte nicht gespeichert werden.',
     SAVE_CONFIRMED_DISPLAY_ERROR: 'Gespeichert. Die Anzeige konnte nicht aktualisiert werden. Bitte lade die Meldungsliste neu.',
@@ -394,17 +394,17 @@ test('startet die Bereichsauswahl, übernimmt Seitenelement und Browserdaten', (
   assert.equal(env.date.value, '', 'Der automatisch gesetzte Erstellungszeitpunkt wird nicht als editierbares Feld angezeigt.');
 });
 
-test('übernimmt eine unbeantwortete FAQ-Suche in die Beschreibung einer neuen Meldung', () => {
+test('übernimmt eine unbeantwortete Helply-Suche in die Beschreibung einer neuen Meldung', () => {
   const env = createEnvironment();
   const question = 'Wie ändere ich die Zuständigkeit?';
-  env.documentListeners['kw-masha-feedly:create-from-faq']({ detail: { question } });
-  assert.equal(env.banner.hidden, false, 'Nach der FAQ-Suche startet die normale Seitenauswahl.');
+  env.documentListeners['kw-masha-feedly:create-from-helply']({ detail: { question } });
+  assert.equal(env.banner.hidden, false, 'Nach der Helply-Suche startet die normale Seitenauswahl.');
 
   const target = new TestElement('main', { id: 'content', text: 'Inhalt' });
   env.documentListeners.click({ target, clientX: 30, clientY: 40, preventDefault() {}, stopPropagation() {} });
 
   assert.equal(env.modal.hidden, false);
-  assert.equal(env.content.value, `Ich habe in der FAQ nach „${question}“ gesucht. Meine Frage dazu: `);
+  assert.equal(env.content.value, `Ich habe in Helply nach „${question}“ gesucht. Meine Frage dazu: `);
   assert.equal(env.content.selectionStart, env.content.value.length, 'Der Cursor steht direkt hinter dem vorbefüllten Satz.');
   assert.equal(env.content.selectionEnd, env.content.value.length);
   assert.equal(env.calls.fetch, null, 'Die Meldung wird erst nach ausdrücklichem Speichern gesendet.');

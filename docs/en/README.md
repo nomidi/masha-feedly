@@ -33,7 +33,7 @@ When creating a report, you can optionally add **Steps to reproduce** and descri
 
 On a phone, open Masha:Feedly using the same button at the bottom right as on a computer. The side panel shows only the plus and help buttons. Mobile help explains how to create a report and states that all tools are available only on a computer with a larger screen. The help text scrolls in small windows while the header and close button stay visible. The tour needs a larger screen: **OK** postpones it, while **Cancel tour** ends it permanently. Page markers remain visible and clickable while the widget is open. The current-page count includes only open reports whose saved page area can still be found on the current page. Reports without an area or with an area that cannot be found appear neither as page markers nor in the current-page count.
 
-On desktop, a **FAQ** button with a book icon sits directly below the help button in the first panel. Quick help explains that detailed answers are in the FAQ and includes a button to open it. It opens detailed help covering reports and markers, files and screenshots, lists and filters, editing and approval, comments and history, and profile and email preferences. Topic buttons and search help find an answer; expand each question individually. The FAQ needs no additional data request. Press Esc or the close button to return to the opener. The mobile version keeps its quick help and hides the FAQ button.
+Detailed answers about Masha:Feedly live in Masha:Helply. Helply provides its own entry point and searchable dialog. Quick help and the end of the onboarding tour can open Helply directly. When a search finds no answer, the question can be sent to Feedly and continued as a report. Feedly still checks access when the report is created.
 
 ## Add a screenshot
 
@@ -59,7 +59,7 @@ In the expandable **Relationships** section, link entries as duplicates, themati
 
 ## Profile and notifications
 
-Whenever a person is added to Masha:Feedly, including when re-added, their email preferences are set to “My reports” with all event types enabled. A welcome email is sent independently of notification preferences. At the end of the tour, you can open quick help or the detailed desktop FAQ directly. You can also restart the tour there.
+Whenever a person is added to Masha:Feedly, including when re-added, their email preferences are set to “My reports” with all event types enabled. A welcome email is sent independently of notification preferences. At the end of the tour, you can open quick help or Masha:Helply. You can also restart the tour there.
 
 “All reports” means emails about all accessible reports on the website, including comments and due dates. “My reports” means reports you created or are currently assigned to. The event checkboxes apply to both scopes. New assignments are covered by “New reports and new assignments”. After an assignment is removed, the report remains in “My reports” only if you created it. Creating or changing reports and posting comments never emails the person taking that action. Cost estimates for approval go only to assignees with that notification enabled. The master option disables all notifications and hides these choices; turning it on shows your saved choices again. Welcome emails and explicitly requested test emails remain independent of the scope.
 
@@ -183,3 +183,5 @@ When switching between mobile and desktop layouts, Feedly closes its windows. Ac
 When another person selects “Done”, the report remains open as “Feedback”. A prominent notice explains the next action. The original creator or designated reporter reviews the result and confirms completion with “Done” and “Save changes”. Assignment alone does not grant final approval. A comment is optional. This rule also applies when moving or saving reports in the CMS.
 
 Categories, priorities and assignees are fetched when the widget is first opened; the page initially renders empty selection fields. The protected endpoint only returns these values to members with access.
+
+Helply links are shown only when Helply provides the authorised Feedly help collection on the current page. Without Helply, its buttons and hints remain hidden.

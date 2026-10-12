@@ -2,6 +2,7 @@
 
 namespace KW\MashaFeedly\Tests\Functional;
 
+use KW\MashaFeedly\Admin\MashaFeedlyAdmin;
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyAttachment;
@@ -134,7 +135,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $body = str_replace(['\\u003C', '\\u003E', '\\u0022'], ['<', '>', '"'], $response->getBody());
         $this->assertSame(200, $response->getStatusCode());
         $this->assertStringContainsString('data-admin-view-tab="reporters"', $body);
-        $this->assertStringContainsString('Menu-KW-MashaFeedly-Admin-MashaFeedlyAdmin', $body);
+        $this->assertTrue(MashaFeedlyAdmin::singleton()->canView($manager), 'Der CMS-Zugriff gilt auch bei gebündelter Masha-Navigation.');
         $this->assertStringContainsString('data-admin-view-panel="reporters"', $body);
         $this->assertStringContainsString('data-reporter-form', $body);
         $this->assertStringContainsString('name="ReportedByID"', $body);
