@@ -1023,6 +1023,12 @@ document.addEventListener('DOMContentLoaded', () => {
     listCount.textContent = t('LIST_LOADING');
     trigger?.setAttribute?.('aria-busy', 'true');
     try {
+      // Auch Direktlinks benötigen die Auswahlfelder, bevor gespeicherte Zuordnungen eingesetzt werden.
+      if (window.KWMashaFeedlyLoadWidgetData) {
+        const ready = await window.KWMashaFeedlyLoadWidgetData();
+        if (requestID !== detailRequest) return;
+        if (!ready) throw new Error(t('LIST_LOAD_ERROR'));
+      }
       const response = await fetch(url.toString(), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
       const result = await window.KWMashaFeedlyReadJSON(response);
       if (requestID !== detailRequest) return;

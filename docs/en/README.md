@@ -53,6 +53,8 @@ History records status, priority, and assignment changes, comments, attachments,
 
 The report list loads only the data needed for cards, filters, sorting, and page markers. Descriptions, comments, history, attachments, and relationships are fetched when you open a report. If loading fails, the list remains available; open the report again to retry.
 
+Categories, priorities, and assignees load when the widget first opens, including during onboarding or through a direct report link. The edit form waits for these choices so existing assignments appear correctly. If loading fails, open the report again. These choices are available only to members with access.
+
 ## Relationships and duplicates
 
 In the expandable **Relationships** section, link entries as duplicates, thematically related, or blocked by. The relationship appears on both entries and is recorded in history. Completing a primary entry also completes its duplicates. Other status changes are not copied automatically.

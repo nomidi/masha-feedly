@@ -217,8 +217,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const panel = widget.querySelector('.kw-masha-feedly__panel');
   const close = widget.querySelector('.kw-masha-feedly__close');
   let widgetDataPromise;
+  /**
+   * Lädt Auswahlwerte gemeinsam für alle Öffnungswege und bündelt gleichzeitige Aufrufe.
+   * @return {Promise<boolean>} Ob Kategorien, Prioritäten und Zuständigkeiten bereitstehen.
+   */
   const loadWidgetData = () => {
-    if (widget.dataset.widgetDataLoaded === 'true') return Promise.resolve();
+    if (widget.dataset.widgetDataLoaded === 'true') return Promise.resolve(true);
     if (!widgetDataPromise) {
       widgetDataPromise = fetch(widget.dataset.widgetDataUrl, {
         credentials: 'same-origin',
@@ -277,14 +281,18 @@ document.addEventListener('DOMContentLoaded', () => {
           });
           widget.dataset.widgetDataLoaded = 'true';
           document.dispatchEvent(new CustomEvent('kw-masha-feedly:widget-data-loaded'));
+          return true;
         })
         .catch((error) => {
           widgetDataPromise = null;
           window.KWMashaFeedlyShowError(error.message || 'Widgetdaten konnten nicht geladen werden. Bitte versuche es erneut.');
+          return false;
         });
     }
     return widgetDataPromise;
   };
+  window.KWMashaFeedlyLoadWidgetData = loadWidgetData;
+  document.addEventListener('kw-masha-feedly:opened', loadWidgetData);
   const setOpen = (open) => {
     toggle.setAttribute('aria-expanded', String(open));
     toggle.setAttribute('aria-label', window.KWMashaFeedlyTranslate(open ? 'CLOSE_WIDGET' : 'OPEN_WIDGET'));
@@ -298,7 +306,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     const expanded = toggle.getAttribute('aria-expanded') === 'true';
-    if (!expanded) loadWidgetData();
     setOpen(!expanded);
   });
   let pullStart = null;
@@ -342,7 +349,6 @@ document.addEventListener('DOMContentLoaded', () => {
       widget.removeAttribute('data-panel-pulling');
       widget.style.removeProperty('--masha-panel-pull');
       widget.style.removeProperty('--masha-panel-pull-distance');
-      loadWidgetData();
       setOpen(true);
     } else {
       resetPull();

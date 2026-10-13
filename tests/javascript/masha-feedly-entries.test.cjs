@@ -2564,6 +2564,38 @@ test('öffnet die angeforderte Eintragsbearbeitung nach Navigation zur Zielseite
   assert.equal(env.pageTarget.scrolled, true);
 });
 
+test('wartet bei einem Eintragslink auf die Personen und setzt anschließend deren Zuordnung', async () => {
+  const env = createWidgetEnvironment('https://feedly:8890/about-us?masha-feedly-entry=71');
+  let finishLoading;
+  const loading = new Promise((resolve) => { finishLoading = resolve; });
+  env.window.KWMashaFeedlyLoadWidgetData = () => loading;
+  env.editForm.assigneeFields = [];
+  env.setEntryAssignees([{ id: 12, name: 'Erika Muster' }]);
+  env.listeners.DOMContentLoaded();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(env.detailRequests.length, 0);
+  assert.equal(env.editModal.hidden, true);
+  env.editForm.assigneeFields = [{ value: '12', checked: false }, { value: '15', checked: false }];
+  finishLoading(true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(env.editModal.hidden, false);
+  assert.equal(env.editForm.assigneeFields[0].checked, true);
+  assert.equal(env.editForm.assigneeFields[1].checked, false);
+});
+
+test('öffnet nach fehlgeschlagenen Auswahlwerten kein unvollständiges Bearbeitungsformular', async () => {
+  const env = createWidgetEnvironment();
+  env.window.KWMashaFeedlyLoadWidgetData = async () => false;
+  await env.openListButton.listeners.click();
+  const card = env.listContainer.children.find((child) => child.dataset.entryId === '71');
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  assert.equal(env.detailRequests.length, 0);
+  assert.equal(env.editModal.hidden, true);
+  env.window.KWMashaFeedlyLoadWidgetData = async () => true;
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  assert.equal(env.editModal.hidden, false);
+});
+
 test('lädt Details erst beim Öffnen und erneut nach einem Ladefehler', async () => {
   const env = createWidgetEnvironment();
   await env.openListButton.listeners.click();

@@ -18,6 +18,14 @@ function renderWidget(frameElement = null, captureEvents = false) {
   let inserted = 0;
   let createdElements = 0;
   const rootListeners = new Map();
+  const documentListeners = new Map();
+  const requests = [];
+  const responses = [];
+  const assigneeContainer = {
+    children: [],
+    closest() { return null; },
+    replaceChildren(...children) { this.children = children; },
+  };
   const appendedElements = [];
   const classes = new Set();
   const controls = new Map([
@@ -46,12 +54,13 @@ function renderWidget(frameElement = null, captureEvents = false) {
     setAttribute(name, value) { this[name] = value; },
   };
   const widget = {
+    dataset: { widgetDataUrl: '/__masha-feedly/widgetData' },
     querySelector(selector) { return controls.get(selector) || null; },
     setAttribute() {},
     contains(element) { return element === trigger; },
   };
   const surface = { append(element) { appendedElements.push(element); }, setAttribute() {} };
-  const root = { append() {}, addEventListener(name, callback) { rootListeners.set(name, callback); }, querySelector(selector) {
+  const root = { append() {}, querySelectorAll(selector) { return selector === '[data-masha-feedly-assignees] > div' ? [assigneeContainer] : []; }, addEventListener(name, callback) { rootListeners.set(name, callback); }, querySelector(selector) {
     return selector === '[data-kw-masha-feedly]' ? widget : surface;
   } };
   const host = { setAttribute() {}, attachShadow(options) { assert.equal(options.mode, 'open'); this.shadowRoot = root; return root; } };
@@ -59,12 +68,15 @@ function renderWidget(frameElement = null, captureEvents = false) {
   const document = {
     addEventListener(name, callback) {
       if (name === 'DOMContentLoaded') ready = callback;
+      else if (name === 'kw-masha-feedly:opened') documentListeners.set(name, callback);
       else assert.fail(`Ereignis ${name} muss an der Widget-Shadow-Root registriert werden`);
     },
     querySelector(selector) { return inserted && selector === '[data-masha-feedly-host]' ? host : null; },
-    createElement() {
+    createElement(tag) {
       createdElements += 1;
-      return [{ innerHTML: '', firstElementChild: widget }, host, stylesheet, surface, tooltip][createdElements - 1];
+      if (createdElements <= 4) return [{ innerHTML: '', firstElementChild: widget }, host, stylesheet, surface][createdElements - 1];
+      if (tag === 'div') return tooltip;
+      return { dataset: {}, style: {}, children: [], append(...children) { this.children.push(...children); }, setAttribute(name, value) { this[name] = value; } };
     },
     body: { append(element) { inserted += 1; appendedElements.push(element); } },
     dispatchEvent() {},
@@ -78,11 +90,18 @@ function renderWidget(frameElement = null, captureEvents = false) {
     setTimeout(callback) { callback(); return 1; },
     requestAnimationFrame(callback) { callback(); },
   };
-  vm.runInNewContext(source, { window, document, CustomEvent: function CustomEvent() {} });
+  vm.runInNewContext(source, { window, document, CustomEvent: function CustomEvent() {}, fetch: async (url, options) => {
+    requests.push({ url, options });
+    const response = responses.shift();
+    if (response instanceof Error) throw response;
+    return response;
+  } });
   ready();
   if (!captureEvents) return inserted;
   return {
     inserted,
+    window, widget, requests, responses, assigneeContainer,
+    dispatchDocument(name) { return documentListeners.get(name)?.(); },
     root, surface, stylesheet, host,
     dom: window.KWMashaFeedlyDOM,
     trigger,
@@ -106,6 +125,37 @@ test('setzt das Widget im normalen Frontend ein', () => {
 
 test('liefert dieselbe Widget-Logik aus wie sie getestet wird', () => {
   assert.equal(compiled, source);
+});
+
+test('lädt drei Personen beim programmgesteuerten Öffnen und bündelt wiederholte Aufrufe', async () => {
+  const state = renderWidget(null, true);
+  assert.equal(state.requests.length, 0, 'Der Seitenaufruf lädt noch keine Auswahlwerte.');
+  state.responses.push({ ok: true, json: async () => ({ success: true, members: [
+    { id: 1, name: 'Erika Muster', initials: 'EM', color: '#F4D06F' },
+    { id: 2, name: 'Max Beispiel', initials: 'MB', color: '#4285c7' },
+    { id: 3, name: 'Alex Test', initials: 'AT', color: '#4285c7' },
+  ] }) });
+  await Promise.all([state.dispatchDocument('kw-masha-feedly:opened'), state.window.KWMashaFeedlyLoadWidgetData()]);
+  assert.equal(state.requests.length, 1);
+  assert.equal(state.requests[0].url, '/__masha-feedly/widgetData');
+  assert.equal(state.requests[0].options.credentials, 'same-origin');
+  assert.deepEqual(state.assigneeContainer.children.map((label) => label.children[2].textContent), ['Erika Muster', 'Max Beispiel', 'Alex Test']);
+  assert.deepEqual(state.assigneeContainer.children.map((label) => label.children[0].value), [1, 2, 3]);
+  await state.dispatchDocument('kw-masha-feedly:opened');
+  assert.equal(state.requests.length, 1, 'Erneutes Öffnen erhält die geladenen Auswahlfelder.');
+});
+
+test('versucht fehlgeschlagene Widgetdaten beim nächsten Öffnen erneut zu laden', async () => {
+  const state = renderWidget(null, true);
+  const errors = [];
+  state.window.KWMashaFeedlyShowError = (message) => errors.push(message);
+  state.responses.push(new Error('Netzwerkfehler'));
+  assert.equal(await state.dispatchDocument('kw-masha-feedly:opened'), false);
+  assert.deepEqual(errors, ['Netzwerkfehler']);
+  assert.notEqual(state.widget.dataset.widgetDataLoaded, 'true');
+  state.responses.push({ ok: true, json: async () => ({ success: true }) });
+  assert.equal(await state.dispatchDocument('kw-masha-feedly:opened'), true);
+  assert.equal(state.requests.length, 2);
 });
 
 test('zeigt Hover-Hinweise als schwebendes Tooltip außerhalb des scrollenden Panels', () => {
