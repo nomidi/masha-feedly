@@ -1029,6 +1029,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok || !result.success || Number(result.entry?.id) !== Number(entry.id)) {
         throw new Error(result.message || t('LIST_LOAD_ERROR'));
       }
+      // Direktlinks können den Eintrag öffnen, bevor die Personen-Auswahl geladen ist.
+      await window.KWMashaFeedlyDOM?.loadWidgetData?.();
+      if (requestID !== detailRequest) return;
       entry = { ...result.entry, isUnread: entry.isUnread };
       listCount.textContent = previousListCount;
     } catch (error) {

@@ -13,8 +13,14 @@ const hoverStyles = [
 ];
 
 /** Simuliert das Einsetzen des globalen Widgets in Frontend und CMS-Vorschau. */
-function renderWidget(frameElement = null, captureEvents = false) {
+function renderWidget(frameElement = null, captureEvents = false, widgetDataResponse = null) {
   let ready;
+  const documentListeners = new Map();
+  const widgetDataRequests = [];
+  const assigneeContainers = [
+    { children: [], closest() { return null; }, replaceChildren(...children) { this.children = children; } },
+    { children: [], closest() { return {}; }, replaceChildren(...children) { this.children = children; } },
+  ];
   let inserted = 0;
   let createdElements = 0;
   const rootListeners = new Map();
@@ -46,6 +52,7 @@ function renderWidget(frameElement = null, captureEvents = false) {
     setAttribute(name, value) { this[name] = value; },
   };
   const widget = {
+    dataset: { widgetDataUrl: '/__masha-feedly/widgetData' },
     querySelector(selector) { return controls.get(selector) || null; },
     setAttribute() {},
     contains(element) { return element === trigger; },
@@ -53,21 +60,26 @@ function renderWidget(frameElement = null, captureEvents = false) {
   const surface = { append(element) { appendedElements.push(element); }, setAttribute() {} };
   const root = { append() {}, addEventListener(name, callback) { rootListeners.set(name, callback); }, querySelector(selector) {
     return selector === '[data-kw-masha-feedly]' ? widget : surface;
+  }, querySelectorAll(selector) {
+    return selector === '[data-masha-feedly-assignees] > div' ? assigneeContainers : [];
   } };
   const host = { setAttribute() {}, attachShadow(options) { assert.equal(options.mode, 'open'); this.shadowRoot = root; return root; } };
   const stylesheet = { addEventListener(name, callback) { if (name === 'load') this.loaded = callback; } };
   const document = {
     addEventListener(name, callback) {
       if (name === 'DOMContentLoaded') ready = callback;
+      else if (name === 'kw-masha-feedly:opened') documentListeners.set(name, callback);
       else assert.fail(`Ereignis ${name} muss an der Widget-Shadow-Root registriert werden`);
     },
     querySelector(selector) { return inserted && selector === '[data-masha-feedly-host]' ? host : null; },
     createElement() {
       createdElements += 1;
-      return [{ innerHTML: '', firstElementChild: widget }, host, stylesheet, surface, tooltip][createdElements - 1];
+      if (createdElements <= 4) return [{ innerHTML: '', firstElementChild: widget }, host, stylesheet, surface][createdElements - 1];
+      if (!widgetDataResponse) return tooltip;
+      return { children: [], dataset: {}, style: {}, setAttribute() {}, append(...children) { this.children.push(...children); } };
     },
     body: { append(element) { inserted += 1; appendedElements.push(element); } },
-    dispatchEvent() {},
+    dispatchEvent(event) { documentListeners.get(event.type)?.(event); },
   };
   const window = {
     KWMashaFeedlyWidgetMarkup: '<div data-kw-masha-feedly></div>',
@@ -78,11 +90,16 @@ function renderWidget(frameElement = null, captureEvents = false) {
     setTimeout(callback) { callback(); return 1; },
     requestAnimationFrame(callback) { callback(); },
   };
-  vm.runInNewContext(source, { window, document, CustomEvent: function CustomEvent() {} });
+  vm.runInNewContext(source, {
+    window, document, CustomEvent: function CustomEvent(type) { this.type = type; },
+    fetch: async (url) => { widgetDataRequests.push(url); return { ok: true, json: async () => widgetDataResponse }; },
+  });
   ready();
   if (!captureEvents) return inserted;
   return {
     inserted,
+    widget, assigneeContainers, widgetDataRequests,
+    openProgrammatically() { document.dispatchEvent({ type: 'kw-masha-feedly:opened' }); },
     root, surface, stylesheet, host,
     dom: window.KWMashaFeedlyDOM,
     trigger,
@@ -185,4 +202,40 @@ test('Avatarfarben zeigen den Hover-Effekt nur bei änderbaren Farbfeldern', () 
   assert.match(hoverStyles[0], /&:disabled:hover \{ transform: none !important;/);
   assert.match(hoverStyles[1], /masha-feedly-color-palette__item:hover:not\(:disabled\)/);
   assert.match(hoverStyles[1], /masha-feedly-color-palette__item:disabled:hover\{transform:none !important/);
+});
+
+
+/** Programmgesteuertes Öffnen muss dieselben Personen laden wie der Klick auf die Lasche. */
+test('lädt Verantwortliche bei programmgesteuertem Öffnen für Erstellen und Bearbeiten', async () => {
+  const state = renderWidget(null, true, {
+    success: true, categories: [], priorities: [],
+    members: [{ id: 7, name: 'Ada Beispiel', initials: 'AB', color: '#6383D8', imageURL: '' }],
+  });
+  state.openProgrammatically();
+  state.openProgrammatically();
+  await new Promise(setImmediate);
+  assert.equal(state.widgetDataRequests.length, 1, 'Gleichzeitige Öffnungsereignisse teilen dieselbe Anfrage.');
+  assert.equal(state.widget.dataset.widgetDataLoaded, 'true');
+  for (const container of state.assigneeContainers) {
+    assert.equal(container.children.length, 1);
+    const [checkbox, avatar, title] = container.children[0].children;
+    assert.equal(checkbox.name, 'AssignedMemberIDs[]');
+    assert.equal(checkbox.value, 7);
+    assert.equal(avatar.textContent, 'AB');
+    assert.equal(title.textContent, 'Ada Beispiel');
+  }
+  state.openProgrammatically();
+  await new Promise(setImmediate);
+  assert.equal(state.widgetDataRequests.length, 1, 'Bereits geladene Personen werden bei erneutem Öffnen nicht neu angefragt.');
+});
+
+
+test('stellt die Personen vor dem Bearbeiten eines direkt geöffneten Eintrags bereit', async () => {
+  const state = renderWidget(null, true, {
+    success: true, categories: [], priorities: [],
+    members: [{ id: 8, name: 'Berta Beispiel', initials: 'BB', color: '#6383D8', imageURL: '' }],
+  });
+  await state.dom.loadWidgetData();
+  assert.equal(state.widget.dataset.widgetDataLoaded, 'true');
+  assert.equal(state.assigneeContainers[1].children[0].children[0].value, 8);
 });

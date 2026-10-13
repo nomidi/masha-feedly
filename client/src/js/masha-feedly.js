@@ -217,6 +217,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const panel = widget.querySelector('.kw-masha-feedly__panel');
   const close = widget.querySelector('.kw-masha-feedly__close');
   let widgetDataPromise;
+  /**
+   * Lädt die gemeinsamen Formularoptionen einmalig für manuelles und programmgesteuertes Öffnen.
+   * @return {Promise<void>} Erfüllt, sobald die Auswahlfelder aufgebaut oder der Ladefehler angezeigt ist.
+   */
   const loadWidgetData = () => {
     if (widget.dataset.widgetDataLoaded === 'true') return Promise.resolve();
     if (!widgetDataPromise) {
@@ -285,6 +289,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     return widgetDataPromise;
   };
+  // Auch Meldungslinks, Formularrückkehr und die Einführung können das Panel ohne Laschenklick öffnen.
+  window.KWMashaFeedlyDOM.loadWidgetData = loadWidgetData;
+  document.addEventListener('kw-masha-feedly:opened', loadWidgetData);
   const setOpen = (open) => {
     toggle.setAttribute('aria-expanded', String(open));
     toggle.setAttribute('aria-label', window.KWMashaFeedlyTranslate(open ? 'CLOSE_WIDGET' : 'OPEN_WIDGET'));
@@ -298,7 +305,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     const expanded = toggle.getAttribute('aria-expanded') === 'true';
-    if (!expanded) loadWidgetData();
     setOpen(!expanded);
   });
   let pullStart = null;
@@ -342,7 +348,6 @@ document.addEventListener('DOMContentLoaded', () => {
       widget.removeAttribute('data-panel-pulling');
       widget.style.removeProperty('--masha-panel-pull');
       widget.style.removeProperty('--masha-panel-pull-distance');
-      loadWidgetData();
       setOpen(true);
     } else {
       resetPull();
