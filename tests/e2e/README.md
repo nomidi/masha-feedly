@@ -40,6 +40,7 @@ Vom Projekt-Hauptverzeichnis aus:
 ```sh
 node --test masha-feedly/tests/e2e/comment-activity.test.cjs
 node --test masha-feedly/tests/e2e/tooltip.test.cjs
+node --test masha-feedly/tests/e2e/assignee-icons.test.cjs
 node --test masha-feedly/tests/e2e/faq.test.cjs  # Helply-Anbindung
 node --test masha-feedly/tests/e2e/onboarding.test.cjs
 node --test masha-feedly/tests/e2e/estimate-workflow.test.cjs
@@ -49,6 +50,8 @@ node --test --test-concurrency=1 masha-feedly/tests/e2e/*.test.cjs
 ```
 
 Ohne vollständige Konfiguration überspringt Node die jeweils betroffenen Tests. Zugangsdaten gehören nur in die ignorierte lokale Datei oder einen Secret Store, niemals in Git. Die Suite legt Testeinträge und Kommentare in der konfigurierten Datenbank an; nur gegen eine lokale oder dafür vorgesehene Testinstanz ausführen.
+
+`assignee-icons.test.cjs` meldet sich mit dem Creator-Konto an und prüft nach dem Widget-Öffnen, dass alle freigegebenen Personen in der Zuständigkeitsauswahl erscheinen. Creator, Commenter und Superadmin müssen freigegeben sein; zusätzliche freigegebene Konten werden ebenfalls geprüft. Für jedes Mitglied wird der Avatar geprüft: ein hinterlegtes Bild muss tatsächlich laden; ohne Bild müssen die Initialen sichtbar sein. Der Test öffnet nur das leere Formular und speichert keine Meldung.
 
 Der separate **Test-E-Mail senden**-Knopf ist kein Teil der E2E-Tests. Er sendet an die Adresse des angemeldeten Masha:Feedly-Superadmins und setzt einen passend konfigurierten und erreichbaren SMTP-Dienst voraus.
 
