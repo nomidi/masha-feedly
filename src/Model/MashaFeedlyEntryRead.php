@@ -138,9 +138,10 @@ class MashaFeedlyEntryRead extends DataObject
 
         $unreadIDs = [];
         $assignedByEntry = self::assignedMemberIDsByEntry();
-        $entries ??= MashaFeedlyEntry::get()->toArray();
+        $entries ??= MashaFeedlyEntry::visibleTo($member)->toArray();
         $creatorMemberIDs = self::creatorMemberIDsByEntry($entries);
         foreach ($entries as $entry) {
+            if (!$entry->canView($member)) continue;
             $entryID = (int)$entry->ID;
             $assignedMemberIDs = $assignedByEntry[$entryID] ?? [];
             $read = $seenReads[$entryID] ?? null;

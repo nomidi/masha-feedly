@@ -472,6 +472,8 @@ test('führt eine Eintragskarte zur Originalseite und übergibt die Eintragskenn
   assert.equal(target.hash, '#kontakt');
 });
 
+
+
 test('hält Karten kompakt und zeigt Beschreibung sowie Seitenbereich nach dem Öffnen', async () => {
   const env = createWidgetEnvironment();
   await env.listeners['kw-masha-feedly:opened']();
@@ -615,6 +617,19 @@ test('bereitet die Bugbeschreibung nur zum Lesen sowie Status und Avatar-Zustän
   assert.equal(editable.actualResult, 'Ladeanzeige bleibt stehen.');
   assert.equal('content' in editable, false);
   assert.equal(editable.assignees[0].initials, 'EM');
+});
+
+test('zeigt technische Häufigkeit nur als Lesetext und verändert die gespeicherte Beschreibung nicht', () => {
+  const entry = {
+    id: 71,
+    content: 'Technischer Fehler',
+    errorSummary: '42 Vorkommen · Zuletzt: 2026-10-14 11:00:00 UTC',
+    isTechnicalError: true,
+  };
+  const editable = entriesUI.editableEntryData(entry);
+  assert.equal(editable.description, `${entry.content}\n\n${entry.errorSummary}`);
+  assert.equal(entry.content, 'Technischer Fehler');
+  assert.equal('content' in editable, false);
 });
 
 test('übernimmt den Fälligkeitstermin in die Bearbeitungsdaten und rendert ihn in der Verlaufshistorie', () => {
@@ -2563,6 +2578,8 @@ test('öffnet die angeforderte Eintragsbearbeitung nach Navigation zur Zielseite
   assert.equal(env.cleanedURL, '/about-us?preview=1');
   assert.equal(env.pageTarget.scrolled, true);
 });
+
+
 
 test('wartet bei einem Eintragslink auf die Personen und setzt anschließend deren Zuordnung', async () => {
   const env = createWidgetEnvironment('https://feedly:8890/about-us?masha-feedly-entry=71');

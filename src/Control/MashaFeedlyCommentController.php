@@ -35,7 +35,7 @@ class MashaFeedlyCommentController extends Controller
             return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
 
-        $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
+        $entry = MashaFeedlyEntry::visibleTo()->byID((int)$request->postVar('EntryID'));
         if (!$entry) {
             return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Die Meldung wurde nicht gefunden.')], 404);
         }
@@ -123,7 +123,7 @@ class MashaFeedlyCommentController extends Controller
     private function manageComment(HTTPRequest $request, Member $member, string $action): HTTPResponse
     {
         $comment = MashaFeedlyComment::get()->byID((int)$request->postVar('CommentID'));
-        if (!$comment) {
+        if (!$comment || !$comment->Entry()->canView($member)) {
             return $this->respond(['success' => false, 'message' => $this->translate('COMMENT_NOT_FOUND', 'Der Kommentar wurde nicht gefunden.')], 404);
         }
         $isAdmin = Permission::checkMember($member, 'ADMIN');
@@ -132,7 +132,7 @@ class MashaFeedlyCommentController extends Controller
         }
         if ($action === 'delete') {
             $commentID = (int)$comment->ID;
-            $entry = MashaFeedlyEntry::get()->byID((int)$comment->EntryID);
+            $entry = MashaFeedlyEntry::visibleTo()->byID((int)$comment->EntryID);
             if ($entry) {
                 MashaFeedlyEntryHistory::record($entry, 'comment_deleted', (string)$comment->CommentText, '', $member, $commentID);
                 MashaFeedlyEntryRead::markAsSeen($entry, $member);
@@ -155,7 +155,7 @@ class MashaFeedlyCommentController extends Controller
         $comment->CommentText = $text;
         $comment->WasEdited = true;
         $comment->write();
-        $entry = MashaFeedlyEntry::get()->byID((int)$comment->EntryID);
+        $entry = MashaFeedlyEntry::visibleTo()->byID((int)$comment->EntryID);
         if ($entry) {
             MashaFeedlyEntryHistory::record($entry, 'comment_edited', $oldText, $text, $member, (int)$comment->ID);
             MashaFeedlyEntryRead::markAsSeen($entry, $member);

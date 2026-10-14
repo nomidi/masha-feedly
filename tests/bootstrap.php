@@ -29,6 +29,11 @@ $bootstrapCandidates = [
 foreach ($bootstrapCandidates as $bootstrap) {
     if (is_file($bootstrap)) {
         require_once $bootstrap;
+        // Testkonfigurationen dürfen die datenbankunabhängige Aktivierung der echten Website nicht überschreiben.
+        // Der Framework-Bootstrap hat hier noch kein Config-Manifest. Die Prozesskonstante benötigt keines.
+        if (!defined('MASHA_FEEDLY_TEST_ERROR_SPOOL')) {
+            define('MASHA_FEEDLY_TEST_ERROR_SPOOL', TEMP_PATH . '/masha-feedly-errors-tests-' . getmypid());
+        }
         return;
     }
 }

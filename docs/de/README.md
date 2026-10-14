@@ -185,3 +185,32 @@ Beim Wechsel zwischen mobiler und Desktop-Ansicht schließen sich die Feedly-Fen
 Wenn eine andere Person „Erledigt“ auswählt, bleibt die Meldung offen im Status „Feedback“. Ein hervorgehobener Hinweis erklärt die nächste Aktion. Der ursprüngliche Ersteller oder die unter „Angezeigte Meldeperson“ eingetragene Person prüft das Ergebnis und bestätigt den Abschluss mit „Erledigt“ und „Änderungen speichern“. Eine Zuständigkeitszuweisung allein berechtigt nicht zur endgültigen Bestätigung. Ein Kommentar ist freiwillig. Die Regel gilt auch beim Verschieben und Speichern im CMS.
 
 Helply-Verweise werden nur angezeigt, wenn Helply die berechtigte Feedly-Hilfe auf der aktuellen Seite bereitstellt. Ohne Helply bleiben Buttons und Hinweise ausgeblendet.
+
+## Automatisch erfasste technische Fehler
+
+Unter **Masha:Feedly → Konfiguration → Technische Fehler** kann das konfigurierte Betreiberkonto die Erfassung aktivieren. Das Konto aus `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` muss vorhanden sein und Administratorrechte besitzen. Jede technische Meldung wird immer diesem Konto zugewiesen. Nur dieses Konto und zusätzlich ausgewählte, allgemein für Feedly freigegebene Personen dürfen technische Meldungen sehen.
+
+Gleiche Fehler werden anhand einer bereinigten Meldung und ihrer Herkunft zusammengefasst. Variable Zahlen und UUIDs werden für den Vergleich vereinheitlicht. Die Detailansicht zeigt die Gesamtzahl sowie erstes und letztes Auftreten in UTC. Neue Fehler verwenden die bestehende Benachrichtigung für neue Meldungen; erneut aufgetretene erledigte Fehler werden wieder geöffnet und verwenden die Änderungsbenachrichtigung. Die persönlichen E-Mail-Einstellungen und der Bereich „Meine Meldungen“ gelten weiterhin. Wiederholungen offener Fehler erhöhen nur den Zähler und erzeugen weder Kommentare noch Änderungsmails.
+
+**Verarbeitung:** Wähle Cronjob oder Websitebesuche und ein Intervall von 1 bis 1440 Minuten. Der Cronjob sollte jede Minute den folgenden Befehl aus dem Projektverzeichnis ausführen; Feedly prüft selbst das eingestellte Intervall:
+
+```sh
+php vendor/bin/sake tasks:MashaFeedlyErrorTask
+```
+
+Im Besuchsmodus startet ein Aufruf einer Silverstripe-Inhaltsseite die fällige Prüfung. Ohne solche Seitenaufrufe oder bei vollständig zwischengespeicherten Seiten verzögert sie sich. Parallele Durchläufe werden verhindert. Pro Durchlauf werden höchstens 100 Fehlergruppen übernommen; weitere folgen im nächsten Intervall.
+
+**Tägliche Zusammenfassung:** Optional aktivieren und eine Uhrzeit im Format HH:MM einstellen (Zeitzone Europe/Berlin). Die Mail listet im Zeitraum aufgetretene Fehler mit ihren Gesamtzahlen und Links auf. Persönliche E-Mail-Hauptoption, Meldungsbereich und technischer Zugriff gelten auch hier; die einzelnen Ereignis-Häkchen steuern weiterhin die Sofortmails. Ohne passende Fehler wird keine Mail geschickt. Ohne Cronjob oder Websitebesuch kommt die Zusammenfassung später. Nach Aktivierung umfasst die erste Zusammenfassung höchstens die vergangenen 24 Stunden. Bei einem abgebrochenen oder fehlgeschlagenen Versand wird die Zusammenfassung an diesem Tag nicht automatisch wiederholt.
+
+**Servereinrichtung:** Der Modul-LogHandler wird automatisch registriert und arbeitet erst nach Aktivierung. Bestehende `NativeMailerHandler` werden dadurch nicht abgeschaltet: Entferne deren Registrierung, wenn Fehler nicht zusätzlich weiterhin einzeln per Mail versendet werden sollen. Behalte ein unabhängiges PHP-/Server-Fehlerprotokoll bei. Nach Installation oder Aktualisierung einmal `dev/build flush=1` ausführen und die Konfiguration speichern.
+
+Die lokale Ablage liegt standardmäßig in einem projektspezifischen Unterordner von `TEMP_PATH`. Webserver und Cronjob benötigen denselben Temp-Pfad und Zugriff auf dieselben Dateien. Bei unterschiedlichen Serverbenutzern oder mehreren Servern muss eine geeignete gemeinsame private Ablage eingerichtet werden. Ein absoluter Pfad kann über YAML konfiguriert werden:
+
+```yaml
+KW\MashaFeedly\Logging\MashaFeedlyErrorHandler:
+  spool_directory: '/srv/private/feedly-errors'
+```
+
+Der Ordner muss außerhalb des Webroots liegen. Ordner und Dateien werden mit 0700 beziehungsweise 0600 geschützt. Erfasst werden Fehler ab dem gewählten Mindestschweregrad (Error, Critical, Alert oder Emergency), die Silverstripe an diesen Logger übergibt. Fehler vor dem Frameworkstart können nur im unabhängigen Serverprotokoll stehen. Die Erfassung benötigt keine Datenbank; bei einem fehlgeschlagenen Import bleiben die Chargen für einen späteren Versuch erhalten. Nicht übernommene Fehler bleiben auch bei ausgeschalteter Erfassung gespeichert.
+
+Die Ablage übernimmt keine vollständigen Request-Daten, Kontextwerte oder Trace-Argumente. Häufige Zugangsdatenmuster und URL-Querystrings werden entfernt. Freitext in einer Fehlermeldung kann dennoch sensible Informationen enthalten; technische Freigaben sollten entsprechend eng bleiben. Fehler während Import oder Mailversand werden nicht erneut in Feedly eingespeist, um Rückkopplungen zu vermeiden. Der Modul-Reset löscht die bereits importierten Meldungen; ausstehende Chargen können sie beim nächsten Lauf erneut anlegen.

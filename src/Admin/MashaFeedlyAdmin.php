@@ -89,6 +89,15 @@ class MashaFeedlyAdmin extends ModelAdmin
         'stopMiteTimer',
     ];
 
+    /** Begrenzt auch die Standard-CMS-Liste auf sichtbare Einträge. @return \SilverStripe\ORM\DataList Geschützte Modellliste. */
+    public function getList()
+    {
+        if ($this->modelClass === MashaFeedlyComment::class) {
+            return parent::getList()->filter('EntryID', MashaFeedlyEntry::visibleTo()->column('ID') ?: [0]);
+        }
+        return $this->modelClass === MashaFeedlyEntry::class ? MashaFeedlyEntry::visibleTo() : parent::getList();
+    }
+
     /** Liefert die Anzahl offener Einträge in der Feedback-Kategorie. */
     public static function feedbackCount(): int
     {
@@ -283,6 +292,8 @@ class MashaFeedlyAdmin extends ModelAdmin
                 ->setStartClosed(false)->addExtraClass('masha-feedly-config-section masha-feedly-config-section--access'),
         ];
         if ($canManageSensitiveSettings) {
+            $sections[] = ToggleCompositeField::create('TechnicalErrorsSettings', self::translate('ERRORS_SECTION', 'Technische Fehler'),
+                \KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::fields());
             $operationsFields = $takeFields(['MashaFeedlyDueDateReminderMode', 'MashaFeedlyHourlyRate']);
             $resetFields = $takeFields(['MashaFeedlyResetHeading', 'ResetConfirmation']);
             $sections[] = ToggleCompositeField::create('OperationsSettings', self::translate('CONFIG_SECTION_OPERATIONS', 'Erinnerungen & Schätzungen'), $operationsFields)
@@ -319,6 +330,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         $form->setAttribute('data-pjax-fragment', 'CurrentForm');
         return $form;
     }
+
 
     /** Erstellt das ausschließlich für Reporter-Manager sichtbare Formular für E-Mail-Texte. */
     private function getEmailTextsForm(): Form
@@ -559,7 +571,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         if (!SecurityToken::inst()->checkRequest($request)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Ungültiges Sicherheitstoken.'], 400);
         }
-        $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
+        $entry = MashaFeedlyEntry::visibleTo()->byID((int)$request->postVar('EntryID'));
         if (!$entry) {
             return $this->jsonResponse(['success' => false, 'message' => 'Eintrag nicht gefunden.'], 404);
         }
@@ -623,7 +635,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             return $this->jsonResponse(['success' => false, 'message' => 'Ungültiges Sicherheitstoken.'], 400);
         }
 
-        $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
+        $entry = MashaFeedlyEntry::visibleTo()->byID((int)$request->postVar('EntryID'));
         $category = MashaFeedlyCategory::get()->byID((int)$request->postVar('CategoryID'));
         if (!$entry || !$category) {
             return $this->jsonResponse(['success' => false, 'message' => 'Eintrag oder Kategorie nicht gefunden.'], 404);
@@ -656,7 +668,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         }
 
         foreach ($entryIDs as $position => $entryID) {
-            $orderedEntry = MashaFeedlyEntry::get()->byID($entryID);
+            $orderedEntry = MashaFeedlyEntry::visibleTo()->byID($entryID);
             if (!$orderedEntry || (int)$orderedEntry->CategoryID !== (int)$category->ID) {
                 continue;
             }
@@ -979,7 +991,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         $html .= '<div class="masha-feedly-board__columns">';
 
         foreach (MashaFeedlyCategory::get()->sort('Sort ASC, Title ASC') as $category) {
-            $entries = MashaFeedlyEntry::get()
+            $entries = MashaFeedlyEntry::visibleTo()
                 ->filter('CategoryID', (int)$category->ID)
                 ->sort('Sort ASC, EntryDate DESC, ID DESC');
             $html .= '<section class="masha-feedly-board__column" data-category-id="' . (int)$category->ID . '">';
@@ -1121,7 +1133,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             return '';
         }
         $reporters = Member::get()->sort('Surname ASC, FirstName ASC');
-        $entries = MashaFeedlyEntry::get()->sort('EntryDate DESC, ID DESC');
+        $entries = MashaFeedlyEntry::visibleTo()->sort('EntryDate DESC, ID DESC');
         $entryIDs = array_map('intval', $entries->column('ID'));
         $creatorNames = [];
         $creatorMemberIDs = [];
@@ -1201,7 +1213,7 @@ class MashaFeedlyAdmin extends ModelAdmin
         if (!SecurityToken::inst()->checkRequest($request)) {
             return $this->jsonResponse(['success' => false, 'message' => 'Ungültiges Sicherheitstoken.'], 400);
         }
-        $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
+        $entry = MashaFeedlyEntry::visibleTo()->byID((int)$request->postVar('EntryID'));
         $reporterID = (int)$request->postVar('ReportedByID');
         $reporter = $reporterID > 0 ? Member::get()->byID($reporterID) : null;
         if (!$entry || ($reporterID > 0 && !$reporter)) {
@@ -1333,6 +1345,12 @@ class MashaFeedlyAdmin extends ModelAdmin
         $siteConfig->MashaFeedlyTheme = preg_match('/^[a-z][a-z0-9_-]{0,79}$/D', $theme) ? $theme : 'playful';
         $canManageSensitiveSettings = MashaFeedlyEntry::canManageReporter($member);
         if ($canManageSensitiveSettings) {
+            try {
+                \KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::save($siteConfig, $data);
+            } catch (\InvalidArgumentException $exception) {
+                $form->sessionMessage($exception->getMessage(), 'bad');
+                return $this->redirectBack();
+            }
             $reminderMode = strtolower((string)($data['MashaFeedlyDueDateReminderMode'] ?? MashaFeedlyConfigExtension::dueDateReminderMode()));
             $siteConfig->MashaFeedlyDueDateReminderMode = in_array($reminderMode, ['cron', 'visitor'], true) ? $reminderMode : 'cron';
             $hourlyRate = str_replace(',', '.', trim((string)($data['MashaFeedlyHourlyRate'] ?? MashaFeedlyConfigExtension::hourlyRate())));

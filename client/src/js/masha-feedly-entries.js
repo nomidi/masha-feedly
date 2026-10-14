@@ -222,7 +222,12 @@ window.KWMashaFeedlyEntries = (() => {
     return targetURL.toString();
   };
 
-  /** Liefert die Bugbeschreibung nur zum Lesen und die separat veränderbaren Eintragsmetadaten. */
+  /**
+   * Liefert die Beschreibung samt optionaler Fehlerstatistik nur zum Lesen.
+   * @param {Object} entry Geladene Eintragsdaten.
+   * @param {string} [entry.errorSummary] Serverseitig formatierte Häufigkeit eines technischen Fehlers.
+   * @returns {Object} Lesebeschreibung und separat veränderbare Eintragsmetadaten.
+   */
   const editableEntryData = (entry) => ({
     id: Number(entry.id),
     categoryID: Number(entry.categoryID),
@@ -231,7 +236,7 @@ window.KWMashaFeedlyEntries = (() => {
     deferredUntil: entry.deferredUntil || '',
     assignedMemberIDs: (entry.assignedMemberIDs || []).map(Number),
     context: t('ENTRY_CONTEXT_STATUS', { status: entry.categoryTitle || t('ENTRY_WITHOUT_CATEGORY') }),
-    description: entry.content || t('ENTRY_NO_DESCRIPTION'),
+    description: [entry.content || t('ENTRY_NO_DESCRIPTION'), entry.errorSummary].filter(Boolean).join('\n\n'),
     stepsToReproduce: entry.stepsToReproduce || '',
     expectedResult: entry.expectedResult || '',
     actualResult: entry.actualResult || '',
@@ -1130,6 +1135,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderComments(entry.comments || []);
     editForm.querySelectorAll('[name="AssignedMemberIDs[]"]').forEach((field) => {
       field.checked = editable.assignedMemberIDs.map(String).includes(field.value);
+      field.disabled = Boolean(entry.isTechnicalError);
     });
     editContext.textContent = editable.context;
     editStatus.textContent = '';

@@ -19,6 +19,12 @@ KW\MashaFeedly\Control\MashaFeedlyEntryController:
 SilverStripe\SiteConfig\SiteConfig:
   extensions:
     - KW\MashaFeedly\Extension\MashaFeedlyConfigExtension
+    - KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension
+
+SilverStripe\Core\Injector\Injector:
+  Psr\Log\LoggerInterface:
+    calls:
+      MashaFeedlyErrors: [ pushHandler, [ '%$KW\MashaFeedly\Logging\MashaFeedlyErrorHandler' ] ]
 
 SilverStripe\Security\Member:
   extensions:

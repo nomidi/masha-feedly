@@ -90,6 +90,14 @@ class MashaFeedlyNotificationService
         ]);
     }
 
+    /** Ergänzt bei technischen Fehlern das Betreiberkonto und filtert die Sichtbarkeit vor jedem Versand. @param MashaFeedlyEntry $entry Meldung. @return list<int> Empfänger-IDs. */
+    private static function recipientIDs(MashaFeedlyEntry $entry): array
+    {
+        $ids = MashaFeedlyConfigExtension::memberIDs();
+        if ($entry->ErrorFingerprint && ($manager = \KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::manager())) $ids[] = (int)$manager->ID;
+        return array_values(array_unique($ids));
+    }
+
     /** Liefert die formatierte Einleitung in der persönlichen Anrede des Empfängers. @param string $type Benachrichtigungstyp. @param Member|null $member Empfänger. @param array<string, string> $placeholders Dynamische Mailwerte. @return array{html: string, plain: string}|null Gespeicherte Einleitung oder bisheriger Vorlagentext. */
     private static function notificationIntro(string $type, ?Member $member, array $placeholders): ?array
     {
@@ -233,7 +241,8 @@ class MashaFeedlyNotificationService
         $sent = 0;
         foreach (Member::get()->filter('ID', $recipientIDs) as $member) {
             if (
-                !(bool)$member->MashaFeedlyEmailNotifications
+                !$entry->canView($member)
+                || !(bool)$member->MashaFeedlyEmailNotifications
                 || ((bool)$member->MashaFeedlyEmailAssignedOnly && !in_array((int)$member->ID, $personalIDs, true))
                 || !(bool)$member->MashaFeedlyNotifyDueDateReminders
                 || !Email::is_valid_address((string)$member->Email)
@@ -293,7 +302,7 @@ class MashaFeedlyNotificationService
     /** Sendet den neuen Bug-Eintrag an ausdrücklich freigegebene Abonnenten. */
     public static function notifyNewEntry(MashaFeedlyEntry $entry): void
     {
-        $memberIDs = MashaFeedlyConfigExtension::memberIDs();
+        $memberIDs = self::recipientIDs($entry);
         if (!$memberIDs) {
             return;
         }
@@ -320,7 +329,8 @@ class MashaFeedlyNotificationService
 
         foreach (Member::get()->filter('ID', $memberIDs) as $member) {
             if (
-                !(bool)$member->MashaFeedlyEmailNotifications
+                !$entry->canView($member)
+                || !(bool)$member->MashaFeedlyEmailNotifications
                 || ((bool)$member->MashaFeedlyEmailAssignedOnly && !in_array((int)$member->ID, $personalIDs, true))
                 || !(bool)$member->MashaFeedlyNotifyNewEntries
                 || (int)$member->ID === $currentMemberID
@@ -365,7 +375,7 @@ class MashaFeedlyNotificationService
         }
 
         $personalIDs = self::personalRecipientIDs($entry);
-        $memberIDs = MashaFeedlyConfigExtension::memberIDs();
+        $memberIDs = self::recipientIDs($entry);
         if (!$memberIDs) {
             return;
         }
@@ -381,7 +391,8 @@ class MashaFeedlyNotificationService
 
         foreach (Member::get()->filter('ID', $memberIDs) as $member) {
             if (
-                !(bool)$member->MashaFeedlyEmailNotifications
+                !$entry->canView($member)
+                || !(bool)$member->MashaFeedlyEmailNotifications
                 || ((bool)$member->MashaFeedlyEmailAssignedOnly && !in_array((int)$member->ID, $personalIDs, true))
                 || ($newAssignmentIDs === null
                     ? !(bool)$member->MashaFeedlyNotifyEntryUpdates
@@ -413,11 +424,39 @@ class MashaFeedlyNotificationService
         }
     }
 
+    /** Versendet die tägliche Zusammenfassung gemäß persönlichem Bereich und aktivierten E-Mails. @param list<MashaFeedlyEntry> $entries Im Zeitraum aufgetretene technische Fehler. @return void */
+    public static function notifyErrorDigest(array $entries): void
+    {
+        if (!$entries) return;
+        $ids = [];
+        foreach ($entries as $entry) $ids = array_merge($ids, self::recipientIDs($entry));
+        $siteTitle = (string)SiteConfig::current_site_config()->Title ?: 'Masha:Feedly';
+        foreach (Member::get()->filter('ID', array_values(array_unique($ids))) as $member) {
+            if (!$member->MashaFeedlyEmailNotifications || !Email::is_valid_address((string)$member->Email)) continue;
+            $items = [];
+            foreach ($entries as $entry) {
+                if (!$entry->canView($member) || ($member->MashaFeedlyEmailAssignedOnly
+                    && !in_array((int)$member->ID, self::personalRecipientIDs($entry), true))) continue;
+                $items[] = [
+                    'Title' => $entry->getTitle(),
+                    'Summary' => $entry->errorSummary(),
+                    'URL' => Director::absoluteURL(MashaFeedlyAdmin::singleton()->getCMSEditLinkForManagedDataObject($entry)),
+                ];
+            }
+            if (!$items) continue;
+            self::sendSafely(Email::create()->setTo((string)$member->Email)
+                ->setSubject(i18n::_t('KW\\MashaFeedly\\Translations.ERRORS_DIGEST_SUBJECT', '{siteTitle}: Tägliche Fehlerzusammenfassung', ['siteTitle' => $siteTitle]))
+                ->setHTMLTemplate('KW/MashaFeedly/Email/ErrorDigestEmail')
+                ->setPlainTemplate('KW/MashaFeedly/Email/ErrorDigestEmailPlain')
+                ->setData(self::emailData(['SiteTitle' => $siteTitle, 'Errors' => \SilverStripe\Model\List\ArrayList::create($items)], $member)));
+        }
+    }
+
     /** Sendet Kommentare an freigegebene Mitglieder gemäß Bereich und Kommentarpräferenz; nie an den Autor. */
     public static function notifyNewComment(MashaFeedlyEntry $entry, MashaFeedlyComment $comment, Member $author): void
     {
         $personalIDs = self::personalRecipientIDs($entry);
-        $recipientIDs = array_values(array_diff(MashaFeedlyConfigExtension::memberIDs(), [(int)$author->ID]));
+        $recipientIDs = array_values(array_diff(self::recipientIDs($entry), [(int)$author->ID]));
         if (!$recipientIDs) {
             return;
         }
@@ -428,7 +467,8 @@ class MashaFeedlyNotificationService
         );
         foreach (Member::get()->filter('ID', $recipientIDs) as $member) {
             if (
-                !(bool)$member->MashaFeedlyEmailNotifications
+                !$entry->canView($member)
+                || !(bool)$member->MashaFeedlyEmailNotifications
                 || ((bool)$member->MashaFeedlyEmailAssignedOnly && !in_array((int)$member->ID, $personalIDs, true))
                 || !(bool)$member->MashaFeedlyNotifyComments
                 || !Email::is_valid_address((string)$member->Email)
@@ -475,7 +515,8 @@ class MashaFeedlyNotificationService
         $sent = 0;
         foreach (Member::get()->filter('ID', $recipientIDs) as $member) {
             if (
-                !(bool)$member->MashaFeedlyEmailNotifications
+                !$entry->canView($member)
+                || !(bool)$member->MashaFeedlyEmailNotifications
                 || (int)$member->ID === (int)(Security::getCurrentUser()?->ID ?? 0)
                 || !(bool)$member->MashaFeedlyNotifyCostEstimates
                 || !Email::is_valid_address((string)$member->Email)

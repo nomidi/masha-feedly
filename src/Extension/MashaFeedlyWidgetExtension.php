@@ -33,6 +33,7 @@ class MashaFeedlyWidgetExtension extends Extension
     public function onAfterInit(): void
     {
         if ($this->owner instanceof ContentController) {
+            \KW\MashaFeedly\Service\MashaFeedlyErrorService::runForWebsiteVisit();
             MashaFeedlyDueDateReminderTask::runForWebsiteVisit();
         }
 

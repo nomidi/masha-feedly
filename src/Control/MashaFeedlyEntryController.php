@@ -123,7 +123,7 @@ class MashaFeedlyEntryController extends Controller
             $miteService = Injector::inst()->get(MashaFeedlyMiteService::class);
             $entryID = (int)$request->postVar('EntryID');
             if ($entryID > 0) {
-                $entry = MashaFeedlyEntry::get()->byID($entryID);
+                $entry = MashaFeedlyEntry::visibleTo()->byID($entryID);
                 if (!$entry) {
                     return $this->respond(['success' => false, 'message' => 'Die Meldung wurde nicht gefunden. Öffne die Meldungsliste erneut.'], 404);
                 }
@@ -169,7 +169,7 @@ class MashaFeedlyEntryController extends Controller
         if (!SecurityToken::inst()->checkRequest($request)) {
             return $this->respond(['success' => false, 'message' => $this->translate('SESSION_EXPIRED_UPDATE_SIE', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
-        $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
+        $entry = MashaFeedlyEntry::visibleTo()->byID((int)$request->postVar('EntryID'));
         if (!$entry) {
             return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Die Meldung wurde nicht gefunden.')], 404);
         }
@@ -466,7 +466,7 @@ class MashaFeedlyEntryController extends Controller
         if (!SecurityToken::inst()->checkRequest($request)) {
             return $this->respond(['success' => false, 'message' => $this->translate(MashaFeedlyMemberExtension::addressFor(Security::getCurrentUser()) === 'sie' ? 'SESSION_EXPIRED_UPDATE_SIE' : 'SESSION_EXPIRED_UPDATE_DU', 'Deine Sitzung ist abgelaufen. Lade die Seite neu und melde dich bei Bedarf erneut an.')], 400);
         }
-        $entry = MashaFeedlyEntry::get()->byID((int)$request->postVar('EntryID'));
+        $entry = MashaFeedlyEntry::visibleTo()->byID((int)$request->postVar('EntryID'));
         if (!$entry) {
             return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Die Meldung wurde nicht gefunden.')], 404);
         }
@@ -583,6 +583,10 @@ class MashaFeedlyEntryController extends Controller
         $assignedIDs = MashaFeedlyConfigExtension::normalizeMemberIDs((array)$request->postVar('AssignedMemberIDs'));
         $allowedIDs = MashaFeedlyConfigExtension::memberIDs();
         $newAssigneeIDs = array_values(array_intersect($assignedIDs, $allowedIDs));
+        if ($entry->ErrorFingerprint) {
+            $manager = \KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::manager();
+            $newAssigneeIDs = $manager ? [(int)$manager->ID] : $oldAssigneeIDs;
+        }
         $entry->CategoryID = (int)$category->ID;
         $entry->PriorityID = (int)$priority->ID;
         if ($request->postVar('StepsToReproduce') !== null) $entry->StepsToReproduce = $this->postedText($request, 'StepsToReproduce', 10000);
@@ -601,7 +605,7 @@ class MashaFeedlyEntryController extends Controller
         $relatedIDs = array_values(array_unique(array_filter(array_map('intval', (array)$relatedInput), static fn(int $id): bool => $id > 0 && $id !== (int)$entry->ID)));
         $relatedEntries = [];
         foreach ($relatedIDs as $relatedID) {
-            $relatedEntry = MashaFeedlyEntry::get()->byID($relatedID);
+            $relatedEntry = MashaFeedlyEntry::visibleTo()->byID($relatedID);
             if ($relatedEntry) {
                 $relatedEntries[] = $relatedEntry;
             }
@@ -727,8 +731,8 @@ class MashaFeedlyEntryController extends Controller
         }
         $openCategoryIDs = MashaFeedlyCategory::get()->filter('IsClosed', false)->column('ID');
         $candidates = $openCategoryIDs
-            ? MashaFeedlyEntry::get()->filter(['PageURL' => $pageURL, 'CategoryID' => $openCategoryIDs])->sort('EntryDate DESC, ID DESC')->limit(60)
-            : MashaFeedlyEntry::get()->filter('ID', 0);
+            ? MashaFeedlyEntry::visibleTo()->filter(['PageURL' => $pageURL, 'CategoryID' => $openCategoryIDs])->sort('EntryDate DESC, ID DESC')->limit(60)
+            : MashaFeedlyEntry::visibleTo()->filter('ID', 0);
         $matches = [];
         $normalizedContent = $this->normalizeForSimilarity($content);
         foreach ($candidates as $candidate) {
@@ -774,7 +778,7 @@ class MashaFeedlyEntryController extends Controller
         if (!$request->isGET()) {
             return $this->respond(['success' => false, 'message' => 'Ungültige Anfrage.'], 405);
         }
-        $entry = MashaFeedlyEntry::get()->byID((int)$request->getVar('EntryID'));
+        $entry = MashaFeedlyEntry::visibleTo()->byID((int)$request->getVar('EntryID'));
         if (!$entry) {
             return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Die Meldung wurde nicht gefunden.')], 404);
         }
@@ -795,7 +799,7 @@ class MashaFeedlyEntryController extends Controller
         if (!$request->isGET()) {
             return $this->respond(['success' => false, 'message' => 'Ungültige Anfrage.'], 405);
         }
-        $entry = MashaFeedlyEntry::get()->byID((int)$request->getVar('EntryID'));
+        $entry = MashaFeedlyEntry::visibleTo()->byID((int)$request->getVar('EntryID'));
         if (!$entry) {
             return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_NOT_FOUND', 'Die Meldung wurde nicht gefunden.')], 404);
         }
@@ -821,6 +825,8 @@ class MashaFeedlyEntryController extends Controller
         return [
             'id' => (int)$entry->ID,
             'title' => (string)$entry->Title,
+            'errorSummary' => $entry->errorSummary(),
+            'isTechnicalError' => (bool)$entry->ErrorFingerprint,
             'entryDate' => (string)$entry->EntryDate,
             'dueDate' => (string)$entry->DueDate,
             'deferredUntil' => (string)$entry->DeferredUntil,
@@ -932,7 +938,7 @@ class MashaFeedlyEntryController extends Controller
         $requestedPageURL = trim((string)$request->getVar('PageURL'));
         $pageURL = $this->safePageURL($requestedPageURL);
         $pageURLs = array_values(array_unique(array_filter([$pageURL, $requestedPageURL])));
-        $allEntries = MashaFeedlyEntry::get();
+        $allEntries = MashaFeedlyEntry::visibleTo();
         $allEntryRecords = $allEntries->toArray();
         $pageURLLookup = array_fill_keys($pageURLs, true);
         $pageEntryIDs = [];
@@ -942,9 +948,9 @@ class MashaFeedlyEntryController extends Controller
             }
         }
         $pageEntries = $pageEntryIDs
-            ? MashaFeedlyEntry::get()->filter('ID', $pageEntryIDs)
-            : MashaFeedlyEntry::get()->filter('ID', 0);
-        $mineEntries = MashaFeedlyEntry::get()->filter('AssignedMembers.ID', (int)$member->ID);
+            ? MashaFeedlyEntry::visibleTo()->filter('ID', $pageEntryIDs)
+            : MashaFeedlyEntry::visibleTo()->filter('ID', 0);
+        $mineEntries = MashaFeedlyEntry::visibleTo()->filter('AssignedMembers.ID', (int)$member->ID);
         $categories = [];
         $this->categorySummaries = [];
         $closedCategoryIDs = [];
@@ -976,7 +982,7 @@ class MashaFeedlyEntryController extends Controller
         }
         $pageOpenEntries = $openCategoryIDs
             ? $pageEntries->filter('CategoryID', $openCategoryIDs)
-            : MashaFeedlyEntry::get()->filter('ID', 0);
+            : MashaFeedlyEntry::visibleTo()->filter('ID', 0);
         $unreadEntryIDs = MashaFeedlyEntryRead::unreadEntryIDs($member, $allEntryRecords);
         $requestedMode = (string)$request->getVar('mode');
         $estimateModes = ['estimate-pending', 'estimate-approved'];
@@ -987,23 +993,23 @@ class MashaFeedlyEntryController extends Controller
         $entries = match ($mode) {
             'all' => $allEntries,
             'open' => $openCategoryIDs
-                ? MashaFeedlyEntry::get()->filter('CategoryID', $openCategoryIDs)
-                : MashaFeedlyEntry::get()->filter('ID', 0),
+                ? MashaFeedlyEntry::visibleTo()->filter('CategoryID', $openCategoryIDs)
+                : MashaFeedlyEntry::visibleTo()->filter('ID', 0),
             'closed' => $closedCategoryIDs
-                ? MashaFeedlyEntry::get()->filter('CategoryID', $closedCategoryIDs)
-                : MashaFeedlyEntry::get()->filter('ID', 0),
+                ? MashaFeedlyEntry::visibleTo()->filter('CategoryID', $closedCategoryIDs)
+                : MashaFeedlyEntry::visibleTo()->filter('ID', 0),
             'mine' => $mineEntries,
             'page-open' => $pageOpenEntries,
             'feedback' => ($feedbackCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first())
-                ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$feedbackCategory->ID)
-                : MashaFeedlyEntry::get()->filter('ID', 0),
+                ? MashaFeedlyEntry::visibleTo()->filter('CategoryID', (int)$feedbackCategory->ID)
+                : MashaFeedlyEntry::visibleTo()->filter('ID', 0),
             'estimate-pending' => ($estimatePendingCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_pending')->first())
-                ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimatePendingCategory->ID)
-                : MashaFeedlyEntry::get()->filter('ID', 0),
+                ? MashaFeedlyEntry::visibleTo()->filter('CategoryID', (int)$estimatePendingCategory->ID)
+                : MashaFeedlyEntry::visibleTo()->filter('ID', 0),
             'estimate-approved' => ($estimateApprovedCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_approved')->first())
-                ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimateApprovedCategory->ID)
-                : MashaFeedlyEntry::get()->filter('ID', 0),
-            'unread' => MashaFeedlyEntry::get()->filter('ID', $unreadEntryIDs ?: [0]),
+                ? MashaFeedlyEntry::visibleTo()->filter('CategoryID', (int)$estimateApprovedCategory->ID)
+                : MashaFeedlyEntry::visibleTo()->filter('ID', 0),
+            'unread' => MashaFeedlyEntry::visibleTo()->filter('ID', $unreadEntryIDs ?: [0]),
             default => $pageEntries,
         };
         $summaryEntries = $entries->sort(['Category.Sort' => 'ASC', 'Priority.Sort' => 'ASC', 'EntryDate' => 'DESC', 'ID' => 'DESC'])->toArray();
@@ -1024,15 +1030,15 @@ class MashaFeedlyEntryController extends Controller
         $pageCount = 0;
         $feedbackCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'feedback')->first();
         $feedbackCount = $feedbackCategory && !(bool)$feedbackCategory->IsClosed
-            ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$feedbackCategory->ID)->count()
+            ? MashaFeedlyEntry::visibleTo()->filter('CategoryID', (int)$feedbackCategory->ID)->count()
             : 0;
         $estimatePendingCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_pending')->first();
         $estimateApprovedCategory = MashaFeedlyCategory::get()->filter('SystemKey', 'estimate_approved')->first();
         $estimatePendingCount = MashaFeedlyEntry::canApproveEstimate($member) && $estimatePendingCategory
-            ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimatePendingCategory->ID)->count()
+            ? MashaFeedlyEntry::visibleTo()->filter('CategoryID', (int)$estimatePendingCategory->ID)->count()
             : 0;
         $estimateApprovedCount = MashaFeedlyEntry::canApproveEstimate($member) && $estimateApprovedCategory
-            ? MashaFeedlyEntry::get()->filter('CategoryID', (int)$estimateApprovedCategory->ID)->count()
+            ? MashaFeedlyEntry::visibleTo()->filter('CategoryID', (int)$estimateApprovedCategory->ID)->count()
             : 0;
         foreach ($allEntryRecords as $entry) {
             $isOnPage = isset($pageURLLookup[(string)$entry->PageURL])
@@ -1379,7 +1385,7 @@ class MashaFeedlyEntryController extends Controller
         $relations = [];
         foreach ($entry->Relations()->sort('ID ASC') as $relation) {
             $target = $relation->RelatedEntry();
-            if (!$target->exists()) {
+            if (!$target->exists() || !$target->canView()) {
                 continue;
             }
             $relations[] = [
@@ -1392,7 +1398,7 @@ class MashaFeedlyEntryController extends Controller
         }
         foreach (MashaFeedlyEntryRelation::get()->filter('RelatedEntryID', (int)$entry->ID)->sort('ID ASC') as $relation) {
             $source = $relation->Entry();
-            if (!$source->exists()) {
+            if (!$source->exists() || !$source->canView()) {
                 continue;
             }
             $incomingType = [
@@ -1429,7 +1435,7 @@ class MashaFeedlyEntryController extends Controller
                 }
                 $visited[$duplicateID] = true;
                 $queue[] = $duplicateID;
-                $duplicate = MashaFeedlyEntry::get()->byID($duplicateID);
+                $duplicate = MashaFeedlyEntry::visibleTo()->byID($duplicateID);
                 if (!$duplicate || (bool)$duplicate->Category()->IsClosed) {
                     continue;
                 }
@@ -1507,7 +1513,9 @@ class MashaFeedlyEntryController extends Controller
         return [
             'id' => (int)$entry->ID,
             'title' => (string)$entry->Title,
+            'errorSummary' => $entry->errorSummary(),
             'content' => trim(html_entity_decode(strip_tags((string)$entry->Content), ENT_QUOTES | ENT_HTML5, 'UTF-8')),
+            'isTechnicalError' => (bool)$entry->ErrorFingerprint,
             'stepsToReproduce' => (string)$entry->StepsToReproduce,
             'expectedResult' => (string)$entry->ExpectedResult,
             'actualResult' => (string)$entry->ActualResult,

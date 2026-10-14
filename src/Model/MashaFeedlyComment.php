@@ -27,6 +27,24 @@ use SilverStripe\i18n\i18n;
  */
 class MashaFeedlyComment extends DataObject
 {
+    /** Schützt technische Kommentare auch bei direktem CMS-Aufruf. @param \SilverStripe\Security\Member|null $member Person. @return bool Sichtbarkeit. */
+    public function canView($member = null): bool
+    {
+        return $this->Entry()->canView($member);
+    }
+
+    /** Behält die bestehenden CMS-Rechte bei und berücksichtigt den technischen Zugriff. @param \SilverStripe\Security\Member|null $member Person. @return bool Bearbeitung erlaubt. */
+    public function canEdit($member = null): bool
+    {
+        return $this->canView($member) && parent::canEdit($member);
+    }
+
+    /** Schützt das Löschen technischer Kommentare. @param \SilverStripe\Security\Member|null $member Person. @return bool Löschen erlaubt. */
+    public function canDelete($member = null): bool
+    {
+        return $this->canView($member) && parent::canDelete($member);
+    }
+
     private static $table_name = 'MashaFeedlyComment';
 
     private static $db = [

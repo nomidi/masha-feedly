@@ -187,3 +187,32 @@ When another person selects “Done”, the report remains open as “Feedback�
 Categories, priorities and assignees are fetched when the widget is first opened; the page initially renders empty selection fields. The protected endpoint only returns these values to members with access.
 
 Helply links are shown only when Helply provides the authorised Feedly help collection on the current page. Without Helply, its buttons and hints remain hidden.
+
+## Automatically captured technical errors
+
+The configured operator can enable capture under **Masha:Feedly → Configuration → Technical errors**. The account specified by `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` must exist and have administrator permissions. Every technical report is always assigned to this account. Only the operator and additionally selected people who also have general Feedly access can see technical reports.
+
+Errors are grouped using a sanitised message and their origin. Variable numbers and UUIDs are normalised for matching. Details show the total count and first/last occurrence in UTC. New errors use existing new-report notifications. Resolved errors that recur reopen and use update notifications. Personal email preferences and the “My reports” scope still apply. Repetitions of open errors only increase the count, without comments or update emails.
+
+**Processing:** Choose cron or website visits and an interval of 1–1440 minutes. Run this command every minute from the project directory; Feedly checks its configured interval:
+
+```sh
+php vendor/bin/sake tasks:MashaFeedlyErrorTask
+```
+
+Visitor mode checks on Silverstripe content-page requests. Without these visits, or with fully cached pages, processing is delayed. Concurrent runs are prevented. Each run imports at most 100 error groups; remaining groups follow in the next interval.
+
+**Daily summary:** Optionally enable it and choose an HH:MM time in Europe/Berlin. The message lists errors occurring in the reporting period, their total counts and links. Personal email master switch, report scope and technical access apply. Individual event checkboxes continue to control immediate notifications. Empty summaries are not sent. Without cron or a website visit, delivery is delayed. The first summary covers at most the preceding 24 hours. Interrupted or failed summary delivery is not retried automatically on that day.
+
+**Server setup:** The module registers its logging handler automatically; capture starts only after activation. Existing `NativeMailerHandler` registrations remain active: remove them to stop individual technical error emails. Keep an independent PHP/server error log. After installation or upgrading, run `dev/build flush=1` and save the configuration.
+
+The private spool defaults to a project-specific directory under `TEMP_PATH`. Webserver and cron must use the same temp path and have access to the same files. Different server users or multiple servers require an appropriate shared private spool. Configure an absolute path via YAML if needed:
+
+```yaml
+KW\MashaFeedly\Logging\MashaFeedlyErrorHandler:
+  spool_directory: '/srv/private/feedly-errors'
+```
+
+The directory must be outside the webroot. Directories and files use 0700 and 0600 permissions. Capture includes events at the configured minimum level (Error, Critical, Alert or Emergency) forwarded to the Silverstripe logger. Errors before framework startup may only reach the independent server log. Capture does not need a database. Failed imports remain queued for retry; disabling capture does not delete pending batches.
+
+Full request data, context values and trace arguments are omitted. Common credential patterns and URL query strings are removed. Free-text error messages may still contain sensitive information; limit technical access accordingly. Events during importing or email delivery are not captured again to avoid feedback loops. Resetting the module removes imported reports; pending batches may recreate them on the next run.

@@ -28,6 +28,12 @@ class MashaFeedlyProfileImageExtension extends Extension
             return null;
         }
 
+        if ((string)$folder->Name === 'masha-feedly-attachments') {
+            foreach (\KW\MashaFeedly\Model\MashaFeedlyAttachment::get()->filter('FileID', (int)$this->owner->ID) as $attachment) {
+                if ($attachment->Entry()->ErrorFingerprint) return $attachment->Entry()->canView($member);
+            }
+        }
+
         return MashaFeedlyConfigExtension::canUse($member);
     }
 }

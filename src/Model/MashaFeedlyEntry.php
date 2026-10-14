@@ -28,6 +28,11 @@ use SilverStripe\i18n\i18n;
  * @property int $ID Datenbank-ID des Eintrags.
  * @property-read string $Title Automatisch aus dem Anfang der Bug-Beschreibung gebildeter Titel.
  * @property string $Content Inhalt des Eintrags.
+ * @property string $ErrorFingerprint Stabile Kennung eines automatisch erfassten technischen Fehlers.
+ * @property int $ErrorOccurrences Anzahl erfasster Vorkommen.
+ * @property string $ErrorFirstSeen Erstes Auftreten (UTC).
+ * @property string $ErrorLastSeen Letztes Auftreten (UTC).
+ * @property string $ErrorLastBatch Zuletzt übernommene Charge zur Wiederanlaufsicherung.
  * @property string $StepsToReproduce Optionale Schritte zum Nachstellen eines Fehlers.
  * @property string $ExpectedResult Optionales erwartetes Ergebnis.
  * @property string $ActualResult Optionales tatsächliches Ergebnis.
@@ -74,10 +79,17 @@ class MashaFeedlyEntry extends DataObject
 
     private static $entry_timezone = 'Europe/Berlin';
 
+    private static $indexes = ['ErrorFingerprint' => true];
+
     /** E-Mail-Adressen der Betreiberkonten, die die angezeigte Meldeperson ändern dürfen. */
     private static $reporter_manager_emails = [];
 
     private static $db = [
+        'ErrorFingerprint' => 'Varchar(64)',
+        'ErrorOccurrences' => 'Int',
+        'ErrorFirstSeen' => 'Datetime',
+        'ErrorLastSeen' => 'Datetime',
+        'ErrorLastBatch' => 'Varchar(32)',
         'Content' => 'HTMLText',
         'StepsToReproduce' => 'Text',
         'ExpectedResult' => 'Text',
@@ -140,6 +152,43 @@ class MashaFeedlyEntry extends DataObject
 
     private bool $notifyMembersAfterWrite = false;
 
+    /** Verhindert Benachrichtigungen vor dem Abschluss eines technischen Imports. */
+    public bool $deferErrorNotification = false;
+
+    /** Liefert nur für die Person sichtbare Einträge, einschließlich direkter ID-Abfragen. @param Member|null $member Person oder aktueller Benutzer. @return \SilverStripe\ORM\DataList<self> Geschützte Eintragsliste. */
+    public static function visibleTo(?Member $member = null): \SilverStripe\ORM\DataList
+    {
+        $member ??= Security::getCurrentUser();
+        $list = self::get();
+        if (!$member || (!MashaFeedlyConfigExtension::canUse($member) && !self::canManageReporter($member))) return $list->filter('ID', 0);
+        return \KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::canAccess($member)
+            ? $list : $list->filterAny(['ErrorFingerprint' => ['', null]]);
+    }
+
+    /** Schützt technische Einträge auch im Standard-CMS-Formular. @param Member|null $member Person. @return bool Bearbeitung erlaubt. */
+    public function canEdit($member = null): bool
+    {
+        return $this->ErrorFingerprint ? $this->canView($member) : parent::canEdit($member);
+    }
+
+    /** Schützt technische Einträge vor unberechtigtem Löschen. @param Member|null $member Person. @return bool Löschen erlaubt. */
+    public function canDelete($member = null): bool
+    {
+        return $this->ErrorFingerprint ? $this->canView($member) : parent::canDelete($member);
+    }
+
+    /** Formatiert die Häufigkeit für die geschützte Detailansicht. @return string Statistik oder leer bei manuellen Meldungen. */
+    public function errorSummary(): string
+    {
+        if (!$this->ErrorFingerprint) return '';
+        return i18n::_t('KW\\MashaFeedly\\Translations.ERRORS_STATISTICS',
+            '{count} Vorkommen · Erstes Auftreten: {first} UTC · Zuletzt: {last} UTC',
+            ['count' => $this->ErrorOccurrences, 'first' => $this->ErrorFirstSeen, 'last' => $this->ErrorLastSeen]);
+    }
+
+
+
+
     private bool $deferNewEntryNotification = false;
 
     private bool $notifyMembersAfterUpdate = false;
@@ -177,6 +226,11 @@ class MashaFeedlyEntry extends DataObject
     public function getCMSFields(): FieldList
     {
         $fields = parent::getCMSFields();
+        $fields->removeByName(['ErrorFingerprint', 'ErrorOccurrences', 'ErrorFirstSeen', 'ErrorLastSeen', 'ErrorLastBatch']);
+        if ($this->ErrorFingerprint) {
+            $fields->addFieldToTab('Root.Main', \SilverStripe\Forms\ReadonlyField::create('TechnicalErrorSummary',
+                i18n::_t('KW\\MashaFeedly\\Translations.ERRORS_SECTION', 'Technische Fehler'), $this->errorSummary()));
+        }
         $fields->removeByName([
             'Comments', 'ClassName', 'Title', 'Sort', 'ReportedByID',
             'EstimatedCostAmount', 'EstimatedCostAmountMax', 'EstimatedCostDuration', 'EstimatedCostCurrency', 'EstimatedCostNote',
@@ -279,6 +333,12 @@ class MashaFeedlyEntry extends DataObject
                 ->setValue($this->AssignedMembers()->column('ID'))
                 ->setDescription($this->translate('FIELD_ASSIGNEES_DESCRIPTION', 'Mehrere freigegebene Benutzer können ausgewählt werden.'))
         );
+        if ($this->ErrorFingerprint) {
+            $fields->removeByName('AssignedMembers');
+            $manager = \KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::manager();
+            $fields->addFieldToTab('Root.Main', \SilverStripe\Forms\ReadonlyField::create('TechnicalErrorAssignee',
+                $this->translate('FIELD_ASSIGNEES', 'Zugeordnet an'), $manager?->getName() ?? ''));
+        }
         $fields->addFieldToTab('Root.Comments', GridField::create(
             'Comments',
             $this->translate('FIELD_COMMENTS', 'Kommentare'),
@@ -497,6 +557,12 @@ class MashaFeedlyEntry extends DataObject
     /** Merkt sich, ob der Eintrag neu angelegt wird. */
     protected function onBeforeWrite(): void
     {
+        // Bei reinen Relationsänderungen überspringt Silverstripe onAfterWrite; bestehende Zuweisungen daher vorher sichern.
+        if ($this->isInDB() && $this->ErrorFingerprint
+            && ($manager = \KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::manager())) {
+            $assignedIDs = array_map('intval', $this->AssignedMembers()->column('ID'));
+            if ($assignedIDs !== [(int)$manager->ID]) $this->AssignedMembers()->setByIDList([(int)$manager->ID]);
+        }
         $this->historyOldCategoryTitle = null;
         $this->historyOldPriorityTitle = null;
         $this->historyOldDueDate = null;
@@ -683,7 +749,11 @@ class MashaFeedlyEntry extends DataObject
             ));
         }
         $assignedMemberIDs = array_map('intval', $this->AssignedMembers()->column('ID'));
-        $unauthorizedIDs = array_diff($assignedMemberIDs, MashaFeedlyConfigExtension::memberIDs());
+        $allowedAssignmentIDs = MashaFeedlyConfigExtension::memberIDs();
+        if ($this->ErrorFingerprint && ($manager = \KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::manager())) {
+            $allowedAssignmentIDs[] = (int)$manager->ID;
+        }
+        $unauthorizedIDs = array_diff($assignedMemberIDs, $allowedAssignmentIDs);
         if ($unauthorizedIDs) {
             $result->addFieldError('AssignedMembers', $this->translate('ALL_ASSIGNEES_ALLOWED', 'Alle zugeordneten Benutzer müssen für Masha:Feedly freigegeben sein.'));
         }
@@ -713,6 +783,9 @@ class MashaFeedlyEntry extends DataObject
     protected function onAfterWrite(): void
     {
         parent::onAfterWrite();
+        if ($this->ErrorFingerprint && ($manager = \KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::manager())) {
+            $this->AssignedMembers()->setByIDList([(int)$manager->ID]);
+        }
         if ($this->historyOldCategoryTitle !== null) {
             $newCategoryTitle = (string)$this->Category()->Title;
             if ($this->historyOldCategoryTitle !== $newCategoryTitle) {
@@ -777,11 +850,11 @@ class MashaFeedlyEntry extends DataObject
         }
         if ($this->notifyMembersAfterWrite) {
             MashaFeedlyEntryHistory::record($this, 'created', '', $this->getTitle(), Security::getCurrentUser());
-            if (!$this->deferNewEntryNotification) {
+            if (!$this->deferNewEntryNotification && !$this->deferErrorNotification) {
                 MashaFeedlyNotificationService::notifyNewEntry($this);
             }
             $this->deferNewEntryNotification = false;
-        } elseif ($this->notifyMembersAfterUpdate) {
+        } elseif ($this->notifyMembersAfterUpdate && !$this->deferErrorNotification) {
             MashaFeedlyNotificationService::notifyUpdatedEntry($this);
         }
         if ($this->notifyCostEstimateRequestedAfterWrite) {
@@ -806,6 +879,7 @@ class MashaFeedlyEntry extends DataObject
     public function canView($member = null): bool
     {
         $member ??= Security::getCurrentUser();
+        if ($this->ErrorFingerprint && !\KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::canAccess($member)) return false;
         return $member instanceof Member && (
             MashaFeedlyConfigExtension::canUse($member)
             || self::canManageReporter($member)
