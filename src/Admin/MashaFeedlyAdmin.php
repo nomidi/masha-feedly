@@ -283,17 +283,25 @@ class MashaFeedlyAdmin extends ModelAdmin
             }
             return $group;
         };
-        $generalFields = $takeFields(['MashaFeedlyEmailTestNotice', 'MashaFeedlyAddress', 'MashaFeedlyFontSize', 'MashaFeedlyTheme', 'MashaFeedlyAnimationPreviews']);
-        $accessFields = $takeFields(array_merge(['AllowedMemberIDs'], $memberColorFieldNames));
+        $generalFields = $takeFields(['MashaFeedlyEmailTestNotice', 'MashaFeedlyAddress', 'MashaFeedlyFontSize', 'MashaFeedlyTheme']);
+        $accessFields = $takeFields(['AllowedMemberIDs']);
         $sections = [
+            LiteralField::create('ConfigurationIntro', $this->renderConfigurationIntro($canManageSensitiveSettings)),
             ToggleCompositeField::create('GeneralSettings', self::translate('CONFIG_SECTION_GENERAL', 'Allgemein'), $generalFields)
                 ->setStartClosed(false)->addExtraClass('masha-feedly-config-section masha-feedly-config-section--general'),
-            ToggleCompositeField::create('AccessSettings', self::translate('CONFIG_SECTION_ACCESS', 'Zugriff & Darstellung'), $accessFields)
-                ->setStartClosed(false)->addExtraClass('masha-feedly-config-section masha-feedly-config-section--access'),
         ];
         if ($canManageSensitiveSettings) {
             $sections[] = ToggleCompositeField::create('TechnicalErrorsSettings', self::translate('ERRORS_SECTION', 'Technische Fehler'),
-                \KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::fields());
+                \KW\MashaFeedly\Extension\MashaFeedlyErrorConfigExtension::fields())
+                ->setStartClosed(false)->addExtraClass('masha-feedly-config-section masha-feedly-config-section--errors');
+        }
+        $sections[] = ToggleCompositeField::create('AccessSettings', self::translate('CONFIG_SECTION_ACCESS_ONLY', 'Zugriff'), $accessFields)
+            ->addExtraClass('masha-feedly-config-section masha-feedly-config-section--access');
+        if ($canManageSensitiveSettings) {
+            $sections[] = ToggleCompositeField::create('ProfileColorsSettings', self::translate('CONFIG_SECTION_COLORS', 'Profilfarben'), $takeFields($memberColorFieldNames))
+                ->addExtraClass('masha-feedly-config-section masha-feedly-config-section--colors');
+            $sections[] = ToggleCompositeField::create('AnimationSettings', self::translate('CONFIG_SECTION_ANIMATIONS', 'Effektvorschauen'), $takeFields(['MashaFeedlyAnimationPreviews']))
+                ->addExtraClass('masha-feedly-config-section masha-feedly-config-section--animations');
             $operationsFields = $takeFields(['MashaFeedlyDueDateReminderMode', 'MashaFeedlyHourlyRate']);
             $resetFields = $takeFields(['MashaFeedlyResetHeading', 'ResetConfirmation']);
             $sections[] = ToggleCompositeField::create('OperationsSettings', self::translate('CONFIG_SECTION_OPERATIONS', 'Erinnerungen & Schätzungen'), $operationsFields)
@@ -325,12 +333,34 @@ class MashaFeedlyAdmin extends ModelAdmin
         $form = Form::create($this, 'EditForm', $fields, $actions)
             ->setHTMLID('Form_EditForm')
             ->setTemplate($this->getTemplatesWithSuffix('_EditForm'));
-        $form->addExtraClass('cms-edit-form cms-panel-padded center flexbox-area-grow');
+        $form->addExtraClass('cms-edit-form cms-panel-padded center flexbox-area-grow masha-feedly-configuration');
         $form->setFormAction(Controller::join_links($this->getLinkForModelTab($this->modelTab), 'EditForm'));
         $form->setAttribute('data-pjax-fragment', 'CurrentForm');
         return $form;
     }
 
+    /** Rendert den Konfigurationskopf mit dem gespeicherten Versand- und Erfassungsstand. @param bool $showErrors Zeigt den sensiblen Erfassungsstand nur der Betreuung. @return string Sicher ausgegebenes HTML. */
+    private function renderConfigurationIntro(bool $showErrors): string
+    {
+        $emailReady = MashaFeedlyConfigExtension::emailTestSucceeded();
+        $status = '<span class="masha-feedly-config-hero__status' . ($emailReady ? ' is-ready' : '') . '">'
+            . $this->escapeBoardValue($emailReady
+                ? self::translate('CONFIG_EMAIL_READY', 'Mailversand bereit')
+                : self::translate('CONFIG_EMAIL_PENDING', 'Mailtest ausstehend')) . '</span>';
+        if ($showErrors) {
+            $enabled = (bool)MashaFeedlyConfigExtension::currentSiteConfig()->MashaFeedlyErrorsEnabled;
+            $status .= '<span class="masha-feedly-config-hero__status' . ($enabled ? ' is-ready' : '') . '">'
+                . $this->escapeBoardValue($enabled
+                    ? self::translate('CONFIG_ERRORS_ACTIVE', 'Fehlererfassung aktiv')
+                    : self::translate('CONFIG_ERRORS_INACTIVE', 'Fehlererfassung aus')) . '</span>';
+        }
+        return '<header class="masha-feedly-config-hero">'
+            . '<div class="masha-feedly-config-hero__copy"><span class="masha-feedly-config-hero__eyebrow">Masha:Feedly</span>'
+            . '<h2>' . $this->escapeBoardValue(self::translate('CONFIG_INTRO_TITLE', 'Alles im Griff.')) . '</h2>'
+            . '<p>' . $this->escapeBoardValue(self::translate('CONFIG_INTRO_DESCRIPTION', 'Ein Ort für Zugriff, Darstellung und automatische Abläufe. Änderungen werden mit „Konfiguration speichern“ übernommen.')) . '</p></div>'
+            . '<div class="masha-feedly-config-hero__statuses"><span class="masha-feedly-config-hero__caption">'
+            . $this->escapeBoardValue(self::translate('CONFIG_SAVED_STATUS', 'Gespeicherter Stand')) . '</span>' . $status . '</div></header>';
+    }
 
     /** Erstellt das ausschließlich für Reporter-Manager sichtbare Formular für E-Mail-Texte. */
     private function getEmailTextsForm(): Form

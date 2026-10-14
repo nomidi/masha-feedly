@@ -608,7 +608,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('aria-label="Pink, #E95DAB"', $response->getBody());
         $this->assertStringContainsString('name="MashaFeedlyAddress"', $response->getBody());
         $this->assertStringContainsString('General', $response->getBody());
-        $this->assertStringContainsString('Access &amp; appearance', $response->getBody());
+        $this->assertStringContainsString('Form_EditForm_AccessSettings', $response->getBody());
+        $this->assertStringContainsString('Form_EditForm_ProfileColorsSettings', $response->getBody());
+        $this->assertStringContainsString('Form_EditForm_AnimationSettings', $response->getBody());
         $this->assertStringContainsString('Reminders &amp; estimates', $response->getBody());
         $this->assertStringContainsString('Reset data', $response->getBody());
         $emailTextsResponse = $this->get('/admin/masha-feedly/email-texts');
@@ -904,7 +906,9 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringNotContainsString('name="MashaFeedlyDueDateReminderMode"', $body);
         $this->assertStringNotContainsString('name="MashaFeedlyHourlyRate"', $body);
         $this->assertStringContainsString('General', $body);
-        $this->assertStringContainsString('Access &amp; appearance', $body);
+        $this->assertStringContainsString('Form_EditForm_AccessSettings', $body);
+        $this->assertStringNotContainsString('Form_EditForm_ProfileColorsSettings', $body);
+        $this->assertStringNotContainsString('Form_EditForm_AnimationSettings', $body);
         $this->assertStringNotContainsString('Reminders &amp; estimates', $body);
         $this->assertStringNotContainsString('Reset data', $body);
         $this->assertStringNotContainsString('masha-feedly-config-section--operations', $body);

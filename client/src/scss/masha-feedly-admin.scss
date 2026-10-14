@@ -70,40 +70,114 @@
   &__status { min-height: 1.3em; margin: 0.65rem 0 0 !important; color: #286b42 !important; font-size: 0.9rem !important; }
 }
 
-/* Einstellungsgruppen auf einer Seite */
-.cms-edit-form .masha-feedly-config-section {
-  overflow: hidden;
-  margin: 0 0 1rem;
-  padding: 0 0.9rem 0.75rem;
-  border: 1px solid #e9e0eb;
-  border-radius: 0.85rem;
-  background: linear-gradient(135deg, #fff 0%, #fdfaff 100%);
-  box-shadow: 0 0.2rem 0.75rem rgba(49, 34, 61, 0.055);
+/* Konfiguration: Kopfbereich und übersichtliche Einstellungsgruppen */
+.cms-edit-form.masha-feedly-configuration {
+  background: #f4f5f8;
+  counter-reset: feedly-config;
 
-  > h3 {
-    margin: 0 -0.9rem 0.75rem;
-    border: 0;
-    background: #f7f2f9;
-    font-size: 1rem;
-    font-weight: 750;
-  }
-
-  > h3 a {
-    display: block;
-    padding: 0.85rem 1rem 0.85rem 2rem;
-    color: #393140;
-    text-decoration: none;
-  }
-
-  .ui-accordion-content { padding: 0.25rem 0 0; }
+  .cms-content-fields { padding: 1.5rem clamp(1rem, 3vw, 3rem) 2.5rem; }
+  .masha-feedly-config-hero,
+  .masha-feedly-config-section { width: 100%; max-width: 72rem; margin-inline: auto; }
 }
 
-.cms-edit-form .masha-feedly-config-section--reset {
-  border-color: #f1d4d4;
-  background: linear-gradient(135deg, #fff 0%, #fff8f8 100%);
+.masha-feedly-config-hero {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 1.75rem;
+  padding: 2.25rem 2.5rem;
+  border: 1px solid #34364e;
+  border-radius: 1.3rem;
+  background: radial-gradient(ellipse at 85% 0%, #693650 0%, transparent 58%), #252638;
+  color: #fff;
+  box-shadow: 0 12px 35px #25263816;
 
-  > h3 { background: #fff0f0; }
-  > h3 a { color: #842626; }
+  &::after { position: absolute; right: -3rem; bottom: -6rem; width: 15rem; height: 15rem; border: 1px solid #ffffff12; border-radius: 50%; content: ''; pointer-events: none; }
+  &__copy { position: relative; z-index: 1; max-width: 40rem; }
+  &__eyebrow { display: block; margin-bottom: 0.65rem; color: #f4aecf; font-size: 0.78rem; font-weight: 750; letter-spacing: 0.15em; text-transform: uppercase; }
+  h2 { margin: 0 0 0.65rem; color: #fff; font-size: clamp(1.8rem, 2.5vw, 2.6rem); font-weight: 750; letter-spacing: -0.045em; line-height: 1.1; }
+  p { max-width: 36rem; margin: 0; color: #dbdce6; font-size: 0.95rem; line-height: 1.65; }
+  &__statuses { position: relative; z-index: 1; display: flex; flex: 0 0 auto; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
+  &__caption { margin-bottom: 0.15rem; color: #c7becb; font-size: 0.72rem; }
+  &__status { display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.8rem; border: 1px solid #ffffff24; border-radius: 999px; background: #ffffff09; color: #ede9ef; font-size: 0.78rem; font-weight: 600; }
+  &__status::before { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: #b9adbf; content: ''; }
+  &__status.is-ready::before { background: #89dfbf; box-shadow: 0 0 0 3px #89dfbf16; }
+}
+
+.cms-edit-form.masha-feedly-configuration .masha-feedly-config-section {
+  counter-increment: feedly-config;
+  --section-accent: #be2473;
+  --section-tint: #fff2f8;
+  overflow: visible;
+  margin-bottom: 1rem;
+  padding: 0;
+  border: 1px solid #e1e3eb;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow: 0 3px 12px #25263804;
+
+  > h3 {
+    display: flex;
+    align-items: center;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 1rem;
+    background: transparent;
+    font-size: 1rem;
+    font-weight: 700;
+    transition: background 150ms ease;
+  }
+  > h3::before { display: grid; flex: 0 0 auto; width: 2.15rem; height: 2.15rem; margin-left: 1.25rem; place-items: center; border: 1px solid color-mix(in srgb, var(--section-accent), transparent 84%); border-radius: 0.7rem; background: var(--section-tint); color: var(--section-accent); content: counter(feedly-config, decimal-leading-zero); font-size: 0.76rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+  > h3 a { flex: 1; padding: 1.25rem 3rem 1.25rem 0.85rem; color: #303245; text-decoration: none; }
+  > h3 .ui-accordion-header-icon { right: 1.3rem; left: auto; }
+  > h3:hover { background: #f9f9fc; }
+  > h3:focus-visible { outline: 3px solid #e6007e55; outline-offset: 3px; }
+  > h3.ui-state-active { border-bottom: 1px solid #eef0f5; border-radius: 1rem 1rem 0 0; }
+  > .ui-accordion-content { overflow: visible !important; padding: 0.6rem 1.75rem 1.25rem; border: 0; border-radius: 0 0 1rem 1rem; background: #fff; }
+  .form-group { padding-block: 1rem; border-bottom-color: #eef0f5; }
+  .form-group:last-child { border-bottom: 0; }
+  .form-label { color: #35374a; font-weight: 650; }
+  .description { color: #737787; font-size: 0.82rem; line-height: 1.6; }
+  .chosen-container-single .chosen-single,
+  .chosen-container-multi .chosen-choices,
+  input.text { min-height: 2.75rem; border-color: #dce0e9; border-radius: 0.6rem; background: #fafbfe; box-shadow: none; }
+  .chosen-container-single .chosen-single { display: flex; align-items: center; }
+  .chosen-container-single .chosen-single div { display: flex; align-items: center; }
+  .chosen-container-active .chosen-single,
+  input.text:focus { border-color: var(--section-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--section-accent), transparent 90%); }
+  .chosen-container-multi .chosen-choices li.search-choice { padding: 0.35rem 1.5rem 0.35rem 0.6rem; border: 1px solid #e4deed; border-radius: 0.45rem; background: #f4f0f8; box-shadow: none; color: #564168; }
+  &--errors { --section-accent: #147665; --section-tint: #edf8f4; border-color: #cddfd9; }
+  &--reset { --section-accent: #ad3945; --section-tint: #fff0f1; margin-top: 1.75rem; }
+  &--reset > h3::before { content: '!'; }
+  &--reset > h3 a { color: #97313c; }
+
+  .masha-feedly-color-palette { margin-bottom: 0; border-color: #edf0f5; background: #fafbfe; }
+  .masha-feedly-animation-previews { margin-top: 1rem; border: 0; background: transparent; }
+}
+
+/* Die Speichern-Aktion bleibt im CMS-Footer klar erkennbar. */
+.cms-edit-form.masha-feedly-configuration {
+  .cms-content-actions { border-top: 1px solid #e1e3eb; background: #fff; }
+  .btn { min-height: 2.6rem; padding: 0.55rem 1rem; border-radius: 0.6rem; font-weight: 650; }
+  #Form_EditForm_action_saveConfiguration { border-color: #be2473; background: #be2473; box-shadow: 0 3px 9px #be247320; color: #fff; }
+  #Form_EditForm_action_saveConfiguration:hover { border-color: #a21960; background: #a21960; }
+  #Form_EditForm_action_sendTestEmail { border: 1px solid #dce0e9; background: #fafbfe; color: #4d5267; }
+  #Form_EditForm_action_resetAllMashaFeedlyData { border: 1px solid #ebcdd2; background: #fff8f9; color: #97313c; }
+}
+
+@media (max-width: 800px) {
+  .masha-feedly-config-hero { align-items: flex-start; flex-direction: column; gap: 1.25rem; padding: 1.6rem; }
+  .masha-feedly-config-hero__statuses { flex-direction: row; flex-wrap: wrap; }
+  .masha-feedly-config-hero__caption { flex-basis: 100%; }
+  .cms-edit-form.masha-feedly-configuration .masha-feedly-config-section > .ui-accordion-content { padding-inline: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cms-edit-form.masha-feedly-configuration .masha-feedly-config-section > h3 { transition: none; }
 }
 
 .masha-feedly-animation-preview {

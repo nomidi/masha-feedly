@@ -145,7 +145,16 @@ test('Profil: Avatarfarbe und stumme CMS-Vorschau bleiben nach dem Speichern erh
     await page.goto(new URL('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig', config.BASE_URL).href);
     assert.equal(await page.evaluate(() => window.KWMashaFeedlyDisableSoundEffects), true);
     assert.equal(await page.evaluate(() => window.KWMashaFeedlyEffects.soundDisabled()), true);
-    await page.locator('[data-masha-feedly-animation-preview="arcade"]').click();
+    // Die Vorschauen liegen in einem eigenen aufklappbaren Bereich; vorhandenen Öffnungszustand bewahren.
+    const animationSection = page.locator('#Form_EditForm_AnimationSettings');
+    const animationHeading = animationSection.locator(':scope > h3');
+    await expect(animationHeading).toBeVisible();
+    if (await animationHeading.getAttribute('aria-expanded') !== 'true') {
+      await animationHeading.click();
+    }
+    await expect(animationHeading).toHaveAttribute('aria-expanded', 'true');
+    await expect(animationSection.locator('[data-masha-feedly-animation-preview="arcade"]')).toBeVisible();
+    await animationSection.locator('[data-masha-feedly-animation-preview="arcade"]').click();
     await expect(page.locator('.kw-masha-feedly__arcade-effect')).toBeVisible();
     assert.equal(await page.evaluate(() => window.effectAudioStarts), 0, 'Die Animation erscheint ohne Tonerzeugung. Anbieter beachtet muted: ' + await page.evaluate(() => window.KWMashaFeedlyEffectModules.arcade.play.toString().includes('muted')));
     await page.evaluate(() => window.KWMashaFeedlyEffects.cancelActive());
