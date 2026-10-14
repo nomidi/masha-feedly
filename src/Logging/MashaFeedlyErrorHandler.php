@@ -6,6 +6,9 @@ use Monolog\Handler\AbstractProcessingHandler;
 use Monolog\LogRecord;
 use Monolog\Level;
 use SilverStripe\Core\Config\Configurable;
+use SilverStripe\Control\Controller;
+use SilverStripe\Control\Director;
+use SilverStripe\CMS\Controllers\ContentController;
 
 /** Erfasst technische Fehler ohne Datenbankzugriff; Kontextwerte und Trace-Argumente bleiben bewusst außen vor. */
 class MashaFeedlyErrorHandler extends AbstractProcessingHandler
@@ -66,6 +69,19 @@ class MashaFeedlyErrorHandler extends AbstractProcessingHandler
         return hash('sha256', $origin . "\n" . $message);
     }
 
+    /** Ermittelt ohne ORM-Zugriff die Inhaltsseite; technische Hintergrundaufrufe erhalten das CMS als Ort. @return string Lokaler Pfad ohne Querystring und Fragment. */
+    public static function currentPageURL(): string
+    {
+        $controller = Controller::curr();
+        $fallback = Controller::join_links(Director::baseURL(), 'admin');
+        if (!$controller instanceof ContentController) return $fallback;
+        $url = $controller->getRequest()?->getURL();
+        if (!is_string($url)) return $fallback;
+        $path = parse_url($url, PHP_URL_PATH);
+        if (!is_string($path) || preg_match('/[\x00-\x20\\\\]/', $path)) return $fallback;
+        $location = Controller::join_links(Director::baseURL(), ltrim($path, '/'));
+        return strlen($location) <= 2048 ? $location : $fallback;
+    }
 
     /** Speichert eine zusammengefasste Charge atomar; Fehler der Erfassung gehen ausschließlich ins PHP-Protokoll. */
     protected function write(LogRecord $record): void
@@ -96,6 +112,10 @@ class MashaFeedlyErrorHandler extends AbstractProcessingHandler
                 'first' => $record->datetime->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s'), 'count' => 0,
             ];
             $batch['count']++;
+            $pageURL = self::currentPageURL();
+            if (empty($batch['pageURL']) || $batch['pageURL'] === Controller::join_links(Director::baseURL(), 'admin')) {
+                $batch['pageURL'] = $pageURL;
+            }
             $batch['last'] = $record->datetime->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s');
             self::writeJSON($path, $batch);
         } catch (\Throwable $exception) {

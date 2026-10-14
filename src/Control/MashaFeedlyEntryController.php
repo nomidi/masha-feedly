@@ -832,7 +832,7 @@ class MashaFeedlyEntryController extends Controller
             'deferredUntil' => (string)$entry->DeferredUntil,
             'loggedAt' => (string)$entry->Created,
             'activityAt' => (new \DateTimeImmutable((string)$activityAt, new \DateTimeZone('UTC')))->format('Y-m-d\\TH:i:s\\Z'),
-            'pageURL' => (string)$entry->PageURL,
+            'pageURL' => $entry->locationURL(),
             'selector' => (string)$entry->ElementSelector,
             'elementText' => (string)$entry->ElementText,
             'elementPositionX' => (string)$entry->ElementPositionX,
@@ -1159,6 +1159,10 @@ class MashaFeedlyEntryController extends Controller
             $entry->EstimatedCostNote = $estimateNote;
         }
         $entry->PageURL = $this->safePageURL((string)$request->postVar('PageURL'));
+        if ($entry->PageURL === '') {
+            return $this->respond(['success' => false, 'message' => $this->translate('ENTRY_LOCATION_REQUIRED',
+                'Wähle einen gültigen Ort für die Meldung. Ohne Seitenadresse kann sie nicht gespeichert werden.')], 400);
+        }
         $entry->ElementSelector = mb_substr(trim((string)$request->postVar('ElementSelector')), 0, 512);
         $entry->ElementText = mb_substr(trim((string)$request->postVar('ElementText')), 0, 5000);
         $entry->ElementPositionX = $this->relativeElementPosition($request->postVar('ElementPositionX'));
@@ -1355,6 +1359,10 @@ class MashaFeedlyEntryController extends Controller
     /** Vereinheitlicht Seitenadressen ohne Query und Fragment für zuverlässige Seitenfilter. */
     private function safePageURL(string $url): string
     {
+        $url = trim($url);
+        if (str_starts_with($url, '/') && !str_starts_with($url, '//') && MashaFeedlyEntry::isValidPageURL($url)) {
+            return rtrim((string)parse_url($url, PHP_URL_PATH), '/') ?: '/';
+        }
         $parts = parse_url(trim($url));
         $scheme = strtolower((string)($parts['scheme'] ?? ''));
         $host = strtolower((string)($parts['host'] ?? ''));
@@ -1522,7 +1530,7 @@ class MashaFeedlyEntryController extends Controller
             'entryDate' => (string)$entry->EntryDate,
             'dueDate' => (string)$entry->DueDate,
             'deferredUntil' => (string)$entry->DeferredUntil,
-            'pageURL' => (string)$entry->PageURL,
+            'pageURL' => $entry->locationURL(),
             'selector' => (string)$entry->ElementSelector,
             'elementText' => (string)$entry->ElementText,
             'elementPositionX' => (string)$entry->ElementPositionX,

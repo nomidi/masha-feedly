@@ -11,6 +11,7 @@ use KW\MashaFeedly\Service\MashaFeedlyAttachmentService;
 use SilverStripe\Assets\Dev\TestAssetStore;
 use SilverStripe\Assets\File;
 use SilverStripe\Core\Config\Config;
+use SilverStripe\ORM\DB;
 use SilverStripe\Dev\FunctionalTest;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\SecurityToken;
@@ -154,5 +155,36 @@ class MashaFeedlyTechnicalErrorAccessTest extends FunctionalTest
         }
     }
 
+    /** Der Erstellungsendpunkt speichert ohne gültigen Ort keinen Eintrag und gibt einen verständlichen Fehler zurück. */
+    public function testCreationRequiresValidLocation(): void
+    {
+        $count = MashaFeedlyEntry::get()->count();
+        foreach (['', 'javascript:alert(1)', '//foreign.example.test/path'] as $location) {
+            $response = $this->post('/__masha-feedly/createEntry', [
+                'SecurityID' => SecurityToken::getSecurityID(), 'Content' => 'Meldung ohne gültigen Ort',
+                'PageURL' => $location, 'CategoryID' => $this->ordinary->CategoryID, 'PriorityID' => $this->ordinary->PriorityID,
+            ]);
+            $this->assertSame(400, $response->getStatusCode());
+            $this->assertSame(\SilverStripe\i18n\i18n::_t('KW\\MashaFeedly\\Translations.ENTRY_LOCATION_REQUIRED',
+                'Wähle einen gültigen Ort für die Meldung. Ohne Seitenadresse kann sie nicht gespeichert werden.'),
+                json_decode($response->getBody(), true)['message']);
+            $this->assertSame($count, MashaFeedlyEntry::get()->count());
+        }
+    }
 
+    /** Das CMS-Board bietet auch bei älteren technischen Meldungen ohne gespeicherte Seite einen anklickbaren Titel. */
+    public function testLegacyTechnicalReportHasClickableAdminLink(): void
+    {
+        DB::prepared_query('UPDATE "MashaFeedlyEntry" SET "PageURL" = ? WHERE "ID" = ?', ['', (int)$this->technical->ID]);
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyErrorsMemberIDs = json_encode([$this->customer->ID]);
+        $config->write();
+        $response = $this->get('/admin/masha-feedly/KW-MashaFeedly-Model-MashaFeedlyEntry');
+        $this->assertSame(200, $response->getStatusCode());
+        $body = str_replace(['\\u003C', '\\u003E', '\\u0022'], ['<', '>', '"'], $response->getBody());
+        $this->assertMatchesRegularExpression('~href="[^"<>]*/admin\?masha-feedly-entry=' . $this->technical->ID
+            . '\#masha-feedly-entry=' . $this->technical->ID . '"~', $body);
+        $details = $this->get('/__masha-feedly/entryDetails?EntryID=' . $this->technical->ID);
+        $this->assertSame('/admin', json_decode($details->getBody(), true)['entry']['pageURL']);
+    }
 }

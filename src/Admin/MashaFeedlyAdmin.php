@@ -1297,7 +1297,10 @@ class MashaFeedlyAdmin extends ModelAdmin
     /** Erstellt einen Direktlink zur Originalseite, der den konkreten Eintrag öffnet. */
     private function frontendEntryURL(MashaFeedlyEntry $entry): string
     {
-        $pageURL = trim((string)$entry->PageURL);
+        $pageURL = $entry->locationURL();
+        if (str_starts_with($pageURL, '/') && !str_starts_with($pageURL, '//')) {
+            $pageURL = (string)Director::absoluteURL($pageURL);
+        }
         $parts = parse_url($pageURL);
         if (!is_array($parts)
             || !in_array(strtolower((string)($parts['scheme'] ?? '')), ['http', 'https'], true)
@@ -1309,6 +1312,10 @@ class MashaFeedlyAdmin extends ModelAdmin
         }
 
         $fragment = '';
+        // Der CMS-Einstieg leitet weiter und verliert dabei Queryparameter. Browser bewahren das Fragment.
+        if (preg_match('~/admin/?$~', (string)($parts['path'] ?? ''))) {
+            $fragment = '#masha-feedly-entry=' . (int)$entry->ID;
+        }
         $fragmentPosition = strpos($pageURL, '#');
         if ($fragmentPosition !== false) {
             $fragment = substr($pageURL, $fragmentPosition);

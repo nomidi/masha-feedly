@@ -11,6 +11,8 @@ use KW\MashaFeedly\Service\MashaFeedlyErrorService;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
 use Monolog\Level;
 use Monolog\LogRecord;
+use SilverStripe\Control\HTTPRequest;
+use SilverStripe\Control\Session;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Dev\SapphireTest;
@@ -270,6 +272,57 @@ class MashaFeedlyErrorServiceTest extends SapphireTest
         $this->assertSame([(int)$this->manager->ID], array_map('intval', $entry->AssignedMembers()->column('ID')));
     }
 
+    /** Fehler auf Inhaltsseiten übernehmen deren Pfad, ohne Querystrings oder Geheimnisse zu speichern. */
+    public function testCapturesContentPageWithoutQueryString(): void
+    {
+        $page = $this->objFromFixture(\Page::class, 'frontendTestPage');
+        $controller = new \PageController($page);
+        $request = new HTTPRequest('GET', 'kontakt?token=vertraulich');
+        $request->setSession(new Session([]));
+        $controller->setRequest($request);
+        $controller->pushCurrent();
+        try { $this->capture(); }
+        finally { $controller->popCurrent(); }
+        $path = (glob($this->directory . '/*.pending.json'))[0];
+        $raw = (string)file_get_contents($path);
+        $batch = json_decode($raw, true);
+        $this->assertSame('/kontakt', $batch['pageURL']);
+        $this->assertStringNotContainsString('vertraulich', $raw);
+        MashaFeedlyErrorService::run('cron');
+        $entry = MashaFeedlyEntry::get()->filter('ErrorFingerprint', $batch['fingerprint'])->first();
+        $this->assertSame('/kontakt', $entry->PageURL);
+    }
 
+    /** Ältere Chargen ohne Seitenadresse und unzulässige fremde Adressen erhalten ein lokales Admin-Ziel. */
+    public function testImportAlwaysAssignsLocation(): void
+    {
+        foreach ([null, '', 'https://foreign.example.test/path', 'javascript:alert(1)'] as $index => $location) {
+            $this->capture('Eigener Fehler ' . ['Alpha', 'Beta', 'Gamma', 'Delta'][$index]);
+            $path = (glob($this->directory . '/*.pending.json'))[0];
+            $batch = json_decode((string)file_get_contents($path), true);
+            if ($location === null) unset($batch['pageURL']);
+            else $batch['pageURL'] = $location;
+            MashaFeedlyErrorHandler::writeJSON($path, $batch);
+            MashaFeedlyErrorService::importFile($path, (int)$this->manager->ID);
+            $entry = MashaFeedlyEntry::get()->filter('ErrorFingerprint', $batch['fingerprint'])->first();
+            $this->assertSame('/admin', $entry->PageURL);
+        }
+    }
 
+    /** Eine später bekannte Inhaltsseite ersetzt das Admin-Ziel, ohne eine Wiederholungsmail auszulösen. */
+    public function testKnownPageReplacesAdminFallback(): void
+    {
+        $this->capture();
+        MashaFeedlyErrorService::run('cron');
+        $entry = MashaFeedlyEntry::get()->exclude('ErrorFingerprint', [null, ''])->first();
+        $this->assertSame('/admin', $entry->PageURL);
+        $this->capture();
+        $path = (glob($this->directory . '/*.pending.json'))[0];
+        $batch = json_decode((string)file_get_contents($path), true);
+        $batch['pageURL'] = '/kontakt';
+        MashaFeedlyErrorHandler::writeJSON($path, $batch);
+        MashaFeedlyErrorService::importFile($path, (int)$this->manager->ID);
+        $this->assertSame('/kontakt', MashaFeedlyEntry::get()->byID($entry->ID)->PageURL);
+        $this->assertCount(1, $this->mailer->messages);
+    }
 }

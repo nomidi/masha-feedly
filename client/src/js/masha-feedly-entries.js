@@ -217,8 +217,10 @@ window.KWMashaFeedlyEntries = (() => {
 
   /** Baut das Ziel einer Eintragskarte samt Kennung für das automatische Öffnen am Zielort. */
   const entryTargetURL = (entry, currentURL) => {
-    const targetURL = new URL(entry.pageURL || currentURL, currentURL);
+    const targetURL = new URL(entry.pageURL || (entry.isTechnicalError ? '/admin' : currentURL), currentURL);
     targetURL.searchParams.set('masha-feedly-entry', String(entry.id));
+    // Die Weiterleitung vom CMS-Einstieg verliert die Query, übernimmt aber das Fragment.
+    if (/\/admin\/?$/.test(targetURL.pathname)) targetURL.hash = `masha-feedly-entry=${entry.id}`;
     return targetURL.toString();
   };
 
@@ -705,7 +707,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let panelOpen = false;
   let listRequest = 0;
   let activeEntry = null;
-  const requestedEntryID = new URL(window.location.href).searchParams.get('masha-feedly-entry');
+  const requestedEntryURL = new URL(window.location.href);
+  const requestedEntryID = requestedEntryURL.searchParams.get('masha-feedly-entry')
+    || /^#masha-feedly-entry=(\d+)$/.exec(requestedEntryURL.hash)?.[1];
   const formalAddress = widget.dataset.address === 'sie';
   const t = (key, values = {}) => window.KWMashaFeedlyTranslate(key, values);
   const renderActiveFilters = () => {
@@ -1760,6 +1764,7 @@ document.addEventListener('DOMContentLoaded', () => {
           await openEntry(requestedEntry);
           const cleanURL = new URL(window.location.href);
           cleanURL.searchParams.delete('masha-feedly-entry');
+          if (/^#masha-feedly-entry=\d+$/.test(cleanURL.hash)) cleanURL.hash = '';
           window.history.replaceState({}, '', `${cleanURL.pathname}${cleanURL.search}${cleanURL.hash}`);
         }
       }

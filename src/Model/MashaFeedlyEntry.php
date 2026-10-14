@@ -120,6 +120,7 @@ class MashaFeedlyEntry extends DataObject
     ];
 
     private static $defaults = [
+        'PageURL' => '/admin',
         'EstimatedCostCurrency' => 'EUR',
     ];
 
@@ -186,8 +187,34 @@ class MashaFeedlyEntry extends DataObject
             ['count' => $this->ErrorOccurrences, 'first' => $this->ErrorFirstSeen, 'last' => $this->ErrorLastSeen]);
     }
 
+    /** Prüft einen anklickbaren Ort ohne unsichere Schemes, Zugangsdaten oder schemarelative Fremdlinks. @param string $url Seitenadresse. @return bool Gültige HTTP-Adresse oder lokaler Pfad. */
+    public static function isValidPageURL(string $url): bool
+    {
+        if ($url === '' || strlen($url) > 2048 || preg_match('/[\x00-\x20\\\\]/', $url)) return false;
+        $parts = parse_url($url);
+        if (!is_array($parts) || isset($parts['user']) || isset($parts['pass'])) return false;
+        if (str_starts_with($url, '/') && !str_starts_with($url, '//')) return !isset($parts['host']) && !isset($parts['scheme']);
+        return in_array(strtolower((string)($parts['scheme'] ?? '')), ['http', 'https'], true)
+            && !empty($parts['host']) && filter_var($url, FILTER_VALIDATE_URL) !== false;
+    }
 
+    /** Liefert für ältere technische Meldungen ohne gespeicherten Ort das CMS-Ziel. @return string Anklickbare Adresse oder leer bei ungültigen manuellen Altdaten. */
+    public function locationURL(): string
+    {
+        $url = trim((string)$this->PageURL);
+        if (self::isValidPageURL($url)) return $url;
+        return $this->ErrorFingerprint ? \SilverStripe\Control\Controller::join_links(\SilverStripe\Control\Director::baseURL(), 'admin') : '';
+    }
 
+    /** Ergänzt beim Aktualisieren alte Meldungen ohne Ort, ohne Verlauf oder Benachrichtigungen auszulösen. */
+    private function repairMissingLocations(): void
+    {
+        $connection = \SilverStripe\ORM\DB::get_conn();
+        $table = $connection->escapeIdentifier(self::getSchema()->tableName(self::class));
+        $location = $connection->escapeIdentifier('PageURL');
+        \SilverStripe\ORM\DB::prepared_query("UPDATE {$table} SET {$location} = ? WHERE {$location} IS NULL OR TRIM({$location}) = ''",
+            [\SilverStripe\Control\Controller::join_links(\SilverStripe\Control\Director::baseURL(), 'admin')]);
+    }
 
     private bool $deferNewEntryNotification = false;
 
@@ -380,6 +407,7 @@ class MashaFeedlyEntry extends DataObject
     public function requireDefaultRecords(): void
     {
         parent::requireDefaultRecords();
+        $this->repairMissingLocations();
         $backlog = MashaFeedlyCategory::defaultCategory();
         MashaFeedlyPriority::ensureDefaultPriorities();
         $defaultPriority = MashaFeedlyPriority::defaultPriority();
@@ -710,6 +738,10 @@ class MashaFeedlyEntry extends DataObject
     public function validate(): ValidationResult
     {
         $result = parent::validate();
+        if (!self::isValidPageURL(trim((string)$this->PageURL))) {
+            $result->addFieldError('PageURL', i18n::_t('KW\\MashaFeedly\\Translations.ENTRY_LOCATION_REQUIRED',
+                'Wähle einen gültigen Ort für die Meldung. Ohne Seitenadresse kann sie nicht gespeichert werden.'));
+        }
         $newCategory = MashaFeedlyCategory::get()->byID((int)$this->CategoryID);
         $newRole = (string)($newCategory?->SystemKey ?? '');
         $oldRole = '';

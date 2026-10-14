@@ -1245,6 +1245,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             $response = $this->post('/__masha-feedly/createEntry', [
                 'SecurityID' => SecurityToken::getSecurityID(),
                 'Content' => 'Bild mit privatem Anhang',
+                'PageURL' => 'https://example.test/privater-anhang',
             ]);
             $data = json_decode($response->getBody(), true);
             $this->logInAs($otherAllowedMember);
@@ -2159,6 +2160,7 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
             $response = $this->post('/__masha-feedly/createEntry', [
                 'SecurityID' => SecurityToken::getSecurityID(),
                 'Content' => 'Eintrag trotz Mailserverfehler speichern.',
+                'PageURL' => 'https://example.test/mailserverfehler',
             ]);
 
             $this->assertSame(200, $response->getStatusCode());

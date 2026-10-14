@@ -472,7 +472,15 @@ test('führt eine Eintragskarte zur Originalseite und übergibt die Eintragskenn
   assert.equal(target.hash, '#kontakt');
 });
 
-
+test('verlinkt technische Meldungen ohne Inhaltsseite auf den Admin-Einstieg und bewahrt die Kennung im Fragment', () => {
+  const url = new URL(entriesUI.entryTargetURL({ id: 71, isTechnicalError: true, pageURL: '' }, 'https://feedly:8890/kontakt'));
+  assert.equal(url.pathname, '/admin');
+  assert.equal(url.searchParams.get('masha-feedly-entry'), '71');
+  assert.equal(url.hash, '#masha-feedly-entry=71');
+  const page = new URL(entriesUI.entryTargetURL({ id: 71, isTechnicalError: true, pageURL: '/kontakt' }, 'https://feedly:8890/admin'));
+  assert.equal(page.pathname, '/kontakt');
+  assert.equal(page.hash, '');
+});
 
 test('hält Karten kompakt und zeigt Beschreibung sowie Seitenbereich nach dem Öffnen', async () => {
   const env = createWidgetEnvironment();
@@ -2579,7 +2587,14 @@ test('öffnet die angeforderte Eintragsbearbeitung nach Navigation zur Zielseite
   assert.equal(env.pageTarget.scrolled, true);
 });
 
-
+test('öffnet die technische Meldung über das nach dem Admin-Redirect erhaltene Fragment', async () => {
+  const env = createWidgetEnvironment('https://feedly:8890/admin/pages/#masha-feedly-entry=71');
+  env.listeners.DOMContentLoaded();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(env.editModal.hidden, false);
+  assert.equal(env.editForm.elements.EntryID.value, '71');
+  assert.equal(env.cleanedURL, '/admin/pages/');
+});
 
 test('wartet bei einem Eintragslink auf die Personen und setzt anschließend deren Zuordnung', async () => {
   const env = createWidgetEnvironment('https://feedly:8890/about-us?masha-feedly-entry=71');

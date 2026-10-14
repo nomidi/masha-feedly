@@ -94,6 +94,10 @@ class MashaFeedlyErrorService
             'Content' => nl2br(htmlspecialchars('[' . $batch['level'] . '] ' . $batch['message'] . "\n" . $batch['origin'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')),
         ]);
         $reopened = !$new && (bool)$entry->Category()->IsClosed;
+        $fallback = \SilverStripe\Control\Controller::join_links(\SilverStripe\Control\Director::baseURL(), 'admin');
+        $pageURL = trim((string)($batch['pageURL'] ?? ''));
+        if (!MashaFeedlyEntry::isValidPageURL($pageURL) || !\SilverStripe\Control\Director::is_relative_url($pageURL)) $pageURL = $fallback;
+        if (!MashaFeedlyEntry::isValidPageURL((string)$entry->PageURL) || $entry->PageURL === '/admin' || $entry->PageURL === $fallback) $entry->PageURL = $pageURL;
         if ($reopened) $entry->CategoryID = MashaFeedlyCategory::defaultCategory()->ID;
         $entry->ErrorOccurrences += (int)$batch['count'];
         $entry->ErrorLastSeen = max((string)$entry->ErrorLastSeen, (string)$batch['last']);
