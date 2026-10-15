@@ -41,6 +41,8 @@ class MashaFeedlyWidgetExtension extends Extension
             return;
         }
 
+        $this->requireCMSHelply();
+
         Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly.css');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly.js');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-emoji.js');
@@ -488,5 +490,24 @@ class MashaFeedlyWidgetExtension extends Extension
                 . 'window.KWMashaFeedlyWidgetMarkup = ' . json_encode($markup, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) . ';',
             'kw-masha-feedly-widget-markup'
         );
+    }
+
+    /** Stellt die optionale Feedly-Hilfe im CMS bereit; Helply prüft selbst den Sammlungszugriff. */
+    private function requireCMSHelply(): void
+    {
+        $rendererClass = 'KW\\MashaHelply\\MashaHelplyRenderer';
+        if (!$this->owner instanceof \SilverStripe\Admin\LeftAndMain || !class_exists($rendererClass)) {
+            return;
+        }
+        $help = $rendererClass::create()->renderMany(['feedly'], 'external');
+        if ($help === '') return;
+        $encoded = json_encode('<div data-masha-feedly-helply-cms>' . $help . '</div>',
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR);
+        // Seitenfelder oder Helply selbst können die Sammlung bereits ausgegeben haben.
+        Requirements::customScript('(function(){function addHelp(){'
+            . 'if(document.querySelector(\'[data-helply][data-help-collection="feedly"]\'))return;'
+            . 'document.body.insertAdjacentHTML("beforeend",' . $encoded . ');'
+            . '}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",addHelp);}else{addHelp();}})();',
+            'kw-masha-feedly-helply-cms');
     }
 }

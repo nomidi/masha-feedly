@@ -29,6 +29,39 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         i18n::set_locale('de_DE');
     }
 
+    /** Die Feedly-Hilfe steht im CMS unabhängig vom gewählten CMS-Bereich bereit. */
+    public function testCmsProvidesOptionalHelplyCollection(): void
+    {
+        if (!class_exists('KW\\MashaHelply\\MashaHelplyRenderer')) $this->markTestSkipped('Masha:Helply ist optional.');
+        $this->logInWithPermission('CMS_ACCESS');
+        $member = Security::getCurrentUser();
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
+        $config->MashaHelplyAccessGroupIDs = '';
+        $config->MashaHelplyCollectionAccess = '{}';
+        $config->write();
+        $response = $this->get('/admin/myprofile');
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringContainsString('data-masha-feedly-helply-cms', $response->getBody());
+        $this->assertStringContainsString('masha-helply.js', $response->getBody());
+    }
+
+    /** Die CMS-Integration umgeht keine von Helply vorgegebenen Gruppenfreigaben. */
+    public function testCmsDoesNotProvideHelplyWithoutCollectionAccess(): void
+    {
+        if (!class_exists('KW\\MashaHelply\\MashaHelplyRenderer')) $this->markTestSkipped('Masha:Helply ist optional.');
+        $this->logInWithPermission('CMS_ACCESS');
+        $member = Security::getCurrentUser();
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
+        $config->MashaHelplyAccessGroupIDs = '';
+        $config->MashaHelplyCollectionAccess = json_encode(['feedly' => [999999]]);
+        $config->write();
+        $response = $this->get('/admin/myprofile');
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringNotContainsString('data-masha-feedly-helply-cms', $response->getBody());
+    }
+
     /** Prüft Icon-Upload und Avatarfarben auf der echten CMS-Profilseite eines freigegebenen Benutzers. */
     public function testAllowedMemberCanChooseProfileIconAndColorOnCmsProfilePage(): void
     {

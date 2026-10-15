@@ -2487,3 +2487,8 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   gap: .5rem;
   margin: 0 0 1rem;
 }
+
+/* Ursprünglicher FAQ-Einstieg; Inhalte und Freigabe kommen von Helply. */
+.kw-masha-feedly__faq-button { display: grid; width: 60px; min-height: 60px; place-items: center; gap: 3px; padding: 8px; border: 1px solid $masha-color-efd3e2; border-radius: 14px; background: linear-gradient(135deg, $masha-color-fff7fb, $masha-color-fff); color: $masha-color-a91c62; font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; box-shadow: 0 4px 12px $masha-color-27233112; }
+.kw-masha-feedly__faq-button svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
+.kw-masha-feedly__faq-button:focus-visible { outline: 3px solid $masha-color-a91c62; outline-offset: 3px; }

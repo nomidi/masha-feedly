@@ -38,6 +38,7 @@
                 </button>
                 <div class="kw-masha-feedly__support-buttons">
                     <button class="kw-masha-feedly__help-button kw-masha-feedly__action-icon-button" type="button" data-masha-feedly-open-help aria-label="<%t KW\MashaFeedly\Translations.OPEN_HELP 'Hilfe zu Masha:Feedly' %>">?</button>
+                    <button type="button" class="kw-masha-feedly__faq-button kw-masha-feedly__action-icon-button" hidden data-masha-feedly-helply-feature data-masha-feedly-open-helply aria-haspopup="dialog" aria-label="<%t KW\MashaFeedly\Translations.FAQ_OPEN 'FAQ: alle Funktionen einfach erklärt' %>" data-tooltip="<%t KW\MashaFeedly\Translations.FAQ_OPEN 'FAQ: alle Funktionen einfach erklärt' %>"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 6.5C9.6 4.6 6.7 4.5 3 5.5v14c3.7-1 6.6-.9 9 1 2.4-1.9 5.3-2 9-1v-14c-3.7-1-6.6-.9-9 1Zm0 0v14M6.5 9h2M6.5 12h2M15.5 9h2M15.5 12h2"/></svg><span>FAQ</span></button>
                 </div>
             </section>
         </div>
