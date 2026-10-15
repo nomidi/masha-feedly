@@ -188,6 +188,8 @@ Helply-Verweise werden nur angezeigt, wenn Helply die berechtigte Feedly-Hilfe a
 
 ## Automatisch erfasste technische Fehler
 
+Für die Einrichtung bei ALL-INKL stehen im Hostprojekt unter `masha-cronjob/README.md` KAS-Schritte und unter `masha-cronjob/all-inkl/run-masha-feedly-errors.php.example` ein geschütztes HTTP-Cronjob-Beispiel bereit. Die Anleitung erklärt außerdem die gemeinsame private Fehlerablage für Website und CLI, den E-Mail-Filter und das Zusammenspiel von KAS- und Feedly-Intervall.
+
 Unter **Masha:Feedly → Konfiguration → Technische Fehler** kann das konfigurierte Betreiberkonto die Erfassung aktivieren. Das Konto aus `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` muss vorhanden sein und Administratorrechte besitzen. Jede technische Meldung wird immer diesem Konto zugewiesen. Nur dieses Konto und zusätzlich ausgewählte, allgemein für Feedly freigegebene Personen dürfen technische Meldungen sehen.
 
 Gleiche Fehler werden anhand einer bereinigten Meldung und ihrer Herkunft zusammengefasst. Variable Zahlen und UUIDs werden für den Vergleich vereinheitlicht. Die Detailansicht zeigt die Gesamtzahl sowie erstes und letztes Auftreten in UTC. Neue Fehler verwenden die bestehende Benachrichtigung für neue Meldungen; erneut aufgetretene erledigte Fehler werden wieder geöffnet und verwenden die Änderungsbenachrichtigung. Die persönlichen E-Mail-Einstellungen und der Bereich „Meine Meldungen“ gelten weiterhin. Wiederholungen offener Fehler erhöhen nur den Zähler und erzeugen weder Kommentare noch Änderungsmails.

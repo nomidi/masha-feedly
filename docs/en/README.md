@@ -190,6 +190,8 @@ Helply links are shown only when Helply provides the authorised Feedly help coll
 
 ## Automatically captured technical errors
 
+The host project includes ALL-INKL KAS setup instructions in `masha-cronjob/README.en.md` and a protected HTTP cron example in `masha-cronjob/all-inkl/run-masha-feedly-errors.php.example`. The guide covers a shared private website/CLI spool, the email filter and how KAS and Feedly intervals interact.
+
 The configured operator can enable capture under **Masha:Feedly → Configuration → Technical errors**. The account specified by `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` must exist and have administrator permissions. Every technical report is always assigned to this account. Only the operator and additionally selected people who also have general Feedly access can see technical reports.
 
 Errors are grouped using a sanitised message and their origin. Variable numbers and UUIDs are normalised for matching. Details show the total count and first/last occurrence in UTC. New errors use existing new-report notifications. Resolved errors that recur reopen and use update notifications. Personal email preferences and the “My reports” scope still apply. Repetitions of open errors only increase the count, without comments or update emails.
