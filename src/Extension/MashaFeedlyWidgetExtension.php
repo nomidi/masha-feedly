@@ -294,6 +294,8 @@ class MashaFeedlyWidgetExtension extends Extension
             'ENTRY_SHARE_ERROR' => 'Link konnte nicht geteilt werden',
             'ENTRY_SELECTED_CONTEXT' => 'Ausgewählter Bereich: „{text}“',
             'ENTRY_CONTEXT_EMPTY' => 'Bereich auf der Seite ausgewählt.',
+            'ENTRY_LOCATION_IMAGE_DIALOG' => 'Die markierte Stelle liegt in einem Bilddialog. Schließe diese Meldung und öffne das betreffende Bild. Feedly zeigt die Markierung, sobald das gespeicherte Feld sichtbar ist. In dieser Meldung ist nicht gespeichert, welches Bild geöffnet war.',
+            'ENTRY_LOCATION_UNAVAILABLE' => 'Die markierte Stelle ist gerade nicht sichtbar oder nicht mehr vorhanden. Öffne den passenden Reiter oder Dialog. Feedly setzt die Markierung nach, sobald die Stelle wieder sichtbar ist.',
             'RAINBOW_EMPTY_BOARD_TITLE' => 'Noch keine offenen Meldungen',
             'RAINBOW_EMPTY_BOARD_MESSAGE' => 'Hier wurde noch nichts erfasst. Wir feiern vorsichtshalber trotzdem.',
             'RAINBOW_BOARD_TITLE' => 'Alles im grünen Bereich!',

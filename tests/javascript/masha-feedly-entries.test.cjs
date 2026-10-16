@@ -1200,7 +1200,7 @@ test('sendet entfernte Verknüpfungen und zeigt die bestätigte Entfernung im Ve
 });
 
 /** Simuliert die Widget-Oberfläche, um Seitenabfrage und Eintragsblasen im echten Ablauf zu prüfen. */
-function createWidgetEnvironment(locationHref = 'https://feedly:8890/about-us?preview=1', address = 'du', priorityIconType = 'warning', entryDueDate = '', entryDeferredUntil = '') {
+function createWidgetEnvironment(locationHref = 'https://feedly:8890/about-us?preview=1', address = 'du', priorityIconType = 'warning', entryDueDate = '', entryDeferredUntil = '', observeTargetChanges = false) {
   const listeners = {};
   const requests = [];
   const detailRequests = [];
@@ -1254,14 +1254,16 @@ function createWidgetEnvironment(locationHref = 'https://feedly:8890/about-us?pr
     }
     scrollIntoView() { this.scrolled = true; }
     select() { this.selected = true; }
-    remove() { this.removed = true; }
+    remove() { this.removed = true; if (this.parentElement) this.parentElement.children = this.parentElement.children.filter((child) => child !== this); }
     cloneNode() { const clone = new Element(); clone.tagName = this.tagName; clone.className = this.className; return clone; }
-    getBoundingClientRect() { return { left: 150, top: 120, width: 200 }; }
+    getBoundingClientRect() { return { left: 150, top: 120, width: 200, height: 80 }; }
   }
 const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetailsUrl: '/__masha-feedly/entryDetails', markEntryReadUrl: '/__masha-feedly/markEntryRead', savedViewsUrl: '/__masha-feedly', saveViewUrl: '/__masha-feedly', deleteViewUrl: '/__masha-feedly', securityId: 'test-token', theme: 'playful' });
   widget.dataset.address = address;
   widget.dataset.unicornUrl = '/_resources/kooperativeweb/masha-feedly/client/dist/icons/masha-feedly-unicorn.svg';
   widget.contains = () => false;
+  const locationNotice = new Element(); locationNotice.hidden = true;
+  const showLocationButton = new Element(); showLocationButton.hidden = true;
   const pageCount = new Element();
   const totalCount = new Element();
   const closedCountDisplay = new Element();
@@ -1341,6 +1343,8 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
   editForm.querySelector = (selector) => selector === '[type="submit"]' ? editForm.submitButton : null;
   const controls = new Map([
     ['[data-masha-feedly-entry-form]', new Element()],
+    ['[data-masha-feedly-location-notice]', locationNotice],
+    ['[data-masha-feedly-show-location]', showLocationButton],
     ['[data-masha-feedly-page-count]', pageCount],
     ['[data-masha-feedly-total-count]', totalCount],
     ['[data-masha-feedly-closed-count]', closedCountDisplay],
@@ -1442,6 +1446,23 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
     KWMashaFeedlyEffects: sharedEffects,
     KWMashaFeedlyEntries: entriesUI,
     confirm: () => true,
+  };
+  let targetObserverCallback;
+  const targetTimers = new Map();
+  if (observeTargetChanges) {
+    window.MutationObserver = class {
+      constructor(callback) { targetObserverCallback = callback; }
+      observe() {}
+      disconnect() { targetObserverCallback = null; }
+    };
+    window.setTimeout = (callback) => { const id = targetTimers.size + 1; targetTimers.set(id, callback); return id; };
+    window.clearTimeout = (id) => targetTimers.delete(id);
+  }
+  const notifyTargetChange = () => {
+    targetObserverCallback?.([{target: document.body}]);
+    const callbacks = [...targetTimers.values()];
+    targetTimers.clear();
+    callbacks.forEach((callback) => callback());
   };
   window.location.assign = (url) => { window.locationAssign = url; };
   let pageEntryCount = 1;
@@ -1567,7 +1588,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
   };
   vm.runInNewContext(source, context);
   listeners.DOMContentLoaded();
-  return { listeners, requests, detailRequests, detailResponses, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editHistoryDetails, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
+  return { locationNotice, showLocationButton, notifyTargetChange, listeners, requests, detailRequests, detailResponses, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editHistoryDetails, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
 }
 
 test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedback-Warteschlange', async () => {
@@ -2105,7 +2126,7 @@ test('zählt auf der Seite nur offene Meldungen, deren gespeicherter Bereich noc
 
   assert.equal(env.document.body.children.length, 0, 'Ohne auffindbaren Seitenbereich wird keine Bubble angelegt.');
   assert.equal(env.pageCount.textContent, '0', 'Der Seitenzähler entspricht der Zahl tatsächlich sichtbarer Bubbles.');
-  assert.equal(env.rainbow.hidden, false, 'Ohne auffindbare offene Seitenmeldung erscheint der Seitenerfolg.');
+  assert.equal(env.rainbow.hidden, true, 'Ein fehlendes Ziel darf offene Meldungen nicht als erledigt erscheinen lassen.');
 });
 
 test('öffnet den dritten Bereich direkt hinter dem ersten, wenn eine Seitenblase angeklickt wird', async () => {
@@ -2660,4 +2681,119 @@ test('verwirft verspätete Details nach dem Schließen des Widgets', async () =>
 test('sortiert schlanke Karten nach dem Aktivitätszeitpunkt ohne Verlauf', () => {
   const entries = [{ id: 1, activityAt: '2026-10-01T10:00:00Z' }, { id: 2, activityAt: '2026-10-08T10:00:00Z' }];
   assert.deepEqual(Array.from(entriesUI.sortEntries(entries, [], [], { key: 'activity', direction: 'desc' }), (entry) => entry.id), [2, 1]);
+});
+
+
+test('wartet mit der Bubble auf sichtbare und verbundene CMS-Felder', () => {
+  const parent = {hidden: true, parentElement: null};
+  const target = {parentElement: parent, isConnected: true, getBoundingClientRect: () => ({width: 100, height: 40})};
+  const browser = {getComputedStyle: () => ({display: 'block', visibility: 'visible'})};
+  assert.equal(entriesUI.targetIsVisible(target, browser), false);
+  parent.hidden = false;
+  assert.equal(entriesUI.targetIsVisible(target, browser), true);
+  target.isConnected = false;
+  assert.equal(entriesUI.targetIsVisible(target, browser), false);
+  target.isConnected = true;
+  target.getBoundingClientRect = () => ({width: 0, height: 0});
+  assert.equal(entriesUI.targetIsVisible(target, browser), false);
+  assert.equal(entriesUI.targetIsVisible(null, browser), false);
+});
+
+test('öffnet nur zum Ziel gehörende CMS-Reiter und keine beliebigen Bilddialoge', () => {
+  const clicks = [];
+  const outer = {id: 'Root_Main', parentElement: null, matches: () => true};
+  const inner = {id: 'Root_Teaser', parentElement: outer, matches: () => true};
+  const detail = {tagName: 'DETAILS', parentElement: inner, open: false};
+  const control = (id) => ({getAttribute: (name) => name === 'href' ? '#' + id : null, click: () => clicks.push(id)});
+  const doc = {querySelectorAll: () => [control('Root_Other'), control('Root_Teaser'), control('Root_Main')]};
+  entriesUI.revealTarget(detail, doc);
+  assert.deepEqual(clicks, ['Root_Main', 'Root_Teaser']);
+  assert.equal(detail.open, true);
+  entriesUI.revealTarget(null, doc);
+  assert.equal(clicks.length, 2);
+});
+
+test('beobachtet nachgeladene CMS-Felder ohne eigene Widget-Änderungen oder zusätzliche Abrufe', () => {
+  let notify;
+  let pending;
+  let updates = 0;
+  let disconnected = false;
+  const browser = {
+    MutationObserver: class {
+      constructor(callback) { notify = callback; }
+      observe(target, options) { assert.equal(target, doc.body); assert.equal(options.subtree, true); }
+      disconnect() { disconnected = true; }
+    },
+    setTimeout(callback) { pending = callback; return 1; },
+    clearTimeout() { pending = null; },
+  };
+  const doc = {body: {}};
+  const stop = entriesUI.observeTargets(doc, browser, () => updates++);
+  notify([{target: {closest: () => ({})}}]);
+  assert.equal(pending, undefined);
+  notify([{target: {closest: () => null}}]);
+  const scheduled = pending;
+  notify([{target: {closest: () => null}}]);
+  assert.equal(pending, scheduled);
+  pending();
+  assert.equal(updates, 1);
+  notify([{target: {closest: () => null}}]);
+  stop();
+  assert.equal(disconnected, true);
+  assert.equal(pending, null);
+});
+
+test('erstellt eine entfernte Bubble nach erneutem Öffnen des Widgets wieder', async () => {
+  const env = createWidgetEnvironment();
+  env.document.querySelector = (selector) => selector === '#about-title' ? env.pageTarget : null;
+  await env.listeners['kw-masha-feedly:opened']();
+  assert.equal(env.document.body.children.length, 1);
+  env.listeners['kw-masha-feedly:closed']();
+  assert.equal(env.document.body.children.length, 0);
+  await env.listeners['kw-masha-feedly:opened']();
+  assert.equal(env.document.body.children.length, 1);
+  assert.equal(env.pageCount.textContent, '1');
+});
+
+
+test('setzt Bubbles nach React-Nachladen und nach dem Öffnen verborgener Bereiche ohne Netzwerkanfrage nach', async () => {
+  const env = createWidgetEnvironment('https://feedly:8890/about-us?preview=1', 'du', 'warning', '', '', true);
+  let available = false;
+  env.document.querySelector = (selector) => available && selector === '#about-title' ? env.pageTarget : null;
+  await env.listeners['kw-masha-feedly:opened']();
+  assert.equal(env.document.body.children.length, 0);
+  const requestCount = env.requests.length;
+  available = true;
+  env.notifyTargetChange();
+  assert.equal(env.document.body.children.length, 1);
+  env.pageTarget.hidden = true;
+  env.notifyTargetChange();
+  assert.equal(env.document.body.children.length, 0);
+  env.pageTarget.hidden = false;
+  env.notifyTargetChange();
+  assert.equal(env.document.body.children.length, 1);
+  assert.equal(env.pageCount.textContent, '1');
+  assert.equal(env.requests.length, requestCount);
+});
+
+test('zeigt die gespeicherte Stelle ohne verdeckenden Meldungsdialog', async () => {
+  const env = createWidgetEnvironment();
+  await env.listeners['kw-masha-feedly:opened']();
+  await env.document.body.children[0].listeners.click({preventDefault() {}, stopPropagation() {}});
+  assert.equal(env.editModal.hidden, false);
+  assert.equal(env.showLocationButton.hidden, false);
+  assert.equal(env.locationNotice.hidden, true);
+  env.showLocationButton.listeners.click();
+  assert.equal(env.editModal.hidden, true);
+  assert.equal(env.listModal.hidden, true);
+  assert.equal(env.pageTarget.scrolled, true);
+  assert.equal(env.document.body.children[0].attributes['aria-pressed'], 'true');
+});
+
+
+test('verwendet gleichnamige CMS-Felder nicht auf einer anderen Seite oder fremden Domain', () => {
+  const entry = {pageURL: 'https://feedly:8890/admin/pages/edit/show/44?masha-feedly-entry=2'};
+  assert.equal(entriesUI.entryIsOnPage(entry, 'https://feedly:8890/admin/pages/edit/show/44'), true);
+  assert.equal(entriesUI.entryIsOnPage(entry, 'https://feedly:8890/admin/pages/edit/show/41'), false);
+  assert.equal(entriesUI.entryIsOnPage(entry, 'https://other.test/admin/pages/edit/show/44'), false);
 });

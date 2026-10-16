@@ -271,6 +271,8 @@
             <form data-masha-feedly-edit-form data-update-url="$UpdateEntryURL" data-security-id="$TokenValue">
                 <input type="hidden" name="EntryID">
                 <p class="kw-masha-feedly__selected-context" data-masha-feedly-edit-context></p>
+                <p class="kw-masha-feedly__selected-context" data-masha-feedly-location-notice role="status" hidden></p>
+                <button type="button" class="kw-masha-feedly__secondary" data-masha-feedly-show-location hidden><%t KW\MashaFeedly\Translations.ENTRY_SHOW_LOCATION 'Markierte Stelle anzeigen' %></button>
                 <div class="kw-masha-feedly__entry-relations" data-masha-feedly-edit-relations aria-label="<%t KW\MashaFeedly\Translations.ENTRY_RELATIONS_ARIA 'Verknüpfte Meldungen' %>"></div>
                 <div class="kw-masha-feedly__entry-description" data-masha-feedly-edit-description></div>
                 <details class="kw-masha-feedly__diagnostics" data-masha-feedly-edit-diagnostics hidden>

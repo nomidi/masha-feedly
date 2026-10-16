@@ -905,3 +905,7 @@ en:
     PROFILE_EMAIL_SCOPE_ASSIGNED: 'My reports'
     PROFILE_EMAIL_SCOPE_DESCRIPTION: '“All reports” includes comments and due dates across the website. “My reports” includes reports you created or are assigned to. The checkboxes select which events you receive by email. Your own actions do not generate emails. Cost estimates go only to assignees.'
     PROFILE_EMAIL_SCOPE_DESCRIPTION_SIE: '“All reports” includes comments and due dates across the website. “My reports” includes reports you created or are assigned to. The checkboxes select which events you receive by email. Your own actions do not generate emails. Cost estimates go only to assignees.'
+
+    ENTRY_LOCATION_IMAGE_DIALOG: 'The marked area is inside an image dialog. Close this report and open the relevant image. Feedly shows the marker when the saved field becomes visible. This report does not record which image was open.'
+    ENTRY_LOCATION_UNAVAILABLE: 'The marked area is currently hidden or no longer exists. Open the relevant tab or dialog. Feedly adds the marker when the area becomes visible again.'
+    ENTRY_SHOW_LOCATION: 'Show marked area'

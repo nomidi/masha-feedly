@@ -413,6 +413,69 @@ window.KWMashaFeedlyEntries = (() => {
     }
   };
 
+  /** Verhindert, dass gleich benannte CMS-Felder nach einem Seitenwechsel fremde Markierungen übernehmen. */
+  const entryIsOnPage = (entry, location) => {
+    try {
+      const saved = new URL(entry.pageURL || location, location);
+      const current = new URL(location);
+      return saved.origin === current.origin && saved.pathname === current.pathname;
+    } catch (_) { return false; }
+  };
+
+  /** Erkennt nur sichtbare Ziele; verborgene CMS-Reiter erhalten keine Markierung bei 0/0. */
+  const targetIsVisible = (target, window) => {
+    if (!target || target.isConnected === false) return false;
+    for (let element = target; element; element = element.parentElement) {
+      if (element.hidden) return false;
+      const style = window.getComputedStyle?.(element);
+      if (style?.display === 'none' || style?.visibility === 'hidden' || style?.visibility === 'collapse') return false;
+    }
+    const bounds = target.getBoundingClientRect?.();
+    return !bounds || (bounds.width > 0 && bounds.height > 0);
+  };
+
+  /**
+   * Öffnet ausschließlich bekannte Reiter und Aufklappbereiche um das gespeicherte Ziel.
+   * Bilddialoge ohne gespeicherte Dateiidentität werden nicht durch einen geratenen Klick geöffnet.
+   * @param {Element|null} target Eindeutig aufgelöster Bereich.
+   * @param {Document} document CMS-Dokument mit vorhandenen Reiterschaltflächen.
+   */
+  const revealTarget = (target, document) => {
+    const ancestors = [];
+    for (let element = target; element; element = element.parentElement) ancestors.unshift(element);
+    ancestors.forEach((element) => {
+      if (element.tagName === 'DETAILS') element.open = true;
+      if (!element.id || !element.matches?.('[role="tabpanel"], .ui-tabs-panel, .tab-pane')) return;
+      const controls = document.querySelectorAll('[role="tab"], .ui-tabs-anchor, [data-toggle="tab"], [data-bs-toggle="tab"]');
+      const control = [...controls].find((candidate) => candidate.getAttribute('aria-controls') === element.id
+        || candidate.getAttribute('href') === '#' + element.id
+        || candidate.getAttribute('data-target') === '#' + element.id
+        || candidate.getAttribute('data-bs-target') === '#' + element.id
+        || candidate.querySelector?.('a')?.getAttribute('href') === '#' + element.id);
+      if (control && control.getAttribute('aria-selected') !== 'true') (control.querySelector?.('a') || control).click();
+    });
+  };
+
+  /**
+   * Wartet auch auf React-Formulare und später geöffnete CMS-Dialoge, ohne Feedlys eigene Änderungen zu beobachten.
+   * @param {Document} document Seitendokument.
+   * @param {Window} window Browser mit MutationObserver und Zeitgebern.
+   * @param {function(): void} changed Aktualisiert bereits geladene Markerdaten ohne HTTP-Abruf.
+   * @return {function(): void} Beendet Beobachtung und ausstehende Aktualisierung.
+   */
+  const observeTargets = (document, window, changed) => {
+    if (!window.MutationObserver || !document.body) return () => {};
+    let timer = null;
+    const observer = new window.MutationObserver((records) => {
+      if (!records.some((record) => !record.target.closest?.('[data-masha-feedly-host], [data-kw-masha-feedly], [data-helply]'))) return;
+      if (timer !== null) return;
+      timer = window.setTimeout(() => { timer = null; changed(); }, 100);
+    });
+    observer.observe(document.body, {subtree: true, childList: true, attributes: true,
+      attributeFilter: ['hidden', 'class', 'style', 'aria-selected']});
+    return () => { observer.disconnect(); if (timer !== null) window.clearTimeout(timer); };
+  };
+
   /** Erstellt eine anklickbare, am passenden Seitenelement verankerte Markierung. */
   const createMarker = (entry, index, target, document, window, onClick) => {
     const marker = document.createElement('button');
@@ -507,7 +570,7 @@ window.KWMashaFeedlyEntries = (() => {
     else if (offset < text.length) container.append(documentRef.createTextNode(text.slice(offset)));
   };
 
-  return { sortEntries, toggleSorting, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, renderCommentReactions, priorityIconSVG, resolveTarget, createMarker, setActiveMarker, trackMarkers, celebrateCompletion, previewCompletionAnimation, trapFocus };
+  return { sortEntries, toggleSorting, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, renderCommentReactions, priorityIconSVG, resolveTarget, entryIsOnPage, targetIsVisible, revealTarget, observeTargets, createMarker, setActiveMarker, trackMarkers, celebrateCompletion, previewCompletionAnimation, trapFocus };
 })();
 
 /** Lädt Einträge, zeichnet Seitenmarkierungen und zeigt die filterbare Übersicht. */
@@ -669,6 +732,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const editPriorityIcon = widget.querySelector('[data-masha-feedly-edit-priority]');
   const shareActiveEntryButton = widget.querySelector('[data-masha-feedly-share-active-entry]');
   const editContext = widget.querySelector('[data-masha-feedly-edit-context]');
+  const locationNotice = widget.querySelector('[data-masha-feedly-location-notice]');
+  const showLocationButton = widget.querySelector('[data-masha-feedly-show-location]');
   const editRelations = widget.querySelector('[data-masha-feedly-edit-relations]');
   const editDescription = widget.querySelector('[data-masha-feedly-edit-description]');
   const editDiagnostics = widget.querySelector('[data-masha-feedly-edit-diagnostics]');
@@ -1153,6 +1218,8 @@ document.addEventListener('DOMContentLoaded', () => {
       detail: { entryID: Number(entry.id) },
     }));
     const target = window.KWMashaFeedlyEntries.resolveTarget(entry, document);
+    window.KWMashaFeedlyEntries.revealTarget(target, document);
+    refreshPageMarkers();
     target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
@@ -1413,27 +1480,81 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   };
 
-  const renderMarkers = (pageEntries) => {
-    clearMarkers();
+  let pageMarkerEntries = [];
+  let markerTargets = [];
+
+  /** Zeigt fehlende Dialoge ausdrücklich an, statt eine beliebige andere Stelle zu markieren. */
+  const updateLocationNotice = () => {
+    if (!locationNotice && !showLocationButton) return;
+    const target = activeEntry?.selector ? window.KWMashaFeedlyEntries.resolveTarget(activeEntry, document) : null;
+    const visible = !!activeEntry && window.KWMashaFeedlyEntries.entryIsOnPage(activeEntry, window.location.href)
+      && window.KWMashaFeedlyEntries.targetIsVisible(target, window);
+    if (showLocationButton) showLocationButton.hidden = !visible;
+    if (!locationNotice) return;
+    locationNotice.hidden = !activeEntry?.selector || visible;
+    locationNotice.textContent = locationNotice.hidden ? '' : t(
+      /^#Form_fileSelectForm_/.test(activeEntry.selector) ? 'ENTRY_LOCATION_IMAGE_DIALOG' : 'ENTRY_LOCATION_UNAVAILABLE'
+    );
+  };
+
+  /** Gleiche Zielknoten behalten ihren Marker; React-Austausch und spätere Dialoge werden erneut aufgelöst. */
+  const refreshPageMarkers = () => {
     if (!panelOpen) return 0;
-    pageEntries.forEach((entry) => {
-      if (entry.isClosed) return;
-      if (!entry.selector) return;
-      const target = window.KWMashaFeedlyEntries.resolveTarget(entry, document);
-      if (!target || widget.contains(target)) return;
-      const marker = window.KWMashaFeedlyEntries.createMarker(entry, markers.length, target, document, window, (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return openEntry(entry, event.currentTarget);
+    const candidates = pageMarkerEntries.map((entry) => Number(entry.id) === Number(activeEntry?.id) ? activeEntry : entry);
+    if (activeEntry && !candidates.some((entry) => Number(entry.id) === Number(activeEntry.id))) candidates.push(activeEntry);
+    const targets = candidates.filter((entry) => !entry.isClosed && entry.selector
+      && window.KWMashaFeedlyEntries.entryIsOnPage(entry, window.location.href)
+    ).map((entry) => ({
+      entry, signature: JSON.stringify([entry.id, entry.title, entry.priorityColor, entry.categoryTitle]), target: window.KWMashaFeedlyEntries.resolveTarget(entry, document),
+    })).filter(({target}) => target && !widget.contains(target) && window.KWMashaFeedlyEntries.targetIsVisible(target, window));
+    const unchanged = markers.length === targets.length && targets.length === markerTargets.length && targets.every(({signature, target}, index) =>
+      markerTargets[index].target === target && markerTargets[index].signature === signature
+      && markers[index]?.isConnected !== false);
+    if (!unchanged) {
+      clearMarkers();
+      markerTargets = targets;
+      targets.forEach(({entry, target}) => {
+        const marker = window.KWMashaFeedlyEntries.createMarker(entry, markers.length, target, document, window, (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return openEntry(entry, event.currentTarget);
+        });
+        (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(marker);
+        markers.push(marker);
       });
-      (window.KWMashaFeedlyDOM?.overlayRoot() || document.body).append(marker);
-      markers.push(marker);
-    });
-    if (activeEntry) window.KWMashaFeedlyEntries.setActiveMarker(markers, activeEntry.id);
-    stopMarkerTracking = window.KWMashaFeedlyEntries.trackMarkers(markers, window);
+      stopMarkerTracking = window.KWMashaFeedlyEntries.trackMarkers(markers, window);
+    }
+    if (activeEntry && !editModal.hidden) window.KWMashaFeedlyEntries.setActiveMarker(markers, activeEntry.id);
+    pageCount.textContent = String(markers.length);
+    if (rainbow) rainbow.hidden = markers.length > 0 || pageMarkerEntries.some((entry) => !entry.isClosed);
+    updateLocationNotice();
     return markers.length;
   };
+
+  const renderMarkers = (pageEntries) => {
+    pageMarkerEntries = pageEntries;
+    return refreshPageMarkers();
+  };
+
+  /** Zeigt die Stelle ohne verdeckenden Feedly-Dialog und erhält die aktive Bubble. */
+  showLocationButton?.addEventListener('click', () => {
+    if (!activeEntry || !window.KWMashaFeedlyEntries.entryIsOnPage(activeEntry, window.location.href)) return;
+    const target = window.KWMashaFeedlyEntries.resolveTarget(activeEntry, document);
+    window.KWMashaFeedlyEntries.revealTarget(target, document);
+    if (!window.KWMashaFeedlyEntries.targetIsVisible(target, window)) { updateLocationNotice(); return; }
+    detailRequest++;
+    editModal.hidden = true;
+    listModal.hidden = true;
+    widget.setAttribute('data-edit-open', 'false');
+    widget.setAttribute('data-list-open', 'false');
+    refreshPageMarkers();
+    window.KWMashaFeedlyEntries.setActiveMarker(markers, activeEntry.id);
+    target.scrollIntoView({behavior: 'smooth', block: 'center'});
+  });
+
+  const stopTargetObservation = window.KWMashaFeedlyEntries.observeTargets(document, window, refreshPageMarkers);
+  window.addEventListener('pagehide', stopTargetObservation, {once: true});
 
   const activityBadge = () => {
     const badge = document.createElement('span');
@@ -1727,7 +1848,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       openClosedButton?.setAttribute('data-tooltip', `${t('OPEN_CLOSED_ENTRIES')} · ${closedCount}`);
       openClosedButton?.setAttribute('aria-label', `${t('OPEN_CLOSED_ENTRIES')} · ${closedCount}`);
-      if (rainbow) rainbow.hidden = pageOpenCount !== 0;
+      if (rainbow) rainbow.hidden = pageOpenCount !== 0 || (mode === 'page' && (data.entries || []).some((entry) => !entry.isClosed));
       widget.setAttribute('data-success-visible', String(pageOpenCount === 0));
       if (rainbow && pageOpenCount === 0) {
         const totalCountValue = Number(data.totalCount || 0);

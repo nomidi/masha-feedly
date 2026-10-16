@@ -905,3 +905,7 @@ de:
     PROFILE_EMAIL_SCOPE_ASSIGNED: 'Meine Meldungen'
     PROFILE_EMAIL_SCOPE_DESCRIPTION: '„Alle Meldungen“ umfasst auch Kommentare und Fälligkeiten auf der ganzen Website. „Meine Meldungen“ umfasst Meldungen, die du erstellt hast oder die dir zugewiesen sind. Die Häkchen bestimmen, welche Ereignisse du per E-Mail erhältst. Eigene Aktionen erzeugen keine Mail. Kostenschätzungen gehen nur an Zuständige.'
     PROFILE_EMAIL_SCOPE_DESCRIPTION_SIE: '„Alle Meldungen“ umfasst auch Kommentare und Fälligkeiten auf der ganzen Website. „Meine Meldungen“ umfasst Meldungen, die Sie erstellt haben oder die Ihnen zugewiesen sind. Die Häkchen bestimmen, welche Ereignisse Sie per E-Mail erhalten. Eigene Aktionen erzeugen keine Mail. Kostenschätzungen gehen nur an Zuständige.'
+
+    ENTRY_LOCATION_IMAGE_DIALOG: 'Die markierte Stelle liegt in einem Bilddialog. Schließe diese Meldung und öffne das betreffende Bild. Feedly zeigt die Markierung, sobald das gespeicherte Feld sichtbar ist. In dieser Meldung ist nicht gespeichert, welches Bild geöffnet war.'
+    ENTRY_LOCATION_UNAVAILABLE: 'Die markierte Stelle ist gerade nicht sichtbar oder nicht mehr vorhanden. Öffne den passenden Reiter oder Dialog. Feedly setzt die Markierung nach, sobald die Stelle wieder sichtbar ist.'
+    ENTRY_SHOW_LOCATION: 'Markierte Stelle anzeigen'
