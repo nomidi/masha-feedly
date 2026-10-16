@@ -1598,10 +1598,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   .kw-masha-feedly__add, .kw-masha-feedly__help-button { flex: 1 1 0; width: auto; height: 64px; }
   .kw-masha-feedly__rainbow { width: 100%; }
   .kw-masha-feedly__entries-modal { right: 208px; }
-  .kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__entries-modal { right: 304px; }
   .kw-masha-feedly__edit-modal, .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal { right: 560px; }
-  .kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__edit-modal,
-  .kw-masha-feedly[data-success-visible="true"][data-list-open="true"] .kw-masha-feedly__edit-modal { right: 672px; }
   @media (max-width: $masha-breakpoint-wide) {
     .kw-masha-feedly__panel { width: 34vw; }
     .kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__panel { width: min(400px, 48vw); }
@@ -1762,25 +1759,16 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal { width: 608px; }
   .kw-masha-feedly__edit-modal { right: 192px; }
   .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal { right: 560px; }
-  .kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__entries-modal,
-  .kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__edit-modal { right: 304px; }
-  .kw-masha-feedly[data-success-visible="true"][data-list-open="true"] .kw-masha-feedly__edit-modal { right: 672px; }
   .kw-masha-feedly__edit-modal:not([hidden]) { filter: drop-shadow(-12.8px 0 16px $masha-color-function-006); }
   @media (max-width: $masha-breakpoint-wide) {
     .kw-masha-feedly__entries-modal { right: calc(34vw - 72px); }
     .kw-masha-feedly__edit-modal { right: calc(34vw - 72px); }
     .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal { right: calc(67vw - 112px); }
-    .kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__entries-modal,
-    .kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__edit-modal { right: calc(min(400px, 48vw) - 40px); }
-    .kw-masha-feedly[data-success-visible="true"][data-list-open="true"] .kw-masha-feedly__edit-modal { right: calc(min(400px, 48vw) + 33vw - 80px); }
   }
   @media (max-width: $masha-breakpoint-mobile) {
     .kw-masha-feedly__entries-modal { right: calc(38vw - 48px); }
     .kw-masha-feedly__edit-modal { right: calc(38vw - 48px); }
     .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal { right: calc(69vw - 80px); }
-    .kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__entries-modal,
-    .kw-masha-feedly[data-success-visible="true"] .kw-masha-feedly__edit-modal { right: calc(min(400px, 72vw) - 32px); }
-    .kw-masha-feedly[data-success-visible="true"][data-list-open="true"] .kw-masha-feedly__edit-modal { right: calc(min(400px, 72vw) + 31vw - 64px); }
   }
 
   /* Hält den Inhalt des letzten aufgefächerten Bereichs vom verdeckten Rand fern. */
@@ -1867,7 +1855,6 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   /* Berechnet den verfügbaren Platz des Bearbeitungsfachs ohne JavaScript. */
   .kw-masha-feedly__edit-modal,
   .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal { width: min(688px, calc(100vw - 576px)); }
-  .kw-masha-feedly[data-success-visible="true"][data-list-open="true"] .kw-masha-feedly__edit-modal { width: min(688px, calc(100vw - 688px)); }
   .kw-masha-feedly__edit-dialog > .kw-masha-feedly__dialog-header,
   .kw-masha-feedly__edit-dialog > form { padding-right: 256px; }
   .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-dialog > .kw-masha-feedly__dialog-header,
@@ -1875,7 +1862,6 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   @media (max-width: $masha-breakpoint-wide) {
     .kw-masha-feedly__edit-modal,
     .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal { width: 33vw; }
-    .kw-masha-feedly[data-success-visible="true"][data-list-open="true"] .kw-masha-feedly__edit-modal { width: calc(67vw - min(400px, 48vw) + 64px); }
     .kw-masha-feedly__edit-dialog > .kw-masha-feedly__dialog-header,
     .kw-masha-feedly__edit-dialog > form,
     .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-dialog > .kw-masha-feedly__dialog-header,
@@ -1885,8 +1871,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
     .kw-masha-feedly[data-edit-open="true"] .kw-masha-feedly__panel,
     .kw-masha-feedly[data-edit-open="true"] .kw-masha-feedly__entries-modal { visibility: hidden; }
     .kw-masha-feedly__edit-modal,
-    .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal,
-    .kw-masha-feedly[data-success-visible="true"][data-list-open="true"] .kw-masha-feedly__edit-modal {
+    .kw-masha-feedly[data-list-open="true"] .kw-masha-feedly__edit-modal {
       inset: 0;
       z-index: 10012;
       width: 100vw;
@@ -2202,7 +2187,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   }
   .kw-masha-feedly__entry-card-actions .kw-masha-feedly__entry-share { width: 20px; min-width: 20px; height: 20px; padding: 3px; border-radius: 5px; }
 
-  /* Responsive Fensterbreiten: auf großen Ansichten schmaler, mobil voll nutzbar. */
+  /* Gemeinsame Panelmaße gelten auch im Erfolgszustand; Sonderabstände würden bei schmalem Startpanel Lücken erzeugen. */
   .kw-masha-feedly {
     --kw-feedly-panel-width: clamp(240px, 18vw, 272px);
     --kw-feedly-list-width: clamp(320px, 30vw, 480px);

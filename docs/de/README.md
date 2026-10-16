@@ -230,3 +230,5 @@ Feedly löst gespeicherte Stellen nach dem Laden und bei späteren Änderungen d
 Wenn eine alte Meldung im Bilddialog angelegt wurde, speichert sie nur das Feld und nicht die Identität des geöffneten Bildes. Feedly kann deshalb keinen bestimmten Bilddialog sicher wiederherstellen. Die Meldung erklärt dies: schließe sie und öffne das betreffende Bild. Sobald das Feld sichtbar ist, erscheint die Markierung automatisch. Bei dauerhaft entfernten Feldern bleibt die Meldung über die Liste erreichbar.
 
 Mit **Markierte Stelle anzeigen** schließt du die Meldungsfenster und springst zur sichtbaren Bubble. Die Markierung der geöffneten Meldung bleibt hervorgehoben.
+
+Die Meldungsbearbeitung schließt auch im Erfolgszustand ohne zusätzliche Lücke an die Liste an. Alle drei Panels verwenden dieselben responsiven Breiten; auf dem Smartphone bleibt die Bearbeitung bildschirmfüllend.

@@ -232,3 +232,5 @@ Feedly resolves saved areas again after loading and whenever the CMS form change
 Older reports created inside an image dialog contain the field selector but not the image identity. Feedly cannot safely restore a specific image dialog from that information. The report explains this: close it and open the relevant image. The marker appears automatically once the field becomes visible. Reports whose fields were removed remain available in the list.
 
 Use **Show marked area** to close the report overlays and scroll to its visible bubble. The opened report’s marker remains highlighted.
+
+The report editor joins the list without an extra gap, including in the success state. All three panels use the same responsive widths; on phones the editor remains full screen.
