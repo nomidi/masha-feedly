@@ -773,7 +773,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let listRequest = 0;
   let activeEntry = null;
   const requestedEntryURL = new URL(window.location.href);
-  const requestedEntryID = requestedEntryURL.searchParams.get('masha-feedly-entry')
+  let requestedEntryID = requestedEntryURL.searchParams.get('masha-feedly-entry')
     || /^#masha-feedly-entry=(\d+)$/.exec(requestedEntryURL.hash)?.[1];
   const formalAddress = widget.dataset.address === 'sie';
   const t = (key, values = {}) => window.KWMashaFeedlyTranslate(key, values);
@@ -1883,6 +1883,8 @@ document.addEventListener('DOMContentLoaded', () => {
           listModal.hidden = false;
           widget.setAttribute('data-list-open', 'true');
           await openEntry(requestedEntry);
+          // Ein Direktlink darf beim Nachladen nach dem Speichern den Hinweis nicht zurücksetzen.
+          requestedEntryID = null;
           const cleanURL = new URL(window.location.href);
           cleanURL.searchParams.delete('masha-feedly-entry');
           if (/^#masha-feedly-entry=\d+$/.test(cleanURL.hash)) cleanURL.hash = '';

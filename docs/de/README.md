@@ -182,7 +182,7 @@ Beim Wechsel zwischen mobiler und Desktop-Ansicht schließen sich die Feedly-Fen
 
 ### Abschluss bestätigen
 
-Wenn eine andere Person „Erledigt“ auswählt, bleibt die Meldung offen im Status „Feedback“. Ein hervorgehobener Hinweis erklärt die nächste Aktion. Der ursprüngliche Ersteller oder die unter „Angezeigte Meldeperson“ eingetragene Person prüft das Ergebnis und bestätigt den Abschluss mit „Erledigt“ und „Änderungen speichern“. Eine Zuständigkeitszuweisung allein berechtigt nicht zur endgültigen Bestätigung. Ein Kommentar ist freiwillig. Die Regel gilt auch beim Verschieben und Speichern im CMS.
+Wenn eine andere Person „Erledigt“ auswählt, bleibt die Meldung offen im Status „Feedback“. Ein hervorgehobener Hinweis erklärt die nächste Aktion. Er bleibt nach dem Speichern in der geöffneten Meldung sichtbar, auch wenn diese über einen Direktlink geöffnet wurde. Der ursprüngliche Ersteller oder die unter „Angezeigte Meldeperson“ eingetragene Person prüft das Ergebnis und bestätigt den Abschluss mit „Erledigt“ und „Änderungen speichern“. Eine Zuständigkeitszuweisung allein berechtigt nicht zur endgültigen Bestätigung. Ein Kommentar ist freiwillig. Die Regel gilt auch beim Verschieben und Speichern im CMS.
 
 Helply-Verweise werden nur angezeigt, wenn Helply die berechtigte Feedly-Hilfe auf der aktuellen Seite bereitstellt. Ohne Helply bleiben Buttons und Hinweise ausgeblendet.
 

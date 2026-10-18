@@ -2384,6 +2384,28 @@ test('übernimmt den vom Server erzwungenen Feedback-Status statt Done vorzutäu
   assert.equal(env.document.body.children.some((child) => child.className === 'kw-masha-feedly__unicorn-runner'), false);
 });
 
+test('behält den Feedback-Hinweis nach dem Speichern einer per Direktlink geöffneten Meldung', async () => {
+  const env = createWidgetEnvironment('https://feedly:8890/about-us?masha-feedly-entry=71');
+  env.listeners.DOMContentLoaded();
+  await new Promise((resolve) => setImmediate(resolve));
+  const detailRequestCount = env.detailRequests.length;
+  const message = 'Die Meldung wartet auf die Prüfung durch die Meldeperson.';
+  env.editForm.elements.CategoryID.value = '4';
+  env.postResponses.push({ ok: true, json: async () => ({
+    success: true, message, sentToFeedback: true,
+    categoryID: 6, categoryTitle: 'Feedback', categoryIsClosed: false,
+  }) });
+
+  await env.editForm.listeners.submit({ preventDefault() {} });
+
+  assert.equal(env.editStatus.textContent, message);
+  assert.equal(env.editStatus.dataset.feedbackNotice, 'true');
+  assert.equal(env.editModal.hidden, false);
+  assert.equal(env.detailRequests.length, detailRequestCount, 'Nach dem Speichern darf der Direktlink die Detailansicht nicht erneut öffnen.');
+  await env.listeners['kw-masha-feedly:opened']();
+  assert.equal(env.editStatus.textContent, message, 'Auch weiteres Nachladen erhält den Hinweis.');
+});
+
 test('sendet zusätzliche Dateien und den zugeschnittenen Screenshot beim Bearbeiten und zeigt Anhänge nach dem Speichern an', async () => {
   const env = createWidgetEnvironment();
   await env.listeners['kw-masha-feedly:opened']();

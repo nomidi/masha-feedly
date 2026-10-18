@@ -234,3 +234,5 @@ Older reports created inside an image dialog contain the field selector but not 
 Use **Show marked area** to close the report overlays and scroll to its visible bubble. The opened report’s marker remains highlighted.
 
 The report editor joins the list without an extra gap, including in the success state. All three panels use the same responsive widths; on phones the editor remains full screen.
+
+When a report moves from Done to Feedback, the highlighted explanation remains visible in the open report after saving, including when it was opened through a direct link.
