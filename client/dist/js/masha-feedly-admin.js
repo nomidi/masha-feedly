@@ -117,6 +117,19 @@
     }
   }, true);
 
+  /** Erstellt das dekorative Link-SVG unabhängig von anderen Masha-Modulen. */
+  const createExternalLinkIcon = () => {
+    const namespace = 'http://www.w3.org/2000/svg';
+    const icon = document.createElementNS(namespace, 'svg');
+    const attributes = {class: 'masha-link-icon', width: '1em', height: '1em', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false'};
+    Object.entries(attributes).forEach(([name, value]) => icon.setAttribute(name, value));
+    ['M14 3h7v7M21 3 10 14', 'M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5'].forEach((data) => {
+      const path = document.createElementNS(namespace, 'path');
+      path.setAttribute('d', data);
+      icon.append(path);
+    });
+    return icon;
+  };
   /** Rendert den Anbieterstatus getrennt vom lokalen Effekt. */
   const createEffectProviderCard = (providerError = '', effectCount = 0) => {
     const card = document.createElement('article');
@@ -126,7 +139,7 @@
     const icon = document.createElement('span');
     icon.className = 'masha-feedly-animation-preview__icon masha-feedly-animation-preview__icon--provider';
     icon.setAttribute('aria-hidden', 'true');
-    icon.textContent = '↗';
+    icon.append(createExternalLinkIcon());
     const copy = document.createElement('div');
     const title = document.createElement('strong');
     title.textContent = effectText('EFFECT_PROVIDER_CARD_TITLE', 'Effekt-Anbieter');
@@ -140,7 +153,8 @@
     link.href = 'https://github.com/nomidi/masha-feedly/blob/main/docs/de/README.md#abschluss-effekte';
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
-    link.textContent = effectText('EFFECT_PROVIDER_SETUP_LINK', 'Effekt-Anbieter einrichten ↗');
+    link.textContent = effectText('EFFECT_PROVIDER_SETUP_LINK', 'Effekt-Anbieter einrichten');
+    link.append(document.createTextNode(' '), createExternalLinkIcon());
     copy.append(title, status, link);
     card.append(icon, copy);
     return card;

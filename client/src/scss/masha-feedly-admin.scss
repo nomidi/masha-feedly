@@ -821,3 +821,6 @@
   .cms form.masha-feedly-configuration > fieldset { padding:16px; }
   .cms form.masha-feedly-configuration > .btn-toolbar { padding:12px 16px; gap:8px; }
 }
+
+/* Einheitliches dekoratives SVG für Link- und Öffnen-Aktionen. */
+.masha-link-icon { width: 1em; height: 1em; flex-shrink: 0; vertical-align: -0.125em; }

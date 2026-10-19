@@ -893,7 +893,7 @@ en:
     EFFECT_PROVIDER_CONNECTED: '{count} provider effects available.'
     EFFECT_LOCAL_DEFAULT_TITLE: 'Local default: Quiet checkmark'
     EFFECT_LOCAL_DEFAULT_DESCRIPTION: 'A calm finish that is always available.'
-    EFFECT_PROVIDER_SETUP_LINK: 'Set up an effect provider ↗'
+    EFFECT_PROVIDER_SETUP_LINK: 'Set up an effect provider'
     EFFECT_PREVIEW_UNAVAILABLE: 'This effect is currently unavailable.'
     PROFILE_ICON_SELECTION: 'Or choose a Masha icon'
     PROFILE_ICON_CHOICES_DESCRIPTION: 'Choose a symbol. Its color automatically adjusts to your avatar color.'

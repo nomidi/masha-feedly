@@ -893,7 +893,7 @@ de:
     EFFECT_PROVIDER_CONNECTED: '{count} Anbieter-Effekte verfügbar.'
     EFFECT_LOCAL_DEFAULT_TITLE: 'Lokaler Standard: Ruhiges Häkchen'
     EFFECT_LOCAL_DEFAULT_DESCRIPTION: 'Ruhiger Abschluss, der immer verfügbar ist.'
-    EFFECT_PROVIDER_SETUP_LINK: 'Effekt-Anbieter einrichten ↗'
+    EFFECT_PROVIDER_SETUP_LINK: 'Effekt-Anbieter einrichten'
     EFFECT_PREVIEW_UNAVAILABLE: 'Dieser Effekt ist momentan nicht verfügbar.'
     PROFILE_ICON_SELECTION: 'Oder ein eigenes Masha-Icon wählen'
     PROFILE_ICON_CHOICES_DESCRIPTION: 'Wähle ein Symbol. Seine Farbe passt sich automatisch an deine Profilfarbe an.'
