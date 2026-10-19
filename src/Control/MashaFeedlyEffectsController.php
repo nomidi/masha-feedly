@@ -96,7 +96,7 @@ class MashaFeedlyEffectsController extends Controller
     private function deniedResponse(HTTPRequest $request): ?HTTPResponse
     {
         if (!MashaFeedlyConfigExtension::canUse(Security::getCurrentUser())) return $this->response('Zugriff verweigert.', 'text/plain', 403);
-        if (\KW\MashaConnect\Connection::enabled() && !\KW\MashaConnect\ServiceAccess::allows('effects')) {
+        if (!MashaFeedlyEffectClient::providerContentAllowed()) {
             return $this->response('Zentrale Feedly-Inhalte nicht freigegeben.', 'text/plain', 403);
         }
         if (!in_array($request->httpMethod(), ['GET', 'HEAD'], true)) return $this->response('', 'text/plain', 405)->addHeader('Allow', 'GET, HEAD');

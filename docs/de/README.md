@@ -1,5 +1,9 @@
 # Masha:Feedly verwenden
 
+## Eigenständig ohne Connect
+
+Feedly kann vollständig ohne Masha:Connect installiert und betrieben werden. `composer require kooperativeweb/masha-feedly` zieht Connect nicht als Pflichtabhängigkeit nach. Meldungen, Kommentare, geschützte Anhänge, lokale E-Mails und die lokale Häkchen-Animation benötigen keinen Anbieter. Connect ist optional und kann separat per Git installiert werden; es wird nur für signierte zentrale Effekte, Profil-Icons und E-Mail-Standards verwendet. Ohne Anbieterzugang startet der Animationsloader keine Anbieterabfrage. Ist ein gemeinsamer Schlüssel eingerichtet, aber Connect fehlt, bleiben Anbieterinhalte gesperrt; lokale Funktionen bleiben nutzbar. Kein Rückfall auf alte Anbieterzugänge.
+
 ## Gemeinsamer Website-Zugang
 
 Aktuelle Kundenmodule verwenden einmal `MASHA_PROVIDER_URL` und `MASHA_API_KEY`; Prism zusätzlich einen lokalen `MASHA_ENCRYPTION_KEY`. Alle Dienste laufen auf kooperative-web.de. Im Anbieter unter **Website-Zugänge** die benötigten Dienste einzeln freigeben und für Promptly das KI-Konto ausdrücklich zuordnen. Alte modulspezifische Variablen sind nur noch ein Kompatibilitätsweg. Neu erzeugte Schlüssel benötigen das signierte Masha:Connect-Protokoll.

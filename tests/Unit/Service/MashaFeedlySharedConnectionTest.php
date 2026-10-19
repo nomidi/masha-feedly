@@ -14,6 +14,9 @@ class MashaFeedlySharedConnectionTest extends TestCase
 {
     public function testSharedConfigurationNeedsNoFeedlySpecificAccess(): void
     {
+        if (!class_exists(\KW\MashaConnect\Connection::class)) {
+            self::markTestSkipped('Diese optionale Integration benötigt Masha:Connect; Standalone-Abdeckung liegt in MashaFeedlyStandaloneTest.');
+        }
         $before = [];
         foreach (['MASHA_API_KEY', 'MASHA_PROVIDER_URL', 'MASHA_FEEDLY_EFFECTS_API_KEY', 'MASHA_FEEDLY_EFFECTS_BASE_URL'] as $name) $before[$name] = Environment::getEnv($name);
         try {

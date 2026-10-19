@@ -24,7 +24,7 @@ class MashaFeedlyEffectProvider
      */
     public static function manifestURL(): string
     {
-        $base = Connection::enabled() ? Connection::baseURL() : trim((string)(Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL') ?: self::config()->get('base_url')));
+        $base = MashaFeedlyEffectClient::sharedConnectionEnabled() ? Connection::baseURL() : trim((string)(Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL') ?: self::config()->get('base_url')));
         if ($base === '') return Director::absoluteURL('__masha-effects/manifest');
         $parts = parse_url($base);
         if (!$parts || !in_array($parts['scheme'] ?? '', ['https', 'http'], true) || empty($parts['host']) || isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])) {

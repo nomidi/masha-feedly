@@ -304,7 +304,7 @@ class MashaFeedlyEffectClient
     /** Zentrale Inhaltsrechte werden vor Cachezugriffen geprüft; das lokale Feedly-Modul bleibt davon unabhängig. */
     private function requireProviderContentAccess(): void
     {
-        if (Connection::enabled() && !\KW\MashaConnect\ServiceAccess::allows('effects')) {
+        if (!self::providerContentAllowed()) {
             throw new RuntimeException('Die zentralen Feedly-Inhalte sind nicht freigegeben.', 403);
         }
     }
@@ -312,11 +312,13 @@ class MashaFeedlyEffectClient
     /** Prüft die explizite Anbieter-Konfiguration, ohne eine Netzwerkverbindung aufzubauen. */
     public static function hasConfiguredProvider(): bool
     {
-        if (Connection::enabled()) {
+        try { $shared = self::sharedConnectionEnabled(); }
+        catch (RuntimeException) { return false; }
+        if ($shared) {
             try { Connection::baseURL(); Connection::apiKey(); return true; } catch (\RuntimeException) { return false; }
         }
-        $base = Connection::enabled() ? Connection::baseURL() : trim((string)(Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL') ?: MashaFeedlyEffectProvider::config()->get('base_url')));
-        $key = Connection::enabled() ? Connection::apiKey() : trim((string)Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY'));
+        $base = trim((string)(Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL') ?: MashaFeedlyEffectProvider::config()->get('base_url')));
+        $key = trim((string)Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY'));
         $localProvider = false;
         if ($base === '') {
             $localBase = rtrim(trim((string)MashaFeedlyEffectProvider::config()->get('local_provider_base_url')), '/');
@@ -333,6 +335,27 @@ class MashaFeedlyEffectClient
             && !empty($parts['host']) && !isset($parts['user']) && !isset($parts['pass'])
             && !isset($parts['query']) && !isset($parts['fragment']);
         return (bool)(($secureExternalProvider || $trustedLocalProvider) && preg_match('/^[A-Za-z0-9_-]{32,256}$/D', $key));
+    }
+
+    /** Optionales Connect verwenden; ein konfigurierter gemeinsamer Zugang darf ohne Modul nicht auf Altzugänge zurückfallen. */
+    public static function sharedConnectionEnabled(): bool
+    {
+        if (class_exists(Connection::class)) return Connection::enabled();
+        if (trim((string)Environment::getEnv('MASHA_API_KEY')) !== '') {
+            throw new RuntimeException('Für zentrale Feedly-Inhalte fehlt Masha:Connect.', 503);
+        }
+        return false;
+    }
+
+    /** Fehlendes oder gesperrtes Connect betrifft ausschließlich Anbieterinhalte, nie die lokalen Feedly-Funktionen. */
+    public static function providerContentAllowed(): bool
+    {
+        try {
+            return !self::sharedConnectionEnabled()
+                || (class_exists(\KW\MashaConnect\ServiceAccess::class) && \KW\MashaConnect\ServiceAccess::allows('effects'));
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /** @return array<string, mixed> Gültiger Anbieter-Katalog; die Restlaufzeit begrenzt den Browsercache. */
@@ -401,7 +424,7 @@ class MashaFeedlyEffectClient
     /** @return string API-Schlüssel ausschließlich aus der serverseitigen Umgebung. */
     private function apiKey(): string
     {
-        $key = Connection::enabled() ? Connection::apiKey() : trim((string)Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY'));
+        $key = self::sharedConnectionEnabled() ? Connection::apiKey() : trim((string)Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY'));
         if (!preg_match('/^[A-Za-z0-9_-]{32,256}$/D', $key)) throw new RuntimeException('Effekt-Anbieter nicht vollständig konfiguriert. Prüfe MASHA_FEEDLY_EFFECTS_API_KEY.', 503);
         return $key;
     }
@@ -418,7 +441,7 @@ class MashaFeedlyEffectClient
     private function request(string $endpoint): array
     {
         $url = $this->providerURL($endpoint);
-        $headers = (Connection::enabled() ? Connection::headers('GET', $url) : ['Authorization' => 'Bearer ' . $this->apiKey()]) + ['Accept' => '*/*'];
+        $headers = (self::sharedConnectionEnabled() ? Connection::headers('GET', $url) : ['Authorization' => 'Bearer ' . $this->apiKey()]) + ['Accept' => '*/*'];
         try {
             // Bei gemeinsamer Installation entfällt HTTPS gegen den eigenen Server; die Schlüsselprüfung bleibt gleich.
             $localBase = trim((string)MashaFeedlyEffectProvider::config()->get('local_provider_base_url'));
@@ -446,7 +469,7 @@ class MashaFeedlyEffectClient
                 $ca = trim((string)Environment::getEnv('MASHA_FEEDLY_EFFECTS_CA_FILE'));
                 if ($ca !== '' && !is_file($ca)) throw new RuntimeException('Ungültige TLS-Konfiguration.', 503);
                 $response = $this->http->request('GET', $url, ['headers' => $headers, 'allow_redirects' => false, 'http_errors' => false,
-                    'timeout' => 5, 'connect_timeout' => 2, 'verify' => (Connection::enabled() ? Connection::tlsVerification() : ($ca ?: true)), 'stream' => true]);
+                    'timeout' => 5, 'connect_timeout' => 2, 'verify' => (self::sharedConnectionEnabled() ? Connection::tlsVerification() : ($ca ?: true)), 'stream' => true]);
                 $status = $response->getStatusCode();
                 $mime = $response->getHeaderLine('Content-Type');
                 $stream = $response->getBody();

@@ -8,8 +8,10 @@
     "php": ">=8.3",
     "silverstripe/asset-admin": "^3.2",
     "silverstripe/cms": "^6.2",
-    "unclecheese/display-logic": "^4.0",
-    "kooperativeweb/masha-connect": "^1.0"
+    "unclecheese/display-logic": "^4.0"
+  },
+  "suggest": {
+    "kooperativeweb/masha-connect": "Optional für signierte Anbieterinhalte; kann separat per Git installiert werden."
   },
   "require-dev": {
     "phpunit/phpunit": "^11.3"

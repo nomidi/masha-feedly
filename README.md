@@ -36,6 +36,18 @@ composer update kooperativeweb/masha-feedly
 vendor/bin/sake dev/build flush=1
 ```
 
+## Ohne Masha:Connect verwenden
+
+Feedly installiert Masha:Connect nicht als Pflichtabhängigkeit. Meldungen, Kommentare, Anhänge, lokale E-Mails und die lokale Häkchen-Animation funktionieren ohne Connect und ohne Anbieterzugang.
+
+Connect ist nur für zusätzliche signierte Anbieterinhalte wie zentrale Effekte, Profil-Icons und E-Mail-Standards erforderlich. Es kann separat per Git installiert werden:
+
+```sh
+git clone https://github.com/nomidi/masha-connect.git
+```
+
+Das geklonte Modul muss von der Silverstripe-Installation geladen werden; bei der ersten Einrichtung den regulären Modul-/Klassenmanifest-Aufbau einplanen. Für einen rein lokalen Feedly-Betrieb weder Connect noch `MASHA_API_KEY` einrichten. Ist ein gemeinsamer Schlüssel bereits gesetzt, aber Connect fehlt, bleiben Anbieterinhalte gesperrt; lokale Feedly-Funktionen und die Häkchen-Animation bleiben nutzbar. Es gibt dabei keinen Rückfall auf alte Anbieterzugänge.
+
 ## Dokumentation
 
 - [Benutzung und Konfiguration auf Deutsch](docs/de/README.md)
