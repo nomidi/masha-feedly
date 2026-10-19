@@ -12,6 +12,25 @@ const compiledStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dis
 const compiledAdminStyles = fs.readFileSync(path.resolve(__dirname, '../../client/dist/css/masha-feedly-admin.css'), 'utf8');
 const widgetTemplate = fs.readFileSync(path.resolve(__dirname, '../../templates/KW/MashaFeedly/Includes/MashaFeedlyWidget.ss'), 'utf8');
 const germanTranslations = fs.readFileSync(path.resolve(__dirname, '../../lang/de.yml'), 'utf8');
+
+/** Prüft einfache ausgelieferte CSS-Regeln unabhängig von Komprimierung und Deklarationsreihenfolge. */
+function assertStyleDeclarations(styles, selector, expected) {
+  const declarations = new Map();
+  const cleanStyles = styles.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const [, selectors, body] of cleanStyles.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!selectors.split(',').some((value) => value.trim() === selector)) continue;
+    for (const declaration of body.split(';')) {
+      const separator = declaration.indexOf(':');
+      if (separator < 0) continue;
+      declarations.set(declaration.slice(0, separator).trim(), declaration.slice(separator + 1).trim());
+    }
+  }
+  const normalise = (value) => value?.replace(/^(-?)0\./, '$1.');
+  for (const [property, value] of Object.entries(expected)) {
+    assert.equal(normalise(declarations.get(property)), normalise(value), `${selector}: ${property}`);
+  }
+}
+
 test('setzt das Plus als abgetrennte Hauptaktion und hängt Screenshots auch beim Bearbeiten an', () => {
   const createSource = fs.readFileSync(path.resolve(__dirname, '../../client/src/js/masha-feedly-create-entry.js'), 'utf8');
   assert.match(widgetTemplate, /kw-masha-feedly__primary-action[\s\S]*?data-masha-feedly-start-selection/);
@@ -563,8 +582,10 @@ test('zeigt Status, Priorität und Zuständige in stabiler Reihenfolge und hält
   assert.match(scss, /entry-metadata \{ display: flex; grid-column: 1 \/ -1; grid-row: 2;/);
   assert.match(scss, /entry-card\[data-has-assignees="true"\] \{ position: relative; margin-bottom: 24px; padding-bottom: 30px; \}/);
   assert.match(scss, /entry-assignees \{ position: absolute; z-index: 2; right: 14px; bottom: 0; gap: 0; margin: 0; transform: translateY\(50%\); \}/);
-  assert.match(compiledAdminStyles, /masha-feedly-board__card\[data-has-assignees=true\][^{]*\{[^}]*padding-bottom:1\.8rem/);
-  assert.match(compiledAdminStyles, /masha-feedly-board__assignees\{position:absolute;z-index:2;right:\.75rem;bottom:-(?:0)?\.55rem;[^}]*transform:none\}/);
+  assertStyleDeclarations(compiledAdminStyles, '.masha-feedly-board__card[data-has-assignees=true]', { 'padding-bottom': '1.8rem' });
+  assertStyleDeclarations(compiledAdminStyles, '.masha-feedly-board__card[data-has-assignees=true] .masha-feedly-board__assignees', {
+    position: 'absolute', 'z-index': '2', right: '0.75rem', bottom: '-0.55rem', transform: 'none',
+  });
   assert.doesNotMatch(source, /entry-assignee-empty|ASSIGNEES_NONE/, 'Ohne Zuständige wird kein Platzhalter gerendert.');
   const unassignedEnv = createWidgetEnvironment();
   unassignedEnv.setEntryAssignees([]);
@@ -590,6 +611,13 @@ test('zeigt die Teilen-Funktion auch im geöffneten Bugfenster und teilt genau d
 
 test('kopiert den Bug-Direktlink auch mit dem Browser-Fallback, wenn die Clipboard-API blockiert ist', async () => {
   const env = createWidgetEnvironment();
+  const createElement = env.document.createElement.bind(env.document);
+  let fallbackField;
+  env.document.createElement = (tagName) => {
+    const element = createElement(tagName);
+    if (tagName === 'textarea') fallbackField = element;
+    return element;
+  };
   env.window.clipboardShouldFail = true;
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
@@ -600,7 +628,11 @@ test('kopiert den Bug-Direktlink auch mit dem Browser-Fallback, wenn die Clipboa
   const copiedLink = new URL(env.window.copiedText);
   assert.equal(copiedLink.searchParams.get('masha-feedly-entry'), '71');
   assert.equal(env.shareActiveEntryButton.dataset.shared, 'true');
-  assert.equal(env.document.body.children.some((child) => child.tagName === 'textarea' && child.removed), true);
+  assert.ok(fallbackField, 'Der Fallback legt ein temporäres Textfeld an.');
+  assert.equal(fallbackField.selected, true);
+  assert.equal(fallbackField.value, env.window.copiedText);
+  assert.equal(fallbackField.removed, true);
+  assert.equal(env.document.body.children.includes(fallbackField), false, 'Nach dem Kopieren bleibt kein temporäres Textfeld im DOM.');
 });
 
 test('bereitet die Bugbeschreibung nur zum Lesen sowie Status und Avatar-Zuständigkeiten zum Ändern auf', () => {
@@ -938,7 +970,9 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__edit-priority \{ display: inline-flex; width: 28px;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__priority\{display:inline-flex;align-items:center;justify-content:center/);
   assert.match(compiledStyles, /\.kw-masha-feedly__edit-priority\{display:inline-flex;width:28px/);
-  assert.match(compiledAdminStyles, /\.masha-feedly-board__priority\{display:inline-flex;align-items:center;justify-content:center/);
+  assertStyleDeclarations(compiledAdminStyles, '.masha-feedly-board__priority', {
+    display: 'inline-flex', 'align-items': 'center', 'justify-content': 'center',
+  });
   assert.match(scss, /\.kw-masha-feedly__attachment-field input::file-selector-button \{ margin-right: 11\.2px;/);
   assert.match(compiledStyles, /\.kw-masha-feedly__attachment-field input::file-selector-button\{margin-right:11\.2px/);
   assert.match(scss, /\.kw-masha-feedly__entry-environment-details > summary \{ overflow-wrap: anywhere; \}/);
@@ -957,7 +991,12 @@ test('liefert lesbare Schrift und die Fächeranimation in den kompilierten Widge
   assert.match(scss, /\.kw-masha-feedly__edit-dialog > \.kw-masha-feedly__dialog-header,[\s\S]*?\.kw-masha-feedly__edit-dialog > form \{ padding-right: 256px; \}/);
   assert.match(scss, /@media \(max-width: \$masha-breakpoint-wide\) \{[\s\S]*?padding-right: clamp\(96px, 9vw, 128px\); \}/);
   assert.match(scss, /@media \(max-width: \$masha-breakpoint-mobile\) \{[\s\S]*?padding-right: 20px; \}/);
-  assert.match(scss, /data-success-visible="true"\]\[data-list-open="true"\] \.kw-masha-feedly__edit-modal \{ width: min\(688px, calc\(100vw - 688px\)\); \}/);
+  // Der Erfolgszustand nutzt inzwischen gemeinsame Panelmaße statt einer eigenen festen 688-px-Ausnahme.
+  // Sass darf calc() innerhalb von min() entfernen; beide Schreibweisen beschreiben dieselbe Breite.
+  const editWidthWithList = /\.kw-masha-feedly\[data-list-open="?true"?\]\s+\.kw-masha-feedly__edit-modal\s*\{[^}]*width:\s*min\(var\(--kw-feedly-edit-width\),\s*(?:calc\()?100vw - var\(--kw-feedly-panel-width\) - var\(--kw-feedly-list-width\) \+ 30px\)?\)/;
+  assert.ok(editWidthWithList.test(scss), 'Die Bearbeitungsbreite berücksichtigt die variablen Breiten von Startpanel und Liste.');
+  assert.ok(editWidthWithList.test(compiledStyles), 'Auch das ausgelieferte CSS verwendet die gemeinsamen Panelmaße.');
+  assert.doesNotMatch(scss, /data-success-visible="true"\]\[data-list-open="true"\]\s+\.kw-masha-feedly__edit-modal\s*\{[^}]*width:/);
   assert.match(scss, /\.kw-masha-feedly\[data-edit-open="true"\] \.kw-masha-feedly__entries-modal \{ visibility: hidden; \}/);
   assert.match(scss, /\.kw-masha-feedly__add > svg \{ width: 60px; height: 60px; \}/);
   assert.match(scss, /\.kw-masha-feedly__actions > \.kw-masha-feedly__add > svg \{ width: 28px; height: 28px; \}/);

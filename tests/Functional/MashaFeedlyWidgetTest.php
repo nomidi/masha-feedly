@@ -110,7 +110,7 @@ class MashaFeedlyWidgetTest extends FunctionalTest
             static fn(array $item): bool => $item['id'] === (int)$member->ID
         ))[0];
         $this->assertSame('EM', $assignee['initials']);
-        $this->assertSame('http://localhost/__masha-feedly-effects/avatar/person/black', $assignee['imageURL']);
+        $this->assertSame(\SilverStripe\Control\Director::absoluteURL('/__masha-feedly-effects/avatar/person/black'), $assignee['imageURL']);
     }
 
     /** Prüft, dass nur freigegebene Benutzer das globale Widget erhalten. */
