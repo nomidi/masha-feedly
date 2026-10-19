@@ -9,6 +9,7 @@ use RuntimeException;
 use SilverStripe\Control\Director;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Core\Environment;
+use KW\MashaConnect\Connection;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\i18n\i18n;
 
@@ -258,6 +259,7 @@ class MashaFeedlyEffectClient
      */
     public function storedAvatarIcon(string $id, string $color): array
     {
+        $this->requireProviderContentAccess();
         if (!preg_match('/^[a-z0-9-]{1,50}$/D', $id) || !in_array($color, ['black', 'white'], true)) throw new RuntimeException('Unbekannte Ressource.', 404);
         $path = $this->storedAvatarIconPath($id, $color);
         $body = is_file($path) ? file_get_contents($path) : false;
@@ -295,14 +297,26 @@ class MashaFeedlyEffectClient
     /** Stellt sicher, dass die Auswahl nicht über die lokale Fallback-Konfiguration angeboten wird. */
     public function requireConfiguredProvider(): void
     {
+        $this->requireProviderContentAccess();
         if (!self::hasConfiguredProvider()) throw new RuntimeException('Die Profil-Icon-Auswahl ist nicht verfügbar.', 503);
+    }
+
+    /** Zentrale Inhaltsrechte werden vor Cachezugriffen geprüft; das lokale Feedly-Modul bleibt davon unabhängig. */
+    private function requireProviderContentAccess(): void
+    {
+        if (Connection::enabled() && !\KW\MashaConnect\ServiceAccess::allows('effects')) {
+            throw new RuntimeException('Die zentralen Feedly-Inhalte sind nicht freigegeben.', 403);
+        }
     }
 
     /** Prüft die explizite Anbieter-Konfiguration, ohne eine Netzwerkverbindung aufzubauen. */
     public static function hasConfiguredProvider(): bool
     {
-        $base = trim((string)(Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL') ?: MashaFeedlyEffectProvider::config()->get('base_url')));
-        $key = trim((string)Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY'));
+        if (Connection::enabled()) {
+            try { Connection::baseURL(); Connection::apiKey(); return true; } catch (\RuntimeException) { return false; }
+        }
+        $base = Connection::enabled() ? Connection::baseURL() : trim((string)(Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL') ?: MashaFeedlyEffectProvider::config()->get('base_url')));
+        $key = Connection::enabled() ? Connection::apiKey() : trim((string)Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY'));
         $localProvider = false;
         if ($base === '') {
             $localBase = rtrim(trim((string)MashaFeedlyEffectProvider::config()->get('local_provider_base_url')), '/');
@@ -324,6 +338,7 @@ class MashaFeedlyEffectClient
     /** @return array<string, mixed> Gültiger Anbieter-Katalog; die Restlaufzeit begrenzt den Browsercache. */
     private function catalogue(): array
     {
+        $this->requireProviderContentAccess();
         $key = $this->cachePrefix() . '_manifest_v2';
         $cached = $this->cache->get($key);
         if (is_array($cached) && ($cached['expires'] ?? 0) > time()) {
@@ -386,7 +401,7 @@ class MashaFeedlyEffectClient
     /** @return string API-Schlüssel ausschließlich aus der serverseitigen Umgebung. */
     private function apiKey(): string
     {
-        $key = trim((string)Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY'));
+        $key = Connection::enabled() ? Connection::apiKey() : trim((string)Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY'));
         if (!preg_match('/^[A-Za-z0-9_-]{32,256}$/D', $key)) throw new RuntimeException('Effekt-Anbieter nicht vollständig konfiguriert. Prüfe MASHA_FEEDLY_EFFECTS_API_KEY.', 503);
         return $key;
     }
@@ -403,15 +418,15 @@ class MashaFeedlyEffectClient
     private function request(string $endpoint): array
     {
         $url = $this->providerURL($endpoint);
-        $headers = ['Authorization' => 'Bearer ' . $this->apiKey(), 'Accept' => '*/*'];
+        $headers = (Connection::enabled() ? Connection::headers('GET', $url) : ['Authorization' => 'Bearer ' . $this->apiKey()]) + ['Accept' => '*/*'];
         try {
             // Bei gemeinsamer Installation entfällt HTTPS gegen den eigenen Server; die Schlüsselprüfung bleibt gleich.
             $localBase = trim((string)MashaFeedlyEffectProvider::config()->get('local_provider_base_url'));
             $local = rtrim($localBase, '/') . '/__masha-effects/';
-            if ($localBase !== '' && str_starts_with($url, $local) && class_exists(\KW\MashaEffects\Control\EffectsController::class)) {
+            if ($localBase !== '' && str_starts_with($url, $local) && class_exists(\KW\MashaSuiteAdmin\Control\EffectsController::class)) {
                 $request = new HTTPRequest('GET', $url);
-                $request->addHeader('Authorization', $headers['Authorization']);
-                $controller = \KW\MashaEffects\Control\EffectsController::create();
+                foreach ($headers as $name => $value) $request->addHeader($name, $value);
+                $controller = \KW\MashaSuiteAdmin\Control\EffectsController::create();
                 if ($endpoint === 'manifest') $response = $controller->manifest($request);
                 elseif ($endpoint === 'icons') $response = $controller->icons($request);
                 elseif ($endpoint === 'email-defaults') $response = $controller->emailDefaults($request);
@@ -431,7 +446,7 @@ class MashaFeedlyEffectClient
                 $ca = trim((string)Environment::getEnv('MASHA_FEEDLY_EFFECTS_CA_FILE'));
                 if ($ca !== '' && !is_file($ca)) throw new RuntimeException('Ungültige TLS-Konfiguration.', 503);
                 $response = $this->http->request('GET', $url, ['headers' => $headers, 'allow_redirects' => false, 'http_errors' => false,
-                    'timeout' => 5, 'connect_timeout' => 2, 'verify' => $ca ?: true, 'stream' => true]);
+                    'timeout' => 5, 'connect_timeout' => 2, 'verify' => (Connection::enabled() ? Connection::tlsVerification() : ($ca ?: true)), 'stream' => true]);
                 $status = $response->getStatusCode();
                 $mime = $response->getHeaderLine('Content-Type');
                 $stream = $response->getBody();

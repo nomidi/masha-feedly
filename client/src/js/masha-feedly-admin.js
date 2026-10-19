@@ -62,6 +62,61 @@
     const translated = window.KWMashaFeedlyTranslate?.(key);
     return translated && translated !== key ? translated : fallback;
   };
+  /** Zeigt Versandstatus direkt in der Aktionsleiste, ohne das Konfigurationsformular auszutauschen. */
+  document.addEventListener('click', async (event) => {
+    const button = event.target.closest?.('.masha-feedly-configuration [name="action_sendTestEmail"]');
+    if (!button) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (button.disabled) return;
+    const form = button.form;
+    const toolbar = button.closest('.btn-toolbar');
+    if (!form || !toolbar) return;
+    let feedback = toolbar.querySelector('[data-email-test-feedback]');
+    if (!feedback) {
+      feedback = document.createElement('div');
+      feedback.className = 'masha-feedly-email-test-feedback';
+      feedback.setAttribute('data-email-test-feedback', '');
+      feedback.setAttribute('aria-atomic', 'true');
+      toolbar.prepend(feedback);
+    }
+    const showStatus = (state, message) => {
+      feedback.dataset.state = state;
+      feedback.setAttribute('role', state === 'error' ? 'alert' : 'status');
+      feedback.textContent = message;
+    };
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    showStatus('pending', effectText('CONFIG_TEST_EMAIL_SENDING', 'Test-E-Mail wird gesendet …'));
+    try {
+      // Nur die Aktion und den CSRF-Token senden; andere Einstellungen werden dabei nicht gespeichert.
+      const data = new FormData();
+      const token = form.querySelector('input[name="SecurityID"]');
+      if (token) data.set(token.name, token.value);
+      data.set(button.name, '1');
+      const response = await fetch(form.action, {
+        method: 'POST', credentials: 'same-origin', body: data,
+        headers: {'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest'}
+      });
+      const result = await readJSONResponse(response);
+      if (!response.ok || result.success !== true) {
+        throw new Error(result.message || effectText('CONFIG_TEST_EMAIL_REQUEST_FAILED', 'Die Test-E-Mail konnte nicht gesendet werden. Bitte versuche es erneut.'));
+      }
+      showStatus('success', result.message);
+      form.querySelector('.masha-feedly-email-test-notice')?.remove();
+      const mailStatus = form.querySelector('[data-masha-feedly-mail-status]');
+      if (mailStatus) {
+        mailStatus.textContent = effectText('CONFIG_EMAIL_READY', 'Mailversand bereit');
+        mailStatus.classList.add('is-ready');
+      }
+    } catch (error) {
+      showStatus('error', error.message || effectText('CONFIG_TEST_EMAIL_REQUEST_FAILED', 'Die Test-E-Mail konnte nicht gesendet werden. Bitte versuche es erneut.'));
+    } finally {
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+    }
+  }, true);
+
   /** Rendert den Anbieterstatus getrennt vom lokalen Effekt. */
   const createEffectProviderCard = (providerError = '', effectCount = 0) => {
     const card = document.createElement('article');

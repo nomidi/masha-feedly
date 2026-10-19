@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+$connectAutoload = dirname(__DIR__, 2) . '/masha-connect/tests/autoload.php';
+if (is_file($connectAutoload)) require_once $connectAutoload;
+
 // Nur ein eigenständiger Modul-Checkout benötigt die minimalen Seitenklassen.
 // In einem Hostprojekt dürfen keine Fixtures angelegt werden: Dessen Klassen
 // können in beliebigen Unterordnern liegen und sind vor dem Framework-Boot

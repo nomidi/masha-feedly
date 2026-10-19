@@ -26,7 +26,7 @@ Damit reichen vier Konten: Creator, Commenter, Superadmin und ein nicht freigege
 | --- | --- | --- |
 | **CREATOR** | In **Masha:Feedly → Konfiguration → Benutzer mit Zugriff** freischalten. Normales Mitglied ohne Kostenschätzungsrechte; Einführung bereits abgeschlossen. | Kommentaraktivität, Zugriffsmatrix, Kostenschätzung; Onboarding als Ersatzkonto |
 | **COMMENTER / Freigabeperson** | Freischalten; Einführung abgeschlossen. Zusätzlich muss ein Betreiber/Superadmin im Mitgliederprofil **Darf Kostenschätzungen freigeben** aktivieren. Kein CMS-ADMIN nötig; dieses Konto darf nicht als Reporter-Superadmin konfiguriert sein. | Kommentaraktivität und Kostenschätzung: kommentiert/reagiert sowie sieht die Schätzung lesend und gibt sie frei |
-| **SUPERADMIN** | Mitglied muss in Silverstripe CMS die Berechtigung **ADMIN** haben, in **Benutzer mit Zugriff** freigeschaltet sein und seine E-Mail-Adresse muss in der Projektkonfiguration `MashaFeedlyEntry.reporter_manager_emails` bzw. `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` stehen. | Kostenschätzung: trägt Dauer/Erläuterung ein und sieht den Stundensatz |
+| **SUPERADMIN** | Mitglied muss in Silverstripe CMS die Berechtigung **ADMIN** haben, in **Benutzer mit Zugriff** freigeschaltet sein und seine E-Mail-Adresse muss in der Projektkonfiguration `MashaFeedlyEntry.reporter_manager_emails` bzw. `MASHA_OPERATOR_EMAIL` (im Host mit Rückfall auf `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL`) stehen. | Kostenschätzung: trägt Dauer/Erläuterung ein und sieht den Stundensatz |
 | **DENIED** | Aktiver Silverstripe-Login, aber **nicht** in **Benutzer mit Zugriff** freischalten. Keine Masha:Feedly-Rolle erforderlich. | Zugriffsmatrix: muss Widget, Einträge, Kommentare und private Anhänge nicht abrufen können |
 
 Zusätzlich für den Kostenschätzungstest muss in der Masha:Feedly-Konfiguration ein **positiver Stundensatz** hinterlegt sein. Commenter/Freigabeperson und Superadmin müssen unterschiedliche Konten sein: Der Superadmin erfasst die Schätzung; Commenter bestätigt sie. Creator muss die Einführung bereits abgeschlossen haben, bevor die Suite läuft; der Onboarding-Test startet sie gezielt neu. CMS-ADMIN-Rechte allein geben keinen Masha:Feedly-Zugriff und machen ein Mitglied nicht zum konfigurierten Superadmin.
@@ -72,9 +72,9 @@ Standardwerte sind fünf Sitzungen, 60 Sekunden Last und zehn Sekunden Anlauf. D
 
 ## Externer Effekt-Anbieter
 
-Masha:Effects kann auf einem getrennten Server laufen. Feedly verbindet sich mit der serverseitig konfigurierten Anbieter-URL und gibt die Effekte über seinen eigenen, zugriffsgeschützten Proxy an den Browser weiter. Adresse und Zugangsschlüssel bleiben auf dem Feedly-Server und gehören weder in `.env.e2e` noch in den Browser.
+Masha:Suite Admin kann auf einem getrennten Server laufen. Feedly verbindet sich mit der serverseitig konfigurierten Anbieter-URL und gibt die Effekte über seinen eigenen, zugriffsgeschützten Proxy an den Browser weiter. Adresse und Zugangsschlüssel bleiben auf dem Feedly-Server und gehören weder in `.env.e2e` noch in den Browser.
 
-`effects-provider.test.cjs` prüft ausschließlich Feedlys Proxy, dessen Zugriffsschutz, den Icon-Katalog und die Wiedergabe im Widget. Der Test ruft keine Masha:Effects-Routen oder CMS-Seiten auf dem Feedly-Host auf. CMS-, Schlüssel- und Dateizugriffstests des Anbieters gehören in dessen eigenes Repository und müssen gegen dessen Testinstanz laufen.
+`effects-provider.test.cjs` prüft ausschließlich Feedlys Proxy, dessen Zugriffsschutz, den Icon-Katalog und die Wiedergabe im Widget. Der Test ruft keine Masha:Suite Admin-Routen oder CMS-Seiten auf dem Feedly-Host auf. CMS-, Schlüssel- und Dateizugriffstests des Anbieters gehören in dessen eigenes Repository und müssen gegen dessen Testinstanz laufen.
 
 Vom Projekt-Root:
 

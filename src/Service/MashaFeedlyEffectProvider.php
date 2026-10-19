@@ -5,6 +5,7 @@ namespace KW\MashaFeedly\Service;
 use SilverStripe\Control\Director;
 use SilverStripe\Core\Config\Configurable;
 use SilverStripe\Core\Environment;
+use KW\MashaConnect\Connection;
 use SilverStripe\Security\Security;
 use SilverStripe\View\Requirements;
 
@@ -23,7 +24,7 @@ class MashaFeedlyEffectProvider
      */
     public static function manifestURL(): string
     {
-        $base = trim((string)(Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL') ?: self::config()->get('base_url')));
+        $base = Connection::enabled() ? Connection::baseURL() : trim((string)(Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL') ?: self::config()->get('base_url')));
         if ($base === '') return Director::absoluteURL('__masha-effects/manifest');
         $parts = parse_url($base);
         if (!$parts || !in_array($parts['scheme'] ?? '', ['https', 'http'], true) || empty($parts['host']) || isset($parts['user']) || isset($parts['pass']) || isset($parts['query']) || isset($parts['fragment'])) {

@@ -42,7 +42,7 @@ vendor/bin/sake dev/build flush=1
 - [Usage and configuration in English](docs/en/README.md)
 - [Browserbasierte Ende-zu-Ende-Tests](tests/e2e/README.md)
 
-Die Anleitungen erklären Bedienung und Einrichtung einschließlich geschützter E-Mail-Textvorlagen, Testmails mit Beispielinhalten, Footer, Fälligkeitserinnerungen und der API-Verbindung zu Masha:Effects.
+Die Anleitungen erklären Bedienung und Einrichtung einschließlich geschützter E-Mail-Textvorlagen, Testmails mit Beispielinhalten, Footer, Fälligkeitserinnerungen und der API-Verbindung zu Masha:Suite Admin.
 
 ## Lizenz
 

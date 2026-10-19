@@ -44,3 +44,63 @@ test('E-Mail-Texte: Testmail-Button sendet per AJAX und zeigt eine Bestätigung'
     await browser.close();
   }
 });
+
+/** Prüft Rückmeldungen und feste Aktionen mit abgefangenen Antworten, ohne eine echte E-Mail zu senden. */
+test('Konfiguration: Testmail bleibt im Reiter und erhält ungespeicherte Werte', { skip: missing.length ? 'E2E-Konfiguration fehlt' : false }, async () => {
+  const { chromium, expect } = require('@playwright/test');
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ ignoreHTTPSErrors: true });
+    const page = await context.newPage();
+    await page.goto(new URL('/Security/login', config.BASE_URL).href);
+    await page.locator('input[type="email"], input[name$="Email"]').first().fill(config.SUPERADMIN_EMAIL);
+    await page.locator('input[type="password"]').first().fill(config.SUPERADMIN_PASSWORD);
+    await page.locator('button[type="submit"], input[type="submit"]').first().click();
+    await page.goto(new URL('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig', config.BASE_URL).href);
+    const form = page.locator('form.masha-feedly-configuration');
+    const button = form.locator('[name="action_sendTestEmail"]');
+    const toolbar = form.locator(':scope > .btn-toolbar');
+    const address = form.locator('select[name="MashaFeedlyAddress"]');
+    const unsavedAddress = await address.inputValue() === 'du' ? 'sie' : 'du';
+    await address.selectOption(unsavedAddress);
+    const url = page.url();
+    let requests = 0;
+    let success = true;
+    let releaseResponse;
+    await page.route('**/SilverStripe-SiteConfig-SiteConfig/EditForm', async route => {
+      requests++;
+      const request = route.request();
+      assert.equal(request.method(), 'POST');
+      assert.equal(request.headers().accept, 'application/json');
+      assert.match(request.postData() || '', /action_sendTestEmail/);
+      assert.match(request.postData() || '', /SecurityID/);
+      assert.doesNotMatch(request.postData() || '', /name="MashaFeedlyAddress"/);
+      await new Promise(resolve => { releaseResponse = resolve; });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success, message: success ? 'Simulierter Versand erfolgreich.' : 'Simulierter Versandfehler.' }) });
+    });
+    await button.click();
+    await expect(button).toBeDisabled();
+    await expect(form.locator('[data-email-test-feedback]')).toHaveAttribute('data-state', 'pending');
+    await expect.poll(() => typeof releaseResponse).toBe('function');
+    releaseResponse();
+    await expect(form.locator('[data-email-test-feedback]')).toHaveAttribute('data-state', 'success');
+    await expect(button).toBeEnabled();
+    assert.equal(page.url(), url);
+    assert.equal(await address.inputValue(), unsavedAddress);
+    success = false;
+    releaseResponse = null;
+    await button.click();
+    await expect.poll(() => typeof releaseResponse).toBe('function');
+    releaseResponse();
+    await expect(form.locator('[data-email-test-feedback]')).toHaveAttribute('data-state', 'error');
+    await expect(form.locator('[role="alert"][data-email-test-feedback]')).toContainText('Simulierter Versandfehler.');
+    assert.equal(page.url(), url);
+    assert.equal(await address.inputValue(), unsavedAddress);
+    assert.equal(requests, 2);
+    await form.locator('fieldset').evaluate(element => { element.scrollTop = element.scrollHeight; });
+    const box = await toolbar.boundingBox();
+    assert.ok(box && box.y >= 0 && box.y + box.height <= page.viewportSize().height);
+  } finally {
+    await browser.close();
+  }
+});

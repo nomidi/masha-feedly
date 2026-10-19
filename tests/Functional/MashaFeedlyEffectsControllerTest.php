@@ -25,6 +25,34 @@ class MashaFeedlyEffectsControllerTest extends FunctionalTest
         Injector::inst()->registerService($this->client, MashaFeedlyEffectClient::class);
     }
 
+    /** Die lokale Nutzung bleibt erlaubt, während gesperrte Anbieterinhalte den Client nicht erreichen. */
+    public function testDeniedProviderContentDoesNotReachCacheOrDisableLocalFeedly(): void
+    {
+        $previousKey = \SilverStripe\Core\Environment::getEnv('MASHA_API_KEY');
+        \SilverStripe\Core\Environment::setEnv('MASHA_API_KEY', str_repeat('a', 64));
+        $injector = Injector::inst();
+        $original = $injector->get(\KW\MashaConnect\ServiceAccess::class);
+        $access = new class extends \KW\MashaConnect\ServiceAccess {
+            public function isAllowed(string $service): bool { return false; }
+        };
+        $injector->registerService($access, \KW\MashaConnect\ServiceAccess::class);
+        $this->client->expects($this->never())->method('manifest');
+        $this->client->expects($this->never())->method('file');
+        $this->client->expects($this->never())->method('avatarIcons');
+        $this->client->expects($this->never())->method('storedAvatarIcon');
+        try {
+            $member = $this->objFromFixture(Member::class, 'allowed');
+            $this->logInAs($member);
+            $this->assertTrue(MashaFeedlyConfigExtension::canUse($member));
+            foreach (['/__masha-feedly-effects/manifest', '/__masha-feedly-effects/icons', '/__masha-feedly-effects/avatar/person/black'] as $url) {
+                $this->assertSame(403, $this->get($url)->getStatusCode());
+            }
+        } finally {
+            \SilverStripe\Core\Environment::setEnv('MASHA_API_KEY', $previousKey);
+            $injector->registerService($original, \KW\MashaConnect\ServiceAccess::class);
+        }
+    }
+
     /** Gäste und nicht freigegebene Mitglieder erreichen weder Client noch warmen Servercache. */
     public function testDeniedUsersCannotReachCache(): void
     {

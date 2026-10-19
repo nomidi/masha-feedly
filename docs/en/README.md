@@ -1,5 +1,10 @@
 # Using Masha:Feedly
 
+## Shared website connection
+
+Current customer modules share `MASHA_PROVIDER_URL` and `MASHA_API_KEY`; Prism also uses an installation-local `MASHA_ENCRYPTION_KEY`. Services run on kooperative-web.de. Enable each service in the provider website access record and explicitly link the AI billing account for Promptly. Module-specific variables are a legacy compatibility path. Newly generated keys require signed Masha:Connect protocol 1.
+
+
 Masha:Feedly is a shared issue and feedback tracker built into your website. People with access can report problems, discuss them, and follow their progress.
 
 The interface uses “report” for issues and change requests. Under **Open profile settings**, choose your **Profile color**, **Thank-you animation**, and form of address. Tour prompts and error messages explain the next action. The preview updates immediately; changes become permanent when you save.
@@ -8,7 +13,7 @@ The plus and save buttons stay pink in both appearances. The news button has a l
 
 ## Access and setup
 
-Administrators open **Masha:Feedly → Configuration** in the CMS. Settings are grouped on one page into **General**, **Access & appearance**, **Reminders & estimates**, and **Reset data**. Email templates and the footer are in the separate **Email texts** tab. Only the CMS administrator configured through `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` can see and use that tab and its actions. Select the people allowed to use the module under **Access & appearance**. Administrators also need explicit access to see the widget. Under **General**, set the form of address, font size, and website default effect category. New installations default to **Playful**. Each allowed member can choose a different category in their profile. The categories for initial status, completion, and approval are required; their names can be customised.
+Administrators open **Masha:Feedly → Configuration** in the CMS. Settings are grouped on one page into **General**, **Access & appearance**, **Reminders & estimates**, and **Reset data**. Email templates and the footer are in the separate **Email texts** tab. Only the CMS administrator configured through `MASHA_OPERATOR_EMAIL` can see and use that tab and its actions. Select the people allowed to use the module under **Access & appearance**. Administrators also need explicit access to see the widget. Under **General**, set the form of address, font size, and website default effect category. New installations default to **Playful**. Each allowed member can choose a different category in their profile. The categories for initial status, completion, and approval are required; their names can be customised.
 
 Under **Email texts**, the operator can edit introductions for new reports, updates, comments, due-date reminders, and estimate requests, each in Du and Sie versions. The two welcome texts are at the top. A test email button under each text sends the current editor contents to the operator account, including unsaved edits.
 
@@ -16,10 +21,10 @@ Test messages show sample content in the email layout: new reports include the r
 
 For normal notifications, each recipient’s personal form of address in their profile selects Du or Sie. The website setting under **Masha:Feedly → Configuration** controls the welcome email. Feedly adds report details and links automatically. Edit the shared footer in this tab.
 
-If `MASHA_FEEDLY_EFFECTS_BASE_URL` and its API key are configured, `dev/build` copies Masha:Effects texts into empty fields only. **Replace with Masha:Effects texts** fetches them again after an explicit click and replaces the saved welcome and notification texts. This button does not import the footer. Masha:Effects provides protected defaults at `GET /__masha-effects/email-defaults`; Feedly calls it server-side with `Authorization: Bearer …`. The response contains `version`, `footer`, `welcome.du`/`welcome.sie`, and the variants under `notifications`. The provider configuration and website-key setup are documented in Masha:Effects.
+If `MASHA_PROVIDER_URL` and its API key are configured, `dev/build` copies Masha:Suite Admin texts into empty fields only. **Replace with Masha:Suite Admin texts** fetches them again after an explicit click and replaces the saved welcome and notification texts. This button does not import the footer. Masha:Suite Admin provides protected defaults at `GET /__masha-effects/email-defaults`; Feedly calls it server-side with `Authorization: Bearer …`. The response contains `version`, `footer`, `welcome.du`/`welcome.sie`, and the variants under `notifications`. The provider configuration and website-key setup are documented in Masha:Suite Admin.
 
 
-The CMS view and its menu item also require explicit module access. The only exception is the CMS administrator whose email is configured through `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL`; this account can open the module configuration without being selected.
+The CMS view and its menu item also require explicit module access. The only exception is the CMS administrator whose email is configured through `MASHA_OPERATOR_EMAIL`; this account can open the module configuration without being selected.
 
 Accounts without module access also have no Masha:Feedly tab in their own CMS profile.
 
@@ -67,16 +72,16 @@ Whenever a person is added to Masha:Feedly, including when re-added, their email
 
 The avatar preview in your profile uses the same icon and color as entries and assignees. When the color is empty, saving assigns and stores a random palette color once. You or the responsible administrator can change it later. Dark backgrounds, emerald and forest green use the light icon; the other light backgrounds use the dark icon. Only the selected icon and its two variants are stored locally in the project, so displaying it does not require repeated requests to the provider.
 
-In the Masha:Feedly section of your profile, set your avatar and color, choose your personal appearance, manage each type of email notification, and restart the onboarding tour. Available effect categories come from the configured Masha:Effects provider. Administrators set the website default under **Masha:Feedly → Configuration**; the local check effect remains available without a provider or during an outage. New installations default to **Playful**. You can separately choose emails for new entries, entry updates, comments within the selected scope, due dates, and cost estimate requests. Your own actions never generate notification emails. News in the widget shows activity regardless of email notification settings. Personal email settings stay locked until the configured Masha:Feedly administrator has successfully sent at least one test email from Configuration; a notice in the profile explains this. Every Masha:Feedly email includes the footer text from **Masha:Feedly → Configuration → Email footer**, an imprint link, and a direct link to your email settings. If the text field is empty, `MASHA_FEEDLY_EMAIL_FOOTER` from the server `.env` is used. This keeps operator details outside the Git repository. Write line breaks as `\n`. `dev/build` copies the value if no footer has been saved yet.
+In the Masha:Feedly section of your profile, set your avatar and color, choose your personal appearance, manage each type of email notification, and restart the onboarding tour. Available effect categories come from the configured Masha:Suite Admin provider. Administrators set the website default under **Masha:Feedly → Configuration**; the local check effect remains available without a provider or during an outage. New installations default to **Playful**. You can separately choose emails for new entries, entry updates, comments within the selected scope, due dates, and cost estimate requests. Your own actions never generate notification emails. News in the widget shows activity regardless of email notification settings. Personal email settings stay locked until the configured Masha:Feedly administrator has successfully sent at least one test email from Configuration; a notice in the profile explains this. Every Masha:Feedly email includes the footer text from **Masha:Feedly → Configuration → Email footer**, an imprint link, and a direct link to your email settings. If the text field is empty, `MASHA_FEEDLY_EMAIL_FOOTER` from the server `.env` is used. This keeps operator details outside the Git repository. Write line breaks as `\n`. `dev/build` copies the value if no footer has been saved yet.
 
 The footer also explains that the message was sent automatically based on your notification settings. Use its link to change those settings at any time.
 New report emails name the website and, when available, show who reported the issue, its category, priority, due date, and assigned people. The full description follows; its automatically generated short title is not repeated separately.
 
-Formatted introductions for new reports, updates, comments, due-date reminders, and estimate requests come from the Masha:Effects provider when configured. Each type has Du and Sie variants. Placeholders such as `{title}` and `{date}` are replaced safely. Report details and links remain part of the email. Masha:Feedly uses its built-in welcome or notification text if no provider is available or the corresponding text field is empty. The footer is configured separately in Feedly, or comes from `MASHA_FEEDLY_EMAIL_FOOTER` when the CMS field is empty.
+Formatted introductions for new reports, updates, comments, due-date reminders, and estimate requests come from the Masha:Suite Admin provider when configured. Each type has Du and Sie variants. Placeholders such as `{title}` and `{date}` are replaced safely. Report details and links remain part of the email. Masha:Feedly uses its built-in welcome or notification text if no provider is available or the corresponding text field is empty. The footer is configured separately in Feedly, or comes from `MASHA_FEEDLY_EMAIL_FOOTER` when the CMS field is empty.
 
-When `MASHA_FEEDLY_EFFECTS_BASE_URL` and `MASHA_FEEDLY_EFFECTS_API_KEY` are set on the server and Masha:Effects returns a valid icon catalogue, you can also choose a profile icon. The icon catalogue is loaded from the provider through Feedly's protected proxy. The selected SVG icon and its light and dark variants are stored locally. They are grouped into people, animals, nature, everyday, hobbies and technology, fruit and vegetables, food and drink, aliens and UFOs, space, spooky, and dinosaurs. Icon color switches between black and white to contrast with your avatar color. The picker stays hidden without provider configuration. If a configured provider is unavailable, a notice is shown; your saved avatar and profile image upload remain available.
+When `MASHA_PROVIDER_URL` and `MASHA_API_KEY` are set on the server and Masha:Suite Admin returns a valid icon catalogue, you can also choose a profile icon. The icon catalogue is loaded from the provider through Feedly's protected proxy. The selected SVG icon and its light and dark variants are stored locally. They are grouped into people, animals, nature, everyday, hobbies and technology, fruit and vegetables, food and drink, aliens and UFOs, space, spooky, and dinosaurs. Icon color switches between black and white to contrast with your avatar color. The picker stays hidden without provider configuration. If a configured provider is unavailable, a notice is shown; your saved avatar and profile image upload remain available.
 
-The CMS administrator configured through `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` can use **Send test email** under **Masha:Feedly → Configuration** to check delivery to the email address on their account. On failure, Configuration also displays the specific cause, with credentials in connection URLs redacted. Full technical details remain in the PHP error log. If a notification fails, the entry is still saved.
+The CMS administrator configured through `MASHA_OPERATOR_EMAIL` can use **Send test email** under **Masha:Feedly → Configuration** to check delivery to the email address on their account. On failure, Configuration also displays the specific cause, with credentials in connection URLs redacted. Full technical details remain in the PHP error log. If a notification fails, the entry is still saved.
 
 Entries can have an optional due date. Use **Postpone reminder until** to pause only the automatic due-date reminder; comment and update emails continue. On the selected date, an entry is considered again if it is still open and due. In Masha:Feedly settings, choose under **Run due-date reminders** whether checks run via cron or on the first website visit of each day. Visitor mode sends no reminders until someone visits the site. The check sends one email on the due date (or after it, if it did not run on time) to approved members with due date notifications enabled and a matching email scope. Changing the due date resets the reminder.
 
@@ -114,7 +119,7 @@ MASHA_FEEDLY_MITE_API_KEY="your-personal-api-key"
 MASHA_FEEDLY_MITE_ACCOUNT="your-mite-account"
 ```
 
-The API key belongs to your Mite user and is never exposed in the CMS or browser. After `dev/build?flush=1`, enable the integration under **Masha:Feedly → Mite**, choose this website's default project and one or more **trigger categories**, then save the configuration. Choose the **service** each time you start a timer. Mite is disabled by default. Only the CMS administrator whose email is configured through `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` can access the tab, the general Mite timer button in the widget's first section, and timer functions. Other people can still use the board but do not see the Mite button or receive a Mite dialog.
+The API key belongs to your Mite user and is never exposed in the CMS or browser. After `dev/build?flush=1`, enable the integration under **Masha:Feedly → Mite**, choose this website's default project and one or more **trigger categories**, then save the configuration. Choose the **service** each time you start a timer. Mite is disabled by default. Only the CMS administrator whose email is configured through `MASHA_OPERATOR_EMAIL` can access the tab, the general Mite timer button in the widget's first section, and timer functions. Other people can still use the board but do not see the Mite button or receive a Mite dialog.
 
 When you move an issue to a selected **trigger category** in the CMS board or change its status in the entry dialog, **Start Mite timer?** opens. It loads available projects and services and shows any currently running timer. **Start timer** creates a Mite time entry with the full issue description as its note, the selected project and service, and starts its tracker. The default project is preselected; choose a project and service for each start. Use **Mite timer** in the first section of the page widget to start general time tracking without a Feedly entry or stop a running timer. General entries use the note “Masha:Feedly – general time tracking” in Mite.
 
@@ -130,11 +135,11 @@ See the [project README](../../../README.md) for installation and PHP and JavaSc
 
 Effect delivery is optional. Without a reachable provider, Feedly plays a subtle local checkmark after a confirmed completion. This also applies when the catalogue is empty or an effect fails to load.
 
-For centrally managed animations, install the standalone Silverstripe **Masha:Effects** module on the same or another website. It manages categories, effects, files, and seasonal rules. Files stay private on the provider server. Feedly contains only the loader and fetches matching effects through a protected server proxy. Provider failure never blocks saving.
+For centrally managed animations, install the standalone Silverstripe **Masha:Suite Admin** module on the same or another website. It manages categories, effects, files, and seasonal rules. Files stay private on the provider server. Feedly contains only the loader and fetches matching effects through a protected server proxy. Provider failure never blocks saving.
 
-Set `MASHA_FEEDLY_EFFECTS_BASE_URL` in the Feedly website's server `.env` to the provider base address, for example `https://effects.example.org`; Feedly appends `/__masha-effects/manifest`. Without a fully configured provider, Feedly does not request an effect catalogue and uses the local checkmark effect. This also applies to CMS previews. Provider outages and empty catalogues do not block saving.
+Set `MASHA_PROVIDER_URL` in the Feedly website's server `.env` to the provider base address, for example `https://effects.example.org`; Feedly appends `/__masha-effects/manifest`. Without a fully configured provider, Feedly does not request an effect catalogue and uses the local checkmark effect. This also applies to CMS previews. Provider outages and empty catalogues do not block saving.
 
-For an external provider, set `MASHA_FEEDLY_EFFECTS_API_KEY` in the Feedly website's server `.env`. Generate the key in the provider CMS and keep it server-side. Browsers receive only local proxy URLs; the proxy checks login and Feedly access.
+For an external provider, set `MASHA_API_KEY` in the Feedly website's server `.env`. Generate the key in the provider CMS and keep it server-side. Browsers receive only local proxy URLs; the proxy checks login and Feedly access.
 
 ### External effect provider interface
 
@@ -175,7 +180,7 @@ Each file URL must be absolute, use the provider's same HTTPS host and base path
 
 In your profile and the final onboarding step, enable **Play animations without sound**. All effects remain available and play without music or other sounds, including previews in the Masha:Feedly configuration. Save to keep your preference. Reload configuration windows that were already open.
 
-The effect provider must also use the current Masha:Effects version: its JavaScript files must honour the `muted` option. Older provider files may still play sound even when the profile preference is correct.
+The effect provider must also use the current Masha:Suite Admin version: its JavaScript files must honour the `muted` option. Older provider files may still play sound even when the profile preference is correct.
 
 
 When switching between mobile and desktop layouts, Feedly closes its windows. Active onboarding returns to the welcome screen in the appropriate layout. Form input is preserved. Resizing within the same layout does not close windows.
@@ -192,7 +197,7 @@ Helply links are shown only when Helply provides the authorised Feedly help coll
 
 The host project includes ALL-INKL KAS setup instructions in `masha-cronjob/README.en.md` and a protected HTTP cron example in `masha-cronjob/all-inkl/run-masha-feedly-errors.php.example`. The guide covers a shared private website/CLI spool, the email filter and how KAS and Feedly intervals interact.
 
-The configured operator can enable capture under **Masha:Feedly → Configuration → Technical errors**. The account specified by `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` must exist and have administrator permissions. Every technical report is always assigned to this account. Only the operator and additionally selected people who also have general Feedly access can see technical reports.
+The configured operator can enable capture under **Masha:Feedly → Configuration → Technical errors**. The account specified by `MASHA_OPERATOR_EMAIL` must exist and have administrator permissions. Every technical report is always assigned to this account. Only the operator and additionally selected people who also have general Feedly access can see technical reports.
 
 Errors are grouped using a sanitised message and their origin. Variable numbers and UUIDs are normalised for matching. Details show the total count and first/last occurrence in UTC. New errors use existing new-report notifications. Resolved errors that recur reopen and use update notifications. Personal email preferences and the “My reports” scope still apply. Repetitions of open errors only increase the count, without comments or update emails.
 
@@ -236,3 +241,26 @@ Use **Show marked area** to close the report overlays and scroll to its visible 
 The report editor joins the list without an extra gap, including in the success state. All three panels use the same responsive widths; on phones the editor remains full screen.
 
 When a report moves from Done to Feedback, the highlighted explanation remains visible in the open report after saving, including when it was opened through a direct link.
+
+## Central provider content
+
+Feedly and Helply use local permissions independently of central module activation. In **Masha:Suite Admin → Customers**, **Allow Feedly provider content** controls only central effects, profile icons and email defaults. With shared credentials, content permission is checked before reading provider caches. Denied or unavailable content is not served; reports, configuration, local email delivery, reminders and error ingestion remain usable. Standalone local operation requires no central status request. Previously imported local text remains available.
+
+## Shared operator account
+
+In this host project, `app/_config.php` maps `MASHA_OPERATOR_EMAIL` to Feedly's `reporter_manager_emails` setting. If it is empty or unset, `MASHA_FEEDLY_REPORTER_MANAGER_EMAIL` remains a fallback. The shared variable takes precedence when both are populated. A separately configured `MASHA_FEEDLY_ESTIMATE_MANAGER_EMAIL` remains unchanged.
+
+Other Masha modules may reuse this name; it does not automatically grant rights in other modules. The account must already exist and still needs CMS administrator permissions. SMTP, widget membership and central Feedly access remain separate settings. Standalone Feedly installations can reproduce this project mapping without depending on the Masha:Suite host.
+
+```php
+$operatorEmail = trim((string) Environment::getEnv('MASHA_OPERATOR_EMAIL'));
+Config::modify()->set(
+    MashaFeedlyEntry::class,
+    'reporter_manager_emails',
+    $operatorEmail === '' ? [] : [$operatorEmail]
+);
+```
+
+Import `SilverStripe\Core\Environment`, `SilverStripe\Core\Config\Config` and `KW\MashaFeedly\Model\MashaFeedlyEntry` in the project code. Only map a configured address; use an empty list when no value is set.
+
+In **Configuration**, the action bar stays visible while scrolling. **Send test email** displays progress, success or failure directly in that bar without switching tabs. Unsaved form values are preserved and are not saved by sending a test email. Without JavaScript, feedback appears in the configuration form.

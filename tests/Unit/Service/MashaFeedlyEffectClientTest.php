@@ -29,7 +29,8 @@ class MashaFeedlyEffectClientTest extends SapphireTest
     protected function setUp(): void
     {
         parent::setUp();
-        foreach (['MASHA_FEEDLY_EFFECTS_API_KEY', 'MASHA_FEEDLY_EFFECTS_BASE_URL', 'MASHA_FEEDLY_EFFECTS_CA_FILE'] as $name) $this->previous[$name] = Environment::getEnv($name);
+        foreach (['MASHA_API_KEY', 'MASHA_PROVIDER_URL', 'MASHA_FEEDLY_EFFECTS_API_KEY', 'MASHA_FEEDLY_EFFECTS_BASE_URL', 'MASHA_FEEDLY_EFFECTS_CA_FILE'] as $name) $this->previous[$name] = Environment::getEnv($name);
+        Environment::setEnv('MASHA_API_KEY', '');
         Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', str_repeat('a', 64));
         Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', '');
         Environment::setEnv('MASHA_FEEDLY_EFFECTS_CA_FILE', '');
@@ -73,6 +74,37 @@ class MashaFeedlyEffectClientTest extends SapphireTest
         } finally {
             $config->set('base_url', $previousBase);
             $config->set('local_provider_base_url', $previousLocalBase);
+        }
+    }
+
+    /** Eine entzogene Inhaltsfreigabe gilt auch bei warmem Cache, ohne weitere Inhaltsabrufe. */
+    public function testDeniedProviderContentCannotReadWarmCache(): void
+    {
+        Environment::setEnv('MASHA_API_KEY', str_repeat('a', 64));
+        Environment::setEnv('MASHA_PROVIDER_URL', 'https://effects.example.test/tenant');
+        $injector = \SilverStripe\Core\Injector\Injector::inst();
+        $original = $injector->get(\KW\MashaConnect\ServiceAccess::class);
+        $access = new class extends \KW\MashaConnect\ServiceAccess {
+            public bool $allowed = true;
+            public function isAllowed(string $service): bool { return $service === 'effects' && $this->allowed; }
+        };
+        $injector->registerService($access, \KW\MashaConnect\ServiceAccess::class);
+        try {
+            $client = $this->client([new Response(200, ['Content-Type' => 'application/json'], json_encode($this->catalogue()))]);
+            $this->assertNotEmpty($client->manifest()['effects']);
+            $this->assertCount(1, $this->history);
+            $access->allowed = false;
+            foreach ([fn() => $client->manifest(), fn() => $client->avatarIcons(), fn() => $client->emailDefaults(), fn() => $client->storedAvatarIcon('person', 'black')] as $read) {
+                try {
+                    $read();
+                    $this->fail('Gesperrte Anbieterinhalte dürfen nicht aus dem Cache gelesen werden.');
+                } catch (RuntimeException $error) {
+                    $this->assertSame(403, $error->getCode());
+                }
+            }
+            $this->assertCount(1, $this->history);
+        } finally {
+            $injector->registerService($original, \KW\MashaConnect\ServiceAccess::class);
         }
     }
 

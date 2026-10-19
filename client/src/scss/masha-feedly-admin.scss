@@ -794,3 +794,30 @@
     transition: none;
   }
 }
+
+/* Das Formular scrollt unabhängig von der dauerhaft sichtbaren Aktionsleiste. */
+.cms form.masha-feedly-configuration {
+  display:flex; flex-direction:column; height:100%; max-height:100%; min-height:0; overflow:hidden !important; padding:0 !important;
+}
+.cms form.masha-feedly-configuration > fieldset {
+  flex:1 1 0; min-height:0; overflow:auto; padding:24px; margin:0;
+}
+.cms form.masha-feedly-configuration > .btn-toolbar {
+  position:relative; z-index:10; display:flex; flex:0 0 auto; flex-wrap:wrap; gap:10px;
+  margin:0; padding:14px 24px; border-top:1px solid #e3dce8; background:#fff;
+  box-shadow:0 -6px 20px rgb(39 35 49 / 7%);
+}
+.masha-feedly-email-test-feedback {
+  display:flex; align-items:center; gap:10px; flex:1 0 100%; padding:12px 16px;
+  border:1px solid #d9d2ed; border-radius:12px; background:#f5f1fc; color:#59447e;
+  font-size:14px; font-weight:600; overflow-wrap:anywhere;
+}
+.masha-feedly-email-test-feedback::before { content:"…"; font-size:22px; line-height:1; }
+.masha-feedly-email-test-feedback[data-state="success"] { border-color:#b9dec9; background:#edf8f1; color:#246644; }
+.masha-feedly-email-test-feedback[data-state="success"]::before { content:"✓"; }
+.masha-feedly-email-test-feedback[data-state="error"] { border-color:#ebc5c5; background:#fff2f1; color:#943838; }
+.masha-feedly-email-test-feedback[data-state="error"]::before { content:"!"; }
+@media(max-width:640px) {
+  .cms form.masha-feedly-configuration > fieldset { padding:16px; }
+  .cms form.masha-feedly-configuration > .btn-toolbar { padding:12px 16px; gap:8px; }
+}

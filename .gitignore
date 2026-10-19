@@ -10,3 +10,8 @@
 /composer.lock
 /app/
 /public/
+
+# Lokale Konfiguration und erzeugte Artefakte
+.phpunit.result.cache
+.phpunit.cache/
+.DS_Store

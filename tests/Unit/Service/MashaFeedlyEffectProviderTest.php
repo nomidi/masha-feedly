@@ -15,6 +15,22 @@ use SilverStripe\View\Requirements_Backend;
 /** Prüft die Anbieter-Konfiguration ohne Änderungen an der Projektdatenbank. */
 class MashaFeedlyEffectProviderTest extends SapphireTest
 {
+    private mixed $previousSharedKey;
+
+    /** Diese Altpfad-Fälle dürfen keinen gemeinsamen Zugang aus der Hostumgebung übernehmen. */
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->previousSharedKey = \SilverStripe\Core\Environment::getEnv('MASHA_API_KEY');
+        \SilverStripe\Core\Environment::setEnv('MASHA_API_KEY', '');
+    }
+
+    protected function tearDown(): void
+    {
+        \SilverStripe\Core\Environment::setEnv('MASHA_API_KEY', $this->previousSharedKey);
+        parent::tearDown();
+    }
+
     /** Ohne Anbieter erhält der Browser keine Abrufadresse und behält den lokalen Effekt-Loader. */
     public function testLoaderDoesNotAdvertiseManifestWithoutProvider(): void
     {

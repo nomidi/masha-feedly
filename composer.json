@@ -8,7 +8,8 @@
     "php": ">=8.3",
     "silverstripe/asset-admin": "^3.2",
     "silverstripe/cms": "^6.2",
-    "unclecheese/display-logic": "^4.0"
+    "unclecheese/display-logic": "^4.0",
+    "kooperativeweb/masha-connect": "^1.0"
   },
   "require-dev": {
     "phpunit/phpunit": "^11.3"
@@ -25,6 +26,8 @@
     }
   },
   "extra": {
-    "expose": ["client/dist"]
+    "expose": [
+      "client/dist"
+    ]
   }
 }

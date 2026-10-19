@@ -458,7 +458,7 @@ class MashaFeedlyEntry extends DataObject
         return (int)($createdEvent?->ActorMemberID ?? 0);
     }
 
-    /** Prüft die explizite Betreiberfreigabe; CMS-ADMIN-Rechte allein reichen absichtlich nicht. */
+    /** Prüft die lokale Betreiberzuordnung und CMS-ADMIN; Anbieterinhalte haben eine getrennte Freigabe. */
     public static function canManageReporter($member = null): bool
     {
         $member ??= Security::getCurrentUser();
@@ -470,7 +470,8 @@ class MashaFeedlyEntry extends DataObject
             return false;
         }
         $emails = array_map(static fn($email): string => mb_strtolower(trim((string)$email)), $emails);
-        return in_array(mb_strtolower(trim((string)$member->Email)), $emails, true);
+        return in_array(mb_strtolower(trim((string)$member->Email)), $emails, true)
+           ;
     }
 
     /** Nur der konfigurierte Betreiber darf Kostenschätzungen erfassen oder bearbeiten. */

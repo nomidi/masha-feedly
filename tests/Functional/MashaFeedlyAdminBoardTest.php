@@ -158,6 +158,51 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         ])->count());
     }
 
+    /** Ohne Anbieterzugang bleibt die Betreiber-Konfiguration erreichbar, aber Widget-Mitgliedschaft wird nicht vergeben. */
+    public function testStandaloneOperatorCanOpenConfigurationWithoutProvider(): void
+    {
+        $environment = [];
+        foreach (['MASHA_PROVIDER_URL', 'MASHA_API_KEY'] as $name) {
+            $environment[$name] = \SilverStripe\Core\Environment::getEnv($name);
+            \SilverStripe\Core\Environment::setEnv($name, '');
+        }
+        try {
+            $this->logInWithPermission('ADMIN');
+            $operator = Security::getCurrentUser();
+            Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$operator->Email]);
+            $this->assertTrue(MashaFeedlyEntry::canManageReporter($operator));
+            $this->assertTrue(MashaFeedlyAdmin::singleton()->canView($operator));
+            $this->assertFalse(MashaFeedlyConfigExtension::canUse($operator), 'Betreiberrechte vergeben keine Widget-Mitgliedschaft.');
+            $this->assertSame(200, $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig')->getStatusCode());
+            Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', []);
+            $this->assertFalse(MashaFeedlyAdmin::singleton()->canView($operator), 'CMS-ADMIN allein erlaubt auch ohne Anbieter keinen Feedly-Zugriff.');
+        } finally {
+            foreach ($environment as $name => $value) \SilverStripe\Core\Environment::setEnv($name, $value);
+        }
+    }
+
+    /** Gesperrte Anbieterinhalte sperren weder die lokale Betreiber-Konfiguration noch die lokale Mitgliedschaft. */
+    public function testDeniedProviderContentDoesNotBlockLocalFeedly(): void
+    {
+        $this->logInWithPermission('ADMIN');
+        $operator = Security::getCurrentUser();
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$operator->Email]);
+        $access = new class extends \KW\MashaConnect\ServiceAccess {
+            public function isAllowed(string $service): bool { return false; }
+        };
+        $injector = Injector::inst();
+        $original = $injector->get(\KW\MashaConnect\ServiceAccess::class);
+        $injector->registerService($access, \KW\MashaConnect\ServiceAccess::class);
+        try {
+            $this->assertTrue(MashaFeedlyEntry::canManageReporter($operator));
+            $this->assertTrue(MashaFeedlyAdmin::singleton()->canView($operator));
+            $this->assertFalse(MashaFeedlyConfigExtension::canUse($operator), 'Die lokale Mitgliederfreigabe wird nicht ersetzt.');
+            $this->assertSame(200, $this->get('/admin/masha-feedly/SilverStripe-SiteConfig-SiteConfig')->getStatusCode());
+        } finally {
+            $injector->registerService($original, \KW\MashaConnect\ServiceAccess::class);
+        }
+    }
+
     /** Ein CMS-Admin ohne passende Allowlist-E-Mail sieht den Tab nicht und kann den Schreib-Endpunkt nicht nutzen. */
     public function testCmsAdminWithoutReporterAllowlistCannotSeeTabOrSave(): void
     {
@@ -179,7 +224,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertSame(403, $emailTextsResponse->getStatusCode());
         $importResponse = $this->post('/admin/masha-feedly/email-texts/EditForm', [
             'SecurityID' => SecurityToken::getSecurityID(),
-            'action_importEffectNotificationTexts' => 'Texte aus Masha:Effects übernehmen',
+            'action_importEffectNotificationTexts' => 'Texte aus Masha:Suite Admin übernehmen',
         ]);
         $this->assertSame(403, $importResponse->getStatusCode());
         $saved = $this->post($url . '/saveReporter', [
@@ -707,7 +752,7 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         try {
             $response = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
                 'SecurityID' => SecurityToken::getSecurityID(),
-                'action_importEffectNotificationTexts' => 'Texte aus Masha:Effects übernehmen',
+                'action_importEffectNotificationTexts' => 'Texte aus Masha:Suite Admin übernehmen',
             ]);
             $this->assertSame(200, $response->getStatusCode());
             $config = MashaFeedlyConfigExtension::currentSiteConfig();
@@ -850,6 +895,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
                 'action_sendTestEmail' => 'Test-E-Mail senden',
             ]);
             $this->assertSame(200, $initialFailure->getStatusCode());
+            $this->assertStringContainsString('masha-feedly-configuration', $initialFailure->getBody());
+            $this->assertStringContainsString('action_saveConfiguration', $initialFailure->getBody());
             $this->assertFalse(MashaFeedlyConfigExtension::emailTestSucceeded());
             $this->assertCount(0, $mailer->messages);
 
@@ -877,6 +924,30 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             $this->assertStringNotContainsString('geheim', $failed->getBody());
             $this->assertCount(1, $mailer->messages);
             $this->assertTrue(MashaFeedlyConfigExtension::emailTestSucceeded());
+
+            // Die direkte Rückmeldung enthält weder ein anderes Formular noch SMTP-Zugangsdaten.
+            $headers = ['Accept' => 'application/json', 'X-Requested-With' => 'XMLHttpRequest'];
+            $ajaxFailure = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
+                'SecurityID' => SecurityToken::getSecurityID(), 'action_sendTestEmail' => '1',
+            ], $headers);
+            $failureData = json_decode($ajaxFailure->getBody(), true, flags: JSON_THROW_ON_ERROR);
+            $this->assertFalse($failureData['success']);
+            $this->assertStringNotContainsString('geheim', $failureData['message']);
+            $this->assertSame('private, no-store', $ajaxFailure->getHeader('Cache-Control'));
+            $this->assertCount(1, $mailer->messages);
+
+            $mailer->failure = null;
+            $savedAddress = (string)MashaFeedlyConfigExtension::currentSiteConfig()->MashaFeedlyAddress;
+            $ajaxSuccess = $this->post(html_entity_decode($matches[1], ENT_QUOTES | ENT_HTML5, 'UTF-8'), [
+                'SecurityID' => SecurityToken::getSecurityID(), 'action_sendTestEmail' => '1',
+                'MashaFeedlyAddress' => $savedAddress === 'du' ? 'sie' : 'du',
+            ], $headers);
+            $successData = json_decode($ajaxSuccess->getBody(), true, flags: JSON_THROW_ON_ERROR);
+            $this->assertTrue($successData['success']);
+            $this->assertStringContainsString((string)$admin->Email, $successData['message']);
+            $this->assertSame(['success', 'message'], array_keys($successData));
+            $this->assertSame($savedAddress, (string)MashaFeedlyConfigExtension::currentSiteConfig()->MashaFeedlyAddress);
+            $this->assertCount(2, $mailer->messages);
         } finally {
             $injector->registerService($originalMailer, MailerInterface::class);
         }

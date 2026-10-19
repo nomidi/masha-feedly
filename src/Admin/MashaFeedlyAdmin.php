@@ -137,7 +137,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     }
 
     /**
-     * Erlaubt den Bereich nur freigegebenen Mitgliedern oder dem konfigurierten Betreiberkonto.
+     * Erlaubt den Bereich lokal berechtigten Mitgliedern oder dem Betreiberkonto unabhängig von Anbieterinhalten.
      *
      * @param Member|null $member Zu prüfendes Silverstripe-Mitglied.
      * @return bool Gibt zurück, ob das Mitglied den Bereich öffnen darf.
@@ -343,7 +343,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     private function renderConfigurationIntro(bool $showErrors): string
     {
         $emailReady = MashaFeedlyConfigExtension::emailTestSucceeded();
-        $status = '<span class="masha-feedly-config-hero__status' . ($emailReady ? ' is-ready' : '') . '">'
+        $status = '<span data-masha-feedly-mail-status class="masha-feedly-config-hero__status' . ($emailReady ? ' is-ready' : '') . '">'
             . $this->escapeBoardValue($emailReady
                 ? self::translate('CONFIG_EMAIL_READY', 'Mailversand bereit')
                 : self::translate('CONFIG_EMAIL_PENDING', 'Mailtest ausstehend')) . '</span>';
@@ -420,11 +420,11 @@ class MashaFeedlyAdmin extends ModelAdmin
         )));
         $importAction = FormAction::create(
             'importEffectNotificationTexts',
-            self::translate('CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS', 'Texte aus Masha:Effects übernehmen')
+            self::translate('CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS', 'Texte aus Masha:Suite Admin übernehmen')
         )->setUseButtonTag(true)
             ->setButtonContent(
                 '<svg class="masha-feedly-email-action-icon" aria-hidden="true" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M16.5 8a6.5 6.5 0 1 0 1 4"/><path d="M16.5 3.5V8H12"/></svg>'
-                . '<span>' . $this->escapeBoardValue(self::translate('CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS', 'Texte aus Masha:Effects übernehmen')) . '</span>'
+                . '<span>' . $this->escapeBoardValue(self::translate('CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS', 'Texte aus Masha:Suite Admin übernehmen')) . '</span>'
             )->addExtraClass('btn-primary masha-feedly-email-text-import');
         $form = Form::create($this, 'EditForm', $fields, FieldList::create(
             FormAction::create('saveEmailTexts', self::translate('CONFIG_SAVE', 'E-Mail-Texte speichern'))->addExtraClass('btn-primary'),
@@ -1445,22 +1445,30 @@ class MashaFeedlyAdmin extends ModelAdmin
         if (!$request->isPOST() || !SecurityToken::inst()->checkRequest($request)) {
             $this->httpError(400);
         }
+        $success = false;
         try {
             MashaFeedlyNotificationService::sendTestEmail($member);
             $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
             $siteConfig->MashaFeedlyEmailTestSucceeded = true;
             $siteConfig->write();
-            $form->sessionMessage(self::translate('CONFIG_TEST_EMAIL_SENT', 'Test-E-Mail wurde an {email} gesendet.', ['email' => (string)$member->Email]), 'good');
+            $success = true;
+            $message = self::translate('CONFIG_TEST_EMAIL_SENT', 'Test-E-Mail wurde an {email} gesendet.', ['email' => (string)$member->Email]);
         } catch (\Throwable $exception) {
             error_log('[Masha:Feedly] Test-E-Mail fehlgeschlagen (' . get_class($exception) . '): ' . $exception->getMessage());
-            $form->sessionMessage(self::translate(
+            $message = self::translate(
                 'CONFIG_TEST_EMAIL_FAILED',
                 'Test-E-Mail fehlgeschlagen: {error}. Prüfe die Mailserver-Konfiguration und das PHP-Fehlerprotokoll.',
                 ['error' => self::emailTestErrorDetails($exception)]
-            ), 'bad');
+            );
         }
+        // Der direkte Versand erhält ungespeicherte Formulareingaben und wechselt keinen Reiter.
+        if (str_contains((string)$request->getHeader('Accept'), 'application/json')) {
+            return $this->jsonResponse(['success' => $success, 'message' => $message])
+                ->addHeader('Cache-Control', 'private, no-store');
+        }
+        $form->sessionMessage($message, $success ? 'good' : 'bad');
         return $this->getResponseNegotiator()->respond($request, [
-            'CurrentForm' => fn(): string => $this->getEmailTextsForm()->forTemplate(),
+            'CurrentForm' => fn(): string => $this->getEditForm()->forTemplate(),
         ]);
     }
 
@@ -1490,13 +1498,13 @@ class MashaFeedlyAdmin extends ModelAdmin
             $siteConfig->write();
             $form->sessionMessage(self::translate(
                 'CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS_DONE',
-                'Die Benachrichtigungstexte aus Masha:Effects wurden übernommen.'
+                'Die Benachrichtigungstexte aus Masha:Suite Admin wurden übernommen.'
             ), 'good');
         } catch (\Throwable $exception) {
-            error_log('[Masha:Feedly] Texte aus Masha:Effects konnten nicht übernommen werden (' . get_class($exception) . '): ' . $exception->getMessage());
+            error_log('[Masha:Feedly] Texte aus Masha:Suite Admin konnten nicht übernommen werden (' . get_class($exception) . '): ' . $exception->getMessage());
             $form->sessionMessage(self::translate(
                 'CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS_FAILED',
-                'Die Texte konnten nicht geladen werden. Prüfe die Verbindung zu Masha:Effects und versuche es erneut.'
+                'Die Texte konnten nicht geladen werden. Prüfe die Verbindung zu Masha:Suite Admin und versuche es erneut.'
             ), 'bad');
         }
 
