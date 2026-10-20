@@ -9,6 +9,7 @@ use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyComment;
 use SilverStripe\Control\Director;
 use SilverStripe\Control\Email\Email;
+use SilverStripe\Control\HTTP;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
 use SilverStripe\Admin\CMSProfileController;
@@ -25,6 +26,24 @@ use SilverStripe\i18n\i18n;
  */
 class MashaFeedlyNotificationService
 {
+    /**
+     * Öffnet eine Meldung an ihrem gespeicherten Ort über den bestehenden Widget-Direktlink.
+     * Ungültige oder fremde Orte fallen auf die geschützte CMS-Detailansicht zurück.
+     */
+    public static function entryURL(MashaFeedlyEntry $entry): string
+    {
+        $location = $entry->locationURL();
+        if ($location === '' || !Director::is_site_url($location)) {
+            return Director::absoluteURL(MashaFeedlyAdmin::singleton()->getCMSEditLinkForManagedDataObject($entry));
+        }
+        $url = HTTP::setGetVar('masha-feedly-entry', (string)(int)$entry->ID, Director::absoluteURL($location));
+        // Der CMS-Einstieg übernimmt beim Weiterleiten nur das Fragment zuverlässig.
+        if (preg_match('~/admin/?$~', (string)parse_url($url, PHP_URL_PATH))) {
+            $url = explode('#', $url, 2)[0] . '#masha-feedly-entry=' . (int)$entry->ID;
+        }
+        return $url;
+    }
+
     /**
      * Liefert Ersteller und aktuelle Zuständige für den persönlichen E-Mail-Bereich.
      * @param MashaFeedlyEntry $entry Betroffene Meldung.
@@ -236,7 +255,7 @@ class MashaFeedlyNotificationService
             return 0;
         }
 
-        $entryURL = Director::absoluteURL(MashaFeedlyAdmin::singleton()->getCMSEditLinkForManagedDataObject($entry));
+        $entryURL = self::entryURL($entry);
         $siteTitle = trim((string)SiteConfig::current_site_config()->Title) ?: 'Masha:Feedly';
         $sent = 0;
         foreach (Member::get()->filter('ID', $recipientIDs) as $member) {
@@ -307,9 +326,7 @@ class MashaFeedlyNotificationService
             return;
         }
 
-        $entryURL = Director::absoluteURL(
-            MashaFeedlyAdmin::singleton()->getCMSEditLinkForManagedDataObject($entry)
-        );
+        $entryURL = self::entryURL($entry);
         $descriptionHTML = (string)$entry->Content;
         $descriptionText = preg_replace('/<\\s*br\\s*\\/?\\s*>|<\\/\\s*(?:p|div|li|h[1-6])\\s*>/i', "\n", $descriptionHTML) ?? $descriptionHTML;
         $bugDescription = trim(html_entity_decode(strip_tags($descriptionText), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
@@ -380,9 +397,7 @@ class MashaFeedlyNotificationService
             return;
         }
 
-        $entryURL = Director::absoluteURL(
-            MashaFeedlyAdmin::singleton()->getCMSEditLinkForManagedDataObject($entry)
-        );
+        $entryURL = self::entryURL($entry);
         $siteTitle = trim((string)SiteConfig::current_site_config()->Title);
         $currentMemberID = (int)(Security::getCurrentUser()?->ID ?? 0);
         if ($siteTitle === '') {
@@ -440,7 +455,7 @@ class MashaFeedlyNotificationService
                 $items[] = [
                     'Title' => $entry->getTitle(),
                     'Summary' => $entry->errorSummary(),
-                    'URL' => Director::absoluteURL(MashaFeedlyAdmin::singleton()->getCMSEditLinkForManagedDataObject($entry)),
+                    'URL' => self::entryURL($entry),
                 ];
             }
             if (!$items) continue;
@@ -462,9 +477,7 @@ class MashaFeedlyNotificationService
         }
 
         $siteTitle = trim((string)SiteConfig::current_site_config()->Title) ?: 'Masha:Feedly';
-        $entryURL = Director::absoluteURL(
-            MashaFeedlyAdmin::singleton()->getCMSEditLinkForManagedDataObject($entry)
-        );
+        $entryURL = self::entryURL($entry);
         foreach (Member::get()->filter('ID', $recipientIDs) as $member) {
             if (
                 !$entry->canView($member)
@@ -509,9 +522,7 @@ class MashaFeedlyNotificationService
         }
 
         $siteTitle = trim((string)SiteConfig::current_site_config()->Title) ?: 'Masha:Feedly';
-        $entryURL = Director::absoluteURL(
-            Director::baseURL() . '?masha-feedly-entry=' . (int)$entry->ID
-        );
+        $entryURL = self::entryURL($entry);
         $sent = 0;
         foreach (Member::get()->filter('ID', $recipientIDs) as $member) {
             if (

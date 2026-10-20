@@ -377,6 +377,8 @@ en:
     ENV_USER_AGENT: 'User agent'
     ENTRY_MARKER_TITLE: '{category} · {title}'
     ENTRY_RECORDED_CONTEXT: 'Report'
+    BOARD_LABEL: 'Board'
+    BOARD_OPEN: 'Open report board: an overview of all accessible reports by status'
     FAQ_OPEN: 'FAQ: all features explained simply'
     OPEN_HELPLY: 'Open Helply'
     HELP_HELPLY_HINT: 'Find detailed answers in Helply.'

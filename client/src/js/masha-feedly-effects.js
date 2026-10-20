@@ -70,7 +70,7 @@
   const refresh = async () => (await refreshCatalogue()).effects;
 
   /** Begrenzt auch Datei-Ladevorgänge, damit ein ausgefallener Anbieter keine wartende Animation hinterlässt. */
-  const loadElement = (element, parent, timeout = 5000) => new Promise((resolve, reject) => {
+  const loadElement = (element, parent, timeout = 12000) => new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => { element.remove(); reject(new Error('Effekt-Datei lädt zu lange.')); }, timeout);
     element.addEventListener('load', () => { window.clearTimeout(timer); resolve(element); }, { once: true });
     element.addEventListener('error', () => { window.clearTimeout(timer); element.remove(); reject(new Error('Effekt-Datei konnte nicht geladen werden.')); }, { once: true });
@@ -216,7 +216,11 @@
         storePlayedIDs(theme, playedIDs);
         batch = chooseBatch(candidates, excludedIDs, random);
       }
-      await Promise.allSettled(batch.map((effect) => load(effect, document)));
+      // Höchstens zwei Effekte gleichzeitig: CSS und JavaScript erzeugen bereits je einen Proxy-Aufruf.
+      // So blockiert das Vorladen keine manuellen Aktionen hinter zwanzig gleichzeitigen PHP-Anfragen.
+      for (let offset = 0; offset < batch.length; offset += 2) {
+        await Promise.allSettled(batch.slice(offset, offset + 2).map((effect) => load(effect, document)));
+      }
       state.effects.push(...batch);
       return batch;
     })().finally(() => { state.refillPromise = null; });

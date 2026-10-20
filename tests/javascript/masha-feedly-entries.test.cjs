@@ -2858,3 +2858,13 @@ test('verwendet gleichnamige CMS-Felder nicht auf einer anderen Seite oder fremd
   assert.equal(entriesUI.entryIsOnPage(entry, 'https://feedly:8890/admin/pages/edit/show/41'), false);
   assert.equal(entriesUI.entryIsOnPage(entry, 'https://other.test/admin/pages/edit/show/44'), false);
 });
+
+
+test('öffnet eine gespeicherte Kostenschätzung mit aktueller Statusrolle und berücksichtigt erst danach eine Statusauswahl', () => {
+  const entry = {categoryID: 7, categoryRole: 'estimate_pending'};
+  const staleCategories = [{id: 7, systemKey: 'backlog'}, {id: 8, systemKey: 'estimate_approved'}];
+  assert.equal(entriesUI.estimateCategoryRole(entry, staleCategories), 'estimate_pending');
+  assert.equal(entriesUI.estimateCategoryRole(entry, staleCategories, '8'), 'estimate_approved');
+  assert.equal(entriesUI.estimateCategoryRole({categoryID: 7, categoryRole: 'restricted_estimate'}, staleCategories), 'restricted_estimate');
+  assert.equal(entriesUI.estimateCategoryRole(entry, staleCategories, '999'), '');
+});

@@ -2406,8 +2406,10 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
     &__rainbow,
     &__actions > :not(.kw-masha-feedly__add) { display: none !important; }
 
-    // Die Hilfe sitzt im Markup außerhalb des Aktionscontainers.
+    // Die Support-Gruppe liegt außerhalb der Aktionen; mobil bleibt dort ausschließlich die Kurzhilfe sichtbar.
     &__help-button { display: grid; }
+    &__support-buttons [data-masha-feedly-open-helply],
+    &__support-buttons [data-masha-feedly-open-board] { display: none !important; }
 
     &__onboarding-modal[data-masha-feedly-onboarding-welcome] {
       .kw-masha-feedly__onboarding-copy,
@@ -2474,9 +2476,17 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 }
 
 /* Ursprünglicher FAQ-Einstieg; Inhalte und Freigabe kommen von Helply. */
-.kw-masha-feedly__faq-button { display: grid; width: 60px; min-height: 60px; place-items: center; gap: 3px; padding: 8px; border: 1px solid $masha-color-efd3e2; border-radius: 14px; background: linear-gradient(135deg, $masha-color-fff7fb, $masha-color-fff); color: $masha-color-a91c62; font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; box-shadow: 0 4px 12px $masha-color-27233112; }
-.kw-masha-feedly__faq-button svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
-.kw-masha-feedly__faq-button:focus-visible { outline: 3px solid $masha-color-a91c62; outline-offset: 3px; }
+.kw-masha-feedly__faq-button, .kw-masha-feedly__board-button { display: grid; width: 60px; min-height: 60px; place-items: center; gap: 3px; padding: 8px; border: 1px solid $masha-color-efd3e2; border-radius: 14px; background: linear-gradient(135deg, $masha-color-fff7fb, $masha-color-fff); color: $masha-color-a91c62; font: inherit; font-size: 11px; font-weight: 750; cursor: pointer; box-shadow: 0 4px 12px $masha-color-27233112; }
+.kw-masha-feedly__faq-button svg, .kw-masha-feedly__board-button svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; }
+.kw-masha-feedly__faq-button:focus-visible, .kw-masha-feedly__board-button:focus-visible { outline: 3px solid $masha-color-a91c62; outline-offset: 3px; }
 
 /* Einheitliches dekoratives SVG für Link- und Öffnen-Aktionen. */
 .masha-link-icon { width: 1em; height: 1em; flex-shrink: 0; vertical-align: -0.125em; }
+
+/* Das Meldungsboard bleibt als kräftiger Navigationseinstieg unter der FAQ erkennbar. */
+.kw-masha-feedly .kw-masha-feedly__board-button {
+  background: linear-gradient(145deg, $masha-color-a91c62, $masha-color-713cff);
+  border-color: $masha-color-a91c62;
+  color: $masha-color-fff;
+  text-decoration: none;
+}

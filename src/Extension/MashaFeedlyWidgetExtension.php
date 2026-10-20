@@ -13,6 +13,7 @@ use SilverStripe\Core\Manifest\ModuleResourceLoader;
 use SilverStripe\i18n\i18n;
 use SilverStripe\Admin\CMSProfileController;
 use SilverStripe\CMS\Controllers\ContentController;
+use KW\MashaFeedly\Admin\MashaFeedlyAdmin;
 use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyPriority;
 use KW\MashaFeedly\Task\MashaFeedlyDueDateReminderTask;
@@ -102,6 +103,7 @@ class MashaFeedlyWidgetExtension extends Extension
             }
         }
         $markup = $this->owner->renderWith('KW/MashaFeedly/Includes/MashaFeedlyWidget', [
+            'BoardURL' => MashaFeedlyAdmin::singleton()->getLinkForModelClass(MashaFeedlyEntry::class),
             'WidgetDataURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'widgetData'),
             'CreateEntryURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'createEntry'),
             'EntryDetailsURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'entryDetails'),

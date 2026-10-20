@@ -13,6 +13,7 @@ function environment(effects = [definition()], options = {}) {
   let requests = 0;
   let failAsset = options.failAsset;
   const appended = [];
+  let activeAssets = 0, peakAssets = 0;
   const played = [];
   const timers = new Map();
   const listeners = {};
@@ -41,8 +42,10 @@ function environment(effects = [definition()], options = {}) {
   };
   const append = (element, root) => {
     appended.push({ element, root });
+    activeAssets++; peakAssets = Math.max(peakAssets, activeAssets);
     queueMicrotask(() => {
       if (options.keepPending) return;
+      activeAssets--;
       if (failAsset) { failAsset = false; element.events.error(); return; }
       if (element.tag === 'script') {
         const id = new URL(element.src).pathname.split('/').pop().split('.')[0];
@@ -65,7 +68,7 @@ function environment(effects = [definition()], options = {}) {
   };
   window.KWMashaFeedlyDOM = { root: () => shadow, widget: () => options.widget || null };
   vm.runInNewContext(source, { window, document, URL, AbortSignal, Date: class extends Date { static now() { return now; } }, console: { warn() {} } });
-  return { api: window.KWMashaFeedlyEffects, window, document, appended, played, listeners, timers, sessionStorage, requests: () => requests, expire: () => { now += 301000; } };
+  return { api: window.KWMashaFeedlyEffects, window, document, appended, played, listeners, timers, sessionStorage, peakAssets: () => peakAssets, requests: () => requests, expire: () => { now += 301000; } };
 }
 
 test('fragt ohne konfigurierte Manifest-Adresse keinen Anbieter ab', async () => {
@@ -137,6 +140,7 @@ test('lädt höchstens zehn Effekte vor und füllt den Pool bei einem verbleiben
     .filter(({ element }) => element.tag === 'script')
     .map(({ element }) => new URL(element.src).pathname));
   assert.equal(loadedBeforePlayback.size, 10);
+  assert.ok(env.peakAssets() <= 4, 'Höchstens zwei Effekte mit je CSS und JavaScript gleichzeitig laden.');
 
   for (let index = 0; index < 9; index++) {
     await env.api.playOnDone(env.document, env.window, '', 'playful', () => 0);

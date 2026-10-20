@@ -9,6 +9,7 @@ use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryHistory;
 use KW\MashaFeedly\Service\MashaFeedlyNotificationService;
 use SilverStripe\Core\Injector\Injector;
+use SilverStripe\Control\Director;
 use SilverStripe\Core\Environment;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\i18n\i18n;
@@ -37,6 +38,43 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->MashaFeedlyEmailTestSucceeded = true;
         $config->write();
+    }
+
+    /** Seitenpfad, vorhandene Parameter und Anker bleiben beim Direktlink erhalten. */
+    public function testEntryURLPreservesPageContext(): void
+    {
+        $entry = MashaFeedlyEntry::create([
+            'ID' => 123,
+            'PageURL' => '/kontakt?lang=de&masha-feedly-entry=9#formular',
+        ]);
+        $url = MashaFeedlyNotificationService::entryURL($entry);
+        $this->assertSame('/kontakt', parse_url($url, PHP_URL_PATH));
+        $this->assertSame('formular', parse_url($url, PHP_URL_FRAGMENT));
+        parse_str((string)parse_url($url, PHP_URL_QUERY), $params);
+        $this->assertSame(['lang' => 'de', 'masha-feedly-entry' => '123'], $params);
+
+        $entry->PageURL = Director::absoluteURL('/angebot');
+        $this->assertSame(
+            Director::absoluteURL('/angebot') . '?masha-feedly-entry=123',
+            MashaFeedlyNotificationService::entryURL($entry)
+        );
+    }
+
+    /** CMS-Einstiegslinks überstehen die Weiterleitung; fremde und ungültige Ziele bleiben gesperrt. */
+    public function testEntryURLHandlesAdminAndUnsafeLocations(): void
+    {
+        $entry = MashaFeedlyEntry::create(['ID' => 123, 'PageURL' => '/admin']);
+        $this->assertSame(
+            Director::absoluteURL('/admin') . '?masha-feedly-entry=123#masha-feedly-entry=123',
+            MashaFeedlyNotificationService::entryURL($entry)
+        );
+        foreach (['https://external.invalid/kontakt', 'javascript:alert(1)', '//external.invalid', ''] as $location) {
+            $entry->PageURL = $location;
+            $url = MashaFeedlyNotificationService::entryURL($entry);
+            $this->assertStringContainsString('/admin/masha-feedly/', $url);
+            $this->assertStringNotContainsString('external.invalid', $url);
+            $this->assertStringNotContainsString('javascript:', $url);
+        }
     }
 
     /** Der Bereich wirkt für alle Eintragsbenachrichtigungen und folgt aktuellen Zuweisungen. */
@@ -327,6 +365,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         try {
             $entry = MashaFeedlyEntry::create([
                 'Content' => 'Der Speichern-Button löst einen Fehler aus.',
+                'PageURL' => '/kontakt',
                 'EntryDate' => '2026-10-01',
                 'DueDate' => '2026-10-12',
                 'ReportedByID' => (int)$allowedMember->ID,
@@ -359,7 +398,8 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertStringContainsString('Verantwortlich:', (string)$message->getTextBody());
             $this->assertStringNotContainsString('Neue Meldung: Der Speichern-Button löst einen Fehler aus.', (string)$message->getTextBody());
             $this->assertStringContainsString('Meldung ansehen:', (string)$message->getTextBody());
-            $this->assertStringContainsString('/admin/masha-feedly/', (string)$message->getTextBody());
+            $this->assertStringContainsString('/kontakt?masha-feedly-entry=' . (int)$entry->ID, (string)$message->getTextBody());
+            $this->assertStringContainsString('/kontakt?masha-feedly-entry=' . (int)$entry->ID, (string)$message->getHtmlBody());
 
             $entry->Content = 'Aktualisierte Beschreibung';
             $entry->write();
@@ -547,7 +587,7 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
         $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$author->ID, (int)$assignee->ID]);
         $config->write();
 
-        $entry = MashaFeedlyEntry::create(['Content' => 'Fehler im Formular speichern.', 'EntryDate' => '2026-10-01']);
+        $entry = MashaFeedlyEntry::create(['Content' => 'Fehler im Formular speichern.', 'PageURL' => '/kontakt', 'EntryDate' => '2026-10-01']);
         $entry->write();
         $entry->AssignedMembers()->setByIDList([(int)$author->ID, (int)$assignee->ID, (int)$optedOut->ID]);
         $comment = MashaFeedlyComment::create([
@@ -576,7 +616,8 @@ class MashaFeedlyNotificationServiceTest extends SapphireTest
             $this->assertSame('Projekt Wolke: Neuer Kommentar zu Fehler im Formular speichern.', $message->getSubject());
             $this->assertStringContainsString('Erika Muster', (string)$message->getTextBody());
             $this->assertStringContainsString('Der Button bleibt deaktiviert.', (string)$message->getTextBody());
-            $this->assertStringContainsString('/admin/masha-feedly/', (string)$message->getTextBody());
+            $this->assertStringContainsString('/kontakt?masha-feedly-entry=' . (int)$entry->ID, (string)$message->getTextBody());
+            $this->assertStringContainsString('/kontakt?masha-feedly-entry=' . (int)$entry->ID, (string)$message->getHtmlBody());
 
             $assignee->MashaFeedlyEmailNotifications = false;
             $assignee->write();

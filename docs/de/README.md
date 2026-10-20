@@ -4,10 +4,10 @@
 
 Feedly kann vollständig ohne Masha:Connect installiert und betrieben werden. `composer require kooperativeweb/masha-feedly` zieht Connect nicht als Pflichtabhängigkeit nach. Meldungen, Kommentare, geschützte Anhänge, lokale E-Mails und die lokale Häkchen-Animation benötigen keinen Anbieter. Connect ist optional und kann separat per Git installiert werden; es wird nur für signierte zentrale Effekte, Profil-Icons und E-Mail-Standards verwendet. Ohne Anbieterzugang startet der Animationsloader keine Anbieterabfrage. Ist ein gemeinsamer Schlüssel eingerichtet, aber Connect fehlt, bleiben Anbieterinhalte gesperrt; lokale Funktionen bleiben nutzbar. Kein Rückfall auf alte Anbieterzugänge.
 
+
 ## Gemeinsamer Website-Zugang
 
 Aktuelle Kundenmodule verwenden einmal `MASHA_PROVIDER_URL` und `MASHA_API_KEY`; Prism zusätzlich einen lokalen `MASHA_ENCRYPTION_KEY`. Alle Dienste laufen auf kooperative-web.de. Im Anbieter unter **Website-Zugänge** die benötigten Dienste einzeln freigeben und für Promptly das KI-Konto ausdrücklich zuordnen. Alte modulspezifische Variablen sind nur noch ein Kompatibilitätsweg. Neu erzeugte Schlüssel benötigen das signierte Masha:Connect-Protokoll.
-
 
 Masha:Feedly ist ein gemeinsamer Fehler- und Feedback-Tracker direkt auf der Website. Berechtigte Personen können Meldungen anlegen, diskutieren und ihren Bearbeitungsstand nachverfolgen.
 
@@ -26,7 +26,6 @@ Die Testmails zeigen neben der Einleitung Beispielinhalte im tatsächlichen E-Ma
 Bei normalen Benachrichtigungen entscheidet die persönliche Anrede im Profil der empfangenden Person über Du oder Sie. Für die Willkommens-E-Mail gilt dagegen die Website-Vorgabe unter **Masha:Feedly → Konfiguration**. Meldungsdaten und Link ergänzt Masha:Feedly automatisch. Der gemeinsame Footer wird in diesem Tab gepflegt.
 
 Ist `MASHA_PROVIDER_URL` samt API-Schlüssel eingerichtet, übernimmt `dev/build` Texte aus Masha:Suite Admin nur in noch leere Felder. **Texte aus Masha:Suite Admin übernehmen** lädt sie nach ausdrücklichem Klick erneut und ersetzt die gespeicherten Willkommen- und Benachrichtigungstexte. Der Footer wird nicht mit diesem Knopf importiert. Masha:Suite Admin stellt die geschützten Standards unter `GET /__masha-effects/email-defaults` bereit; Feedly ruft den Endpunkt serverseitig mit `Authorization: Bearer …` ab. Die Antwort enthält `version`, `footer`, `welcome.du`/`welcome.sie` und die Varianten unter `notifications`. Die Einrichtung des Website-Zugangs und des API-Schlüssels ist in der Masha:Suite Admin-Anleitung beschrieben.
-
 
 Die CMS-Ansicht und ihr Menüpunkt sind ebenfalls nur für ausdrücklich ausgewählte Personen verfügbar. Die einzige Ausnahme ist das CMS-Admin-Konto mit der unter `MASHA_OPERATOR_EMAIL` konfigurierten E-Mail-Adresse; es kann die Modulkonfiguration auch ohne Zuordnung öffnen.
 
@@ -54,6 +53,8 @@ Die aktuelle Funktion schneidet das Bild zu; einzelne Stellen innerhalb des Auss
 
 ## Einträge finden und bearbeiten
 
+Im Feedly-Panel öffnet **Board** unter dem FAQ-Button das Meldungsboard im CMS. Dort siehst du alle für dich freigegebenen Meldungen nach Status. Beim Darüberfahren oder Tastaturfokus erklärt ein Hinweis das Ziel. Der Board-Link ist unabhängig von Helply verfügbar.
+
 Das Globus-Symbol öffnet offene Einträge der ganzen Website. Das Seitensymbol zeigt offene Einträge der aktuellen Seite. Die Schaltflächen für Neuigkeiten, Feedback und abgeschlossene Einträge öffnen jeweils die passende Liste. Neuigkeiten heben Einträge und Kommentare seit dem letzten Besuch hervor.
 
 In der Liste kannst du nach Kategorie, Priorität, Seite und Zuständigkeit filtern. Über **Filter** lassen sich persönliche Filterkombinationen speichern und später wieder auswählen. Öffne einen Eintrag, um Beschreibung, Browser- und Seitendetails, Kommentare, Anhänge, Verlauf und Zusammenhänge zu sehen. Status, Priorität und Zuständigkeiten werden nach **Änderungen speichern** übernommen.
@@ -80,6 +81,8 @@ Im Masha:Feedly-Bereich deines Profils kannst du Avatarbild und -farbe festlegen
 Der Footer erklärt außerdem, dass die Nachricht automatisch aufgrund deiner Benachrichtigungseinstellungen versendet wurde. Über den Link darin kannst du diese Einstellungen jederzeit ändern.
 
 Bei einer neuen Meldung nennt die E-Mail die Website und zeigt – sofern vorhanden – Meldeperson, Kategorie, Priorität, Fälligkeit und Zuständigkeit. Darunter steht der vollständige Beschreibungstext; der automatisch daraus gebildete Kurztitel wird nicht zusätzlich wiederholt.
+
+„Meldung ansehen“ öffnet die gespeicherte Ursprungsseite und die betreffende Meldung im Feedly-Widget. So gelangst du zur markierten Stelle. Das gilt auch für Kommentare, Änderungen, Erinnerungen und Kostenschätzungen. Die Anmeldung und die Feedly-Zugriffsrechte bleiben erforderlich. Bei fehlenden, ungültigen oder fremden Seitenadressen führt der Link zur geschützten CMS-Detailansicht. Bereits versendete E-Mails behalten ihren bisherigen Link.
 
 Die formatierte Einleitung für neue Meldungen, Änderungen, Kommentare, Fälligkeitserinnerungen und Kostenschätzungen kommt – sofern konfiguriert – vom Masha:Suite Admin-Anbieter. Dort gibt es pro Typ eine Du- und Sie-Fassung. Platzhalter wie `{title}` oder `{date}` werden sicher ersetzt. Angaben wie Meldungsdetails, Link und Footer bleiben feste Bestandteile der E-Mail. Für Willkommens- und Benachrichtigungs-E-Mails verwendet Masha:Feedly seine eingebauten Texte, wenn kein Anbieter erreichbar ist oder das jeweilige Textfeld leer ist. Der Footer kommt separat aus der Feedly-Konfiguration oder – falls dort leer – aus `MASHA_FEEDLY_EMAIL_FOOTER`.
 
@@ -181,11 +184,9 @@ Beispiel für ein Manifest:
 
 Jede Datei-URL muss absolut sein, denselben HTTPS-Host und Basispfad wie der Anbieter verwenden und dem Muster `/__masha-effects/file/{positive ID}/{64 kleingeschriebene Hex-Zeichen}/{js|css|image}` entsprechen. `{SHA256}` ist der SHA-256-Hash der unveränderten Dateibytes. Feedly folgt keinen Weiterleitungen und prüft URL, Dateihash und MIME-Typ. Erlaubte MIME-Typen sind `text/javascript` oder `application/javascript` für JavaScript, `text/css` für Stylesheets sowie `image/svg+xml`, `image/png`, `image/jpeg`, `image/webp` oder `image/gif` für Bilder. Ohne gültigen Schlüssel soll der Anbieter `403` liefern. Für geschützte Antworten werden `Cache-Control: private, no-store`, `Vary: Authorization` und `X-Content-Type-Options: nosniff` empfohlen.
 
-
 Im eigenen Profil und im letzten Schritt der Einführung kannst du **Animationen ohne Ton abspielen** aktivieren. Alle Effekte bleiben verfügbar und werden ohne Musik oder andere Töne wiedergegeben, auch in den Vorschauen der Masha:Feedly-Konfiguration. Die Auswahl wird beim Speichern übernommen. Bereits geöffnete Konfigurationsfenster danach neu laden.
 
 Der Effekt-Anbieter muss ebenfalls die aktuelle Masha:Suite Admin-Version verwenden: Seine JavaScript-Dateien müssen die Option `muted` berücksichtigen. Ältere Anbieterdateien können trotz korrekter Profileinstellung Ton abspielen.
-
 
 Beim Wechsel zwischen mobiler und Desktop-Ansicht schließen sich die Feedly-Fenster. Eine laufende Einführung zeigt wieder die Begrüßung in der passenden Größe. Formulareingaben bleiben erhalten. Größenänderungen innerhalb derselben Ansicht schließen keine Fenster.
 
@@ -196,6 +197,8 @@ Wenn eine andere Person „Erledigt“ auswählt, bleibt die Meldung offen im St
 Helply-Verweise werden nur angezeigt, wenn Helply die berechtigte Feedly-Hilfe auf der aktuellen Seite bereitstellt. Ohne Helply bleiben Buttons und Hinweise ausgeblendet.
 
 ## Automatisch erfasste technische Fehler
+
+Automatisch erfasste Systemmeldungen darf das konfigurierte Betreiberkonto direkt auf „Erledigt“ setzen, auch im CMS. Eine zusätzliche technische Lesefreigabe oder Zuständigkeit allein reicht dafür nicht. Tritt derselbe Fehler erneut auf, wird die Meldung wieder geöffnet. Änderungs-E-Mails folgen weiterhin den persönlichen Einstellungen; die handelnde Person erhält keine eigene Mail.
 
 Für die Einrichtung bei ALL-INKL stehen im Hostprojekt unter `masha-cronjob/README.md` KAS-Schritte und unter `masha-cronjob/all-inkl/run-masha-feedly-errors.php.example` ein geschütztes HTTP-Cronjob-Beispiel bereit. Die Anleitung erklärt außerdem die gemeinsame private Fehlerablage für Website und CLI, den E-Mail-Filter und das Zusammenspiel von KAS- und Feedly-Intervall.
 

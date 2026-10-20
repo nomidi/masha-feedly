@@ -377,6 +377,8 @@ de:
     ENV_USER_AGENT: 'Browserkennung'
     ENTRY_MARKER_TITLE: '{category} · {title}'
     ENTRY_RECORDED_CONTEXT: 'Meldung'
+    BOARD_LABEL: 'Board'
+    BOARD_OPEN: 'Meldungsboard öffnen: alle freigegebenen Meldungen nach Status im Überblick'
     FAQ_OPEN: 'FAQ: alle Funktionen einfach erklärt'
     OPEN_HELPLY: 'Helply öffnen'
     HELP_HELPLY_HINT: 'Die ausführlichen Antworten findest du in Helply.'

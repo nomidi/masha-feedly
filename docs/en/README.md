@@ -4,10 +4,10 @@
 
 Feedly can be installed and used entirely without Masha:Connect. `composer require kooperativeweb/masha-feedly` does not install Connect as a required dependency. Reports, comments, protected attachments, local email and the local checkmark animation need no provider. Connect is optional and can be installed separately using Git; it is used only for signed central effects, profile icons and email defaults. Without provider credentials, the animation loader sends no provider request. If shared credentials are configured but Connect is missing, provider content stays blocked while local features remain available. There is no fallback to legacy provider credentials.
 
+
 ## Shared website connection
 
 Current customer modules share `MASHA_PROVIDER_URL` and `MASHA_API_KEY`; Prism also uses an installation-local `MASHA_ENCRYPTION_KEY`. Services run on kooperative-web.de. Enable each service in the provider website access record and explicitly link the AI billing account for Promptly. Module-specific variables are a legacy compatibility path. Newly generated keys require signed Masha:Connect protocol 1.
-
 
 Masha:Feedly is a shared issue and feedback tracker built into your website. People with access can report problems, discuss them, and follow their progress.
 
@@ -26,7 +26,6 @@ Test messages show sample content in the email layout: new reports include the r
 For normal notifications, each recipient’s personal form of address in their profile selects Du or Sie. The website setting under **Masha:Feedly → Configuration** controls the welcome email. Feedly adds report details and links automatically. Edit the shared footer in this tab.
 
 If `MASHA_PROVIDER_URL` and its API key are configured, `dev/build` copies Masha:Suite Admin texts into empty fields only. **Replace with Masha:Suite Admin texts** fetches them again after an explicit click and replaces the saved welcome and notification texts. This button does not import the footer. Masha:Suite Admin provides protected defaults at `GET /__masha-effects/email-defaults`; Feedly calls it server-side with `Authorization: Bearer …`. The response contains `version`, `footer`, `welcome.du`/`welcome.sie`, and the variants under `notifications`. The provider configuration and website-key setup are documented in Masha:Suite Admin.
-
 
 The CMS view and its menu item also require explicit module access. The only exception is the CMS administrator whose email is configured through `MASHA_OPERATOR_EMAIL`; this account can open the module configuration without being selected.
 
@@ -54,6 +53,8 @@ The current tool crops the image; it cannot black out individual areas inside th
 
 ## Finding and updating entries
 
+In the Feedly panel, **Board** below the FAQ button opens the report board in the CMS. It shows all reports you can access, grouped by status. A tooltip explains the destination on hover or keyboard focus. The board link is available independently of Helply.
+
 The globe button opens open entries across the website. The page button shows open entries on the current page. The News, Feedback, and completed-entry buttons each open their corresponding list. News highlights entries and comments added since your last visit.
 
 Filter the list by category, priority, page, and assignee. Expand **Filters** to save a personal combination and select it again later. Open an entry to view its description, browser and page details, comments, attachments, history, and relationships. Status, priority, and assignee changes take effect when you select **Save changes**.
@@ -80,6 +81,8 @@ In the Masha:Feedly section of your profile, set your avatar and color, choose y
 
 The footer also explains that the message was sent automatically based on your notification settings. Use its link to change those settings at any time.
 New report emails name the website and, when available, show who reported the issue, its category, priority, due date, and assigned people. The full description follows; its automatically generated short title is not repeated separately.
+
+“View report” opens the saved source page and the report in the Feedly widget, taking you to the marked spot. This also applies to comments, updates, reminders and cost estimates. Login and Feedly access permissions are still required. Missing, invalid or external page addresses fall back to the protected CMS detail view. Previously sent emails retain their original links.
 
 Formatted introductions for new reports, updates, comments, due-date reminders, and estimate requests come from the Masha:Suite Admin provider when configured. Each type has Du and Sie variants. Placeholders such as `{title}` and `{date}` are replaced safely. Report details and links remain part of the email. Masha:Feedly uses its built-in welcome or notification text if no provider is available or the corresponding text field is empty. The footer is configured separately in Feedly, or comes from `MASHA_FEEDLY_EMAIL_FOOTER` when the CMS field is empty.
 
@@ -181,11 +184,9 @@ Example manifest:
 
 Each file URL must be absolute, use the provider's same HTTPS host and base path, and match `/__masha-effects/file/{positive ID}/{64 lowercase hexadecimal characters}/{js|css|image}`. `{SHA256}` is the SHA-256 hash of the exact file bytes. Feedly does not follow redirects and verifies the URL, file hash, and MIME type. Allowed MIME types are `text/javascript` or `application/javascript` for JavaScript, `text/css` for stylesheets, and `image/svg+xml`, `image/png`, `image/jpeg`, `image/webp`, or `image/gif` for images. The provider should return `403` without a valid key. `Cache-Control: private, no-store`, `Vary: Authorization`, and `X-Content-Type-Options: nosniff` are recommended for protected responses.
 
-
 In your profile and the final onboarding step, enable **Play animations without sound**. All effects remain available and play without music or other sounds, including previews in the Masha:Feedly configuration. Save to keep your preference. Reload configuration windows that were already open.
 
 The effect provider must also use the current Masha:Suite Admin version: its JavaScript files must honour the `muted` option. Older provider files may still play sound even when the profile preference is correct.
-
 
 When switching between mobile and desktop layouts, Feedly closes its windows. Active onboarding returns to the welcome screen in the appropriate layout. Form input is preserved. Resizing within the same layout does not close windows.
 
@@ -198,6 +199,8 @@ Categories, priorities and assignees are fetched when the widget is first opened
 Helply links are shown only when Helply provides the authorised Feedly help collection on the current page. Without Helply, its buttons and hints remain hidden.
 
 ## Automatically captured technical errors
+
+The configured operator can mark automatically captured system reports as Done directly, including in the CMS. Additional technical access or assignment alone does not grant this approval. If the same error recurs, the report reopens. Update emails still follow personal preferences; the person making the change receives no email about their own action.
 
 The host project includes ALL-INKL KAS setup instructions in `masha-cronjob/README.en.md` and a protected HTTP cron example in `masha-cronjob/all-inkl/run-masha-feedly-errors.php.example`. The guide covers a shared private website/CLI spool, the email filter and how KAS and Feedly intervals interact.
 

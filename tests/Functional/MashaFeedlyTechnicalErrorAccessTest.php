@@ -4,6 +4,7 @@ namespace KW\MashaFeedly\Tests\Functional;
 
 use KW\MashaFeedly\Extension\MashaFeedlyConfigExtension;
 use KW\MashaFeedly\Logging\MashaFeedlyErrorHandler;
+use KW\MashaFeedly\Model\MashaFeedlyCategory;
 use KW\MashaFeedly\Model\MashaFeedlyComment;
 use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Model\MashaFeedlyEntryRelation;
@@ -15,6 +16,7 @@ use SilverStripe\ORM\DB;
 use SilverStripe\Dev\FunctionalTest;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\SecurityToken;
+use SilverStripe\Security\Security;
 
 /** Prüft den technischen Zugriff über reale Controlleraufrufe statt nur über Modellmethoden. */
 class MashaFeedlyTechnicalErrorAccessTest extends FunctionalTest
@@ -78,6 +80,48 @@ class MashaFeedlyTechnicalErrorAccessTest extends FunctionalTest
             'SecurityID' => SecurityToken::getSecurityID(), 'EntryID' => $this->technical->ID, 'CommentText' => 'Unbefugt',
         ]);
         $this->assertSame(404, $response->getStatusCode());
+    }
+
+    /** Der Betreiber kann Systemmeldungen im Widget und CMS schließen, reine technische Freigaben reichen nicht. */
+    public function testOnlyConfiguredOperatorCanConfirmSystemReports(): void
+    {
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyErrorsMemberIDs = json_encode([$this->customer->ID]);
+        $config->write();
+        $this->technical->AssignedMembers()->add($this->customer);
+        $this->assertTrue($this->technical->canView($this->customer));
+        $this->assertFalse($this->technical->canConfirmCompletion($this->customer));
+
+        $this->logInWithPermission('ADMIN');
+        $operator = Security::getCurrentUser();
+        $this->assertInstanceOf(Member::class, $operator);
+        $this->assertFalse($this->technical->canConfirmCompletion($operator), 'ADMIN allein bestätigt keine Systemmeldung.');
+        Config::modify()->set(MashaFeedlyEntry::class, 'reporter_manager_emails', [(string)$operator->Email]);
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([$this->customer->ID, $operator->ID]);
+        $config->write();
+        $this->assertTrue($this->technical->canConfirmCompletion($operator));
+        $this->assertFalse($this->ordinary->canConfirmCompletion($operator), 'Die Betreiberrolle umgeht nicht die Bestätigung normaler Meldungen.');
+        MashaFeedlyCategory::ensureDefaultCategories();
+        $done = MashaFeedlyCategory::get()->filter('SystemKey', 'done')->first();
+        $this->assertNotNull($done);
+        $response = $this->post('/__masha-feedly/updateEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'EntryID' => (int)$this->technical->ID,
+            'CategoryID' => (int)$done->ID,
+        ]);
+        $this->assertSame(200, $response->getStatusCode());
+        $data = json_decode($response->getBody(), true);
+        $this->assertFalse($data['sentToFeedback']);
+        $this->assertTrue($data['categoryIsClosed']);
+        $this->assertSame((int)$done->ID, (int)MashaFeedlyEntry::get()->byID($this->technical->ID)->CategoryID);
+
+        // Ein anderer Übergang prüft zusätzlich den Modellschutz beim direkten Speichern im CMS.
+        $entry = MashaFeedlyEntry::get()->byID($this->technical->ID);
+        $entry->CategoryID = (int)MashaFeedlyCategory::defaultCategory()->ID;
+        $entry->write();
+        $entry->CategoryID = (int)$done->ID;
+        $entry->write();
+        $this->assertSame((int)$done->ID, (int)MashaFeedlyEntry::get()->byID($entry->ID)->CategoryID);
     }
 
     /** Verknüpfungen einer sichtbaren Meldung verraten keine technischen Titel oder IDs. */

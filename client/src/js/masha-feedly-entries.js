@@ -245,6 +245,21 @@ window.KWMashaFeedlyEntries = (() => {
     assignees: entry.assignees || [],
   });
 
+  /**
+   * Verwendet für den gespeicherten Status die aktuellen Details; nur bewusste Auswahländerungen lesen den Katalog.
+   * @param {{categoryID: number, categoryRole?: string}} entry Aktuell geladene Meldung.
+   * @param {{id: number, systemKey: string}[]} categories Sichtbarer Kategorienkatalog.
+   * @param {string|number|null} selectedCategoryID Ausdrücklich gewählter Zielstatus.
+   * @returns {string} Geschützte Statusrolle aus Serverdaten oder Kategorieauswahl.
+   */
+  const estimateCategoryRole = (entry, categories, selectedCategoryID = null) => {
+    const categoryID = selectedCategoryID ?? entry.categoryID;
+    const category = categories.find((item) => String(item.id) === String(categoryID));
+    return String(categoryID) === String(entry.categoryID)
+      ? entry.categoryRole || category?.systemKey || ''
+      : category?.systemKey || '';
+  };
+
   /** Formatiert Urheber und Erstellungszeit aus dem unveränderlichen Erstellungspunkt. */
   const entryCreationMeta = (entry) => {
     const creation = (entry?.history || []).find((item) => item?.type === 'created');
@@ -570,7 +585,7 @@ window.KWMashaFeedlyEntries = (() => {
     else if (offset < text.length) container.append(documentRef.createTextNode(text.slice(offset)));
   };
 
-  return { sortEntries, toggleSorting, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, renderCommentReactions, priorityIconSVG, resolveTarget, entryIsOnPage, targetIsVisible, revealTarget, observeTargets, createMarker, setActiveMarker, trackMarkers, celebrateCompletion, previewCompletionAnimation, trapFocus };
+  return { sortEntries, toggleSorting, filterByCategory, filterByPriority, relatedEntryOptions, renderRelationBadges, entryTargetURL, editableEntryData, estimateCategoryRole, entryCreationMeta, renderEntryCreatorAvatar, renderEnvironment, renderAssignees, renderHistory, renderLinks, renderCommentReactions, priorityIconSVG, resolveTarget, entryIsOnPage, targetIsVisible, revealTarget, observeTargets, createMarker, setActiveMarker, trackMarkers, celebrateCompletion, previewCompletionAnimation, trapFocus };
 })();
 
 /** Lädt Einträge, zeichnet Seitenmarkierungen und zeigt die filterbare Übersicht. */
@@ -946,14 +961,11 @@ document.addEventListener('DOMContentLoaded', () => {
     editPriorityIcon.hidden = false;
   };
 
-  const renderEstimate = (entry = activeEntry) => {
+  const renderEstimate = (entry = activeEntry, selectedCategoryID = null) => {
     if (!estimateSection || !entry || !editForm) return;
-    const categoryID = editForm.elements.CategoryID?.value || entry.categoryID;
-    const category = categories.find((item) => String(item.id) === String(categoryID));
-    const role = category?.systemKey || entry.categoryRole || '';
+    const role = window.KWMashaFeedlyEntries.estimateCategoryRole(entry, categories, selectedCategoryID);
     const relevant = ['estimate_pending', 'estimate_approved'].includes(role);
     estimateSection.hidden = !relevant;
-    if (!relevant) return;
     const transitionLocked = entry.categoryRole === 'estimate_pending';
     [...editForm.elements.CategoryID.options].forEach((option) => {
       const optionRole = categories.find((item) => String(item.id) === option.value)?.systemKey || '';
@@ -961,6 +973,7 @@ document.addEventListener('DOMContentLoaded', () => {
         || (optionRole === 'estimate_pending' && !entry.canManageEstimate);
     });
     estimateLock.hidden = !transitionLocked;
+    if (!relevant) return;
     const canEdit = Boolean(entry.canManageEstimate) && role === 'estimate_pending';
     const hasEstimate = Boolean(entry.estimateDuration);
     const amount = entry.estimateAmount
@@ -1223,7 +1236,7 @@ document.addEventListener('DOMContentLoaded', () => {
     target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
-  editForm?.elements.CategoryID?.addEventListener('change', () => renderEstimate(activeEntry));
+  editForm?.elements.CategoryID?.addEventListener('change', () => renderEstimate(activeEntry, editForm.elements.CategoryID.value));
   editForm?.elements.EstimatedCostDuration?.addEventListener('input', () => {
     if (!estimatePrice) return;
     estimatePrice.textContent = estimatePricePreview(editForm.elements.EstimatedCostDuration.value)

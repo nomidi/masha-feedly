@@ -436,15 +436,21 @@ class MashaFeedlyEntry extends DataObject
         return rtrim(mb_substr($plainText, 0, 69)) . '…';
     }
 
-    /** Prüft, wer den Abschluss bestätigen darf: Ersteller oder angezeigte Meldeperson.
+    /** Erlaubt den Abschluss durch Ersteller/Meldeperson, bei technischen Fehlern durch den konfigurierten Betreiber.
      * @param Member|null $member Prüfendes Mitglied.
      * @return bool Ob dieses Mitglied die Meldung endgültig abschließen darf.
      */
     public function canConfirmCompletion(?Member $member = null): bool
     {
         $member = $member ?? Security::getCurrentUser();
-        return $member instanceof Member && (int)$member->ID > 0
-            && in_array((int)$member->ID, [$this->creatorMemberID(), (int)$this->ReportedByID], true);
+        if (!$member instanceof Member || (int)$member->ID <= 0) {
+            return false;
+        }
+        // Systemmeldungen haben keine redaktionelle Meldeperson, die Feedback bestätigen könnte.
+        if ($this->ErrorFingerprint) {
+            return self::canManageReporter($member) && $this->canView($member);
+        }
+        return in_array((int)$member->ID, [$this->creatorMemberID(), (int)$this->ReportedByID], true);
     }
 
     /** Liefert die ursprüngliche Autorin aus dem unveränderlichen Erstellungseintrag im Verlauf. */
