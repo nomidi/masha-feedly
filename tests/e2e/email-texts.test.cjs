@@ -62,7 +62,23 @@ test('Konfiguration: Testmail bleibt im Reiter und erhält ungespeicherte Werte'
     const toolbar = form.locator(':scope > .btn-toolbar');
     const address = form.locator('select[name="MashaFeedlyAddress"]');
     const unsavedAddress = await address.inputValue() === 'du' ? 'sie' : 'du';
-    await address.selectOption(unsavedAddress);
+    // Chosen blendet das native Select aus; die sichtbare Auswahl wie eine Person bedienen.
+    const chosen = form.locator('#Form_EditForm_MashaFeedlyAddress_chosen');
+    const indices = await address.evaluate((select, value) => ({
+      current: select.selectedIndex,
+      target: [...select.options].findIndex(option => option.value === value),
+    }), unsavedAddress);
+    assert.ok(indices.target >= 0, 'Die alternative Anrede ist eine gültige Auswahl.');
+    await chosen.locator('.chosen-single').click();
+    await expect(chosen).toHaveClass(/chosen-with-drop/);
+    // Chosen fokussiert das Suchfeld und markiert den aktuellen Eintrag beim Öffnen.
+    // Pfeiltaste und Enter bedienen die Auswahl auch bei ausgeblendetem Suchfeld ohne Textselektor.
+    const direction = indices.target > indices.current ? 'ArrowDown' : 'ArrowUp';
+    for (let step = 0; step < Math.abs(indices.target - indices.current); step++) {
+      await page.keyboard.press(direction);
+    }
+    await page.keyboard.press('Enter');
+    await expect(address).toHaveValue(unsavedAddress);
     const url = page.url();
     let requests = 0;
     let success = true;

@@ -51,7 +51,34 @@ const openEntryList = async (page, widget) => {
   await dismissWelcome(page);
   const toggle = widget.locator('.kw-masha-feedly__toggle');
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
-  await widget.locator('[data-masha-feedly-open-page-list]').click();
+  const [response] = await Promise.all([
+    page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname.endsWith('/listEntries') && url.searchParams.get('mode') === 'page-open';
+    }, { timeout: 60000 }),
+    widget.locator('[data-masha-feedly-open-page-list]').click(),
+  ]);
+  const result = await response.json();
+  assert.equal(response.ok(), true, `Seitenliste: HTTP ${response.status()}`);
+  assert.equal(result.success, true);
+  return result;
+};
+
+/** Öffnet die Meldung erst nach bestätigtem Detailabruf; prüft anschließend den sichtbaren Editor. */
+const openEntry = async (page, widget, card, entryID, expect) => {
+  const [response] = await Promise.all([
+    page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname.endsWith('/entryDetails') && Number(url.searchParams.get('EntryID')) === entryID;
+    }, { timeout: 60000 }),
+    card.click(),
+  ]);
+  const result = await response.json();
+  assert.equal(response.ok(), true, `Meldungsdetails: HTTP ${response.status()}`);
+  assert.equal(result.success, true);
+  assert.equal(Number(result.entry.id), entryID);
+  await expect(widget.locator('[data-masha-feedly-edit-form]')).toBeVisible();
+  return result.entry;
 };
 
 test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechsel', {
@@ -102,7 +129,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     await openEntryList(superadminPage, superadminWidget);
     const superadminCard = superadminWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
     await expect(superadminCard).toBeVisible({ timeout: 30000 });
-    await superadminCard.click();
+    await openEntry(superadminPage, superadminWidget, superadminCard, entryID, expect);
 
     const editForm = superadminWidget.locator('[data-masha-feedly-edit-form]');
     await expect(editForm).toBeVisible();
@@ -147,7 +174,9 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     const reviewerCard = managerWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
     await expect(reviewerCard).toBeVisible({ timeout: 30000 });
     await expect(reviewerCard.locator('.kw-masha-feedly__entry-estimate-status')).toHaveAttribute('aria-label', /Kostenschätzung wartet auf Freigabe/u);
-    await reviewerCard.click();
+    const reviewerDetails = await openEntry(managerPage, managerWidget, reviewerCard, entryID, expect);
+    assert.equal(reviewerDetails.categoryRole, 'estimate_pending');
+    assert.equal(reviewerDetails.estimateDuration, '2–4 Stunden');
     const reviewerForm = managerWidget.locator('[data-masha-feedly-edit-form]');
     const reviewerEstimate = reviewerForm.locator('[data-masha-feedly-estimate]');
     await expect(reviewerEstimate).toBeVisible();
@@ -176,12 +205,7 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     await memberPage.reload();
     const refreshedMemberWidget = memberPage.locator('[data-kw-masha-feedly]');
     await refreshedMemberWidget.waitFor({ state: 'attached' });
-    await openEntryList(memberPage, refreshedMemberWidget);
-    const listResponsePromise = memberPage.waitForResponse((response) =>
-      new URL(response.url()).pathname.endsWith('/listEntries') && response.request().method() === 'GET');
-    await refreshedMemberWidget.locator('[data-masha-feedly-open-page-list]').click();
-    const listResponse = await listResponsePromise;
-    const listResult = await listResponse.json();
+    const listResult = await openEntryList(memberPage, refreshedMemberWidget);
     assert.equal(listResult.canManageEstimate, false);
     const protectedEntry = listResult.entries.find((entry) => Number(entry.id) === entryID);
     assert.ok(protectedEntry, 'Das normale Mitglied sieht seinen Eintrag weiterhin.');
@@ -193,7 +217,10 @@ test('Kostenschätzung: Berechtigung, Preisberechnung, Freigabe und Statuswechse
     const memberCard = refreshedMemberWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
     await expect(memberCard).toBeVisible({ timeout: 30000 });
     await expect(memberCard).toContainText(approvedTitle);
-    await memberCard.click();
+    const memberDetails = await openEntry(memberPage, refreshedMemberWidget, memberCard, entryID, expect);
+    for (const field of ['estimateAmount', 'estimateAmountMax', 'estimateDuration', 'estimateCurrency', 'estimateNote']) {
+      assert.equal(Object.hasOwn(memberDetails, field), false, `Auch Details dürfen ${field} nicht preisgeben.`);
+    }
     const memberEditForm = refreshedMemberWidget.locator('[data-masha-feedly-edit-form]');
     await expect(memberEditForm.locator('[data-masha-feedly-estimate]')).toHaveCount(0);
     const memberCategorySelect = memberEditForm.locator('[name="CategoryID"]');

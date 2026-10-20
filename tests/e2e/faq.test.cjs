@@ -42,7 +42,7 @@ test('Helply: Feedly-Kurzhilfe öffnet die Helply-Sammlung und übergibt Fragen'
     await page.goto(config.baseURL);
     const widget = page.locator('[data-kw-masha-feedly]');
     await widget.locator('.kw-masha-feedly__toggle').click();
-    const faqButton = widget.locator('.kw-masha-feedly__support-buttons .kw-masha-feedly__faq-button');
+    const faqButton = widget.locator('.kw-masha-feedly__support-buttons button[data-masha-feedly-open-helply]');
     await expect(faqButton).toBeVisible();
     await faqButton.click();
     const directDialog = page.getByRole('dialog', { name: /Schritt für Schritt|Make sense of every step/ });

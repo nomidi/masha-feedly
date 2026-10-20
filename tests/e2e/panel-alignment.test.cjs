@@ -14,8 +14,10 @@ for (const browserName of ['chromium', 'firefox', 'webkit']) {
       const page = await browser.newPage();
       for (const width of [1920, 1440, 1024, 641, 640, 390]) {
         await page.setViewportSize({width, height: 900});
-        await page.setContent(`<style>${stylesheet}</style><div data-masha-feedly-surface><div id="widget" class="kw-masha-feedly" data-theme="playful" data-panel-open="true" data-edit-open="true" data-list-open="true" data-success-visible="false"><div class="kw-masha-feedly__panel"></div><div class="kw-masha-feedly__entries-modal"><section class="kw-masha-feedly__entries-dialog"></section></div><div class="kw-masha-feedly__edit-modal"><section class="kw-masha-feedly__edit-dialog"></section></div></div></div>`);
-        const measure = () => page.evaluate(() => {
+        await page.setContent(`<style>${stylesheet}</style><div data-masha-feedly-surface><div id="widget" class="kw-masha-feedly" data-theme="playful" data-panel-open="true" data-edit-open="true" data-list-open="true" data-success-visible="false"><div class="kw-masha-feedly__panel"></div><div class="kw-masha-feedly__modal kw-masha-feedly__entries-modal"><section class="kw-masha-feedly__entries-dialog"></section></div><div class="kw-masha-feedly__modal kw-masha-feedly__edit-modal"><section class="kw-masha-feedly__edit-dialog"></section></div></div></div>`);
+        const measure = () => page.evaluate(async () => {
+          // Die beiden Fächer fahren unterschiedlich lange ein; nur abgeschlossene Zustände vergleichen.
+          await Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => {})));
           const rect = (selector) => {
             const bounds = document.querySelector(selector).getBoundingClientRect();
             return {left: bounds.left, right: bounds.right, width: bounds.width};

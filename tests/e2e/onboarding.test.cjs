@@ -19,6 +19,45 @@ const config = {
 };
 const missingConfig = Object.entries(config).filter(([, value]) => !value).map(([name]) => name);
 
+/** Wartet auf die tatsächliche Bilddatei; sichtbare Lazy-Bilder werden zuerst in den Ausschnitt gescrollt. */
+const waitForLoadedImage = async (image, responses = new Map()) => {
+  await image.scrollIntoViewIfNeeded();
+  try {
+    await image.evaluate(element => new Promise((resolve, reject) => {
+      let timer;
+      const cleanup = () => {
+        clearTimeout(timer);
+        element.removeEventListener('load', loaded);
+        element.removeEventListener('error', failed);
+      };
+      const loaded = () => {
+        cleanup();
+        if (element.naturalWidth > 0) resolve();
+        else reject(new Error('Die Profil-Icon-Datei enthält kein darstellbares Bild.'));
+      };
+      const failed = () => {
+        cleanup();
+        reject(new Error('Die Profil-Icon-Datei konnte nicht geladen werden: ' + element.getAttribute('src')));
+      };
+      if (element.complete && element.getAttribute('src')) {
+        if (element.naturalWidth > 0) resolve();
+        else failed();
+        return;
+      }
+      element.addEventListener('load', loaded, {once: true});
+      element.addEventListener('error', failed, {once: true});
+      timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('Die Profil-Icon-Datei wurde innerhalb von 60 Sekunden nicht geladen: ' + element.getAttribute('src')));
+      }, 60000);
+    }));
+  } catch (error) {
+    const url = await image.getAttribute('src');
+    const diagnostic = await responses.get(url);
+    throw new Error(error.message + (diagnostic ? ` (${diagnostic})` : ' (keine HTTP-Antwort erfasst)'));
+  }
+};
+
 test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung und Abschluss', {
   skip: missingConfig.length ? `E2E-Konfiguration fehlt: ${missingConfig.join(', ')}` : false,
 }, async () => {
@@ -26,8 +65,21 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ ignoreHTTPSErrors: true });
   const page = await context.newPage();
+  const iconResponses = new Map();
+  page.on('response', response => {
+    if (!new URL(response.url()).pathname.startsWith('/__masha-feedly-effects/icon/')) return;
+    iconResponses.set(response.url(), (async () => {
+      if (response.ok()) return `HTTP ${response.status()}`;
+      const body = await response.text().catch(() => '');
+      const reason = body === 'Zugriff verweigert.' ? 'Anmeldung oder lokale Mitgliederfreigabe fehlt'
+        : body === 'Zentrale Feedly-Inhalte nicht freigegeben.' ? 'Zentrale Freigabe oder Freigabeabruf fehlgeschlagen'
+        : 'Icon-Endpunkt hat die Datei abgelehnt';
+      return `HTTP ${response.status()}: ${reason}`;
+    })());
+  });
   const unique = `E2E Onboarding ${new Date().toISOString()} ${Math.random().toString(36).slice(2, 7)}`;
   const comment = `E2E Kommentar aus dem Onboarding zu ${unique}`;
+  let cleanupOnboarding = null;
 
   try {
     await page.goto(new URL('/Security/login', config.baseURL).toString());
@@ -38,6 +90,11 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
 
     const widget = page.locator('[data-kw-masha-feedly]');
     await expect(widget).toBeAttached();
+    // Browser-Fehler dürfen das gemeinsam verwendete Testkonto nicht in einer offenen Tour zurücklassen.
+    cleanupOnboarding = {
+      url: new URL(await widget.getAttribute('data-onboarding-url'), config.baseURL).href,
+      securityID: await widget.getAttribute('data-security-id'),
+    };
     // Das Testkonto muss in den Masha:Feedly-Einstellungen freigeschaltet sein.
     // Ein noch offener Erststartdialog wird geschlossen, bevor der Hilfeneustart getestet wird.
     const firstWelcome = widget.locator('[data-masha-feedly-onboarding-welcome]');
@@ -79,12 +136,30 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     assert.ok(Number(created.entryID) > 0, 'Der Server liefert eine Eintrags-ID zurück.');
     await expect(tip).toContainText('Schritt 5 von 8');
 
+    const pageListResponse = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname.endsWith('/listEntries') && url.searchParams.get('mode') === 'page-open';
+    });
     await widget.locator('[data-masha-feedly-open-page-list]').click();
+    const pageList = await pageListResponse;
+    const pageListData = await pageList.json();
+    assert.equal(pageList.ok(), true, 'Die Seitenliste muss erfolgreich geladen werden.');
+    assert.ok(pageListData.entries.some(entry => Number(entry.id) === Number(created.entryID)), 'Die Seitenliste enthält die neue Meldung.');
     await expect(tip).toContainText('Schritt 6 von 8');
     const card = widget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${created.entryID}"]`);
-    await expect(card).toBeVisible();
+    await expect(card).toBeVisible({ timeout: 30000 });
     await expect(card).toContainText(unique);
-    await card.click();
+    const [detailsResponse] = await Promise.all([
+      page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return url.pathname.endsWith('/entryDetails') && Number(url.searchParams.get('EntryID')) === Number(created.entryID);
+      }, { timeout: 60000 }),
+      card.click(),
+    ]);
+    const details = await detailsResponse.json();
+    assert.equal(detailsResponse.ok(), true, `Meldung öffnen: HTTP ${detailsResponse.status()}`);
+    assert.equal(details.success, true);
+    assert.equal(Number(details.entry.id), Number(created.entryID));
     await expect(widget.locator('[data-masha-feedly-edit-modal]')).toBeVisible();
     await expect(tip).toContainText('Schritt 7 von 8');
 
@@ -196,7 +271,7 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
         await preferences.locator('[data-masha-feedly-avatar-icon-open]').click();
         await expect(preferences.locator('[data-masha-feedly-avatar-icon-dialog]')).toBeVisible();
         const icon = preferences.locator('[data-masha-feedly-avatar-icons] [role="tabpanel"]:visible img').first();
-        await expect.poll(() => icon.evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+        await waitForLoadedImage(icon, iconResponses);
         const channels = colorField.inputValue().then((value) => value.match(/[\da-f]{2}/gi).map((channel) => Number.parseInt(channel, 16)));
         const [red, green, blue] = await channels;
         const expectedIconVariant = ['#35A98F', '#69B85A'].includes((await colorField.inputValue()).toUpperCase())
@@ -208,7 +283,7 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
         const selectedIconID = await selectedIcon.getAttribute('data-icon-id');
         await selectedIcon.click();
         await expect(avatarPreview.locator('img')).toHaveAttribute('src', new RegExp(`/icon/${selectedIconID}/[^/]+/${expectedIconVariant}$`));
-        await expect.poll(() => avatarPreview.locator('img').evaluate(image => image.complete && image.naturalWidth > 0)).toBe(true);
+        await waitForLoadedImage(avatarPreview.locator('img'), iconResponses);
         await expect(avatarPreview.locator('img')).toHaveCSS('padding', '12px');
         const liveIconSize = await avatarPreview.locator('img').boundingBox();
         assert.ok(liveIconSize.width <= 48 && liveIconSize.height <= 48, 'Ein neu gewähltes Symbol muss in der kompakten Vorschau bleiben.');
@@ -273,8 +348,17 @@ test('führt das Onboarding aus der Hilfe durch Eintrag, Kommentar, Bearbeitung 
     }
 
   } finally {
-    await context.close();
-    await browser.close();
+    try {
+      if (cleanupOnboarding) {
+        const response = await context.request.post(cleanupOnboarding.url, {
+          form: { SecurityID: cleanupOnboarding.securityID, Deferred: '0' },
+        });
+        assert.equal(response.ok(), true, 'Die Einführung des Testkontos muss auch nach Fehlern beendet werden.');
+      }
+    } finally {
+      await context.close();
+      await browser.close();
+    }
   }
 });
 
@@ -312,7 +396,12 @@ for (const browserName of ['chromium', 'firefox', 'webkit']) {
       const welcome = widget.locator('[data-masha-feedly-onboarding-welcome]');
       const openTour = async (width, height) => {
         await page.setViewportSize({ width: 1280, height: 900 });
-        await widget.locator('.kw-masha-feedly__toggle').click();
+        if (await welcome.isVisible()) {
+          await welcome.locator('[data-masha-feedly-tour-end]').click();
+          await expect(welcome).toBeHidden();
+        }
+        const toggle = widget.locator('.kw-masha-feedly__toggle');
+        if (await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
         await widget.locator('[data-masha-feedly-open-help]').click();
         await widget.locator('[data-masha-feedly-restart-onboarding]').click();
         await expect(welcome).toBeVisible();
@@ -347,6 +436,8 @@ for (const browserName of ['chromium', 'firefox', 'webkit']) {
       const content = panel.locator('.kw-masha-feedly__content');
       await expect(content.locator('button:visible')).toHaveCount(2);
       await expect(content.locator('[data-masha-feedly-start-selection]')).toBeVisible();
+      await expect(content.locator('.kw-masha-feedly__support-buttons [data-masha-feedly-open-helply]')).toBeHidden();
+      await expect(content.locator('[data-masha-feedly-open-board]')).toBeHidden();
       await content.locator('[data-masha-feedly-open-help]').click();
       await expect(widget.locator('.kw-masha-feedly__help-mobile')).toBeVisible();
       await expect(widget.locator('.kw-masha-feedly__help-mobile')).toContainText('unten rechts');

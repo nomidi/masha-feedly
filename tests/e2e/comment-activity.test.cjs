@@ -35,6 +35,21 @@ const signIn = async (page, baseURL, email, password) => {
   assert.notEqual(await widget.getAttribute('data-onboarding-enabled'), '1', 'Für die E2E-Testkonten muss die Einführung abgeschlossen sein.');
 };
 
+/** Wartet auf den durch eine Aktion gestarteten Abruf und prüft den echten Servererfolg vor UI-Assertions. */
+const performFeedlyRequest = async (page, action, click, matches = () => true) => {
+  const [response] = await Promise.all([
+    page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname.endsWith('/' + action) && matches(url, response);
+    }, { timeout: 60000 }),
+    click(),
+  ]);
+  const result = await response.json();
+  assert.equal(response.ok(), true, `${action}: HTTP ${response.status()}`);
+  assert.equal(result.success, true, `${action}: Der Server bestätigt den Abruf.`);
+  return result;
+};
+
 test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten und wird beim Öffnen gelesen', {
   skip: missingConfig.length ? `E2E-Konfiguration fehlt: ${missingConfig.join(', ')}` : false,
 }, async () => {
@@ -60,7 +75,7 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     const createForm = creatorWidget.locator('[data-masha-feedly-entry-form]');
     await expect(createForm).toBeVisible();
     await createForm.locator('[name="Content"]').fill(unique);
-    await expect(createForm.locator('[name="AssignedMemberIDs[]"]').first()).toBeAttached();
+    await expect(createForm.locator('[name="AssignedMemberIDs[]"]')).toHaveCount(0);
     const image = {
       name: 'e2e-anlage.png',
       mimeType: 'image/png',
@@ -121,7 +136,23 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     await expect(commenterCard).toHaveAttribute('data-entry-unread', 'true');
     const commenterUnreadCount = Number(await commenterWidget.locator('[data-masha-feedly-unread-count]').textContent());
     assert.ok(commenterUnreadCount > 0, 'Der neue Eintrag muss im Neuigkeiten-Zähler erscheinen.');
-    await commenterCard.click();
+    // Das Öffnen lädt Details und bestätigt anschließend den Lesestand. Die UI allein quittiert keinen Erfolg.
+    const [detailsResponse, readResponse] = await Promise.all([
+      commenterPage.waitForResponse(response => {
+        const url = new URL(response.url());
+        return url.pathname.endsWith('/entryDetails') && Number(url.searchParams.get('EntryID')) === entryID;
+      }, { timeout: 60000 }),
+      commenterPage.waitForResponse(response => response.request().method() === 'POST'
+        && new URL(response.url()).pathname.endsWith('/markEntryRead'), { timeout: 60000 }),
+      commenterCard.click(),
+    ]);
+    const detailsResult = await detailsResponse.json();
+    const readResult = await readResponse.json();
+    assert.equal(detailsResponse.ok(), true, `Meldungsdetails: HTTP ${detailsResponse.status()}`);
+    assert.equal(detailsResult.success, true);
+    assert.equal(Number(detailsResult.entry.id), entryID);
+    assert.equal(readResponse.ok(), true, `Lesebestätigung: HTTP ${readResponse.status()}`);
+    assert.equal(readResult.success, true);
     await expect(commenterCard).not.toHaveAttribute('data-entry-unread', 'true');
     await expect(commenterWidget.locator('[data-masha-feedly-edit-attachments] img')).toBeVisible();
     await expect(commenterWidget.locator('[data-masha-feedly-unread-count]'))
@@ -188,16 +219,31 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
 
     await creatorPage.reload();
     const reloadedCreatorWidget = creatorPage.locator('[data-kw-masha-feedly]');
-    await reloadedCreatorWidget.locator('.kw-masha-feedly__toggle').click();
+    // Der Zähler startet im HTML mit 0. Erst die Listen-Antwort liefert den tatsächlichen Neuigkeitenstand.
+    const initialNews = await performFeedlyRequest(creatorPage, 'listEntries',
+      () => reloadedCreatorWidget.locator('.kw-masha-feedly__toggle').click(),
+      url => url.searchParams.get('mode') === 'page');
+    assert.ok(initialNews.unreadCount > 0, 'Der Ersteller erhält ungelesene Aktivität nach dem fremden Kommentar.');
     const newsButton = reloadedCreatorWidget.locator('[data-masha-feedly-open-news]');
     const unreadCount = newsButton.locator('[data-masha-feedly-unread-count]');
     await expect(unreadCount).not.toHaveText('0');
     const unreadBeforeOpen = Number(await unreadCount.textContent());
-    await newsButton.click();
+    const news = await performFeedlyRequest(creatorPage, 'listEntries', () => newsButton.click(),
+      url => url.searchParams.get('mode') === 'unread');
+    assert.ok(news.entries.some(entry => Number(entry.id) === entryID && entry.isUnread), 'Die kommentierte Meldung steht ausdrücklich ungelesen in den Neuigkeiten.');
     const unreadCard = reloadedCreatorWidget.locator(`[data-masha-feedly-entries-list] [data-entry-id="${entryID}"]`);
     await expect(unreadCard).toBeVisible({ timeout: 30000 });
     await expect(unreadCard.locator('[data-entry-unread]')).toBeVisible();
-    await unreadCard.click();
+    const readConfirmation = creatorPage.waitForResponse(response => response.request().method() === 'POST'
+      && new URL(response.url()).pathname.endsWith('/markEntryRead'), { timeout: 60000 });
+    const [opened, creatorReadResponse] = await Promise.all([
+      performFeedlyRequest(creatorPage, 'entryDetails', () => unreadCard.click(),
+        url => Number(url.searchParams.get('EntryID')) === entryID),
+      readConfirmation,
+    ]);
+    assert.equal(Number(opened.entry.id), entryID);
+    assert.equal(creatorReadResponse.ok(), true, 'Die Lesebestätigung wurde erfolgreich gespeichert.');
+    assert.equal((await creatorReadResponse.json()).success, true);
     await expect(reloadedCreatorWidget.locator('[data-masha-feedly-comments]')).toContainText(commentText);
     await expect.poll(async () => Number(await unreadCount.textContent()))
       .toBeLessThan(unreadBeforeOpen);
@@ -233,7 +279,9 @@ test('Kommentar eines zweiten Benutzers erscheint beim Ersteller in Neuigkeiten 
     await react('😂');
     assert.equal(await comment.locator('.kw-masha-feedly__comment-reaction-summary [data-reaction-emoji="😂"]').count(), 0, 'Ein erneuter Klick entfernt die eigene Reaktion.');
     const historyDetails = reloadedCreatorWidget.locator('.kw-masha-feedly__history');
+    // Reaktionsantworten enthalten bereits den aktuellen Verlauf; beim Öffnen ist kein weiterer Abruf nötig.
     await historyDetails.locator('summary').click();
+    await expect(historyDetails).toHaveAttribute('open', '');
     const historyList = historyDetails.locator('[data-masha-feedly-history]');
     await expect(historyList).toContainText('Reaktion auf Kommentar geändert: Keine Reaktion → ❤️');
     await expect(historyList).toContainText('Reaktion auf Kommentar geändert: ❤️ → 😂');

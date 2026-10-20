@@ -168,10 +168,13 @@ test('Profil: Avatarfarbe und stumme CMS-Vorschau bleiben nach dem Speichern erh
 test('Effekt-Anbieter: Feedly-Proxy lädt den externen Katalog und spielt im Shadow Root', { skip: missing.length ? `E2E-Konfiguration fehlt: ${missing.join(', ')}` : false }, async () => {
   const { chromium, expect } = require('@playwright/test');
   const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+  const context = await browser.newContext({ ignoreHTTPSErrors: true, reducedMotion: 'no-preference' });
   const page = await context.newPage();
-  const errors = [];
+  const errors = [], effectWarnings = [];
   page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => {
+    if (message.type() === 'warning' && message.text().startsWith('[Masha:Feedly]')) effectWarnings.push(message.text());
+  });
   try {
     await page.goto(new URL('/Security/login', config.BASE_URL).href);
     await page.locator('input[type="email"], input[name$="Email"]').first().fill(config.SUPERADMIN_EMAIL);
@@ -202,7 +205,7 @@ test('Effekt-Anbieter: Feedly-Proxy lädt den externen Katalog und spielt im Sha
       const recordID = new URL(effect.files.js).pathname.match(/\/file\/(\d+)\//)?.[1];
       return { id: effect.id, name: effect.name, recordID, played: !!playback, cancelled: count, styles, css: effect.files.css, url: effect.files.js };
     });
-    assert.ok(result.played, `Effekt ${result.id} muss laufen.`);
+    assert.ok(result.played, `Effekt ${result.id} muss laufen. ${effectWarnings.join("; ")}`);
     assert.ok(result.cancelled > 0);
     if (result.css) assert.ok(result.styles.includes(result.css));
     assert.match(result.url, /\/__masha-feedly-effects\/file\/\d+\/[a-f0-9]{64}\/js$/);
