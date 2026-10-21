@@ -52,9 +52,24 @@ class LanguageFileParityTest extends SapphireTest
     {
         foreach (['de', 'en'] as $language) {
             $catalogue = Yaml::parseFile(dirname(__DIR__, 2) . '/lang/' . $language . '.yml')[$language];
-            self::assertSame(['KW\\MashaFeedly\\Translations'], array_keys($catalogue));
+            self::assertSame(['KW\\MashaFeedly\\Translations', 'KW\\MashaFeedly\\Admin\\ModuleIntro'], array_keys($catalogue));
             foreach (['TOUR_THANKS_TEXT', 'PROFILE_THEME_DESCRIPTION', 'PROFILE_ICON_CLEAR', 'ESTIMATE_REVIEW_HELP', 'RELATIONS_HELP', 'REPORTER_USE_CREATOR'] as $key) {
                 self::assertArrayHasKey($key, $catalogue['KW\\MashaFeedly\\Translations']);
+            }
+        }
+    }
+
+    /** Auch der neue Moduleinstieg muss vollständig übersetzt sein und echte Katalogtexte verwenden. */
+    public function testModuleinstiegHatDieselbenSchluesselUndAufloesbareTexte(): void
+    {
+        $namespace = 'KW\\MashaFeedly\\Admin\\ModuleIntro';
+        $keys = ['TITLE', 'DESCRIPTION', 'HELP', 'HELP_UNAVAILABLE'];
+        foreach (['de' => 'de_DE', 'en' => 'en_US'] as $language => $locale) {
+            $catalogue = Yaml::parseFile(dirname(__DIR__, 2) . '/lang/' . $language . '.yml')[$language][$namespace];
+            self::assertSame($keys, array_keys($catalogue));
+            foreach ($catalogue as $key => $text) {
+                self::assertSame($text, i18n::with_locale($locale,
+                    static fn (): string => i18n::_t($namespace . '.' . $key, 'MISSING')));
             }
         }
     }

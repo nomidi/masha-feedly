@@ -2,8 +2,15 @@
   "schema": 1,
   "module": "feedly",
   "package": "kooperativeweb/masha-feedly",
-  "version": "1.0.0-dev.7",
+  "version": "1.0.0-dev.8",
   "changes": [
+    {
+      "version": "1.0.0-dev.8",
+      "date": "2026-10-21",
+      "kind": "fixed",
+      "de": "Übersetzungsprüfungen berücksichtigen die eigene Sprache des Moduleinstiegs.",
+      "en": "Translation checks cover the module introduction’s own catalogue."
+    },
     {
       "version": "1.0.0-dev.7",
       "date": "2026-10-21",
