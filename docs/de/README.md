@@ -1,5 +1,9 @@
 # Masha:Feedly verwenden
 
+## Scrollen in Meldungen
+
+Lange Beschreibungen und das Bearbeitungsfenster lassen sich mit Mausrad, Trackpad und auf Touchscreens scrollen. Feedly nimmt seinen gesamten Widget-Bereich automatisch von Lenis-Scrollanimationen der Website aus. Das gilt auch beim Öffnen einer Meldung über ihren Direktlink; zusätzliche Lenis-Einstellungen sind dafür nicht nötig.
+
 ## Eigenständig ohne Connect
 
 Feedly kann vollständig ohne Masha:Connect installiert und betrieben werden. `composer require kooperativeweb/masha-feedly` zieht Connect nicht als Pflichtabhängigkeit nach. Meldungen, Kommentare, geschützte Anhänge, lokale E-Mails und die lokale Häkchen-Animation benötigen keinen Anbieter. Connect ist optional und kann separat per Git installiert werden; es wird nur für signierte zentrale Effekte, Profil-Icons und E-Mail-Standards verwendet. Ohne Anbieterzugang startet der Animationsloader keine Anbieterabfrage. Ist ein gemeinsamer Schlüssel eingerichtet, aber Connect fehlt, bleiben Anbieterinhalte gesperrt; lokale Funktionen bleiben nutzbar. Kein Rückfall auf alte Anbieterzugänge.

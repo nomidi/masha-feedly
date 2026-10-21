@@ -15,6 +15,10 @@ The interface uses “report” for issues and change requests. Under **Open pro
 
 The plus and save buttons stay pink in both appearances. The news button has a light background without a dark rectangle behind the NEW icon.
 
+## Scrolling reports
+
+Long descriptions and the edit dialog support scrolling with a mouse wheel, trackpad and touch. Feedly automatically excludes its entire widget from the website’s Lenis scrolling animations. This also applies when opening a report through its direct link; no additional Lenis configuration is required.
+
 ## Access and setup
 
 Administrators open **Masha:Feedly → Configuration** in the CMS. Settings are grouped on one page into **General**, **Access & appearance**, **Reminders & estimates**, and **Reset data**. Email templates and the footer are in the separate **Email texts** tab. Only the CMS administrator configured through `MASHA_OPERATOR_EMAIL` can see and use that tab and its actions. Select the people allowed to use the module under **Access & appearance**. Administrators also need explicit access to see the widget. Under **General**, set the form of address, font size, and website default effect category. New installations default to **Playful**. Each allowed member can choose a different category in their profile. The categories for initial status, completion, and approval are required; their names can be customised.

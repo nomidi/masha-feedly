@@ -72,6 +72,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!widget) return;
   const host = document.createElement('div');
   host.setAttribute('data-masha-feedly-host', '');
+  // Der Host liegt auch bei Shadow-DOM-Ereignissen im äußeren Ereignispfad.
+  // Lenis soll Dialoge und Listen nativ scrollen lassen statt die Hintergrundseite zu bewegen.
+  host.setAttribute('data-lenis-prevent', '');
   const root = host.attachShadow({ mode: 'open' });
   const stylesheet = document.createElement('link');
   stylesheet.rel = 'stylesheet';
