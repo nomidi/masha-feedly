@@ -2,8 +2,15 @@
   "schema": 1,
   "module": "feedly",
   "package": "kooperativeweb/masha-feedly",
-  "version": "1.0.0-dev.8",
+  "version": "1.0.0-dev.9",
   "changes": [
+    {
+      "version": "1.0.0-dev.9",
+      "date": "2026-10-21",
+      "kind": "fixed",
+      "de": "Icon-Auswahlprüfung isoliert gemeinsame und ältere Anbieterzugänge vollständig.",
+      "en": "Icon picker regression fully isolates shared and legacy provider credentials."
+    },
     {
       "version": "1.0.0-dev.8",
       "date": "2026-10-21",

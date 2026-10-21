@@ -358,10 +358,16 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         $previousURL = Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL');
         $previousKey = Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY');
         $previousBase = MashaFeedlyEffectProvider::config()->get('base_url');
+        $previousSharedKey = Environment::getEnv('MASHA_API_KEY');
+        $previousLocalBase = MashaFeedlyEffectProvider::config()->get('local_provider_base_url');
         try {
+            // Auch einen gemeinsamen Host-Zugang und den lokalen Anbieterpfad isolieren.
+            Environment::setEnv('MASHA_API_KEY', '');
+            Config::modify()->set(MashaFeedlyEffectProvider::class, 'local_provider_base_url', '');
             Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', '');
             Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', '');
             Config::modify()->set(MashaFeedlyEffectProvider::class, 'base_url', '');
+            $this->assertFalse(MashaFeedlyEffectClient::hasConfiguredProvider());
             $member = $this->objFromFixture(Member::class, 'allowed');
             $this->allowMember($member);
             $this->logInAs($member);
@@ -373,6 +379,8 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
             $this->assertSame('white', MashaFeedlyMemberExtension::iconColorForAvatarColor('#35A98F'));
             $this->assertSame('white', MashaFeedlyMemberExtension::iconColorForAvatarColor('#69b85a'));
         } finally {
+            Environment::setEnv('MASHA_API_KEY', $previousSharedKey);
+            Config::modify()->set(MashaFeedlyEffectProvider::class, 'local_provider_base_url', $previousLocalBase);
             Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', $previousURL);
             Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', $previousKey);
             Config::modify()->set(MashaFeedlyEffectProvider::class, 'base_url', $previousBase);
