@@ -280,4 +280,4 @@ Central host-root entry scripts: `masha-cronjob/run-feedly-errors.php` and `mash
 
 New, updated and commented entry notifications, reminders and estimates place the entry link in a consistent button below the content. The link opens the saved original page with the entry ID; Feedly uses its saved page location. Plain-text emails contain the full address instead.
 
-With Masha:Admin installed, Suite interfaces can share Proxima Nova from the operator-supplied Adobe Fonts kit. Admin remains optional; existing fallback fonts are retained without shared typography. Local version metadata is stored in `masha-release.json`.
+Interfaces use their existing CMS or fallback fonts without an external font kit. Local version metadata is stored in `masha-release.json`.

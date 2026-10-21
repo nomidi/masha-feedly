@@ -276,4 +276,4 @@ Zentrale Cron-Einstiege im Hostroot: `masha-cronjob/run-feedly-errors.php` und `
 
 Benachrichtigungen zu neuen, geänderten und kommentierten Meldungen sowie Erinnerungen und Schätzungen zeigen den Meldungslink unten als einheitlichen Button. Der Link öffnet die gespeicherte Originalseite mit Meldungskennung; Feedly verwendet deren gespeicherten Seitenbereich. Reine Textmails enthalten stattdessen die vollständige Adresse.
 
-Die Suite kann bei installiertem Masha:Admin zentral Proxima Nova aus dem Betreiber-Adobe-Fonts-Kit verwenden. Das Modul benötigt Admin weiterhin nicht; ohne gemeinsame Schrift bleibt die bisherige Ersatzschrift aktiv. Der lokale Versionsstand steht in `masha-release.json`.
+Die Oberflächen verwenden ihre bisherigen CMS- bzw. Ersatzschriften ohne externes Schrift-Kit. Der lokale Versionsstand steht in `masha-release.json`.

@@ -2,8 +2,15 @@
   "schema": 1,
   "module": "feedly",
   "package": "kooperativeweb/masha-feedly",
-  "version": "1.0.0-dev",
+  "version": "1.0.0-dev.1",
   "changes": [
+    {
+      "version": "1.0.0-dev.1",
+      "date": "2026-10-21",
+      "kind": "fixed",
+      "de": "Externe Schrift-Einbindung entfernt; vorhandene CMS- und Ersatzschriften bleiben aktiv.",
+      "en": "Removed external font loading; existing CMS and fallback fonts remain active."
+    },
     {
       "version": "1.0.0-dev",
       "date": "2026-10-21",
