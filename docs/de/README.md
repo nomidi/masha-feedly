@@ -200,7 +200,7 @@ Helply-Verweise werden nur angezeigt, wenn Helply die berechtigte Feedly-Hilfe a
 
 Automatisch erfasste Systemmeldungen darf das konfigurierte Betreiberkonto direkt auf „Erledigt“ setzen, auch im CMS. Eine zusätzliche technische Lesefreigabe oder Zuständigkeit allein reicht dafür nicht. Tritt derselbe Fehler erneut auf, wird die Meldung wieder geöffnet. Änderungs-E-Mails folgen weiterhin den persönlichen Einstellungen; die handelnde Person erhält keine eigene Mail.
 
-Für die Einrichtung bei ALL-INKL stehen im Hostprojekt unter `masha-cronjob/README.md` KAS-Schritte und unter `masha-cronjob/all-inkl/run-masha-feedly-errors.php.example` ein geschütztes HTTP-Cronjob-Beispiel bereit. Die Anleitung erklärt außerdem die gemeinsame private Fehlerablage für Website und CLI, den E-Mail-Filter und das Zusammenspiel von KAS- und Feedly-Intervall.
+Für die Einrichtung bei ALL-INKL stehen im Hostprojekt unter `masha-cronjob/README.md` KAS-Schritte und unter `masha-cronjob/run-feedly-errors.php` ein geschütztes HTTP-Cronjob-Beispiel bereit. Die Anleitung erklärt außerdem die gemeinsame private Fehlerablage für Website und CLI, den E-Mail-Filter und das Zusammenspiel von KAS- und Feedly-Intervall.
 
 Unter **Masha:Feedly → Konfiguration → Technische Fehler** kann das konfigurierte Betreiberkonto die Erfassung aktivieren. Das Konto aus `MASHA_OPERATOR_EMAIL` muss vorhanden sein und Administratorrechte besitzen. Jede technische Meldung wird immer diesem Konto zugewiesen. Nur dieses Konto und zusätzlich ausgewählte, allgemein für Feedly freigegebene Personen dürfen technische Meldungen sehen.
 
@@ -267,3 +267,5 @@ Config::modify()->set(
 Im Projektcode dafür `SilverStripe\Core\Environment`, `SilverStripe\Core\Config\Config` und `KW\MashaFeedly\Model\MashaFeedlyEntry` importieren. Nur eine tatsächlich konfigurierte Adresse zuordnen; bei leerem Wert eine leere Liste verwenden.
 
 Unter **Konfiguration** bleibt die Aktionsleiste beim Scrollen sichtbar. **Test-E-Mail senden** zeigt Versandfortschritt, Erfolg oder Fehler direkt in dieser Leiste und wechselt keinen Reiter. Ungespeicherte Formulareingaben bleiben erhalten und werden durch den Testversand nicht gespeichert. Ohne JavaScript erscheint die Rückmeldung im Konfigurationsformular.
+
+Zentrale Cron-Einstiege im Hostroot: `masha-cronjob/run-feedly-errors.php` und `masha-cronjob/run-feedly-reminders.php`. Anleitung: `masha-cronjob/README.md`. Der gemeinsame Erfolgsmarker für den KAS-Mailfilter ist `MashaCronOK`; alte eigene Skripte und Cron-Einträge nach Umstellung deaktivieren.

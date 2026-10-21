@@ -202,7 +202,7 @@ Helply links are shown only when Helply provides the authorised Feedly help coll
 
 The configured operator can mark automatically captured system reports as Done directly, including in the CMS. Additional technical access or assignment alone does not grant this approval. If the same error recurs, the report reopens. Update emails still follow personal preferences; the person making the change receives no email about their own action.
 
-The host project includes ALL-INKL KAS setup instructions in `masha-cronjob/README.en.md` and a protected HTTP cron example in `masha-cronjob/all-inkl/run-masha-feedly-errors.php.example`. The guide covers a shared private website/CLI spool, the email filter and how KAS and Feedly intervals interact.
+The host project includes ALL-INKL KAS setup instructions in `masha-cronjob/README.en.md` and a protected HTTP cron example in `masha-cronjob/run-feedly-errors.php`. The guide covers a shared private website/CLI spool, the email filter and how KAS and Feedly intervals interact.
 
 The configured operator can enable capture under **Masha:Feedly → Configuration → Technical errors**. The account specified by `MASHA_OPERATOR_EMAIL` must exist and have administrator permissions. Every technical report is always assigned to this account. Only the operator and additionally selected people who also have general Feedly access can see technical reports.
 
@@ -271,3 +271,5 @@ Config::modify()->set(
 Import `SilverStripe\Core\Environment`, `SilverStripe\Core\Config\Config` and `KW\MashaFeedly\Model\MashaFeedlyEntry` in the project code. Only map a configured address; use an empty list when no value is set.
 
 In **Configuration**, the action bar stays visible while scrolling. **Send test email** displays progress, success or failure directly in that bar without switching tabs. Unsaved form values are preserved and are not saved by sending a test email. Without JavaScript, feedback appears in the configuration form.
+
+Central host-root entry scripts: `masha-cronjob/run-feedly-errors.php` and `masha-cronjob/run-feedly-reminders.php`. See `masha-cronjob/README.en.md`. The shared KAS email-filter success marker is `MashaCronOK`; disable old custom scripts and cron entries after migration.
