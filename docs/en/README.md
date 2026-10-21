@@ -280,4 +280,4 @@ Central host-root entry scripts: `masha-cronjob/run-feedly-errors.php` and `mash
 
 New, updated and commented entry notifications, reminders and estimates place the entry link in a consistent button below the content. The link opens the saved original page with the entry ID; Feedly uses its saved page location. Plain-text emails contain the full address instead.
 
-Interfaces use their existing CMS or fallback fonts without an external font kit. Local version metadata is stored in `masha-release.json`.
+Admin can provide Plus Jakarta Sans locally in the CMS. The widget only inherits an existing CSS font variable; Feedly never registers font files or a font stylesheet. Existing fallback typography remains without shared fonts. Local version metadata is stored in `masha-release.json`.

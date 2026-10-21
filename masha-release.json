@@ -2,8 +2,15 @@
   "schema": 1,
   "module": "feedly",
   "package": "kooperativeweb/masha-feedly",
-  "version": "1.0.0-dev.1",
+  "version": "1.0.0-dev.2",
   "changes": [
+    {
+      "version": "1.0.0-dev.2",
+      "date": "2026-10-21",
+      "kind": "improved",
+      "de": "Bereits vorhandene Suite-Schrift übernehmen, ohne eigenen Schrift-Download.",
+      "en": "Use an already available Suite font without registering font downloads."
+    },
     {
       "version": "1.0.0-dev.1",
       "date": "2026-10-21",

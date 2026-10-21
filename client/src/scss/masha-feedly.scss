@@ -568,7 +568,8 @@ $masha-breakpoint-mobile-landscape-short: 520px;
   all: initial;
   display: contents;
   color: $masha-color-272331;
-  font: 16px/1.5 Arial, sans-serif;
+  /* Nur vorhandene Suite-Schrift übernehmen; Feedly lädt selbst keine Fonts. */
+  font: 16px/1.5 var(--masha-font-family, Arial, sans-serif);
   text-align: left;
   direction: ltr;
   color-scheme: light;
