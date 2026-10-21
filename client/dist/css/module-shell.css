@@ -10,13 +10,14 @@
 :is(.MashaPrismAdmin,.masha-module-shell--prism) { --masha-accent:#287899; --masha-tint:#f0f7fa; }
 :is(.MashaPromptlyAdmin,.masha-module-shell--promptly) { --masha-accent:#6d3fb3; --masha-tint:#f5f2fa; }
 :is(.MashaWelcomeAdmin,.masha-module-shell--welcome) { --masha-accent:#9a5b1e; --masha-tint:#faf6ef; }
-/* Arbeitsbereich und Formular teilen eine Breite. Das linke CMS-Menü scrollt nicht mit. */
+/* Nur das sichtbare CMS-Hauptformular wächst mit. Leere POST-Hilfsformulare dürfen keinen Platz belegen.
+   Arbeitsbereich und Formular teilen eine Breite; das linke CMS-Menü scrollt nicht mit. */
 body.cms .cms-content:has(> .masha-module-header) { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
-body.cms .cms-content:has(> .masha-module-header) > :is(form,.cms-content-fields) { height:auto; min-width:0; min-height:0; flex:1 1 0; }
-body.cms .cms-content:has(> .masha-module-header) > form { display:flex; flex-direction:column; overflow:hidden; }
+body.cms .cms-content:has(> .masha-module-header) > :is(form.cms-edit-form,.cms-content-fields) { height:auto; min-width:0; min-height:0; flex:1 1 0; }
+body.cms .cms-content:has(> .masha-module-header) > form.cms-edit-form { display:flex; flex-direction:column; overflow:hidden; }
 body.cms .masha-module-shell :is(.cms-content-fields,.promptly-form-scroll),
 body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin) > .cms-content-fields { min-width:0; min-height:0; background:var(--masha-paper); }
-body.cms .cms-content:has(> .masha-module-header) > form > :is(.cms-content-fields,.promptly-form-scroll) { flex:1 1 0; overflow:auto; overscroll-behavior:contain; }
+body.cms .cms-content:has(> .masha-module-header) > form.cms-edit-form > :is(.cms-content-fields,.promptly-form-scroll) { flex:1 1 0; overflow:auto; overscroll-behavior:contain; }
 body.cms .masha-module-shell .masha-module-body,
 body.cms .masha-module-shell .cms-content-fields > fieldset { box-sizing:border-box; width:100%; max-width:var(--masha-width); min-width:0; margin-inline:auto; padding:28px; }
 body.cms .masha-module-shell .promptly-form-scroll { padding:28px; }

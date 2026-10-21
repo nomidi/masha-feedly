@@ -2,8 +2,15 @@
   "schema": 1,
   "module": "feedly",
   "package": "kooperativeweb/masha-feedly",
-  "version": "1.0.0-dev.6",
+  "version": "1.0.0-dev.7",
   "changes": [
+    {
+      "version": "1.0.0-dev.7",
+      "date": "2026-10-21",
+      "kind": "fixed",
+      "de": "Aktionsformulare verdrängen den sichtbaren CMS-Inhalt nicht mehr.",
+      "en": "Auxiliary action forms no longer collapse visible CMS content."
+    },
     {
       "version": "1.0.0-dev.6",
       "date": "2026-10-21",
