@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "module": "feedly",
+  "package": "kooperativeweb/masha-feedly",
+  "version": "1.0.0-dev",
+  "changes": [
+    {
+      "version": "1.0.0-dev",
+      "date": "2026-10-21",
+      "kind": "fixed",
+      "de": "Meldungen bleiben auch auf Websites mit Lenis scrollbar.",
+      "en": "Reports remain scrollable on websites using Lenis."
+    }
+  ]
+}

@@ -42,6 +42,11 @@ class MashaFeedlyWidgetExtension extends Extension
             return;
         }
 
+        // Die gemeinsame Schrift ist optional; Feedly setzt Masha:Admin nicht voraus.
+        if (class_exists('KW\MashaAdmin\Service\Typography')) {
+            \KW\MashaAdmin\Service\Typography::requireFonts();
+        }
+
         $this->requireCMSHelply();
 
         Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly.css');

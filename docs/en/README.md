@@ -279,3 +279,5 @@ In **Configuration**, the action bar stays visible while scrolling. **Send test 
 Central host-root entry scripts: `masha-cronjob/run-feedly-errors.php` and `masha-cronjob/run-feedly-reminders.php`. See `masha-cronjob/README.en.md`. The shared KAS email-filter success marker is `MashaCronOK`; disable old custom scripts and cron entries after migration.
 
 New, updated and commented entry notifications, reminders and estimates place the entry link in a consistent button below the content. The link opens the saved original page with the entry ID; Feedly uses its saved page location. Plain-text emails contain the full address instead.
+
+With Masha:Admin installed, Suite interfaces can share Proxima Nova from the operator-supplied Adobe Fonts kit. Admin remains optional; existing fallback fonts are retained without shared typography. Local version metadata is stored in `masha-release.json`.

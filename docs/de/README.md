@@ -275,3 +275,5 @@ Unter **Konfiguration** bleibt die Aktionsleiste beim Scrollen sichtbar. **Test-
 Zentrale Cron-Einstiege im Hostroot: `masha-cronjob/run-feedly-errors.php` und `masha-cronjob/run-feedly-reminders.php`. Anleitung: `masha-cronjob/README.md`. Der gemeinsame Erfolgsmarker für den KAS-Mailfilter ist `MashaCronOK`; alte eigene Skripte und Cron-Einträge nach Umstellung deaktivieren.
 
 Benachrichtigungen zu neuen, geänderten und kommentierten Meldungen sowie Erinnerungen und Schätzungen zeigen den Meldungslink unten als einheitlichen Button. Der Link öffnet die gespeicherte Originalseite mit Meldungskennung; Feedly verwendet deren gespeicherten Seitenbereich. Reine Textmails enthalten stattdessen die vollständige Adresse.
+
+Die Suite kann bei installiertem Masha:Admin zentral Proxima Nova aus dem Betreiber-Adobe-Fonts-Kit verwenden. Das Modul benötigt Admin weiterhin nicht; ohne gemeinsame Schrift bleibt die bisherige Ersatzschrift aktiv. Der lokale Versionsstand steht in `masha-release.json`.

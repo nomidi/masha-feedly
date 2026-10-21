@@ -59,3 +59,9 @@ Die Anleitungen erklären Bedienung und Einrichtung einschließlich geschützter
 ## Lizenz
 
 MIT. Siehe [`composer.json`](composer.json).
+
+## Versionsstand / Version metadata
+
+`masha-release.json` enthält die eigene Modulversion und kurze deutsche/englische Änderungshinweise. Der erste Stand `1.0.0-dev` ist ausdrücklich eine Entwicklungskennzeichnung. Masha:Admin kann diese lokalen Hinweise anzeigen; das Modul bleibt ohne Dashboard einzeln nutzbar. Bei sichtbaren Änderungen den Versionsstand und den passenden Eintrag (`new`, `improved`, `fixed`) mitpflegen. Keine automatische Aktualisierung oder neuen Composer-Pflichtabhängigkeiten.
+
+`masha-release.json` records the independent module version and short bilingual change notes. The initial `1.0.0-dev` is a development baseline. Masha:Admin can display this metadata; standalone use remains supported. Keep the version and change entry current when changing user-facing behaviour. This does not install updates or add required dashboard dependencies.
