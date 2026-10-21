@@ -273,3 +273,5 @@ Import `SilverStripe\Core\Environment`, `SilverStripe\Core\Config\Config` and `K
 In **Configuration**, the action bar stays visible while scrolling. **Send test email** displays progress, success or failure directly in that bar without switching tabs. Unsaved form values are preserved and are not saved by sending a test email. Without JavaScript, feedback appears in the configuration form.
 
 Central host-root entry scripts: `masha-cronjob/run-feedly-errors.php` and `masha-cronjob/run-feedly-reminders.php`. See `masha-cronjob/README.en.md`. The shared KAS email-filter success marker is `MashaCronOK`; disable old custom scripts and cron entries after migration.
+
+New, updated and commented entry notifications, reminders and estimates place the entry link in a consistent button below the content. The link opens the saved original page with the entry ID; Feedly uses its saved page location. Plain-text emails contain the full address instead.
