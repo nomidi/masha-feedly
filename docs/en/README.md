@@ -281,3 +281,7 @@ Central host-root entry scripts: `masha-cronjob/run-feedly-errors.php` and `mash
 New, updated and commented entry notifications, reminders and estimates place the entry link in a consistent button below the content. The link opens the saved original page with the entry ID; Feedly uses its saved page location. Plain-text emails contain the full address instead.
 
 Admin can provide Plus Jakarta Sans locally in the CMS. The widget only inherits an existing CSS font variable; Feedly never registers font files or a font stylesheet. Existing fallback typography remains without shared fonts. Local version metadata is stored in `masha-release.json`.
+
+## Cron status and help
+
+Administrators see run reports for technical errors and reminders in CMS settings when the current optional Masha:Connect status reader is present. The current central runner writes them privately in this installation. Green means task completion, not email delivery. Missing, failed and overdue runs are distinct. Feedly remains usable without Connect. Local Feedly Helply content explains status alongside existing features.

@@ -310,6 +310,9 @@ class MashaFeedlyAdmin extends ModelAdmin
                 ->addExtraClass('masha-feedly-config-section masha-feedly-config-section--reset');
         }
         $fields = FieldList::create(...$sections);
+        if (Permission::check('ADMIN') && class_exists(\KW\MashaConnect\CronStatus::class)) {
+            $fields->push(LiteralField::create('FeedlyCronStatus', \KW\MashaConnect\CronStatus::render(['feedly-errors', 'feedly-reminders'])));
+        }
         Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly-admin.css');
         Requirements::css('kooperativeweb/masha-feedly:client/dist/css/masha-feedly.css');
         Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-colors.js');

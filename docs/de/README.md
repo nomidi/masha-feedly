@@ -277,3 +277,7 @@ Zentrale Cron-Einstiege im Hostroot: `masha-cronjob/run-feedly-errors.php` und `
 Benachrichtigungen zu neuen, geänderten und kommentierten Meldungen sowie Erinnerungen und Schätzungen zeigen den Meldungslink unten als einheitlichen Button. Der Link öffnet die gespeicherte Originalseite mit Meldungskennung; Feedly verwendet deren gespeicherten Seitenbereich. Reine Textmails enthalten stattdessen die vollständige Adresse.
 
 Im CMS kann Masha:Admin Plus Jakarta Sans lokal bereitstellen. Das Widget übernimmt ausschließlich eine bereits vorhandene CSS-Schriftvariable; Feedly lädt selbst keine Schriftdateien oder Schrift-Stylesheets. Ohne gemeinsame Schrift bleibt die bisherige Ersatzschrift aktiv. Der lokale Versionsstand steht in `masha-release.json`.
+
+## Cron-Status und Hilfe
+
+Administratoren finden in der CMS-Konfiguration die Laufmeldungen für technische Fehler und Erinnerungen, wenn der aktuelle optionale Masha:Connect-Statusleser vorhanden ist. Der aktuelle zentrale runner.php schreibt sie privat in dieser Installation. Grün bedeutet erfolgreichen Aufgabenabschluss, nicht E-Mail-Zustellung. Fehlende, fehlerhafte und überfällige Läufe sind getrennt erkennbar. Ohne Connect bleibt Feedly unabhängig nutzbar. Die lokale Feedly-Helply-Sammlung erklärt diese Anzeige zusätzlich zu den bestehenden Funktionen.
