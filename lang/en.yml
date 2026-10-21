@@ -1,5 +1,13 @@
 en:
   KW\MashaFeedly\Translations:
+    MITE_SETTINGS_TITLE: "Track time with Mite"
+    MITE_SETTINGS_INTRO: "Connect reports with time tracking. A timer starts only after your confirmation."
+    MITE_STATE_SETUP: "Setup needed"
+    MITE_STATE_SETUP_HELP: "Ask your website administrator to connect Mite. Then you can enable time tracking and select a project here."
+    MITE_STATE_READY: "Connection available"
+    MITE_STATE_READY_HELP: "Active projects have been loaded. Select a default project and the categories where Feedly should offer a timer. Select the service when starting."
+    MITE_STATE_UNAVAILABLE: "Connection currently unavailable"
+    MITE_STATE_UNAVAILABLE_HELP: "Projects could not be loaded. Your saved selection is preserved. Reopen this section later or ask your administrator to check the connection."
     ERRORS_SECTION: 'Technical errors'
     ERRORS_ENABLED: 'Automatically capture technical errors'
     ERRORS_MODE: 'Process errors'
@@ -913,3 +921,9 @@ en:
     ENTRY_LOCATION_IMAGE_DIALOG: 'The marked area is inside an image dialog. Close this report and open the relevant image. Feedly shows the marker when the saved field becomes visible. This report does not record which image was open.'
     ENTRY_LOCATION_UNAVAILABLE: 'The marked area is currently hidden or no longer exists. Open the relevant tab or dialog. Feedly adds the marker when the area becomes visible again.'
     ENTRY_SHOW_LOCATION: 'Show marked area'
+
+  KW\MashaFeedly\Admin\ModuleIntro:
+    TITLE: "Get tasks done together."
+    DESCRIPTION: "Collect reports directly on your website. Discuss changes, assign tasks and keep track of progress."
+    HELP: "Open Masha:Feedly help"
+    HELP_UNAVAILABLE: "The relevant help is currently unavailable."

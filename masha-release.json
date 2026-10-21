@@ -2,8 +2,29 @@
   "schema": 1,
   "module": "feedly",
   "package": "kooperativeweb/masha-feedly",
-  "version": "1.0.0-dev.3",
+  "version": "1.0.0-dev.6",
   "changes": [
+    {
+      "version": "1.0.0-dev.6",
+      "date": "2026-10-21",
+      "kind": "improved",
+      "de": "Kühle, flache Navigation und ruhigere Verwaltungslisten; kein dauerhaft schwebender CMS-Hilfebutton.",
+      "en": "Cool, flat navigation and calmer management lists; no persistent floating CMS help button."
+    },
+    {
+      "version": "1.0.0-dev.5",
+      "date": "2026-10-21",
+      "kind": "improved",
+      "de": "Einheitliche Reiter und Modulaktionen; Hilfe bleibt außerhalb der Navigation.",
+      "en": "Consistent tabs and module actions; help stays outside navigation."
+    },
+    {
+      "version": "1.0.0-dev.4",
+      "date": "2026-10-21",
+      "kind": "improved",
+      "de": "Einheitliche Moduleinstiege, farbige Reiter und getrennte Modulhilfen.",
+      "en": "Shared module entry layout, coloured tabs and separate module help."
+    },
     {
       "version": "1.0.0-dev.3",
       "date": "2026-10-21",

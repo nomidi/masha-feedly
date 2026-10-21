@@ -34,6 +34,12 @@ use SilverStripe\Security\Security;
  */
 class MashaFeedlyAdminBoardTest extends FunctionalTest
 {
+    /** Neue Startseite darf Links zu Meldungen nicht auf einen Einführungsreiter umlenken. */
+    public function testEntryLinksKeepTheirExistingModelRoute(): void
+    {
+        self::assertStringEndsWith(str_replace('\\', '-', MashaFeedlyEntry::class), MashaFeedlyAdmin::create()->getLinkForModelClass(MashaFeedlyEntry::class));
+    }
+
     protected static $fixture_file = '../fixtures/MashaFeedly.yml';
 
     protected function setUp(): void

@@ -1,0 +1,145 @@
+/* Lokaler CMS-Rahmen: kühles Papier, präzise Typografie und nur ein Farbakzent je Modul.
+   Alle Regeln sind auf Masha begrenzt. Native Formular-, Tabellen- und Tabfunktionen bleiben erhalten. */
+:is(.MashaAdmin,.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace,.masha-module-shell) {
+  --masha-accent:#6b50a8; --masha-tint:#f5f3f9; --masha-ink:#222b36; --masha-muted:#627080;
+  --masha-line:#e1e6ec; --masha-paper:#f6f8fa; --masha-width:1220px; --masha-radius:18px;
+  color:var(--masha-ink); font-family:var(--masha-font-family,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif);
+}
+:is(.MashaFeedlyAdmin,.masha-module-shell--feedly) { --masha-accent:#b52672; --masha-tint:#fbf3f7; }
+:is(.MashaHelplyAdmin,.masha-module-shell--helply) { --masha-accent:#465e74; --masha-tint:#f0f5f8; }
+:is(.MashaPrismAdmin,.masha-module-shell--prism) { --masha-accent:#287899; --masha-tint:#f0f7fa; }
+:is(.MashaPromptlyAdmin,.masha-module-shell--promptly) { --masha-accent:#6d3fb3; --masha-tint:#f5f2fa; }
+:is(.MashaWelcomeAdmin,.masha-module-shell--welcome) { --masha-accent:#9a5b1e; --masha-tint:#faf6ef; }
+/* Arbeitsbereich und Formular teilen eine Breite. Das linke CMS-Menü scrollt nicht mit. */
+body.cms .cms-content:has(> .masha-module-header) { display:flex; flex-direction:column; min-width:0; min-height:0; overflow:hidden; }
+body.cms .cms-content:has(> .masha-module-header) > :is(form,.cms-content-fields) { height:auto; min-width:0; min-height:0; flex:1 1 0; }
+body.cms .cms-content:has(> .masha-module-header) > form { display:flex; flex-direction:column; overflow:hidden; }
+body.cms .masha-module-shell :is(.cms-content-fields,.promptly-form-scroll),
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin) > .cms-content-fields { min-width:0; min-height:0; background:var(--masha-paper); }
+body.cms .cms-content:has(> .masha-module-header) > form > :is(.cms-content-fields,.promptly-form-scroll) { flex:1 1 0; overflow:auto; overscroll-behavior:contain; }
+body.cms .masha-module-shell .masha-module-body,
+body.cms .masha-module-shell .cms-content-fields > fieldset { box-sizing:border-box; width:100%; max-width:var(--masha-width); min-width:0; margin-inline:auto; padding:28px; }
+body.cms .masha-module-shell .promptly-form-scroll { padding:28px; }
+body.cms .masha-module-shell .promptly-form-scroll > fieldset { width:100%; max-width:var(--masha-width); min-width:0; padding:0; margin-inline:auto; }
+/* Einstieg: Weißraum und ein lokales Motiv statt verschachtelter Effekte. */
+body.cms .masha-module-intro { display:grid; grid-template-columns:minmax(0,1fr) 120px; align-items:center; gap:40px; position:relative; box-sizing:border-box; width:100%; max-width:var(--masha-width); margin:0 auto 24px; padding:40px; border:1px solid var(--masha-line); border-radius:20px; background:#fff; box-shadow:none; }
+body.cms .masha-module-intro__eyebrow { display:block; margin-bottom:14px; color:var(--masha-accent); font-size:12px; font-weight:700; letter-spacing:.08em; }
+body.cms .masha-module-intro h1 { max-width:24ch; margin:0 0 18px; color:var(--masha-ink); font:700 clamp(30px,3vw,44px)/1.13 var(--masha-font-family,system-ui,sans-serif); letter-spacing:-.045em; }
+body.cms .masha-module-intro p { max-width:64ch; margin:0; color:var(--masha-muted); font-size:16px; line-height:1.7; }
+body.cms .masha-module-intro__mark { display:grid; place-items:center; width:120px; height:132px; border:0; border-radius:24px; background:var(--masha-tint); box-shadow:none; }
+body.cms .masha-module-intro__mark img { width:92px; height:92px; object-fit:contain; }
+body.cms .masha-module-intro__help { margin-top:26px; }
+body.cms .masha-module-intro__help [data-helply] { position:static!important; transform:none!important; }
+body.cms .masha-module-intro__help .helply__open { display:inline-flex; align-items:center; gap:8px; min-height:42px; padding:10px 16px; border:1px solid var(--masha-line); border-radius:10px; background:#fff; color:var(--masha-accent); font-size:14px; font-weight:600; box-shadow:none; }
+body.cms .masha-module-intro__help-unavailable { min-height:42px; padding:10px 16px; border:1px solid var(--masha-line); border-radius:10px; background:#f5f7f9; color:var(--masha-muted); }
+/* Flache Navigation, auch für noch zwischengespeicherte native CMS-Köpfe.
+   Auswahl wird durch Farbe UND eine Linie angezeigt, ohne gefüllte Kapseln. */
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-module-shell) > .cms-content-header {
+  display:flex; flex:0 0 auto; flex-direction:column; align-items:stretch; justify-content:flex-start; gap:16px;
+  box-sizing:border-box; width:100%; min-height:0; padding:20px 28px 0; border:0; border-bottom:1px solid var(--masha-line); background:#fff; box-shadow:none;
+}
+body.cms .masha-module-header__row,
+body.cms .masha-module-header__identity { display:flex; align-items:center; gap:12px; min-width:0; }
+body.cms .masha-module-header__identity img { display:block; flex:0 0 32px; width:32px; height:36px; object-fit:contain; }
+body.cms .masha-module-header__identity h1 { margin:0; color:var(--masha-ink); font-size:18px; font-weight:700; line-height:1.3; letter-spacing:-.025em; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-module-shell) .cms-content-header-info { flex:0 0 auto; min-width:0; width:100%; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-module-shell) :is(.cms-content-header-tabs,.cms-tabset-nav-primary),
+body.cms .masha-module-nav { float:none; clear:both; width:100%; min-width:0; max-width:none; margin:0; padding:0; border:0; background:transparent; box-shadow:none; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-module-shell) .cms-content-header-tabs > ul,
+body.cms .masha-module-shell .ss-tabset > ul,
+body.cms .masha-module-nav,
+body.cms .masha-suite-workspace :is(.masha-suite-sections,.masha-suite-subnav) {
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-start; gap:4px 22px; box-sizing:border-box; width:100%; min-height:46px;
+  margin:0; padding:0; border:0; border-radius:0; background:transparent; list-style:none; box-shadow:none;
+}
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-module-shell) .cms-content-header-tabs li,
+body.cms .masha-module-shell .ss-tabset > ul > li { display:block; float:none; flex:0 0 auto; margin:0!important; padding:0!important; border:0!important; border-radius:0!important; background:transparent!important; box-shadow:none!important; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-module-shell) .cms-content-header-tabs li > a,
+body.cms .masha-module-shell .ss-tabset > ul > li > a,
+body.cms .masha-module-nav > a,
+body.cms .masha-suite-workspace :is(.masha-suite-section,.masha-suite-subnav a) {
+  display:flex; align-items:center; justify-content:center; box-sizing:border-box; position:relative; min-height:46px; margin:0; padding:12px 0 14px;
+  border:0!important; border-radius:0!important; background:transparent!important; color:#647180; font:500 14px/1.35 var(--masha-font-family,system-ui,sans-serif); text-decoration:none; box-shadow:none;
+}
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-module-shell) .cms-content-header-tabs li > a::after { display:none; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-module-shell) .cms-content-header-tabs li:is(.current,.ui-tabs-active,.ui-state-active,.active) > a,
+body.cms .masha-module-shell .ss-tabset > ul > li.ui-tabs-active > a,
+body.cms .masha-module-nav > a.is-current,
+body.cms .masha-suite-workspace :is(.masha-suite-section.is-current,.masha-suite-subnav a.is-current) { color:var(--masha-tab-accent,var(--masha-accent)); font-weight:700; box-shadow:inset 0 -2px currentColor; }
+body.cms .masha-module-nav > a:hover,
+body.cms .masha-module-shell .cms-content-header-tabs a:hover { color:var(--masha-ink); }
+.masha-module-tab--feedly { --masha-tab-accent:#b52672; }
+.masha-module-tab--helply { --masha-tab-accent:#465e74; }
+.masha-module-tab--prism { --masha-tab-accent:#287899; }
+.masha-module-tab--promptly { --masha-tab-accent:#6d3fb3; }
+.masha-module-tab--welcome { --masha-tab-accent:#9a5b1e; }
+.masha-module-tab--suite,.masha-module-tab--provider { --masha-tab-accent:#6b50a8; }
+body.cms .masha-module-shell :is(a,button,input,select,textarea):focus-visible { outline:2px solid var(--masha-accent); outline-offset:3px; }
+/* Speichern: eine primäre Handlung rechts. Fachliche Löschen-/Fehlerfarben werden nicht umgefärbt. */
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin) form > .btn-toolbar,
+body.cms .masha-module-shell .cms-content-actions > .btn-toolbar,
+body.cms .masha-module-shell .promptly-savebar-inner { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:12px; box-sizing:border-box; width:100%; margin:0; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin) form > .btn-toolbar,
+body.cms .masha-module-shell .cms-content-actions { flex:0 0 auto; padding:16px 28px; border-top:1px solid var(--masha-line); background:#fff; box-shadow:none; }
+body.cms .masha-module-shell :is(.cms-content-actions,form > .btn-toolbar) :is(.btn-primary,.btn-success),
+body.cms :is(.MashaFeedlyAdmin,.MashaWelcomeAdmin) form > .btn-toolbar .btn-primary { min-height:40px; padding:10px 18px; border:1px solid var(--masha-accent)!important; border-radius:9px; background:var(--masha-accent)!important; color:#fff!important; font-weight:600; box-shadow:none; }
+body.cms .masha-module-shell button:disabled { opacity:.5; cursor:not-allowed; }
+body.cms .masha-welcome-form:has(:is(#Root_Start.active,#Root_Start[aria-hidden="false"])) > .cms-content-actions,
+body.cms .masha-promptly-form:has(:is(#Root_Start.active,#Root_Account.active,#Root_Start[aria-hidden="false"],#Root_Account[aria-hidden="false"])) > .promptly-savebar,
+body.cms .masha-prism-admin-form:has(#Root_Configuration:not(.active)):not(:has(#Root_Configuration[aria-hidden="false"])) > .cms-content-actions { display:none; }
+/* Einstellungskarten besitzen einen Rahmen; Felder darin keine weiteren Karten. */
+body.cms .masha-module-shell :is(.masha-module-panel,.promptly-panel,.masha-welcome-card) { box-sizing:border-box; min-width:0; padding:28px; border:1px solid var(--masha-line); border-radius:18px; background:#fff; box-shadow:none; }
+body.cms .masha-module-panel__heading { margin-bottom:24px; }
+body.cms .masha-module-panel__eyebrow { display:block; margin-bottom:8px; color:var(--masha-accent); font-size:12px; font-weight:600; letter-spacing:.06em; }
+body.cms .masha-module-panel__heading h2 { margin:0 0 10px; font-size:26px; letter-spacing:-.035em; }
+body.cms .masha-module-panel__heading p { max-width:65ch; margin:0; color:var(--masha-muted); font-size:15px; line-height:1.65; }
+body.cms .masha-module-connection { position:relative; margin:0 0 24px; padding:18px 20px 18px 44px; border:1px solid var(--masha-line); border-radius:10px; background:#f6f8fa; }
+body.cms .masha-module-connection::before { position:absolute; top:23px; left:20px; width:9px; height:9px; border-radius:50%; background:#8290a3; content:""; }
+body.cms .masha-module-connection--ready::before { background:#28764d; }
+body.cms .masha-module-connection--unavailable::before { background:#a55b0b; }
+body.cms .masha-module-connection p { max-width:70ch; margin:6px 0 0; color:var(--masha-muted); line-height:1.65; }
+/* ModelAdmin verwendet für diese Ansicht einen äußeren Scrollbereich. Keine abgeschnittene innere Flexbox. */
+body.cms .MashaFeedlyAdmin > .cms-content-fields { overflow:auto; }
+body.cms .MashaFeedlyAdmin .cms-content-view > form.masha-feedly-mite-form { display:block; height:auto; min-height:0; overflow:visible; flex:none; }
+body.cms .masha-feedly-mite-form > .cms-content-fields { height:auto; min-height:0; overflow:visible; flex:none; }
+body.cms .masha-feedly-mite-form .masha-module-panel { max-width:920px; margin-inline:auto; }
+body.cms .masha-feedly-mite-form .masha-module-panel :is(.field,.form__field-holder,.form__fieldgroup,.middleColumn) { box-sizing:border-box; min-width:0; max-width:100%; }
+body.cms .masha-feedly-mite-form .masha-module-panel .field { display:block; width:100%; padding:0; border:0; margin:0 0 20px; }
+body.cms .masha-feedly-mite-form .masha-module-panel .field > label { float:none; width:auto; max-width:100%; padding:0; margin:0 0 8px; }
+body.cms .masha-feedly-mite-form .masha-module-panel .form__field-holder { float:none; width:100%; margin:0; padding:0; }
+body.cms .masha-feedly-mite-form :is(.chosen-container,.select2-container,select) { box-sizing:border-box; width:100%!important; max-width:100%; }
+/* GridField: ruhige Datenfläche, lesbare Zeilen und klar erkennbare Werkzeuge.
+   Komponenten, Sortierung, Paginierung, Datensatzrechte und Formaktionen bleiben unverändert. */
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) { box-sizing:border-box; min-width:0; max-width:100%; margin:0 0 24px; border:1px solid var(--masha-line); border-radius:14px; background:#fff; color:var(--masha-ink); box-shadow:none; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) table { width:100%; margin:0; border-collapse:separate; border-spacing:0; background:#fff; font-size:14px; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) :is(th,td) { padding:14px 16px; vertical-align:middle; border:0; border-bottom:1px solid #edf0f3; line-height:1.5; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) thead th { background:#f7f9fb; color:#5b6878; font-size:12px; font-weight:600; text-align:left; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) :is(.grid-field__title-row,.gridfield-title) th { padding:20px; background:#fff; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) :is(h2,.grid-field__title) { margin:0; color:var(--masha-ink); font-size:20px; font-weight:600; letter-spacing:-.025em; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) tbody tr:not(.table-danger):not(.table-warning):hover > td { background:#f7fafc; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) tbody tr:last-child > td { border-bottom:0; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) :is(tfoot td,tfoot th) { padding:14px 18px; border-top:1px solid var(--masha-line); background:#fafbfd; color:var(--masha-muted); font-size:12px; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:36px; padding:8px 12px; border-radius:8px; font-size:13px; line-height:1.3; font-weight:600; box-shadow:none; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) :is(.btn-primary,.btn-success) { background:var(--masha-accent); border-color:var(--masha-accent); color:#fff; }
+body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-suite-workspace) :is(.grid-field,.ss-gridfield) :is(input[type="text"],input[type="search"],select) { box-sizing:border-box; min-height:36px; max-width:100%; padding:8px 10px; border:1px solid #d8e0e8; border-radius:8px; background:#fff; color:var(--masha-ink); font:inherit; }
+body.cms .masha-module-shell .helply-admin__save-access { margin:0!important; }
+/* Anbieternavigation und Fachkarten folgen derselben kühlen Basis. */
+body.cms .masha-suite-workspace { --suite-accent:var(--masha-accent); --suite-line:var(--masha-line); --suite-ink:var(--masha-ink); --suite-muted:var(--masha-muted); }
+body.cms .masha-suite-workspace :is(.masha-suite-header,.masha-suite-body) { background:var(--masha-paper); }
+body.cms .masha-suite-workspace :is(.masha-suite-admin-card,.masha-suite-admin-guide) { border:1px solid var(--masha-line); border-radius:16px; background:#fff; box-shadow:none; }
+body.cms .masha-suite-workspace:has(.masha-suite-section--cron.is-current) .masha-suite-body { overflow:auto; min-height:0; }
+@media(max-width:800px) {
+  body.cms .masha-module-intro { grid-template-columns:minmax(0,1fr) 76px; gap:20px; padding:26px; }
+  body.cms .masha-module-intro__mark { width:76px; height:86px; border-radius:18px; }
+  body.cms .masha-module-intro__mark img { width:60px; height:60px; }
+  body.cms .masha-module-shell .masha-module-body,
+  body.cms .masha-module-shell .cms-content-fields > fieldset,
+  body.cms .masha-module-shell .masha-module-panel { padding:20px; }
+}
+@media(max-width:520px) {
+  body.cms .masha-module-intro { display:block; padding:22px; }
+  body.cms .masha-module-intro__eyebrow { min-height:64px; padding-right:76px; }
+  body.cms .masha-module-intro__mark { position:absolute; top:20px; right:20px; width:60px; height:68px; }
+  body.cms .masha-module-intro__mark img { width:48px; height:48px; }
+  body.cms :is(.MashaFeedlyAdmin,.MashaHelplyAdmin,.MashaPrismAdmin,.MashaPromptlyAdmin,.MashaWelcomeAdmin,.masha-module-shell) > .cms-content-header { padding:16px 16px 0; gap:10px; }
+}

@@ -281,3 +281,13 @@ Im CMS kann Masha:Admin Plus Jakarta Sans lokal bereitstellen. Das Widget übern
 ## Cron-Status und Hilfe
 
 Administratoren finden in der CMS-Konfiguration die Laufmeldungen für technische Fehler und Erinnerungen, wenn der aktuelle optionale Masha:Connect-Statusleser vorhanden ist. Der aktuelle zentrale runner.php schreibt sie privat in dieser Installation. Grün bedeutet erfolgreichen Aufgabenabschluss, nicht E-Mail-Zustellung. Fehlende, fehlerhafte und überfällige Läufe sind getrennt erkennbar. Ohne Connect bleibt Feedly unabhängig nutzbar. Die lokale Feedly-Helply-Sammlung erklärt diese Anzeige zusätzlich zu den bestehenden Funktionen.
+
+
+## Moduleinstieg und Hilfe
+
+Der CMS-Einstieg zeigt zuerst Start mit einer kurzen Einführung und der Feedly-Hilfe. Meldungen, Kategorien und weitere Funktionen bleiben in ihren eigenen Reitern; bestehende Meldungslinks bleiben erreichbar.
+
+
+Die Modulbereiche haben eine gemeinsame Kopfzeile: Modulname oben, eine flache Reiterleiste darunter. Hilfe wird gezielt auf Start geöffnet und schwebt nicht über der Navigation. Speichern steht rechts und verwendet die Modulfarbe. Auf Start und reinen Bericht-/Kontoansichten wird keine unnötige Speicheraktion angezeigt.
+
+Die Verwaltungslisten verwenden kühle weiße Flächen, dezente Zeilentrenner und einheitliche Werkzeuge. Sortieren, Filtern, Seitennavigation, Datensatzrechte und Formularaktionen bleiben native GridField-Funktionen.

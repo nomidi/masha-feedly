@@ -55,6 +55,34 @@ class MashaFeedlyMiteTest extends FunctionalTest
         parent::tearDown();
     }
 
+    /** Fehlende Einrichtung erklärt den nächsten Schritt ohne API-Aufruf oder wirkungslose Speicheraktion. */
+    public function testMiteSettingsExplainMissingConnectionWithoutRequest(): void
+    {
+        $this->logInManager(false);
+        Environment::setEnv('MASHA_FEEDLY_MITE_API_KEY', '');
+        $response = $this->get('/admin/masha-feedly/mite');
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('masha-module-connection--setup', $response->getBody());
+        self::assertStringNotContainsString('MASHA_FEEDLY_MITE_API_KEY', $response->getBody());
+        self::assertStringNotContainsString('name="action_saveMiteConfiguration"', $response->getBody());
+        self::assertCount(0, $this->requests);
+    }
+
+    /** Bei einem Ausfall bleibt die Auswahl erhalten, und aktives Mite kann weiterhin abgeschaltet werden. */
+    public function testMiteSettingsPreserveSelectionDuringOutage(): void
+    {
+        $this->logInManager();
+        $this->respond(['error' => 'private-provider-message'], 503);
+        $response = $this->get('/admin/masha-feedly/mite');
+        self::assertSame(200, $response->getStatusCode());
+        self::assertStringContainsString('masha-module-connection--unavailable', $response->getBody());
+        self::assertStringNotContainsString('private-provider-message', $response->getBody());
+        self::assertStringNotContainsString('test-key-only', $response->getBody());
+        self::assertStringContainsString('name="action_saveMiteConfiguration"', $response->getBody());
+        self::assertSame(123, (int)MashaFeedlyConfigExtension::currentSiteConfig()->MashaFeedlyMiteProjectID);
+        self::assertCount(1, $this->requests);
+    }
+
     /** Andere CMS-Admins können Optionen weder lesen noch Timer starten oder stoppen. */
     public function testOnlyConfiguredManagerCanAccessMiteEndpoints(): void
     {

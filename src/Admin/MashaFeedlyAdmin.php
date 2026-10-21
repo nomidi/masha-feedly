@@ -59,6 +59,7 @@ class MashaFeedlyAdmin extends ModelAdmin
     private static $menu_title = 'Masha:Feedly';
     private static $menu_icon = 'kooperativeweb/masha-feedly:client/dist/icons/masha-feedly.svg';
     private static $managed_models = [
+        'start' => ['dataClass' => MashaFeedlyEntry::class, 'title' => 'Start'],
         MashaFeedlyEntry::class => ['title' => 'Meldungen'],
         MashaFeedlyCategory::class => ['title' => 'Kategorien'],
         MashaFeedlyPriority::class => ['title' => 'Prioritäten'],
@@ -67,6 +68,18 @@ class MashaFeedlyAdmin extends ModelAdmin
         'email-texts' => ['dataClass' => SiteConfig::class, 'title' => 'E-Mail-Texte'],
         'mite' => ['dataClass' => SiteConfig::class, 'title' => 'Mite'],
     ];
+
+    /** Die lokale Inhaltsvorlage ist verbindlich; native ModelAdmin-Köpfe sind hier kein Ersatz. */
+    public function getTemplatesWithSuffix($suffix): array
+    {
+        return $suffix === '_Content' ? ['KW/MashaFeedly/Admin/MashaFeedlyAdmin_Content'] : parent::getTemplatesWithSuffix($suffix);
+    }
+
+    /** Identisches Modulmotiv wie auf dem Einstieg. */
+    public function ModuleIcon(): string
+    {
+        return \KW\MashaFeedly\Admin\ModuleIntro::iconURL();
+    }
 
     /** canView() verwendet die modulspezifische Benutzerfreigabe. */
     private static $required_permission_codes = false;
@@ -133,6 +146,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             $this->httpError(403);
         }
         parent::init();
+        Requirements::css('kooperativeweb/masha-feedly:client/dist/css/module-shell.css');
         MashaFeedlyCategory::ensureDefaultCategories();
     }
 
@@ -160,6 +174,13 @@ class MashaFeedlyAdmin extends ModelAdmin
      */
     public function getEditForm($id = null, $fields = null)
     {
+        if ($this->modelTab === 'start') {
+            $form = Form::create($this, 'EditForm', FieldList::create(LiteralField::create('FeedlyStart', ModuleIntro::render())), FieldList::create());
+            $form->setTemplate($this->getTemplatesWithSuffix('_EditForm'));
+            $form->addExtraClass('cms-edit-form cms-panel-padded center flexbox-area-grow masha-module-shell masha-module-shell--feedly');
+            $form->setAttribute('data-pjax-fragment', 'CurrentForm');
+            return $form;
+        }
         if ($this->modelTab === 'email-texts') {
             return $this->getEmailTextsForm();
         }
@@ -511,13 +532,27 @@ class MashaFeedlyAdmin extends ModelAdmin
         $projects = [];
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $enabled = MashaFeedlyConfigExtension::miteEnabled();
-        $message = self::translate('MITE_CONFIG_DESCRIPTION', 'Aktiviere Mite und wähle das Projekt sowie die Startkategorien für den Timerdialog. Die Leistung wählst du beim Start.');
-        try {
-            $miteClient = Injector::inst()->get(MashaFeedlyMiteClient::class);
-            $projects = $miteClient->projects();
-        } catch (\RuntimeException $exception) {
-            $message = $exception->getMessage();
+        $miteClient = Injector::inst()->get(MashaFeedlyMiteClient::class);
+        $configured = $miteClient->isConfigured();
+        $connected = false;
+        if ($configured) {
+            try {
+                $projects = $miteClient->projects();
+                $connected = true;
+            } catch (\RuntimeException) {
+                // Keine technischen Anbieterantworten oder Zugangshinweise in die Oberfläche übernehmen.
+            }
         }
+        $state = !$configured ? 'setup' : ($connected ? 'ready' : 'unavailable');
+        $title = self::translate('MITE_STATE_' . strtoupper($state), [
+            'setup' => 'Noch nicht eingerichtet', 'ready' => 'Verbindung verfügbar', 'unavailable' => 'Verbindung derzeit nicht verfügbar',
+        ][$state]);
+        $message = self::translate('MITE_STATE_' . strtoupper($state) . '_HELP', [
+            'setup' => 'Bitte die Website-Administration bitten, Mite zu verbinden. Danach kannst du hier die Zeiterfassung aktivieren und ein Projekt auswählen.',
+            'ready' => 'Die aktiven Projekte wurden geladen. Wähle ein Standardprojekt und die Kategorien, bei denen Feedly einen Timer anbieten soll. Die Leistung wählst du beim Start.',
+            'unavailable' => 'Die Projekte konnten gerade nicht geladen werden. Deine gespeicherte Auswahl bleibt erhalten. Öffne diesen Bereich später erneut oder bitte die Administration, die Verbindung zu prüfen.',
+        ][$state]);
+        Requirements::javascript('kooperativeweb/masha-feedly:client/dist/js/masha-feedly-admin.js');
         if ((int)$config->MashaFeedlyMiteProjectID > 0 && !isset($projects[(int)$config->MashaFeedlyMiteProjectID])) {
             $projects[(int)$config->MashaFeedlyMiteProjectID] = self::translate('MITE_SAVED_PROJECT', 'Gespeichertes Projekt #{id}', ['id' => (int)$config->MashaFeedlyMiteProjectID]);
         }
@@ -530,17 +565,24 @@ class MashaFeedlyAdmin extends ModelAdmin
                 ->setValue(MashaFeedlyConfigExtension::miteCategoryIDs())
                 ->setDescription(self::translate('MITE_CATEGORIES_DESCRIPTION', 'Wähle eine oder mehrere Kategorien. Nur beim Wechsel in eine ausgewählte Kategorie erscheint der Dialog.'))
         )->setName('MiteSettings');
-        $fields = FieldList::create(
-            LiteralField::create('MiteHeading', '<h2>Mite</h2><p>' . $this->escapeBoardValue($message) . '</p>'),
-            CheckboxField::create('MashaFeedlyMiteEnabled', self::translate('MITE_ENABLED', 'Mite aktivieren'))->setValue($enabled),
+        $activation = CheckboxField::create('MashaFeedlyMiteEnabled', self::translate('MITE_ENABLED', 'Mite aktivieren'))->setValue($enabled);
+        if (!$configured && !$enabled) $activation->setDisabled(true);
+        $card = CompositeField::create(
+            LiteralField::create('MiteHeading', '<header class="masha-module-panel__heading"><span class="masha-module-panel__eyebrow">Masha:Feedly</span><h2>'
+                . $this->escapeBoardValue(self::translate('MITE_SETTINGS_TITLE', 'Zeit erfassen mit Mite')) . '</h2><p>'
+                . $this->escapeBoardValue(self::translate('MITE_SETTINGS_INTRO', 'Verbinde Meldungen mit deiner Zeiterfassung. Ein Timer startet erst nach deiner Bestätigung.')) . '</p></header>'),
+            LiteralField::create('MiteConnection', '<section class="masha-module-connection masha-module-connection--' . $state . '" role="status"><strong>'
+                . $this->escapeBoardValue($title) . '</strong><p>' . $this->escapeBoardValue($message) . '</p></section>'),
+            $activation,
             LiteralField::create('MiteSettingsStart', '<div data-mite-settings' . ($enabled ? '' : ' hidden') . '>'),
             $settings,
             LiteralField::create('MiteSettingsEnd', '</div>')
-        );
-        $form = Form::create($this, 'EditForm', $fields, FieldList::create(
-            FormAction::create('saveMiteConfiguration', self::translate('CONFIG_SAVE', 'Konfiguration speichern'))->addExtraClass('btn-primary')
-        ))->setHTMLID('Form_EditForm')->setTemplate($this->getTemplatesWithSuffix('_EditForm'));
-        $form->addExtraClass('cms-edit-form cms-panel-padded center flexbox-area-grow');
+        )->setName('MiteConnectionSettings')->addExtraClass('masha-module-panel');
+        $actions = FieldList::create();
+        if ($configured || $enabled) $actions->push(FormAction::create('saveMiteConfiguration', self::translate('CONFIG_SAVE', 'Konfiguration speichern'))->addExtraClass('btn-primary'));
+        $form = Form::create($this, 'EditForm', FieldList::create($card), $actions)
+            ->setHTMLID('Form_EditForm')->setTemplate('KW/MashaFeedly/Admin/MashaFeedlySettingsForm');
+        $form->addExtraClass('cms-edit-form center flexbox-area-grow masha-module-shell masha-module-shell--feedly masha-feedly-mite-form');
         $form->setFormAction(Controller::join_links($this->getLinkForModelTab('mite'), 'EditForm'));
         $form->setAttribute('data-pjax-fragment', 'CurrentForm');
         return $form;
@@ -1530,6 +1572,20 @@ class MashaFeedlyAdmin extends ModelAdmin
         $class = substr(strrchr('\\' . get_class($exception), '\\'), 1);
 
         return $message === '' ? $class : $class . ': ' . $message;
+    }
+
+    /** Die Einführung ist kein Datensatzbereich: bestehende Bearbeitungslinks behalten ihren Fachreiter. */
+    protected function getModelTabForModelClass(string $modelClass): ?string
+    {
+        if (!is_subclass_of($modelClass, \SilverStripe\ORM\DataObject::class)) {
+            return parent::getModelTabForModelClass($modelClass);
+        }
+        foreach (array_reverse(\SilverStripe\Core\ClassInfo::ancestry($modelClass)) as $class) {
+            foreach ($this->getManagedModels() as $tab => $definition) {
+                if (!in_array($tab, ['start', 'cron'], true) && ($definition['dataClass'] ?? $tab) === $class) return $tab;
+            }
+        }
+        return null;
     }
 
     /**

@@ -1,5 +1,13 @@
 de:
   KW\MashaFeedly\Translations:
+    MITE_SETTINGS_TITLE: "Zeit erfassen mit Mite"
+    MITE_SETTINGS_INTRO: "Verbinde Meldungen mit deiner Zeiterfassung. Ein Timer startet erst nach deiner Bestätigung."
+    MITE_STATE_SETUP: "Noch nicht eingerichtet"
+    MITE_STATE_SETUP_HELP: "Bitte die Website-Administration bitten, Mite zu verbinden. Danach kannst du hier die Zeiterfassung aktivieren und ein Projekt auswählen."
+    MITE_STATE_READY: "Verbindung verfügbar"
+    MITE_STATE_READY_HELP: "Die aktiven Projekte wurden geladen. Wähle ein Standardprojekt und die Kategorien, bei denen Feedly einen Timer anbieten soll. Die Leistung wählst du beim Start."
+    MITE_STATE_UNAVAILABLE: "Verbindung derzeit nicht verfügbar"
+    MITE_STATE_UNAVAILABLE_HELP: "Die Projekte konnten gerade nicht geladen werden. Deine gespeicherte Auswahl bleibt erhalten. Öffne diesen Bereich später erneut oder bitte die Administration, die Verbindung zu prüfen."
     ERRORS_SECTION: 'Technische Fehler'
     ERRORS_ENABLED: 'Technische Fehler automatisch erfassen'
     ERRORS_MODE: 'Fehler verarbeiten'
@@ -913,3 +921,9 @@ de:
     ENTRY_LOCATION_IMAGE_DIALOG: 'Die markierte Stelle liegt in einem Bilddialog. Schließe diese Meldung und öffne das betreffende Bild. Feedly zeigt die Markierung, sobald das gespeicherte Feld sichtbar ist. In dieser Meldung ist nicht gespeichert, welches Bild geöffnet war.'
     ENTRY_LOCATION_UNAVAILABLE: 'Die markierte Stelle ist gerade nicht sichtbar oder nicht mehr vorhanden. Öffne den passenden Reiter oder Dialog. Feedly setzt die Markierung nach, sobald die Stelle wieder sichtbar ist.'
     ENTRY_SHOW_LOCATION: 'Markierte Stelle anzeigen'
+
+  KW\MashaFeedly\Admin\ModuleIntro:
+    TITLE: "Aufgaben gemeinsam erledigen."
+    DESCRIPTION: "Sammle Meldungen direkt auf deiner Website. Besprich Änderungen, verteile Aufgaben und behalte den Bearbeitungsstand im Blick."
+    HELP: "Hilfe zu Masha:Feedly öffnen"
+    HELP_UNAVAILABLE: "Die passende Hilfe ist derzeit nicht verfügbar."

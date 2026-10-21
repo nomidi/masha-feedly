@@ -285,3 +285,13 @@ Admin can provide Plus Jakarta Sans locally in the CMS. The widget only inherits
 ## Cron status and help
 
 Administrators see run reports for technical errors and reminders in CMS settings when the current optional Masha:Connect status reader is present. The current central runner writes them privately in this installation. Green means task completion, not email delivery. Missing, failed and overdue runs are distinct. Feedly remains usable without Connect. Local Feedly Helply content explains status alongside existing features.
+
+
+## Module entry and help
+
+The CMS entry opens Start with a short introduction and Feedly help. Reports, categories and other features keep their own tabs; existing report links remain available.
+
+
+Module areas share one header: module name above a flat tab row. Help opens deliberately from Start and does not float above navigation. Save actions are right-aligned and use the module colour. Start and read-only report/account views show no unnecessary save action.
+
+Management lists use cool white surfaces, subtle row dividers and consistent tools. Sorting, filters, pagination, record permissions and form actions remain native GridField features.
