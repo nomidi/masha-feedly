@@ -1510,6 +1510,8 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
   let totalEntriesCount = 2;
   let feedbackEntryCount = 1;
   let entryIsClosed = false;
+  let pageEntriesEmpty = false;
+  let entryIsTechnicalError = false;
   let entryIsUnread = false;
   let unreadCommentCountOverride = null;
   let entryStatusOverride = null;
@@ -1526,8 +1528,9 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
     mineCount: 1,
     categories: [{ id: 1, title: 'Backlog', isClosed: false }, { id: 4, title: 'Done', isClosed: true }, { id: 5, title: 'Archiv', isClosed: true }, { id: 6, title: 'Feedback', isClosed: false }, { id: 8, title: 'In Bearbeitung', systemKey: 'restricted_estimate', isClosed: false }],
     priorities: [{ id: 1, title: 'Sofort bearbeiten', iconType: 'warning' }, { id: 2, title: 'Zeitnah bearbeiten', iconType: 'warning' }, { id: 3, title: 'Normal', iconType: 'warning' }, { id: 4, title: 'Bei Gelegenheit', iconType: 'warning' }, { id: 5, title: 'Info', iconType: 'info' }],
-    entries: (totalEntriesCount === 0 || (mode === 'unread' && !entryIsUnread)) ? [] : [{
+    entries: (totalEntriesCount === 0 || (mode === 'page' && pageEntriesEmpty) || (mode === 'unread' && !entryIsUnread)) ? [] : [{
       id: 71,
+      isTechnicalError: entryIsTechnicalError,
       title: entryTitleValue,
       content: entryContent,
       attachments: entryAttachments,
@@ -1584,7 +1587,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
           if (response instanceof Error) throw response;
           return await response;
         }
-        return { ok: true, json: async () => ({ success: true, entry: responseFor('page').entries.find((entry) => Number(entry.id) === Number(parsedURL.searchParams.get('EntryID'))) }) };
+        return { ok: true, json: async () => ({ success: true, entry: responseFor('all').entries.find((entry) => Number(entry.id) === Number(parsedURL.searchParams.get('EntryID'))) }) };
       }
       const mode = parsedURL.searchParams.get('mode');
       requests.push(parsedURL);
@@ -1627,7 +1630,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
   };
   vm.runInNewContext(source, context);
   listeners.DOMContentLoaded();
-  return { locationNotice, showLocationButton, notifyTargetChange, listeners, requests, detailRequests, detailResponses, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editHistoryDetails, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
+  return { locationNotice, showLocationButton, notifyTargetChange, listeners, requests, detailRequests, detailResponses, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editHistoryDetails, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntriesEmpty(value) { pageEntriesEmpty = value; }, setEntryTechnicalError(value) { entryIsTechnicalError = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
 }
 
 test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedback-Warteschlange', async () => {
@@ -2867,4 +2870,40 @@ test('öffnet eine gespeicherte Kostenschätzung mit aktueller Statusrolle und b
   assert.equal(entriesUI.estimateCategoryRole(entry, staleCategories, '8'), 'estimate_approved');
   assert.equal(entriesUI.estimateCategoryRole({categoryID: 7, categoryRole: 'restricted_estimate'}, staleCategories), 'restricted_estimate');
   assert.equal(entriesUI.estimateCategoryRole(entry, staleCategories, '999'), '');
+});
+
+
+test('öffnet System-Direktlinks trotz leerer Seitenliste über die geschützte Detailabfrage', async () => {
+  const env = createWidgetEnvironment('https://feedly.example.test/admin/pages#masha-feedly-entry=71');
+  env.setPageEntriesEmpty(true);
+  env.setEntryTechnicalError(true);
+  env.listeners.DOMContentLoaded();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(env.detailRequests.length, 1);
+  assert.equal(env.detailRequests[0].searchParams.get('EntryID'), '71');
+  assert.equal(env.editModal.hidden, false);
+  assert.equal(env.editForm.elements.EntryID.value, '71');
+  assert.equal(env.cleanedURL, '/admin/pages');
+});
+
+test('zeigt bei verweigertem Direktlink einen Fehler statt ein Bearbeitungsformular', async () => {
+  const env = createWidgetEnvironment('https://feedly.example.test/admin/pages#masha-feedly-entry=71');
+  env.setPageEntriesEmpty(true);
+  env.detailResponses.push({ ok: false, json: async () => ({ success: false, message: 'Keine Berechtigung' }) });
+  env.listeners.DOMContentLoaded();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(env.editModal.hidden, true);
+  assert.equal(env.listModal.hidden, false);
+  assert.equal(env.listCount.textContent, 'Keine Berechtigung');
+});
+
+test('öffnet Systemmeldungen aus der Gesamtliste ohne Navigation zur Fehleradresse', async () => {
+  const env = createWidgetEnvironment('https://feedly.example.test/admin/pages');
+  env.setEntryTechnicalError(true);
+  env.setEntryPageURL('/admin');
+  await env.openListButton.listeners.click();
+  const card = env.listContainer.children.find((child) => child.dataset?.entryId === '71');
+  await env.listContainer.listeners.click({ target: card, preventDefault() {} });
+  assert.equal(env.window.locationAssign, undefined);
+  assert.equal(env.editModal.hidden, false);
 });

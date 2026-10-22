@@ -790,6 +790,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const requestedEntryURL = new URL(window.location.href);
   let requestedEntryID = requestedEntryURL.searchParams.get('masha-feedly-entry')
     || /^#masha-feedly-entry=(\d+)$/.exec(requestedEntryURL.hash)?.[1];
+  if (!/^[1-9]\d*$/.test(requestedEntryID || '')) requestedEntryID = null;
   const formalAddress = widget.dataset.address === 'sie';
   const t = (key, values = {}) => window.KWMashaFeedlyTranslate(key, values);
   const renderActiveFilters = () => {
@@ -1234,6 +1235,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.KWMashaFeedlyEntries.revealTarget(target, document);
     refreshPageMarkers();
     target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return true;
   };
 
   editForm?.elements.CategoryID?.addEventListener('change', () => renderEstimate(activeEntry, editForm.elements.CategoryID.value));
@@ -1884,7 +1886,10 @@ document.addEventListener('DOMContentLoaded', () => {
       renderList(data);
       document.dispatchEvent(new CustomEvent('kw-masha-feedly:onboarding-list-rendered'));
       if (requestedEntryID && mode === 'page') {
-        const requestedEntry = (data.entries || []).find((entry) => Number(entry.id) === Number(requestedEntryID));
+        // Systemmeldungen ohne Seitenmarker fehlen bewusst in der Seitenliste.
+        // Die Detailabfrage prüft Sichtbarkeit und Mitgliedsrechte unabhängig vom Seitenfilter.
+        const requestedEntry = (data.entries || []).find((entry) => Number(entry.id) === Number(requestedEntryID))
+          || { id: Number(requestedEntryID) };
         if (requestedEntry) {
           const panel = widget.querySelector('.kw-masha-feedly__panel');
           const toggle = widget.querySelector('.kw-masha-feedly__toggle');
@@ -1895,9 +1900,10 @@ document.addEventListener('DOMContentLoaded', () => {
           renderMarkers(data.entries || []);
           listModal.hidden = false;
           widget.setAttribute('data-list-open', 'true');
-          await openEntry(requestedEntry);
+          const opened = await openEntry(requestedEntry);
           // Ein Direktlink darf beim Nachladen nach dem Speichern den Hinweis nicht zurücksetzen.
           requestedEntryID = null;
+          if (!opened) return;
           const cleanURL = new URL(window.location.href);
           cleanURL.searchParams.delete('masha-feedly-entry');
           if (/^#masha-feedly-entry=\d+$/.test(cleanURL.hash)) cleanURL.hash = '';
@@ -2042,7 +2048,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (event.target.closest('a')) return;
     event.preventDefault();
-    if (entry.pageURL && new URL(entry.pageURL, window.location.href).href.split(/[?#]/)[0] !== window.location.href.split(/[?#]/)[0]) {
+    if (!entry.isTechnicalError && entry.pageURL && new URL(entry.pageURL, window.location.href).href.split(/[?#]/)[0] !== window.location.href.split(/[?#]/)[0]) {
       window.location.assign(window.KWMashaFeedlyEntries.entryTargetURL(entry, window.location.href));
       return;
     }

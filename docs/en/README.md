@@ -295,3 +295,5 @@ The CMS entry opens Start with a short introduction and Feedly help. Reports, ca
 Module areas share one header: module name above a flat tab row. Help opens deliberately from Start and does not float above navigation. Save actions are right-aligned and use the module colour. Start and read-only report/account views show no unnecessary save action.
 
 Management lists use cool white surfaces, subtle row dividers and consistent tools. Sorting, filters, pagination, record permissions and form actions remain native GridField features.
+
+Technical error reports can be opened through their direct link even without a marked page element. Opening one from the full list shows its details directly without navigating to the error URL. Existing Feedly and record access checks still apply.

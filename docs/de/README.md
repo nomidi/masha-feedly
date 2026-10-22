@@ -291,3 +291,5 @@ Der CMS-Einstieg zeigt zuerst Start mit einer kurzen Einführung und der Feedly-
 Die Modulbereiche haben eine gemeinsame Kopfzeile: Modulname oben, eine flache Reiterleiste darunter. Hilfe wird gezielt auf Start geöffnet und schwebt nicht über der Navigation. Speichern steht rechts und verwendet die Modulfarbe. Auf Start und reinen Bericht-/Kontoansichten wird keine unnötige Speicheraktion angezeigt.
 
 Die Verwaltungslisten verwenden kühle weiße Flächen, dezente Zeilentrenner und einheitliche Werkzeuge. Sortieren, Filtern, Seitennavigation, Datensatzrechte und Formularaktionen bleiben native GridField-Funktionen.
+
+Systemmeldungen lassen sich über ihren Direktlink auch ohne markierten Seitenbereich öffnen. In der Gesamtliste öffnet sich die Meldung direkt; die Fehleradresse wird nicht automatisch aufgerufen. Die vorhandenen Feedly- und Datensatzrechte gelten weiterhin.
