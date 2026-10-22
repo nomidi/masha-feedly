@@ -5,20 +5,6 @@
   "version": "1.0.0-dev.9",
   "changes": [
     {
-      "version": "1.0.0-dev.9",
-      "date": "2026-10-21",
-      "kind": "fixed",
-      "de": "Icon-Auswahlprüfung isoliert gemeinsame und ältere Anbieterzugänge vollständig.",
-      "en": "Icon picker regression fully isolates shared and legacy provider credentials."
-    },
-    {
-      "version": "1.0.0-dev.8",
-      "date": "2026-10-21",
-      "kind": "fixed",
-      "de": "Übersetzungsprüfungen berücksichtigen die eigene Sprache des Moduleinstiegs.",
-      "en": "Translation checks cover the module introduction’s own catalogue."
-    },
-    {
       "version": "1.0.0-dev.7",
       "date": "2026-10-21",
       "kind": "fixed",
