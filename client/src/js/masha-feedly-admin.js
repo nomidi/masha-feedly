@@ -563,7 +563,8 @@
     deleteButton.type = 'button';
     deleteButton.className = 'masha-feedly-board__category-delete';
     deleteButton.dataset.deleteCategory = '';
-    deleteButton.textContent = '×';
+    // Ein symmetrisches SVG bleibt unabhängig von Schrift und CMS-Zeilenhöhe mittig.
+    deleteButton.innerHTML = '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>';
     deleteButton.setAttribute('aria-label', t('BOARD_CATEGORY_DELETE'));
     deleteButton.title = t('BOARD_CATEGORY_DELETE');
     header.append(dragHandle, title, count, deleteButton);

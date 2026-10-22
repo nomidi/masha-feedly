@@ -990,9 +990,14 @@
   background: #fff;
   color: #a91c62;
   font: inherit;
-  font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
+}
+.masha-feedly-board__category-delete svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
 }
 .masha-feedly-board__category-delete:hover {
   border-color: #d86b9d;

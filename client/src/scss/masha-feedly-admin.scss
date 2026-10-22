@@ -462,9 +462,11 @@
     background: #fff;
     color: #a91c62;
     font: inherit;
-    font-size: 1.2rem;
     line-height: 1;
     cursor: pointer;
+
+    // Feste SVG-Fläche vermeidet den optischen Versatz eines Schriftzeichens.
+    svg { display: block; width: 14px; height: 14px; pointer-events: none; }
 
     &:hover { border-color: #d86b9d; background: #fff1f8; }
     &:focus-visible { outline: 3px solid #e6007e55; outline-offset: 2px; }

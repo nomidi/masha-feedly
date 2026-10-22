@@ -1082,7 +1082,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                 $deleteLabel = self::translate('BOARD_CATEGORY_DELETE', 'Leere Kategorie löschen');
                 $html .= '<button type="button" class="masha-feedly-board__category-delete" data-delete-category'
                     . ' aria-label="' . $this->escapeBoardValue($deleteLabel) . '" title="'
-                    . $this->escapeBoardValue($deleteLabel) . '">×</button>';
+                    . $this->escapeBoardValue($deleteLabel) . '"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>';
             }
             $html .= '</header>';
             $html .= '<div class="masha-feedly-board__list" data-category-id="' . (int)$category->ID . '">';
