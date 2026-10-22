@@ -43,7 +43,7 @@ class MashaFeedlyEntryLocationTest extends SapphireTest
             $entry = MashaFeedlyEntry::create(['Content' => 'Ungültiger Ort', 'PageURL' => $location]);
             $this->assertFalse($entry->validate()->isValid(), $location);
         }
-        foreach (['/', '/admin', '/kontakt', 'https://example.test/kontakt', 'http://feedly:8890/kontakt'] as $location) {
+        foreach (['/', '/admin', '/kontakt', 'https://example.test/kontakt', 'http://feedly.example.test:8443/kontakt'] as $location) {
             $this->assertTrue(MashaFeedlyEntry::isValidPageURL($location), $location);
         }
     }

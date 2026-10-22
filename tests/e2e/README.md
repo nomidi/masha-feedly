@@ -7,7 +7,7 @@ Die opt-in Playwright-Tests prüfen die Desktop-FAQ, Tooltips, Kommentaraktivit�
 Lege die nicht versionierte Datei `.env.e2e` in diesem Verzeichnis an: `masha-feedly/tests/e2e/.env.e2e`. Alternativ können dieselben Variablen in der Shell gesetzt werden; gesetzte Umgebungsvariablen haben Vorrang.
 
 ```dotenv
-MASHA_FEEDLY_E2E_BASE_URL="https://feedly:8890"
+MASHA_FEEDLY_E2E_BASE_URL="https://feedly.example.test:8443"
 MASHA_FEEDLY_E2E_CREATOR_EMAIL="creator@example.test"
 MASHA_FEEDLY_E2E_CREATOR_PASSWORD="..."
 MASHA_FEEDLY_E2E_COMMENTER_EMAIL="commenter@example.test"

@@ -15,3 +15,6 @@
 .phpunit.result.cache
 .phpunit.cache/
 .DS_Store
+
+# Persönliche Betreiberangaben bleiben außerhalb des Modul-Repositories.
+/readme.local.md

@@ -482,8 +482,8 @@ test('zeigt Reaktionen kompakt und öffnet die sechs Optionen erst auf Klick', a
 
 test('führt eine Eintragskarte zur Originalseite und übergibt die Eintragskennung', () => {
   const target = new URL(entriesUI.entryTargetURL(
-    { id: 71, pageURL: 'https://feedly:8890/about-us?from=cms#kontakt' },
-    'https://feedly:8890/andere-seite'
+    { id: 71, pageURL: 'https://feedly.example.test:8443/about-us?from=cms#kontakt' },
+    'https://feedly.example.test:8443/andere-seite'
   ));
   assert.equal(target.pathname, '/about-us');
   assert.equal(target.searchParams.get('from'), 'cms');
@@ -492,11 +492,11 @@ test('führt eine Eintragskarte zur Originalseite und übergibt die Eintragskenn
 });
 
 test('verlinkt technische Meldungen ohne Inhaltsseite auf den Admin-Einstieg und bewahrt die Kennung im Fragment', () => {
-  const url = new URL(entriesUI.entryTargetURL({ id: 71, isTechnicalError: true, pageURL: '' }, 'https://feedly:8890/kontakt'));
+  const url = new URL(entriesUI.entryTargetURL({ id: 71, isTechnicalError: true, pageURL: '' }, 'https://feedly.example.test:8443/kontakt'));
   assert.equal(url.pathname, '/admin');
   assert.equal(url.searchParams.get('masha-feedly-entry'), '71');
   assert.equal(url.hash, '#masha-feedly-entry=71');
-  const page = new URL(entriesUI.entryTargetURL({ id: 71, isTechnicalError: true, pageURL: '/kontakt' }, 'https://feedly:8890/admin'));
+  const page = new URL(entriesUI.entryTargetURL({ id: 71, isTechnicalError: true, pageURL: '/kontakt' }, 'https://feedly.example.test:8443/admin'));
   assert.equal(page.pathname, '/kontakt');
   assert.equal(page.hash, '');
 });
@@ -1239,7 +1239,7 @@ test('sendet entfernte Verknüpfungen und zeigt die bestätigte Entfernung im Ve
 });
 
 /** Simuliert die Widget-Oberfläche, um Seitenabfrage und Eintragsblasen im echten Ablauf zu prüfen. */
-function createWidgetEnvironment(locationHref = 'https://feedly:8890/about-us?preview=1', address = 'du', priorityIconType = 'warning', entryDueDate = '', entryDeferredUntil = '', observeTargetChanges = false) {
+function createWidgetEnvironment(locationHref = 'https://feedly.example.test:8443/about-us?preview=1', address = 'du', priorityIconType = 'warning', entryDueDate = '', entryDeferredUntil = '', observeTargetChanges = false) {
   const listeners = {};
   const requests = [];
   const detailRequests = [];
@@ -1342,7 +1342,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
   const panel = new Element(); panel.hidden = true;
   const toggle = new Element();
   const pageTarget = new Element();
-  let entryPageURL = 'https://feedly:8890/about-us';
+  let entryPageURL = 'https://feedly.example.test:8443/about-us';
   let entryTitleValue = 'Fehler auf About us';
   let entryAssigneeList = [{ id: 12, name: 'Ada Beispiel', initials: 'EM', color: '#E95DAB', imageURL: '' }];
   let entryContent = 'Der Inhalt ist verschoben.';
@@ -2147,7 +2147,7 @@ test('lädt Einträge für die aktuelle URL und setzt eine Blase am gespeicherte
   await env.listeners['kw-masha-feedly:opened']();
   assert.equal(env.requests[0].pathname, '/__masha-feedly/listEntries');
   assert.equal(env.requests[0].searchParams.get('mode'), 'page');
-  assert.equal(env.requests[0].searchParams.get('PageURL'), 'https://feedly:8890/about-us?preview=1');
+  assert.equal(env.requests[0].searchParams.get('PageURL'), 'https://feedly.example.test:8443/about-us?preview=1');
   assert.equal(env.pageCount.textContent, '1');
   assert.equal(env.totalCount.textContent, '2');
   assert.equal(env.document.body.children.length, 1);
@@ -2237,7 +2237,7 @@ test('lädt persönliche Zuweisungen im eigenen Listenfilter nach', async () => 
 });
 
 test('verwendet die konfigurierte Sie-Anrede in persönlichen Listenmeldungen', async () => {
-  const env = createWidgetEnvironment('https://feedly:8890/about-us?preview=1', 'sie');
+  const env = createWidgetEnvironment('https://feedly.example.test:8443/about-us?preview=1', 'sie');
   await env.listeners['kw-masha-feedly:opened']();
   env.modeField.value = 'mine';
   await env.modeField.listeners.change();
@@ -2316,12 +2316,12 @@ test('macht Links in Eintragsbeschreibung anklickbar und zeigt Bildanhänge inli
 
 test('navigiert beim Klick auf einen anderen Seiteneintrag zur Seite mit Eintragskennung', async () => {
   const env = createWidgetEnvironment();
-  env.setEntryPageURL('https://feedly:8890/contact');
+  env.setEntryPageURL('https://feedly.example.test:8443/contact');
   await env.listeners['kw-masha-feedly:opened']();
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.className === 'kw-masha-feedly__entry-card');
   await env.listContainer.listeners.click({ target: card, preventDefault() {} });
-  const destination = new URL(env.window?.locationAssign || 'https://feedly:8890/about-us');
+  const destination = new URL(env.window?.locationAssign || 'https://feedly.example.test:8443/about-us');
   assert.equal(destination.pathname, '/contact');
   assert.equal(destination.searchParams.get('masha-feedly-entry'), '71');
 });
@@ -2424,7 +2424,7 @@ test('übernimmt den vom Server erzwungenen Feedback-Status statt Done vorzutäu
 });
 
 test('behält den Feedback-Hinweis nach dem Speichern einer per Direktlink geöffneten Meldung', async () => {
-  const env = createWidgetEnvironment('https://feedly:8890/about-us?masha-feedly-entry=71');
+  const env = createWidgetEnvironment('https://feedly.example.test:8443/about-us?masha-feedly-entry=71');
   env.listeners.DOMContentLoaded();
   await new Promise((resolve) => setImmediate(resolve));
   const detailRequestCount = env.detailRequests.length;
@@ -2658,7 +2658,7 @@ test('lässt den Dialog offen und zeigt den Fehler, wenn das Speichern fehlschl�
 });
 
 test('öffnet die angeforderte Eintragsbearbeitung nach Navigation zur Zielseite automatisch', async () => {
-  const env = createWidgetEnvironment('https://feedly:8890/about-us?preview=1&masha-feedly-entry=71');
+  const env = createWidgetEnvironment('https://feedly.example.test:8443/about-us?preview=1&masha-feedly-entry=71');
   env.listeners.DOMContentLoaded();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(env.editModal.hidden, false);
@@ -2670,7 +2670,7 @@ test('öffnet die angeforderte Eintragsbearbeitung nach Navigation zur Zielseite
 });
 
 test('öffnet die technische Meldung über das nach dem Admin-Redirect erhaltene Fragment', async () => {
-  const env = createWidgetEnvironment('https://feedly:8890/admin/pages/#masha-feedly-entry=71');
+  const env = createWidgetEnvironment('https://feedly.example.test:8443/admin/pages/#masha-feedly-entry=71');
   env.listeners.DOMContentLoaded();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(env.editModal.hidden, false);
@@ -2679,7 +2679,7 @@ test('öffnet die technische Meldung über das nach dem Admin-Redirect erhaltene
 });
 
 test('wartet bei einem Eintragslink auf die Personen und setzt anschließend deren Zuordnung', async () => {
-  const env = createWidgetEnvironment('https://feedly:8890/about-us?masha-feedly-entry=71');
+  const env = createWidgetEnvironment('https://feedly.example.test:8443/about-us?masha-feedly-entry=71');
   let finishLoading;
   const loading = new Promise((resolve) => { finishLoading = resolve; });
   env.window.KWMashaFeedlyLoadWidgetData = () => loading;
@@ -2818,7 +2818,7 @@ test('erstellt eine entfernte Bubble nach erneutem Öffnen des Widgets wieder', 
 
 
 test('setzt Bubbles nach React-Nachladen und nach dem Öffnen verborgener Bereiche ohne Netzwerkanfrage nach', async () => {
-  const env = createWidgetEnvironment('https://feedly:8890/about-us?preview=1', 'du', 'warning', '', '', true);
+  const env = createWidgetEnvironment('https://feedly.example.test:8443/about-us?preview=1', 'du', 'warning', '', '', true);
   let available = false;
   env.document.querySelector = (selector) => available && selector === '#about-title' ? env.pageTarget : null;
   await env.listeners['kw-masha-feedly:opened']();
@@ -2853,9 +2853,9 @@ test('zeigt die gespeicherte Stelle ohne verdeckenden Meldungsdialog', async () 
 
 
 test('verwendet gleichnamige CMS-Felder nicht auf einer anderen Seite oder fremden Domain', () => {
-  const entry = {pageURL: 'https://feedly:8890/admin/pages/edit/show/44?masha-feedly-entry=2'};
-  assert.equal(entriesUI.entryIsOnPage(entry, 'https://feedly:8890/admin/pages/edit/show/44'), true);
-  assert.equal(entriesUI.entryIsOnPage(entry, 'https://feedly:8890/admin/pages/edit/show/41'), false);
+  const entry = {pageURL: 'https://feedly.example.test:8443/admin/pages/edit/show/44?masha-feedly-entry=2'};
+  assert.equal(entriesUI.entryIsOnPage(entry, 'https://feedly.example.test:8443/admin/pages/edit/show/44'), true);
+  assert.equal(entriesUI.entryIsOnPage(entry, 'https://feedly.example.test:8443/admin/pages/edit/show/41'), false);
   assert.equal(entriesUI.entryIsOnPage(entry, 'https://other.test/admin/pages/edit/show/44'), false);
 });
 
