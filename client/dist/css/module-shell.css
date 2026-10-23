@@ -101,6 +101,10 @@ body.cms .masha-module-connection--unavailable::before { background:#a55b0b; }
 body.cms .masha-module-connection p { max-width:70ch; margin:6px 0 0; color:var(--masha-muted); line-height:1.65; }
 /* ModelAdmin verwendet für diese Ansicht einen äußeren Scrollbereich. Keine abgeschnittene innere Flexbox. */
 body.cms .MashaFeedlyAdmin > .cms-content-fields { overflow:auto; }
+/* Das Kategorienboard ist eine Arbeitsfläche und nutzt auch auf großen Monitoren die verfügbare Breite. */
+body.cms .MashaFeedlyAdmin.masha-module-shell .masha-feedly-board {
+  box-sizing:border-box; width:100%; max-width:none; min-width:0; margin-inline:0;
+}
 body.cms .MashaFeedlyAdmin .cms-content-view > form.masha-feedly-mite-form { display:block; height:auto; min-height:0; overflow:visible; flex:none; }
 body.cms .masha-feedly-mite-form > .cms-content-fields { height:auto; min-height:0; overflow:visible; flex:none; }
 body.cms .masha-feedly-mite-form .masha-module-panel { max-width:920px; margin-inline:auto; }
