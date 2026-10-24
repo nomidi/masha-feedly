@@ -216,11 +216,20 @@ class MashaFeedlyConfigExtension extends Extension
         }
     }
 
-    /** Liest den optionalen Footer aus der Serverumgebung und decodiert Zeilenumbrüche. */
+    /** Lokale ausdrückliche Vorgabe, sonst der geprüfte gemeinsame Footer des konfigurierten Anbieters. */
     public static function defaultEmailFooter(): string
     {
         $footer = trim((string)Environment::getEnv('MASHA_FEEDLY_EMAIL_FOOTER'));
         if ($footer === '') {
+            if (MashaFeedlyEffectClient::hasConfiguredProvider()) {
+                try {
+                    $defaults = Injector::inst()->get(MashaFeedlyEffectClient::class)->emailDefaults();
+                    return trim((string)($defaults['footer'] ?? ''));
+                } catch (\Throwable) {
+                    // Keine erfundenen Impressumsangaben und kein Rückfall auf andere Anbieterzugänge.
+                    return '';
+                }
+            }
             return '';
         }
 
@@ -228,7 +237,7 @@ class MashaFeedlyConfigExtension extends Extension
         return trim(str_replace(['\\r\\n', '\\n', '\\r'], "\n", $footer));
     }
 
-    /** Liefert den gespeicherten Footer oder den Wert aus der Serverumgebung. */
+    /** Erhält eigene gespeicherte Texte; leere Felder verwenden die lokale oder zentrale Vorgabe ohne Datenbankschreibzugriff. */
     public static function emailFooter(): string
     {
         $value = trim((string)self::currentSiteConfig()->MashaFeedlyEmailFooter);

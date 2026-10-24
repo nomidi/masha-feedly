@@ -117,6 +117,57 @@ class MashaFeedlyConfigExtensionTest extends SapphireTest
         }
     }
 
+    /** Leere Footer nutzen die Schnittstelle; eigene Angaben und lokale Vorgaben bleiben vorrangig. */
+    public function testEmptyFooterUsesProviderWithoutOverwritingSavedText(): void
+    {
+        $previousFooter = Environment::getEnv('MASHA_FEEDLY_EMAIL_FOOTER');
+        $previousBase = Environment::getEnv('MASHA_FEEDLY_EFFECTS_BASE_URL');
+        $previousKey = Environment::getEnv('MASHA_FEEDLY_EFFECTS_API_KEY');
+        $provider = \KW\MashaFeedly\Service\MashaFeedlyEffectProvider::config();
+        $previousLocalBase = $provider->get('local_provider_base_url');
+        Environment::setEnv('MASHA_FEEDLY_EMAIL_FOOTER', '');
+        Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', '');
+        Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', str_repeat('a', 64));
+        $provider->set('local_provider_base_url', rtrim(\SilverStripe\Control\Director::absoluteURL('/'), '/'));
+        $injector = Injector::inst();
+        $originalClient = $injector->get(MashaFeedlyEffectClient::class);
+        $client = new class extends MashaFeedlyEffectClient {
+            public int $calls = 0;
+            public bool $fail = false;
+            public function __construct() {}
+            public function emailDefaults(bool $refresh = false): array
+            {
+                $this->calls++;
+                if ($this->fail) throw new \RuntimeException('provider_unavailable');
+                return ['footer' => "Example Provider\nExample Street 1"];
+            }
+        };
+        $injector->registerService($client, MashaFeedlyEffectClient::class);
+        try {
+            $config = MashaFeedlyConfigExtension::currentSiteConfig();
+            $config->MashaFeedlyEmailFooter = ''; $config->write();
+            $this->assertSame("Example Provider\nExample Street 1", MashaFeedlyConfigExtension::emailFooter());
+            $this->assertSame('', (string)SiteConfig::get()->byID($config->ID)->MashaFeedlyEmailFooter, 'Lesen allein speichert keine CMS-Einstellung.');
+            $config->MashaFeedlyEmailFooter = 'Eigene Footerangaben'; $config->write();
+            $calls = $client->calls;
+            $this->assertSame('Eigene Footerangaben', MashaFeedlyConfigExtension::emailFooter());
+            $this->assertSame($calls, $client->calls);
+            Environment::setEnv('MASHA_FEEDLY_EMAIL_FOOTER', 'Lokale Vorgabe\\nZweite Zeile');
+            $this->assertSame("Lokale Vorgabe\nZweite Zeile", MashaFeedlyConfigExtension::defaultEmailFooter());
+            $this->assertSame($calls, $client->calls);
+            Environment::setEnv('MASHA_FEEDLY_EMAIL_FOOTER', '');
+            $client->fail = true;
+            $this->assertSame('', MashaFeedlyConfigExtension::defaultEmailFooter());
+            $this->assertSame('Eigene Footerangaben', MashaFeedlyConfigExtension::emailFooter());
+        } finally {
+            $injector->registerService($originalClient, MashaFeedlyEffectClient::class);
+            Environment::setEnv('MASHA_FEEDLY_EMAIL_FOOTER', $previousFooter);
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_BASE_URL', $previousBase);
+            Environment::setEnv('MASHA_FEEDLY_EFFECTS_API_KEY', $previousKey);
+            $provider->set('local_provider_base_url', $previousLocalBase);
+        }
+    }
+
     /** Benachrichtigungstexte werden passend zur persönlichen Du-/Sie-Auswahl gelesen. */
     public function testNotificationTextUsesRequestedAddressVariant(): void
     {

@@ -1,5 +1,7 @@
 de:
   KW\MashaFeedly\Translations:
+    PROFILE_WEEKLY_ENABLED: "Wöchentlichen Website-Rückblick erhalten"
+    PROFILE_WEEKLY_HELP: "Montags ab 08:00 Uhr: Aufgaben, verfügbare Kennzahlen und nächste Schritte aus deinen freigegebenen Bereichen. Diese Wochenmail kannst du hier unabhängig von den einzelnen Feedly-Nachrichten abwählen."
     MITE_SETTINGS_TITLE: "Zeit erfassen mit Mite"
     MITE_SETTINGS_INTRO: "Verbinde Meldungen mit deiner Zeiterfassung. Ein Timer startet erst nach deiner Bestätigung."
     MITE_STATE_SETUP: "Noch nicht eingerichtet"
@@ -634,7 +636,7 @@ de:
     CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS_DONE: 'Die Benachrichtigungstexte aus Masha:Suite Admin wurden übernommen.'
     CONFIG_IMPORT_EFFECTS_NOTIFICATION_TEXTS_FAILED: 'Die Texte konnten nicht geladen werden. Prüfe die Verbindung zu Masha:Suite Admin und versuche es erneut.'
     CONFIG_EMAIL_FOOTER: 'Footer in allen Masha:Feedly-E-Mails'
-    CONFIG_EMAIL_FOOTER_DESCRIPTION: 'Dieser Text erscheint am Ende jeder E-Mail. Wenn das Feld leer ist, wird MASHA_FEEDLY_EMAIL_FOOTER aus der Server-.env übernommen. Zeilenumbrüche darin als \n schreiben.'
+    CONFIG_EMAIL_FOOTER_DESCRIPTION: "Dieser Text erscheint am Ende aller Masha:Feedly-E-Mails. Ein leeres Feld verwendet die gemeinsame Anbietervorlage; eine ausdrückliche lokale Servervorgabe hat Vorrang. Eigene gespeicherte Texte bleiben erhalten."
     HISTORY_EYEBROW: 'ÄNDERUNGEN'
     HISTORY_TITLE: 'Verlauf'
     HISTORY_LOADING: 'Verlauf wird geladen …'
@@ -927,3 +929,19 @@ de:
     DESCRIPTION: "Sammle Meldungen direkt auf deiner Website. Besprich Änderungen, verteile Aufgaben und behalte den Bearbeitungsstand im Blick."
     HELP: "Hilfe zu Masha:Feedly öffnen"
     HELP_UNAVAILABLE: "Die passende Hilfe ist derzeit nicht verfügbar."
+
+  KW\MashaFeedly\Service\WeeklySummaryProvider:
+    Tasks: "Deine Aufgaben im Blick."
+    TaskIntro: "Hier siehst du neue Aufgaben und Fortschritte aus deinem persönlichen Meldungsbereich."
+    New: "Neu in der Woche"
+    Done: "In der Woche abgeschlossen"
+    Open: "Aktuell offen"
+    Due: "Termin bis zum Wochenende"
+    OpenTasks: "Nächste Aufgabe auswählen"
+    DueStep: "Ein guter Anfang: Schau dir eine Aufgabe mit vergangenem Termin an und lege fest, wie es damit weitergeht."
+    TaskStep: "Welche kleine Verbesserung bringt deine Website als Nächstes weiter? Wähle eine offene Aufgabe oder halte eine neue Idee fest."
+    Errors: "Technik, die gut begleitet bleibt."
+    ErrorIntro: "Diese technischen Hinweise wurden in der Woche neu erfasst. Die Anzahl bezeichnet Fehlergruppen, keine einzelnen Aufrufe."
+    ErrorGroups: "Neue Fehlergruppen"
+    ErrorStep: "Öffne einen Hinweis und schau, ob er wiederkehrt. Wenn du Unterstützung möchtest, können wir die Ursache gemeinsam eingrenzen."
+    CheckErrors: "Technische Hinweise ansehen"

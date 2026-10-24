@@ -352,7 +352,7 @@ class MashaFeedlyEntryController extends Controller
     }
 
     /**
-     * Speichert nur die Darstellungsoptionen des angemeldeten, freigegebenen Mitglieds.
+     * Speichert Darstellungs- und persönliche E-Mail-Optionen ausschließlich für das angemeldete, freigegebene Mitglied.
      *
      * @param HTTPRequest $request CSRF-geschützte Profiländerung.
      * @return HTTPResponse JSON-Ergebnis des Speichervorgangs.
@@ -411,6 +411,10 @@ class MashaFeedlyEntryController extends Controller
             }
         }
 
+        // Die Suite-Wochenmail bleibt unabhängig von Feedlys einzelnen Ereignisbenachrichtigungen.
+        if (!empty($postVars['WeeklySummarySettingsSubmitted']) && $member->hasMethod('setMashaWeeklyDigestOptIn')) {
+            $member->setMashaWeeklyDigestOptIn(!empty($postVars['MashaWeeklyDigestOptIn']));
+        }
         $previousIconID = (string)$member->MashaFeedlyAvatarIcon;
         $member->MashaFeedlyColor = $color === '' ? '' : MashaFeedlyMemberExtension::normalizeColor($color);
         $member->MashaFeedlyTheme = $theme;

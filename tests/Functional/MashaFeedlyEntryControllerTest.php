@@ -2327,6 +2327,27 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertTrue((bool)json_decode($restarted->getBody(), true)['success']);
     }
 
+    /** Die optionale Suite-Abwahl gilt ausschließlich für das aktuelle freigegebene Konto. */
+    public function testWeeklySummaryPreferenceIsIndependentAndCannotTargetAnotherMember(): void
+    {
+        $allowed = $this->objFromFixture(Member::class, 'allowed');
+        $other = $this->objFromFixture(Member::class, 'notAllowed');
+        if (!$allowed->hasMethod('getMashaWeeklyDigestOptIn')) $this->markTestSkipped('Optionales Masha:Admin ist nicht installiert.');
+        $this->allowMember($allowed); $this->logInAs($allowed);
+        $otherBefore = $other->getMashaWeeklyDigestOptIn();
+        $response = $this->post('/__masha-feedly/saveProfilePreferences', [
+            'SecurityID' => SecurityToken::getSecurityID(), 'WeeklySummarySettingsSubmitted' => '1',
+            'MemberID' => $other->ID, 'MashaFeedlyTheme' => 'serious',
+        ]);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertFalse(Member::get()->byID($allowed->ID)->getMashaWeeklyDigestOptIn());
+        $this->assertSame($otherBefore, Member::get()->byID($other->ID)->getMashaWeeklyDigestOptIn());
+        $this->post('/__masha-feedly/saveProfilePreferences', [
+            'SecurityID' => SecurityToken::getSecurityID(), 'MashaFeedlyTheme' => 'serious',
+        ]);
+        $this->assertFalse(Member::get()->byID($allowed->ID)->getMashaWeeklyDigestOptIn(), 'Eine Änderung ohne Wochenmail-Feld darf die Abwahl nicht zurücksetzen.');
+    }
+
     /** Speichert Theme und Avatarfarbe ausschließlich für das freigegebene Mitglied. */
     public function testProfilePreferencesCanBeSavedOnlyByAllowedMember(): void
     {

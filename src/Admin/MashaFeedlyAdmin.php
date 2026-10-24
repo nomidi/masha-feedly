@@ -440,7 +440,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             MashaFeedlyConfigExtension::emailFooter()
         )->setRows(4)->setDescription(self::translate(
             'CONFIG_EMAIL_FOOTER_DESCRIPTION',
-            'Dieser gemeinsame Text erscheint am Ende aller Masha:Feedly-E-Mails.'
+            'Dieser Text erscheint am Ende aller Masha:Feedly-E-Mails. Ein leeres Feld verwendet die gemeinsame Anbietervorlage; eine ausdrückliche lokale Servervorgabe hat Vorrang. Eigene gespeicherte Texte bleiben erhalten.'
         )));
         $importAction = FormAction::create(
             'importEffectNotificationTexts',

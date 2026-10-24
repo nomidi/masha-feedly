@@ -99,6 +99,10 @@
                     <summary><strong><%t KW\MashaFeedly\Translations.PROFILE_EMAIL_SETTINGS 'E-Mail-Benachrichtigungen' %></strong><small data-masha-feedly-address-copy="TOUR_THANKS_EMAIL_SUMMARY"><%t KW\MashaFeedly\Translations.TOUR_THANKS_EMAIL_SUMMARY 'Wähle, welche Nachrichten du per E-Mail bekommst.' %></small><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
                     <fieldset class="kw-masha-feedly__onboarding-email-settings">
                     <legend class="kw-masha-feedly__sr-only"><%t KW\MashaFeedly\Translations.PROFILE_EMAIL_SETTINGS 'E-Mail-Benachrichtigungen' %></legend>
+                    <% if $ProfileWeeklyAvailable %>
+                        <input type="hidden" name="WeeklySummarySettingsSubmitted" value="1">
+                        <label class="kw-masha-feedly__onboarding-email-master"><input type="checkbox" name="MashaWeeklyDigestOptIn" value="1" <% if $ProfileWeeklyEnabled %>checked<% end_if %>><span><strong><%t KW\MashaFeedly\Translations.PROFILE_WEEKLY_ENABLED 'Wöchentlichen Website-Rückblick erhalten' %></strong><small><%t KW\MashaFeedly\Translations.PROFILE_WEEKLY_HELP 'Montags ab 08:00 Uhr: Aufgaben, verfügbare Kennzahlen und nächste Schritte aus deinen freigegebenen Bereichen. Diese Wochenmail kannst du hier unabhängig von den einzelnen Feedly-Nachrichten abwählen.' %></small></span></label>
+                    <% end_if %>
                     <% if $ProfileEmailTestSucceeded %>
                         <p data-masha-feedly-address-copy="TOUR_THANKS_EMAIL_HELP"><%t KW\MashaFeedly\Translations.TOUR_THANKS_EMAIL_HELP 'Ein Häkchen bedeutet: Du bekommst diese E-Mail. Du kannst jede Auswahl jederzeit ändern.' %></p>
                         <input type="hidden" name="EmailSettingsSubmitted" value="1">

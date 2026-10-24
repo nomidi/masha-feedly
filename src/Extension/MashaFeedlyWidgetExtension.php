@@ -131,6 +131,8 @@ class MashaFeedlyWidgetExtension extends Extension
             'ProfileAvatarIcon' => (string)($currentMember?->MashaFeedlyAvatarIcon ?? ''),
             'ProfileAvatarPreviewHTML' => $canPersonalize ? $currentMember->renderAvatarPreview() : '',
             'ProfileEmailAssignedOnly' => (bool)($currentMember?->MashaFeedlyEmailAssignedOnly ?? false),
+            'ProfileWeeklyAvailable' => $currentMember?->hasMethod('getMashaWeeklyDigestOptIn') ?? false,
+            'ProfileWeeklyEnabled' => $currentMember?->hasMethod('getMashaWeeklyDigestOptIn') ? $currentMember->getMashaWeeklyDigestOptIn() : false,
             'ProfileEmailNotifications' => (bool)($currentMember?->MashaFeedlyEmailNotifications ?? false),
             'ProfileEmailTestSucceeded' => $emailTestSucceeded,
             'ProfileEmailOptions' => $profileEmailOptions,
