@@ -53,12 +53,12 @@ class WeeklySummaryProvider
                 'intro' => self::text('TaskIntro', 'Hier siehst du neue Aufgaben und Fortschritte aus deinem persönlichen Meldungsbereich.'),
                 'period' => $period['start'] . ' – ' . $period['end'],
                 'metrics' => [
+                    ['label' => self::text('Done', 'In der Woche abgeschlossen'), 'value' => count($completed), 'achievement' => true],
                     ['label' => self::text('New', 'Neu in der Woche'), 'value' => $counts['new']],
-                    ['label' => self::text('Done', 'In der Woche abgeschlossen'), 'value' => count($completed)],
                     ['label' => self::text('Open', 'Aktuell offen'), 'value' => $counts['open']],
                     ['label' => self::text('Due', 'Termin bis zum Wochenende'), 'value' => $counts['overdue']],
-                ], 'items' => $items, 'url' => MashaFeedlyAdmin::singleton()->Link(),
-                'action' => self::text('OpenTasks', 'Nächste Aufgabe auswählen'),
+                ], 'items' => $items, 'url' => MashaFeedlyAdmin::singleton()->getLinkForModelTab(MashaFeedlyEntry::class),
+                'action' => self::text('OpenTasks', 'Aufgaben und Meldungen ansehen'),
                 'nextStep' => $counts['overdue'] ? self::text('DueStep', 'Ein guter Anfang: Schau dir eine Aufgabe mit vergangenem Termin an und lege fest, wie es damit weitergeht.')
                     : self::text('TaskStep', 'Welche kleine Verbesserung bringt deine Website als Nächstes weiter? Wähle eine offene Aufgabe oder halte eine neue Idee fest.')];
         }
@@ -68,7 +68,7 @@ class WeeklySummaryProvider
                 'metrics' => [['label' => self::text('ErrorGroups', 'Neue Fehlergruppen'), 'value' => count($errors)]],
                 'items' => array_map(static fn ($entry): array => ['label' => $entry->getTitle(), 'value' => ''], array_slice($errors, 0, 3)),
                 'nextStep' => self::text('ErrorStep', 'Öffne einen Hinweis und schau, ob er wiederkehrt. Wenn du Unterstützung möchtest, können wir die Ursache gemeinsam eingrenzen.'),
-                'url' => MashaFeedlyAdmin::singleton()->Link(), 'action' => self::text('CheckErrors', 'Technische Hinweise ansehen')];
+                'url' => MashaFeedlyAdmin::singleton()->getLinkForModelTab(MashaFeedlyEntry::class), 'action' => self::text('CheckErrors', 'Technische Hinweise ansehen')];
         }
         return $sections;
     }

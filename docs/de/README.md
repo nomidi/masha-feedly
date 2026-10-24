@@ -300,3 +300,5 @@ Systemmeldungen lassen sich über ihren Direktlink auch ohne markierten Seitenbe
 ## Optionaler masha.tools-Wochenrückblick
 
 Mit Masha:Admin kann dieses Modul einen ausschließlich lesenden Beitrag zur persönlichen Wochenmail liefern. Modulrechte bleiben Voraussetzung; die zentrale Abwahl liegt unter Mein Profil → Wochenrückblick und ist standardmäßig eingeschaltet. Bei Feedly ist die Auswahl zusätzlich in dessen Profileinstellungen sichtbar. Für Einrichtung, Zeiträume, Versandreservierungen und Betreiberbuttons siehe Masha:Admin → README, Abschnitt „Persönlicher Website-Wochenrückblick“. Die Wochenmail ersetzt keine bestehenden Ereignisbenachrichtigungen oder Erinnerungen.
+
+In der Wochenmail stehen abgeschlossene Aufgaben vor neuen und offenen Aufgaben. Der Link „Aufgaben und Meldungen ansehen“ öffnet direkt die Meldungsübersicht; technische Hinweise verweisen ebenfalls auf diesen Arbeitsbereich statt auf die Moduleinführung. Bestehende Sichtbarkeitsrechte gelten weiterhin.

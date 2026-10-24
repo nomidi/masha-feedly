@@ -304,3 +304,5 @@ Technical error reports can be opened through their direct link even without a m
 ## Optional masha.tools weekly review
 
 With Masha:Admin, this module supplies a read-only section for the personal weekly email. Module permissions still apply. My Profile → Weekly review contains the default-on preference; Feedly also exposes it in its profile settings. See Masha:Admin's English documentation for setup, source periods, delivery reservations and operator actions. Weekly reviews do not replace existing event notifications or reminders.
+
+In weekly emails, completed tasks precede new and open tasks. “View tasks and reports” opens the reports overview directly; technical notices also link to this working area rather than the module introduction. Existing visibility permissions still apply.
