@@ -11,7 +11,7 @@ Feedly kann vollständig ohne Masha:Connect installiert und betrieben werden. `c
 
 ## Gemeinsamer Website-Zugang
 
-Aktuelle Kundenmodule verwenden einmal `MASHA_PROVIDER_URL` und `MASHA_API_KEY`; Prism zusätzlich einen lokalen `MASHA_ENCRYPTION_KEY`. Alle Dienste laufen auf kooperative-web.de. Im Anbieter unter **Website-Zugänge** die benötigten Dienste einzeln freigeben und für Promptly das KI-Konto ausdrücklich zuordnen. Alte modulspezifische Variablen sind nur noch ein Kompatibilitätsweg. Neu erzeugte Schlüssel benötigen das signierte Masha:Connect-Protokoll.
+Aktuelle Kundenmodule verwenden einmal `MASHA_PROVIDER_URL` und `MASHA_API_KEY`; Prism zusätzlich einen lokalen `MASHA_ENCRYPTION_KEY`. Die Anbieteradresse wird über `MASHA_PROVIDER_URL` festgelegt. Im Anbieter unter **Website-Zugänge** die benötigten Dienste einzeln freigeben und für Promptly das KI-Konto ausdrücklich zuordnen. Alte modulspezifische Variablen sind nur noch ein Kompatibilitätsweg. Neu erzeugte Schlüssel benötigen das signierte Masha:Connect-Protokoll.
 
 Masha:Feedly ist ein gemeinsamer Fehler- und Feedback-Tracker direkt auf der Website. Berechtigte Personen können Meldungen anlegen, diskutieren und ihren Bearbeitungsstand nachverfolgen.
 

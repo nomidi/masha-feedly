@@ -7,7 +7,7 @@ Feedly can be installed and used entirely without Masha:Connect. `composer requi
 
 ## Shared website connection
 
-Current customer modules share `MASHA_PROVIDER_URL` and `MASHA_API_KEY`; Prism also uses an installation-local `MASHA_ENCRYPTION_KEY`. Services run on kooperative-web.de. Enable each service in the provider website access record and explicitly link the AI billing account for Promptly. Module-specific variables are a legacy compatibility path. Newly generated keys require signed Masha:Connect protocol 1.
+Current customer modules share `MASHA_PROVIDER_URL` and `MASHA_API_KEY`; Prism also uses an installation-local `MASHA_ENCRYPTION_KEY`. The provider address is configured through `MASHA_PROVIDER_URL`. Enable each service in the provider website access record and explicitly link the AI billing account for Promptly. Module-specific variables are a legacy compatibility path. Newly generated keys require signed Masha:Connect protocol 1.
 
 Masha:Feedly is a shared issue and feedback tracker built into your website. People with access can report problems, discuss them, and follow their progress.
 
