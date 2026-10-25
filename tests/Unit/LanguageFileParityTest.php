@@ -52,10 +52,29 @@ class LanguageFileParityTest extends SapphireTest
     {
         foreach (['de', 'en'] as $language) {
             $catalogue = Yaml::parseFile(dirname(__DIR__, 2) . '/lang/' . $language . '.yml')[$language];
-            self::assertSame(['KW\\MashaFeedly\\Translations', 'KW\\MashaFeedly\\Admin\\ModuleIntro'], array_keys($catalogue));
+            self::assertSame(['KW\\MashaFeedly\\Translations', 'KW\\MashaFeedly\\Admin\\ModuleIntro', 'KW\\MashaFeedly\\Service\\WeeklySummaryProvider'], array_keys($catalogue));
             foreach (['TOUR_THANKS_TEXT', 'PROFILE_THEME_DESCRIPTION', 'PROFILE_ICON_CLEAR', 'ESTIMATE_REVIEW_HELP', 'RELATIONS_HELP', 'REPORTER_USE_CREATOR'] as $key) {
                 self::assertArrayHasKey($key, $catalogue['KW\\MashaFeedly\\Translations']);
             }
+        }
+    }
+
+    /** Wochenübersichten brauchen ebenfalls identische Schlüssel und Platzhalter in beiden Sprachen. */
+    public function testWochenuebersichtHatDieselbenSchluesselUndPlatzhalter(): void
+    {
+        $namespace = 'KW\\MashaFeedly\\Service\\WeeklySummaryProvider';
+        $directory = dirname(__DIR__, 2) . '/lang/';
+        $german = Yaml::parseFile($directory . 'de.yml')['de'][$namespace];
+        $english = Yaml::parseFile($directory . 'en.yml')['en'][$namespace];
+        self::assertSame(array_keys($german), array_keys($english));
+        foreach ($german as $key => $text) {
+            self::assertIsString($text);
+            self::assertIsString($english[$key]);
+            preg_match_all('/\{[a-zA-Z][a-zA-Z0-9_]*\}/', $text, $de);
+            preg_match_all('/\{[a-zA-Z][a-zA-Z0-9_]*\}/', $english[$key], $en);
+            sort($de[0]);
+            sort($en[0]);
+            self::assertSame($de[0], $en[0], $key);
         }
     }
 

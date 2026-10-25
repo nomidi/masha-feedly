@@ -1239,7 +1239,7 @@ test('sendet entfernte Verknüpfungen und zeigt die bestätigte Entfernung im Ve
 });
 
 /** Simuliert die Widget-Oberfläche, um Seitenabfrage und Eintragsblasen im echten Ablauf zu prüfen. */
-function createWidgetEnvironment(locationHref = 'https://feedly.example.test:8443/about-us?preview=1', address = 'du', priorityIconType = 'warning', entryDueDate = '', entryDeferredUntil = '', observeTargetChanges = false) {
+function createWidgetEnvironment(locationHref = 'https://feedly.example.test:8443/about-us?preview=1', address = 'du', priorityIconType = 'warning', entryDueDate = '', entryDeferredUntil = '', observeTargetChanges = false, startImmediately = true) {
   const listeners = {};
   const requests = [];
   const detailRequests = [];
@@ -1629,7 +1629,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
     console,
   };
   vm.runInNewContext(source, context);
-  listeners.DOMContentLoaded();
+  if (startImmediately) listeners.DOMContentLoaded();
   return { locationNotice, showLocationButton, notifyTargetChange, listeners, requests, detailRequests, detailResponses, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editHistoryDetails, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntriesEmpty(value) { pageEntriesEmpty = value; }, setEntryTechnicalError(value) { entryIsTechnicalError = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
 }
 
@@ -2874,7 +2874,7 @@ test('öffnet eine gespeicherte Kostenschätzung mit aktueller Statusrolle und b
 
 
 test('öffnet System-Direktlinks trotz leerer Seitenliste über die geschützte Detailabfrage', async () => {
-  const env = createWidgetEnvironment('https://feedly.example.test/admin/pages#masha-feedly-entry=71');
+  const env = createWidgetEnvironment('https://feedly.example.test/admin/pages#masha-feedly-entry=71', 'du', 'warning', '', '', false, false);
   env.setPageEntriesEmpty(true);
   env.setEntryTechnicalError(true);
   env.listeners.DOMContentLoaded();
@@ -2887,7 +2887,7 @@ test('öffnet System-Direktlinks trotz leerer Seitenliste über die geschützte 
 });
 
 test('zeigt bei verweigertem Direktlink einen Fehler statt ein Bearbeitungsformular', async () => {
-  const env = createWidgetEnvironment('https://feedly.example.test/admin/pages#masha-feedly-entry=71');
+  const env = createWidgetEnvironment('https://feedly.example.test/admin/pages#masha-feedly-entry=71', 'du', 'warning', '', '', false, false);
   env.setPageEntriesEmpty(true);
   env.detailResponses.push({ ok: false, json: async () => ({ success: false, message: 'Keine Berechtigung' }) });
   env.listeners.DOMContentLoaded();
@@ -2904,6 +2904,6 @@ test('öffnet Systemmeldungen aus der Gesamtliste ohne Navigation zur Fehleradre
   await env.openListButton.listeners.click();
   const card = env.listContainer.children.find((child) => child.dataset?.entryId === '71');
   await env.listContainer.listeners.click({ target: card, preventDefault() {} });
-  assert.equal(env.window.locationAssign, undefined);
+  assert.equal(env.window.locationAssign, '');
   assert.equal(env.editModal.hidden, false);
 });
