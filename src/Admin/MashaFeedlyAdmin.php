@@ -43,6 +43,7 @@ use SilverStripe\Security\Security;
 use SilverStripe\Security\SecurityToken;
 use SilverStripe\SiteConfig\SiteConfig;
 use SilverStripe\View\Requirements;
+use SilverStripe\View\ArrayData;
 use SilverStripe\i18n\i18n;
 
 /**
@@ -973,7 +974,7 @@ class MashaFeedlyAdmin extends ModelAdmin
                 . self::translate('BOARD_CATEGORY_FORM_TITLE', 'Neue Kategorie') . '</span><h2 id="masha-feedly-category-title">'
                 . self::translate('BOARD_CATEGORY_NAME', 'Name der Kategorie') . '</h2></div>'
                 . '<button type="button" class="masha-feedly-board__dialog-close" data-close-category-modal aria-label="'
-                . $this->escapeBoardValue(self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen')) . '">×</button></header>'
+                . $this->escapeBoardValue(self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen')) . '">' . ArrayData::create()->renderWith('KW\\MashaFeedly\\Includes\\MashaFeedlyCloseIcon') . '</button></header>'
                 . '<div class="masha-feedly-board__category-form" data-create-category-form role="form">'
                 . '<label for="MashaFeedlyCategoryTitle">' . self::translate('BOARD_CATEGORY_NAME', 'Name der Kategorie') . '</label>'
                 . '<input id="MashaFeedlyCategoryTitle" name="Title" maxlength="120" required data-category-title-input placeholder="'
@@ -993,7 +994,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             . self::translate('BOARD_CREATE_ENTRY_EYEBROW', 'NEUE MELDUNG') . '</span><h2 id="masha-feedly-create-title">'
             . self::translate('BOARD_CREATE_ENTRY_TITLE', 'Meldung hinzufügen') . '</h2></div>'
             . '<button type="button" class="masha-feedly-board__dialog-close kw-masha-feedly__close" data-close-entry-modal aria-label="'
-            . $this->escapeBoardValue(self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen')) . '">×</button></header>'
+            . $this->escapeBoardValue(self::translate('BOARD_CATEGORY_ADD_CANCEL', 'Abbrechen')) . '">' . ArrayData::create()->renderWith('KW\\MashaFeedly\\Includes\\MashaFeedlyCloseIcon') . '</button></header>'
             . '<form class="masha-feedly-board__entry-form kw-masha-feedly__create-form" data-admin-create-entry-form data-create-url="'
             . $this->escapeBoardValue(Controller::join_links(Director::baseURL(), '__masha-feedly', 'createEntry'))
             . '" data-security-id="' . $this->escapeBoardValue((string)SecurityToken::getSecurityID()) . '">'
@@ -1187,7 +1188,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             . '<header class="kw-masha-feedly__dialog-header"><div><span class="kw-masha-feedly__eyebrow">MITE</span><h2 id="masha-feedly-mite-title" tabindex="-1">'
             . self::translate('MITE_DIALOG_TITLE', 'Mite-Timer starten?') . '</h2>'
             . '</div><button type="button" class="kw-masha-feedly__close" data-mite-close aria-label="'
-            . $this->escapeBoardValue(self::translate('CLOSE_MODAL', 'Dialog schließen')) . '">×</button></header>'
+            . $this->escapeBoardValue(self::translate('CLOSE_MODAL', 'Dialog schließen')) . '">' . ArrayData::create()->renderWith('KW\\MashaFeedly\\Includes\\MashaFeedlyCloseIcon') . '</button></header>'
             . '<form class="kw-masha-feedly__mite-form" data-mite-controls>'
             . '<p class="kw-masha-feedly__selected-context">' . self::translate('MITE_DIALOG_DESCRIPTION', 'Bei Bedarf startet hier die Zeiterfassung in Mite. Beschreibung und Seitenlink der Meldung werden übernommen.') . '</p>'
             . '<label>' . self::translate('MITE_PROJECT', 'Mite-Projekt') . '<select data-mite-project disabled></select></label>'

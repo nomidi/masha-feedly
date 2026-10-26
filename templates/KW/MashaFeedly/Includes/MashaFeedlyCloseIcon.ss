@@ -1,0 +1,1 @@
+<svg class="masha-feedly-close-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><use href="$resourceURL('kooperativeweb/masha-feedly:client/dist/icons/close.svg')#close"></use></svg>

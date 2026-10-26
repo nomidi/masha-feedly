@@ -1324,6 +1324,11 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
   const closeHelpButton = new Element();
   const listModal = new Element(); listModal.hidden = true;
   const closeListButton = new Element();
+  const closeListIcon = new Element();
+  closeListIcon.tagName = 'svg';
+  closeListIcon.className = 'masha-feedly-close-icon';
+  closeListButton.append(closeListIcon);
+  closeListButton.querySelector = (selector) => selector === '.masha-feedly-close-icon' ? closeListIcon : null;
   const modeField = new Element(); modeField.value = 'all';
   const categoryFilter = new Element(); categoryFilter.value = '';
   const priorityFilter = new Element(); priorityFilter.value = '';
@@ -1768,6 +1773,12 @@ test('hält Filter eingeklappt, zeigt aktive Filter als Chips und erlaubt Entfer
   assert.equal(chips.hidden, false);
   assert.deepEqual(chips.children.slice(0, 3).map((chip) => chip.dataset.removeFilter), ['mode', 'category', 'priority']);
   assert.match(chips.children[1].textContent, /Feedback/);
+  for (const chip of chips.children.slice(0, 3)) {
+    assert.doesNotMatch(chip.textContent, /×/);
+    assert.equal(chip.children[0].tagName, 'svg');
+    assert.equal(chip.children[0].className, 'masha-feedly-close-icon');
+    assert.notEqual(chip.children[0], env.widget.querySelector('[data-masha-feedly-close-list]').children[0], 'Der Filter erhält eine Kopie; das Schließen-Symbol im Dialog bleibt erhalten.');
+  }
   assert.match(env.widget.querySelector('[data-masha-feedly-priority-filter-icon]').innerHTML, /<svg[\s\S]*<path/);
 
   await chips.children[1].listeners.click();

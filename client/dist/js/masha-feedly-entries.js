@@ -819,7 +819,10 @@ document.addEventListener('DOMContentLoaded', () => {
       chip.type = 'button';
       chip.className = 'kw-masha-feedly__active-filter';
       chip.dataset.removeFilter = filter.kind;
-      chip.textContent = `${filter.label} ×`;
+      chip.textContent = filter.label;
+      // Dasselbe dekorative SVG wie im Dialog; der zugängliche Name bleibt am Button.
+      const closeIcon = closeListButton?.querySelector('.masha-feedly-close-icon')?.cloneNode(true);
+      if (closeIcon) chip.append(closeIcon);
       chip.setAttribute('aria-label', t('FILTER_REMOVE', { label: filter.label }));
       chip.addEventListener('click', () => {
         if (filter.kind === 'mode') modeField.value = 'page';

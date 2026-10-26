@@ -24,6 +24,7 @@ use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Forms\MashaFeedlyInteractiveLiteralField;
 use SilverStripe\i18n\i18n;
 use SilverStripe\View\Requirements;
+use SilverStripe\View\ArrayData;
 
 /**
  * Ergänzt Mitglieder um Profilbild, Avatarfarbe und E-Mail-Einstellungen für Masha Feedly.
@@ -555,7 +556,7 @@ class MashaFeedlyMemberExtension extends Extension
             . '"><header class="masha-feedly-avatar-icons__header"><div><span>MASHA:FEEDLY</span><h2>'
             . htmlspecialchars(self::translate('PROFILE_ICON_CHOOSER', 'Profil-Symbol auswählen'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
             . '</h2></div><button type="button" data-masha-feedly-avatar-icon-close aria-label="'
-            . htmlspecialchars(self::translate('CLOSE', 'Schließen'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">×</button></header><div class="masha-feedly-avatar-icons__content"><p>'
+            . htmlspecialchars(self::translate('CLOSE', 'Schließen'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">' . ArrayData::create()->renderWith('KW\\MashaFeedly\\Includes\\MashaFeedlyCloseIcon') . '</button></header><div class="masha-feedly-avatar-icons__content"><p>'
             . htmlspecialchars(self::translate('PROFILE_ICON_CHOICES_DESCRIPTION', 'Wähle ein Symbol. Seine Farbe passt sich automatisch an deine Profilfarbe an.'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
             . '</p><button type="button" class="masha-feedly-avatar-icons__clear" data-masha-feedly-avatar-icon-clear aria-pressed="' . ($selectedID === '' ? 'true' : 'false') . '">'
             . htmlspecialchars(self::translate('PROFILE_ICON_CLEAR', 'Kein Symbol verwenden'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</button><nav class="masha-feedly-avatar-icons__tabs" role="tablist" aria-label="'

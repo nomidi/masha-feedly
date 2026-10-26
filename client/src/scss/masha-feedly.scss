@@ -1,3 +1,5 @@
+@use "close-icon";
+
 /* --------------------------------------------------------------------------
    Zentrale Farbpalette
    Variablennamen enthalten den ursprünglichen Farbwert. Dadurch lassen sich
@@ -654,7 +656,6 @@ $masha-breakpoint-mobile-landscape-short: 520px;
     border-radius: 50%;
     background: $masha-color-f5f2f5;
     color: var(--kw-masha-feedly-ink);
-    font-size: calc(22.4px * var(--masha-font-scale, 1));
     line-height: 1;
     cursor: pointer;
   }
@@ -991,7 +992,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
 .kw-masha-feedly__dialog { width: min(688px, 100%); }
 .kw-masha-feedly__dialog-header { padding: 23.2px 30.4px; }
 .kw-masha-feedly__dialog-header h2 { font-size: calc(26px * var(--masha-font-scale, 1)); }
-.kw-masha-feedly__dialog-header .kw-masha-feedly__close { display: grid; flex: 0 0 40px; width: 40px; height: 40px; place-items: center; padding: 0; font-size: calc(28px * var(--masha-font-scale, 1)); line-height: 1; }
+.kw-masha-feedly__dialog-header .kw-masha-feedly__close { display: grid; flex: 0 0 40px; width: 40px; height: 40px; place-items: center; padding: 0; line-height: 1; }
 .kw-masha-feedly__eyebrow { font-size: calc(16px * var(--masha-font-scale, 1)); }
 .kw-masha-feedly__dialog form { gap: 19.2px; padding: 10.4px 30.4px 28.8px; }
 .kw-masha-feedly__dialog form > label, .kw-masha-feedly__form-grid label { font-size: calc(17px * var(--masha-font-scale, 1)); }
@@ -1398,8 +1399,8 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   .kw-masha-feedly__mite-button:focus-visible { z-index: 7; transform: translateY(-3px); border-color: $masha-color-f28c28; box-shadow: 0 8.8px 19.2px $masha-color-e8872633, inset 0 1px 0 $masha-color-fff; }
   .kw-masha-feedly__mite-button:focus-visible { outline: 3px solid $masha-color-db791c; outline-offset: 3px; }
   .kw-masha-feedly__mite-button[hidden] { display: none !important; }
-  .kw-masha-feedly__close { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; padding: 0; border: 1px solid $masha-color-f1d2e1; border-radius: 13.6px; background: linear-gradient(145deg, $masha-color-fff, $masha-color-fff2f8); color: $masha-color-a91c62; box-shadow: 0 3.2px 9.6px $masha-color-27233112; font-family: inherit; font-size: calc(29.6px * var(--masha-font-scale, 1)); font-weight: 500; line-height: 1; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease; }
-  .kw-masha-feedly__dialog-header .kw-masha-feedly__close { width: 44px; height: 44px; flex-basis: 44px; padding: 0; font-size: calc(29.6px * var(--masha-font-scale, 1)); }
+  .kw-masha-feedly__close { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; padding: 0; border: 1px solid $masha-color-f1d2e1; border-radius: 13.6px; background: linear-gradient(145deg, $masha-color-fff, $masha-color-fff2f8); color: $masha-color-a91c62; box-shadow: 0 3.2px 9.6px $masha-color-27233112; font-family: inherit; font-weight: 500; line-height: 1; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease; }
+  .kw-masha-feedly__dialog-header .kw-masha-feedly__close { width: 44px; height: 44px; flex-basis: 44px; padding: 0; }
   .kw-masha-feedly__close:hover { border-color: $masha-color-e6007e; background: $masha-color-e6007e; color: $masha-color-fff; box-shadow: 0 5px 14px $masha-color-e6007e40; }
   .kw-masha-feedly__entries-toolbar { grid-template-columns: 1fr; gap: 14.4px; }
   .kw-masha-feedly__entries-toolbar label { gap: 8px; font-size: calc(16px * var(--masha-font-scale, 1)); }
@@ -1970,7 +1971,7 @@ body.kw-masha-feedly-is-selecting, body.kw-masha-feedly-is-selecting * { cursor:
   .kw-masha-feedly__filters-details .kw-masha-feedly__saved-view-select { padding: 2.4px 12.8px 7.2px; }
   .kw-masha-feedly__filters-details .kw-masha-feedly__saved-views-details { margin: 0 12.8px 7.2px; }
   .kw-masha-feedly__active-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6.4px; padding: 4px 28.8px 5.6px; }
-  .kw-masha-feedly__active-filter { min-height: 32px; padding: 4px 9.6px; border: 1px solid $masha-color-e8c5d8; border-radius: 999px; background: $masha-color-fff4f9; color: $masha-color-76254d; font: inherit; font-size: calc(14px * var(--masha-font-scale, 1)); font-weight: 700; cursor: pointer; }
+  .kw-masha-feedly__active-filter { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 9.6px; border: 1px solid $masha-color-e8c5d8; border-radius: 999px; background: $masha-color-fff4f9; color: $masha-color-76254d; font: inherit; font-size: calc(14px * var(--masha-font-scale, 1)); font-weight: 700; cursor: pointer; }
   .kw-masha-feedly__active-filter:hover { border-color: $masha-color-c95a90; background: $masha-color-fde8f2; }
   .kw-masha-feedly__active-filter:focus-visible,
   .kw-masha-feedly__clear-filters:focus-visible { outline: 2px solid $masha-color-a91c62; outline-offset: 2px; }

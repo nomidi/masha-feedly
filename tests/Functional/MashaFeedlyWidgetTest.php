@@ -29,6 +29,32 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         i18n::set_locale('de_DE');
     }
 
+    /** Alle Schließen-Aktionen bleiben beschriftet und verwenden ein dekoratives SVG statt eines Schriftzeichens. */
+    public function testWidgetCloseButtonsUseDecorativeSvg(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyAllowedMemberIDs = json_encode([(int)$member->ID]);
+        $config->write();
+        $this->logInAs($member);
+
+        $response = $this->get('/masha-feedly-widget-test');
+        $this->assertSame(200, $response->getStatusCode());
+        $document = new \DOMDocument();
+        $document->loadHTML(
+            '<!DOCTYPE html><html><body>' . $this->widgetMarkup($response->getBody()) . '</body></html>',
+            LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING
+        );
+        $xpath = new \DOMXPath($document);
+        $buttons = $xpath->query('//button[contains(concat(" ", normalize-space(@class), " "), " kw-masha-feedly__close ") or @data-masha-feedly-dismiss-toast]');
+        $this->assertCount(7, $buttons);
+        foreach ($buttons as $button) {
+            $this->assertNotSame('', $button->getAttribute('aria-label'));
+            $this->assertStringNotContainsString('×', $button->textContent);
+            $this->assertSame(1, $xpath->query('./svg[@aria-hidden="true" and @focusable="false"]/use[contains(@href, "close.svg")]', $button)->length);
+        }
+    }
+
     /** Die Feedly-Hilfe steht im CMS unabhängig vom gewählten CMS-Bereich bereit. */
     public function testCmsProvidesOptionalHelplyCollection(): void
     {

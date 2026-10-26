@@ -1,0 +1,32 @@
+/* Ein gemeinsames Motiv ohne Schriftgrundlinie für Widget, Dialoge und Filter. */
+.kw-masha-feedly__close > svg.masha-feedly-close-icon,
+.kw-masha-feedly__toast button > svg.masha-feedly-close-icon,
+.kw-masha-feedly__active-filter > svg.masha-feedly-close-icon,
+.masha-feedly-board__dialog-close > svg.masha-feedly-close-icon,
+.masha-feedly-avatar-icons__header button > svg.masha-feedly-close-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  margin: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.kw-masha-feedly__close,
+.masha-feedly-board__dialog-close,
+.masha-feedly-avatar-icons__header button[data-masha-feedly-avatar-icon-close] {
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+}
+
+.kw-masha-feedly__active-filter > svg.masha-feedly-close-icon {
+  width: 14px;
+  height: 14px;
+  flex-basis: 14px;
+}
