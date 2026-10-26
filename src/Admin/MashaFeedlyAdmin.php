@@ -43,7 +43,7 @@ use SilverStripe\Security\Security;
 use SilverStripe\Security\SecurityToken;
 use SilverStripe\SiteConfig\SiteConfig;
 use SilverStripe\View\Requirements;
-use SilverStripe\View\ArrayData;
+use SilverStripe\Model\ArrayData;
 use SilverStripe\i18n\i18n;
 
 /**

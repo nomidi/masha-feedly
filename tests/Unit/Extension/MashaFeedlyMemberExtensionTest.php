@@ -413,6 +413,14 @@ class MashaFeedlyMemberExtensionTest extends SapphireTest
         };
 
         $html = $extension::renderPickerForTest('', $client);
+        // Der PHP-gerenderte Schließen-Button muss auch ohne alte Framework-Klassenaliase ein SVG enthalten.
+        $document = new \DOMDocument();
+        $document->loadHTML('<!DOCTYPE html><html><body>' . $html . '</body></html>', LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new \DOMXPath($document);
+        $closeButtons = $xpath->query('//button[@data-masha-feedly-avatar-icon-close]');
+        $this->assertCount(1, $closeButtons);
+        $this->assertSame('Schließen', $closeButtons->item(0)->getAttribute('aria-label'));
+        $this->assertSame(1, $xpath->query('./svg[@aria-hidden="true" and @focusable="false"]/use[contains(@href, "close.svg")]', $closeButtons->item(0))->length);
         $this->assertStringContainsString('role="tablist"', $html);
         $this->assertStringContainsString('role="tab"', $html);
         $this->assertStringContainsString('aria-selected="true"', $html);

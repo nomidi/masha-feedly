@@ -523,6 +523,11 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
         $this->assertStringContainsString('data-submit-category-form', $body);
         $this->assertStringContainsString('class="masha-feedly-board__category-form" data-create-category-form role="form"', $body);
         $this->assertStringContainsString('data-category-modal hidden="hidden"', $body);
+        // Der PHP-gerenderte Dialog verwendet die aktuelle Framework-Klasse für seine SVG-Vorlage.
+        $document = new \DOMDocument();
+        $document->loadHTML($body, LIBXML_NONET | LIBXML_NOERROR | LIBXML_NOWARNING);
+        $xpath = new \DOMXPath($document);
+        $this->assertSame(1, $xpath->query('//button[@data-close-category-modal]/svg[@aria-hidden="true"]/use[contains(@href, "close.svg")]')->length);
         $this->assertStringContainsString('placeholder=', $body);
         $this->assertStringContainsString('data-category-title-input', $body);
         $this->assertStringContainsString('role="dialog" aria-modal="true" aria-labelledby="masha-feedly-category-title"', $body);

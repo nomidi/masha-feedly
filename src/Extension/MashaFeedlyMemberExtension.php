@@ -24,7 +24,7 @@ use KW\MashaFeedly\Model\MashaFeedlyEntry;
 use KW\MashaFeedly\Forms\MashaFeedlyInteractiveLiteralField;
 use SilverStripe\i18n\i18n;
 use SilverStripe\View\Requirements;
-use SilverStripe\View\ArrayData;
+use SilverStripe\Model\ArrayData;
 
 /**
  * Ergänzt Mitglieder um Profilbild, Avatarfarbe und E-Mail-Einstellungen für Masha Feedly.
