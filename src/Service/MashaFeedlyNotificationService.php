@@ -13,6 +13,7 @@ use SilverStripe\Control\HTTP;
 use SilverStripe\Security\Member;
 use SilverStripe\Security\Security;
 use SilverStripe\Admin\CMSProfileController;
+use SilverStripe\Model\ArrayData;
 use SilverStripe\SiteConfig\SiteConfig;
 use SilverStripe\i18n\i18n;
 
@@ -206,7 +207,7 @@ class MashaFeedlyNotificationService
         $previewTemplates = [
             'welcome' => ['AccessGrantedEmail', 'AccessGrantedEmailPlain'],
             'newEntry' => ['NewEntryEmail', 'NewEntryEmailPlain'],
-            'updatedEntry' => ['NotificationTextPreviewUpdatedEntry', 'NotificationTextPreviewUpdatedEntryPlain'],
+            'updatedEntry' => ['UpdatedEntryEmail', 'UpdatedEntryEmailPlain'],
             'newComment' => ['NewCommentEmail', 'NewCommentEmailPlain'],
             'dueDate' => ['DueDateReminderEmail', 'DueDateReminderEmailPlain'],
             'costEstimate' => ['CostEstimateRequestedEmail', 'CostEstimateRequestedEmailPlain'],
@@ -240,6 +241,81 @@ class MashaFeedlyNotificationService
             ->setHTMLTemplate('KW/MashaFeedly/Email/' . $previewTemplates[$type][0])
             ->setPlainTemplate('KW/MashaFeedly/Email/' . $previewTemplates[$type][1])
             ->setData(self::emailData($previewData, $member))
+            ->send();
+    }
+
+    /** Sendet eine echte Feedly-Vorlage mit Beispieldaten ausschließlich an das angemeldete CMS-Konto. */
+    public static function sendTemplatePreview(Member $member, string $type): void
+    {
+        if (!Email::is_valid_address((string)$member->Email)) {
+            throw new \RuntimeException('Für dein Benutzerkonto ist keine gültige E-Mail-Adresse hinterlegt.');
+        }
+        $definitions = [
+            'welcome' => ['AccessGrantedEmail', 'AccessGrantedEmailPlain', 'welcome'],
+            'newEntry' => ['NewEntryEmail', 'NewEntryEmailPlain', 'newEntry'],
+            'updatedEntry' => ['UpdatedEntryEmail', 'UpdatedEntryEmailPlain', 'updatedEntry'],
+            'done' => ['UpdatedEntryEmail', 'UpdatedEntryEmailPlain', 'updatedEntry'],
+            'archive' => ['UpdatedEntryEmail', 'UpdatedEntryEmailPlain', 'updatedEntry'],
+            'newComment' => ['NewCommentEmail', 'NewCommentEmailPlain', 'newComment'],
+            'dueDate' => ['DueDateReminderEmail', 'DueDateReminderEmailPlain', 'dueDate'],
+            'costEstimate' => ['CostEstimateRequestedEmail', 'CostEstimateRequestedEmailPlain', 'costEstimate'],
+            'errorDigest' => ['ErrorDigestEmail', 'ErrorDigestEmailPlain', null],
+            'test' => ['TestEmail', 'TestEmailPlain', null],
+        ];
+        if (!isset($definitions[$type])) {
+            throw new \InvalidArgumentException('Unbekannte Feedly-E-Mail-Vorlage.');
+        }
+
+        [$htmlTemplate, $plainTemplate, $notificationType] = $definitions[$type];
+        $siteTitle = trim((string)SiteConfig::current_site_config()->Title) ?: 'Masha:Feedly';
+        $title = 'Beispielmeldung: Kontaktformular funktioniert nicht';
+        $url = Director::absoluteURL(Director::baseURL() . '?masha-feedly-entry=123');
+        $subject = match ($type) {
+            'welcome' => i18n::_t('KW\\MashaFeedly\\Translations.EMAIL_ACCESS_SUBJECT', 'Willkommen bei Masha:Feedly auf {siteTitle}', ['siteTitle' => $siteTitle]),
+            'newEntry' => i18n::_t('KW\\MashaFeedly\\Translations.EMAIL_NEW_SUBJECT', 'Neue Meldung auf {siteTitle}', ['siteTitle' => $siteTitle]),
+            'updatedEntry' => i18n::_t('KW\\MashaFeedly\\Translations.EMAIL_UPDATED_SUBJECT', '{siteTitle}: Masha-Feedly-Meldung geändert: {title}', ['siteTitle' => $siteTitle, 'title' => $title]),
+            'done' => i18n::_t('KW\\MashaFeedly\\Translations.EMAIL_COMPLETED_SUBJECT', '{siteTitle}: Geschafft: {title}', ['siteTitle' => $siteTitle, 'title' => $title]),
+            'archive' => i18n::_t('KW\\MashaFeedly\\Translations.EMAIL_ARCHIVED_SUBJECT', '{siteTitle}: Meldung archiviert: {title}', ['siteTitle' => $siteTitle, 'title' => $title]),
+            'newComment' => i18n::_t('KW\\MashaFeedly\\Translations.EMAIL_COMMENT_SUBJECT', '{siteTitle}: Neuer Kommentar zu {title}', ['siteTitle' => $siteTitle, 'title' => $title]),
+            'dueDate' => i18n::_t('KW\\MashaFeedly\\Translations.EMAIL_DUE_DATE_SUBJECT', '{siteTitle}: Heute fällig – {title}', ['siteTitle' => $siteTitle, 'title' => $title]),
+            'costEstimate' => i18n::_t('KW\\MashaFeedly\\Translations.EMAIL_ESTIMATE_REQUEST_SUBJECT', '{siteTitle}: Kostenschätzung zur Freigabe – {title}', ['siteTitle' => $siteTitle, 'title' => $title]),
+            'errorDigest' => i18n::_t('KW\\MashaFeedly\\Translations.ERRORS_DIGEST_SUBJECT', '{siteTitle}: Tägliche Fehlerzusammenfassung', ['siteTitle' => $siteTitle]),
+            default => 'Masha:Feedly – Test-E-Mail',
+        };
+        $data = [
+            'SiteTitle' => $siteTitle,
+            'WidgetURL' => Director::absoluteURL(Director::baseURL()),
+            'EntryURL' => $url,
+            'BugTitle' => $title,
+            'EntryTitle' => $title,
+            'ReporterName' => 'Alex Beispiel',
+            'AssignedNames' => 'Sam Beispiel',
+            'CategoryTitle' => 'In Bearbeitung',
+            'PriorityTitle' => 'Normal',
+            'DueDate' => date('d.m.Y'),
+            'BugDescription' => 'Das Kontaktformular zeigt nach dem Absenden eine Fehlermeldung. Bitte prüfen, damit Besucherinnen und Besucher Anfragen senden können.',
+            'CommentAuthor' => 'Sam Beispiel',
+            'CommentText' => 'Ich prüfe das Formular und gebe hier Bescheid, sobald ich mehr weiß.',
+            'CommentDate' => date('d.m.Y, H:i'),
+            'EstimateDuration' => '2–3 Stunden',
+            'EstimatePrice' => '190,00 € – 285,00 €',
+            'EstimateNote' => 'Ursache finden, Formular korrigieren und prüfen.',
+            'CategoryNotice' => in_array($type, ['done', 'archive'], true) ? $type : '',
+            'Errors' => \SilverStripe\Model\List\ArrayList::create([ArrayData::create([
+                'Title' => 'Beispiel: Formularprüfung fehlgeschlagen',
+                'Summary' => '3 Vorkommen · zuletzt heute um 09:15 Uhr',
+                'URL' => $url,
+            ])]),
+        ];
+        $placeholders = ['siteTitle' => $siteTitle, 'websiteName' => $siteTitle, 'title' => $title,
+            'recipientName' => (string)$member->getName(), 'name' => (string)$member->getName(),
+            'date' => date('d.m.Y'), 'author' => 'Sam Beispiel'];
+        Email::create()
+            ->setTo((string)$member->Email)
+            ->setSubject($subject)
+            ->setHTMLTemplate('KW/MashaFeedly/Email/' . $htmlTemplate)
+            ->setPlainTemplate('KW/MashaFeedly/Email/' . $plainTemplate)
+            ->setData(self::emailData($data, $member, $notificationType, $placeholders))
             ->send();
     }
 
@@ -383,9 +459,10 @@ class MashaFeedlyNotificationService
      * Sendet Änderungen oder zusätzliche Zuweisungshinweise ohne doppelte E-Mail.
      * @param MashaFeedlyEntry $entry Betroffene Meldung.
      * @param int[]|null $newAssignmentIDs Bei neuen Zuweisungen nur Empfänger ohne Änderungsabo benachrichtigen.
+     * @param string $categoryNotice Sondertext nur beim direkten Wechsel nach Done oder Archiv.
      * @return void
      */
-    public static function notifyUpdatedEntry(MashaFeedlyEntry $entry, ?array $newAssignmentIDs = null): void
+    public static function notifyUpdatedEntry(MashaFeedlyEntry $entry, ?array $newAssignmentIDs = null, string $categoryNotice = ''): void
     {
         if ($newAssignmentIDs === []) {
             return;
@@ -423,8 +500,16 @@ class MashaFeedlyNotificationService
             self::sendSafely(Email::create()
                 ->setTo((string)$member->Email)
                 ->setSubject(i18n::_t(
-                    'KW\\MashaFeedly\\Translations.EMAIL_UPDATED_SUBJECT',
-                    '{siteTitle}: Masha-Feedly-Meldung geändert: {title}',
+                    match ($categoryNotice) {
+                        'done' => 'KW\\MashaFeedly\\Translations.EMAIL_COMPLETED_SUBJECT',
+                        'archive' => 'KW\\MashaFeedly\\Translations.EMAIL_ARCHIVED_SUBJECT',
+                        default => 'KW\\MashaFeedly\\Translations.EMAIL_UPDATED_SUBJECT',
+                    },
+                    match ($categoryNotice) {
+                        'done' => '{siteTitle}: Geschafft: {title}',
+                        'archive' => '{siteTitle}: Meldung archiviert: {title}',
+                        default => '{siteTitle}: Masha-Feedly-Meldung geändert: {title}',
+                    },
                     ['siteTitle' => $siteTitle, 'title' => $entry->getTitle()]
                 ))
                 ->setHTMLTemplate('KW/MashaFeedly/Email/UpdatedEntryEmail')
@@ -434,6 +519,7 @@ class MashaFeedlyNotificationService
                     'BugTitle' => $entry->getTitle(),
                     'EntryURL' => $entryURL,
                     'CategoryTitle' => (string)$entry->Category()->Title,
+                    'CategoryNotice' => in_array($categoryNotice, ['done', 'archive'], true) ? $categoryNotice : '',
                 ], $member, 'updatedEntry', ['siteTitle' => $siteTitle, 'title' => $entry->getTitle()]))
             );
         }

@@ -222,6 +222,9 @@ class MashaFeedlyEntry extends DataObject
 
     private ?string $historyOldCategoryTitle = null;
 
+    /** Kennzeichnet einen direkten Wechsel in Done oder Archiv für die passende E-Mail. */
+    private string $updatedEntryNotice = '';
+
     private ?string $historyOldPriorityTitle = null;
 
     private ?string $historyOldDueDate = null;
@@ -599,6 +602,7 @@ class MashaFeedlyEntry extends DataObject
             if ($assignedIDs !== [(int)$manager->ID]) $this->AssignedMembers()->setByIDList([(int)$manager->ID]);
         }
         $this->historyOldCategoryTitle = null;
+        $this->updatedEntryNotice = '';
         $this->historyOldPriorityTitle = null;
         $this->historyOldDueDate = null;
         $this->historyDueDateChanged = false;
@@ -620,6 +624,13 @@ class MashaFeedlyEntry extends DataObject
                     $this->CategoryID = $feedback ? (int)$feedback->ID : (int)$storedEntry->CategoryID;
                     $newCategory = $feedback ?? $storedEntry->Category();
                     $newRole = (string)$newCategory->SystemKey;
+                }
+                $actor = Security::getCurrentUser();
+                if ($oldRole !== $newRole && $newRole === 'done'
+                    && $actor instanceof Member && $storedEntry->canConfirmCompletion($actor)) {
+                    $this->updatedEntryNotice = 'done';
+                } elseif ($oldRole !== $newRole && $newRole === 'archive') {
+                    $this->updatedEntryNotice = $newRole;
                 }
 
                 $invalidEstimateTransition = ($newRole === 'estimate_pending'
@@ -894,8 +905,9 @@ class MashaFeedlyEntry extends DataObject
             }
             $this->deferNewEntryNotification = false;
         } elseif ($this->notifyMembersAfterUpdate && !$this->deferErrorNotification) {
-            MashaFeedlyNotificationService::notifyUpdatedEntry($this);
+            MashaFeedlyNotificationService::notifyUpdatedEntry($this, null, $this->updatedEntryNotice);
         }
+        $this->updatedEntryNotice = '';
         if ($this->notifyCostEstimateRequestedAfterWrite) {
             MashaFeedlyNotificationService::notifyCostEstimateRequested($this);
             $this->notifyCostEstimateRequestedAfterWrite = false;
