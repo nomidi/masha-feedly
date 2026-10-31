@@ -1,5 +1,10 @@
 en:
   KW\MashaFeedly\Translations:
+    CONFIG_POLLING_MINUTES: "minutes"
+    CONFIG_POLLING_ENABLED: "Refresh activity automatically (polling)"
+    CONFIG_POLLING_HELP: "Off by default. Checks for activity only while the Feedly panel is open and the browser tab is visible. Opening a list loads its data even when polling is off. Reload the page after changing these settings."
+    CONFIG_POLLING_INTERVAL: "Refresh interval"
+    CONFIG_POLLING_INTERVAL_HELP: "Applies when polling is enabled: 5 to 60 minutes in 5-minute steps. Errors increase the waiting time."
     PROFILE_WEEKLY_ENABLED: "Receive a weekly website review"
     PROFILE_WEEKLY_HELP: "Mondays from 08:00: tasks, available metrics and next steps from your permitted sections. You can turn off this weekly email here independently of individual Feedly notifications."
     MITE_SETTINGS_TITLE: "Track time with Mite"

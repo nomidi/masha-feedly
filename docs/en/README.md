@@ -27,7 +27,7 @@ Under **Email texts**, the operator can edit introductions for new reports, upda
 
 Each editable introduction also has a test button that sends it to the operator account, including unsaved editor changes, rendered in the matching original template.
 
-Test messages show sample content in the email layout: new reports include the reporter, category, priority, due date, assignees, and description; comments show the report, comment, and author; due-date reminders include the due date and report details; estimate requests show sample effort, cost, and explanation. The update preview illustrates changes to status, priority, due date, and assignee. These are sample values, not real report data.
+Test messages show sample content in the email layout: new reports include the reporter, category, priority, due date, assignees, and description; comments show the report, comment, and author; due-date reminders include the due date and report details; estimate requests show sample effort, cost, and explanation. The update preview shows the entered introduction, current sample category, and report link in the original template. These are sample values, not real report data.
 
 For normal notifications, each recipient’s personal form of address in their profile selects Du or Sie. The website setting under **Masha:Feedly → Configuration** controls the welcome email. Feedly adds report details and links automatically. Edit the shared footer in this tab.
 
@@ -62,6 +62,8 @@ The current tool crops the image; it cannot black out individual areas inside th
 In the Feedly panel, **Board** below the FAQ button opens the report board in the CMS. It shows all reports you can access, grouped by status. A tooltip explains the destination on hover or keyboard focus. The board link is available independently of Helply.
 
 The globe button opens open entries across the website. The page button shows open entries on the current page. The News, Feedback, and completed-entry buttons each open their corresponding list. News highlights entries and comments added since your last visit.
+
+Under **Masha:Feedly → Configuration**, **Refresh activity automatically (polling)** is off by default. Enable it when needed and choose the **Refresh interval**: 5 to 60 minutes in 5-minute steps, default 5 minutes. Reload the page after saving. Activity requests run only while the Feedly panel is open and the browser tab is visible. Returning to the tab checks again if the interval has elapsed. Only activity data is transferred. Errors increase the waiting time up to four times the selected interval; requests do not overlap. Opening a list loads current data even when polling is off.
 
 Filter the list by category, priority, page, and assignee. Expand **Filters** to save a personal combination and select it again later. Open an entry to view its description, browser and page details, comments, attachments, history, and relationships. Status, priority, and assignee changes take effect when you select **Save changes**.
 

@@ -1248,6 +1248,9 @@ function createWidgetEnvironment(locationHref = 'https://feedly.example.test:844
   const postResponses = [];
   const postCalls = [];
   const intervalCallbacks = [];
+  const intervalDelays = [];
+  const listResponses = [];
+  let clockNow = Date.now();
   let savedViewsData = [];
   class Element {
     constructor(dataset = {}) {
@@ -1297,7 +1300,7 @@ function createWidgetEnvironment(locationHref = 'https://feedly.example.test:844
     cloneNode() { const clone = new Element(); clone.tagName = this.tagName; clone.className = this.className; return clone; }
     getBoundingClientRect() { return { left: 150, top: 120, width: 200, height: 80 }; }
   }
-const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetailsUrl: '/__masha-feedly/entryDetails', markEntryReadUrl: '/__masha-feedly/markEntryRead', savedViewsUrl: '/__masha-feedly', saveViewUrl: '/__masha-feedly', deleteViewUrl: '/__masha-feedly', securityId: 'test-token', theme: 'playful' });
+const widget = new Element({ pollingEnabled: '1', pollingMinutes: '5', listUrl: '/__masha-feedly/listEntries', entryDetailsUrl: '/__masha-feedly/entryDetails', markEntryReadUrl: '/__masha-feedly/markEntryRead', savedViewsUrl: '/__masha-feedly', saveViewUrl: '/__masha-feedly', deleteViewUrl: '/__masha-feedly', securityId: 'test-token', theme: 'playful' });
   widget.dataset.address = address;
   widget.dataset.unicornUrl = '/_resources/kooperativeweb/masha-feedly/client/dist/icons/masha-feedly-unicorn.svg';
   widget.contains = () => false;
@@ -1451,6 +1454,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
   widget.querySelector = (selector) => controls.get(selector) || null;
   widget.querySelectorAll = () => [];
   const document = {
+    visibilityState: 'visible',
     body: new Element(),
     documentElement: { classList: { add() {}, remove() {} } },
     addEventListener(name, callback) { listeners[name] = callback; },
@@ -1482,7 +1486,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
     innerWidth: 1280,
     addEventListener() {},
     setTimeout(callback) { callback(); },
-    setInterval(callback) { intervalCallbacks.push(callback); return intervalCallbacks.length; },
+    setInterval(callback, delay) { intervalDelays.push(delay); intervalCallbacks.push(callback); return intervalCallbacks.length; },
     locationAssign: '',
     KWMashaFeedlyTranslate: translate,
     KWMashaFeedlyTranslations: {},
@@ -1596,14 +1600,23 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
       }
       const mode = parsedURL.searchParams.get('mode');
       requests.push(parsedURL);
+      if (listResponses.length) {
+        const response = listResponses.shift();
+        if (response instanceof Error) throw response;
+        return await response;
+      }
       const result = responseFor(mode);
       result.entries = result.entries.map((entry) => {
         const summary = { ...entry, activityAt: entry.history[0].created };
         ['content', 'attachments', 'relations', 'history', 'comments', 'assignedMemberIDs', 'operatingSystem', 'browser', 'userAgent', 'resolution', 'browserWindow', 'colorDepth'].forEach((key) => delete summary[key]);
         return summary;
       });
+      if (parsedURL.searchParams.get('activityOnly') === '1') {
+        result.entries = result.entries.map(({ id, isUnread, activityAt }) => ({ id, isUnread, activityAt }));
+      }
       return { ok: true, json: async () => result };
     },
+    Date: class extends Date { static now() { return clockNow; } },
     Option: class { constructor(text, value) { this.text = text; this.value = value; this.dataset = {}; } },
     URL,
     CustomEvent: class { constructor(type) { this.type = type; } },
@@ -1635,7 +1648,7 @@ const widget = new Element({ listUrl: '/__masha-feedly/listEntries', entryDetail
   };
   vm.runInNewContext(source, context);
   if (startImmediately) listeners.DOMContentLoaded();
-  return { locationNotice, showLocationButton, notifyTargetChange, listeners, requests, detailRequests, detailResponses, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editHistoryDetails, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntriesEmpty(value) { pageEntriesEmpty = value; }, setEntryTechnicalError(value) { entryIsTechnicalError = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
+  return { intervalDelays, listResponses, advanceClock(milliseconds) { clockNow += milliseconds; }, locationNotice, showLocationButton, notifyTargetChange, listeners, requests, detailRequests, detailResponses, postResponses, postCalls, intervalCallbacks, dispatchedEvents, widget, pageCount, totalCount, closedCountDisplay, feedbackButton, feedbackCountDisplay, unreadCountDisplay, newsSummary, openListButton, openClosedButton, openPageListButton, openNewsButton, rainbow, rainbowCopy, rainbowTitle, rainbowMessage, helpModal, openHelpButton, closeHelpButton, listModal, modeField, categoryFilter, priorityFilter, savedViewSelect, savedViewName, saveViewButton, deleteViewButton, savedViewStatus, listCount, listContainer, document, pageTarget, editModal, editForm, editAttachmentInput, editAttachments, editStatus, editHeading, editPriorityIcon, shareActiveEntryButton, editHistory, editHistoryDetails, editContext, editRelations, relationTypeSelect, relatedEntrySelect, editDescription, editEnvironment, editEnvironmentDetails, editAssignees, commentForm, commentList, commentCount, commentStatus, panel, toggle, window, setSavedViews(views) { savedViewsData = views; }, setAddress(value) { widget.dataset.address = value; }, setEntryPageURL(url) { entryPageURL = url; }, setEntryTitle(value) { entryTitleValue = value; }, setEntryAssignees(value) { entryAssigneeList = value; }, setEntryContent(value) { entryContent = value; }, setEntryAttachments(value) { entryAttachments = value; }, setEntryRelations(value) { entryRelations = value; }, setPageEntriesEmpty(value) { pageEntriesEmpty = value; }, setEntryTechnicalError(value) { entryIsTechnicalError = value; }, setPageEntryCount(count) { pageEntryCount = count; }, setPageOpenEntryCount(count) { pageOpenEntryCount = count; }, setOpenEntryCount(count) { openEntryCount = count; }, setTotalEntriesCount(count) { totalEntriesCount = count; }, setFeedbackEntryCount(count) { feedbackEntryCount = count; }, setEntryClosed(value) { entryIsClosed = value; }, setEntryUnread(value) { entryIsUnread = value; }, setUnreadCommentCount(count) { unreadCommentCountOverride = count; }, setEntryStatus(value) { entryStatusOverride = value; }, get cleanedURL() { return cleanedURL; } };
 }
 
 test('beschriftet die beiden Fehlerzähler verständlich und öffnet die Feedback-Warteschlange', async () => {
@@ -2917,4 +2930,70 @@ test('öffnet Systemmeldungen aus der Gesamtliste ohne Navigation zur Fehleradre
   await env.listContainer.listeners.click({ target: card, preventDefault() {} });
   assert.equal(env.window.locationAssign, '');
   assert.equal(env.editModal.hidden, false);
+});
+
+
+test('pollt nur im sichtbaren Tab mit geöffnetem Panel und lädt ausschließlich Aktivitätsdaten', async () => {
+  const env = createWidgetEnvironment();
+  await env.intervalCallbacks[0]();
+  assert.equal(env.requests.length, 0);
+  await env.listeners['kw-masha-feedly:opened']();
+  const initial = env.requests.length;
+  env.document.visibilityState = 'hidden';
+  await env.intervalCallbacks[0]();
+  assert.equal(env.requests.length, initial);
+  env.document.visibilityState = 'visible';
+  await env.listeners.visibilitychange();
+  assert.equal(env.requests.length, initial + 1);
+  assert.equal(env.requests.at(-1).searchParams.get('activityOnly'), '1');
+  assert.equal(env.requests.at(-1).searchParams.has('mode'), false);
+  env.listeners['kw-masha-feedly:closed']();
+  await env.intervalCallbacks[0]();
+  await env.listeners.visibilitychange();
+  assert.equal(env.requests.length, initial + 1);
+});
+
+test('verhindert überlappende Aktivitätsabfragen und wartet nach Serverfehlern länger', async () => {
+  const env = createWidgetEnvironment();
+  await env.listeners['kw-masha-feedly:opened']();
+  let finishRequest;
+  env.listResponses.push(new Promise((resolve) => { finishRequest = resolve; }));
+  const pending = env.intervalCallbacks[0]();
+  const count = env.requests.length;
+  await env.intervalCallbacks[0]();
+  await env.listeners.visibilitychange();
+  assert.equal(env.requests.length, count);
+  finishRequest({ ok: false, status: 503, json: async () => ({ success: false }) });
+  await pending;
+  env.advanceClock(300000);
+  await env.intervalCallbacks[0]();
+  assert.equal(env.requests.length, count);
+  env.advanceClock(300000);
+  await env.intervalCallbacks[0]();
+  assert.equal(env.requests.length, count + 1);
+  env.advanceClock(300000);
+  await env.intervalCallbacks[0]();
+  assert.equal(env.requests.length, count + 2, 'Nach Erfolg gilt wieder das normale Intervall.');
+});
+
+
+test('Polling bleibt ohne Aktivierung aus und übernimmt nur Intervalle in Fünf-Minuten-Schritten', async () => {
+  for (const [enabled, minutes, expected] of [[undefined, '5', null], ['0', '10', null], ['1', '15', 900000], ['1', '7', 300000]]) {
+    const env = createWidgetEnvironment(undefined, undefined, undefined, undefined, undefined, false, false);
+    env.widget.dataset.pollingEnabled = enabled;
+    env.widget.dataset.pollingMinutes = minutes;
+    env.listeners.DOMContentLoaded();
+    await env.listeners['kw-masha-feedly:opened']();
+    const count = env.requests.length;
+    if (expected === null) {
+      assert.equal(env.intervalCallbacks.length, 0);
+      await env.listeners.visibilitychange();
+      assert.equal(env.requests.length, count);
+    } else {
+      assert.equal(env.intervalDelays[0], expected);
+      await env.intervalCallbacks[0]();
+      await env.listeners.visibilitychange();
+      assert.equal(env.requests.length, count + 1, 'Tabwechsel umgeht das gewählte Intervall nicht.');
+    }
+  }
 });

@@ -37,6 +37,7 @@ class MashaFeedlyTechnicalErrorAccessTest extends FunctionalTest
         $this->customer = $this->objFromFixture(Member::class, 'allowed');
         $config = MashaFeedlyConfigExtension::currentSiteConfig();
         $config->MashaFeedlyAllowedMemberIDs = json_encode([$this->customer->ID]);
+        $config->MashaFeedlyPollingEnabled = true;
         $config->write();
         $this->technical = MashaFeedlyEntry::create([
             'Content' => 'Vertraulicher technischer Fehler', 'ErrorFingerprint' => hash('sha256', 'privat'),
@@ -65,6 +66,11 @@ class MashaFeedlyTechnicalErrorAccessTest extends FunctionalTest
         $ids = array_map('intval', array_column($data['entries'], 'id'));
         $this->assertContains((int)$this->ordinary->ID, $ids);
         $this->assertNotContains((int)$this->technical->ID, $ids);
+        $activityResponse = $this->get('/__masha-feedly/listEntries?activityOnly=1');
+        $this->assertSame(200, $activityResponse->getStatusCode());
+        $activityIDs = array_column(json_decode($activityResponse->getBody(), true)['entries'], 'id');
+        $this->assertContains((int)$this->ordinary->ID, $activityIDs);
+        $this->assertNotContains((int)$this->technical->ID, $activityIDs);
         foreach (['entryDetails', 'entryHistory'] as $action) {
             $response = $this->get('/__masha-feedly/' . $action . '?EntryID=' . $this->technical->ID);
             $this->assertSame(404, $response->getStatusCode());

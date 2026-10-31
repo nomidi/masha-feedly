@@ -711,6 +711,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
                 ],
                 'MashaFeedlyMemberColor_' . (int)$member->ID => '#B5A0E0',
                 'MashaFeedlyAddress' => 'sie',
+                'MashaFeedlyPollingEnabled' => '1',
+                'MashaFeedlyPollingMinutes' => '15',
                 'MashaFeedlyFontSize' => 'large',
                 'MashaFeedlyTheme' => 'serious',
                 'MashaFeedlyDueDateReminderMode' => 'visitor',
@@ -720,6 +722,8 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
 
         $this->assertSame(200, $saveResponse->getStatusCode());
         $this->assertSame('sie', MashaFeedlyConfigExtension::address());
+        $this->assertTrue(MashaFeedlyConfigExtension::pollingEnabled());
+        $this->assertSame(15, MashaFeedlyConfigExtension::pollingMinutes());
         $this->assertSame('large', MashaFeedlyConfigExtension::fontSize());
         $this->assertSame('serious', MashaFeedlyConfigExtension::theme());
         $this->assertSame('visitor', MashaFeedlyConfigExtension::dueDateReminderMode());
@@ -836,10 +840,15 @@ class MashaFeedlyAdminBoardTest extends FunctionalTest
             $this->assertCount(3, $mailer->messages);
             $updatedMessage = $mailer->messages[2];
             $this->assertSame('Masha:Feedly – Test: Meldung geändert (Du)', $updatedMessage->getSubject());
-            $this->assertStringContainsString('Was wurde geändert?', (string)$updatedMessage->getHtmlBody());
-            $this->assertStringContainsString('10.10.2026', (string)$updatedMessage->getHtmlBody());
-            $this->assertStringContainsString('Sam Beispiel', (string)$updatedMessage->getHtmlBody());
-            $this->assertStringContainsString('Backlog → In Bearbeitung', (string)$updatedMessage->getTextBody());
+            // Die Vorschau verwendet die Originalvorlage mit aktuellem Status statt erfundener Änderungen.
+            foreach ([(string)$updatedMessage->getHtmlBody(), (string)$updatedMessage->getTextBody()] as $body) {
+                $this->assertStringContainsString('Beispielmeldung auf', $body);
+                $this->assertStringContainsString('wurde aktualisiert.', $body);
+                $this->assertStringContainsString('In Bearbeitung', $body);
+                $this->assertStringContainsString('?masha-feedly-entry=123', $body);
+                $this->assertStringNotContainsString('Backlog', $body);
+                $this->assertStringNotContainsString('10.10.2026', $body);
+            }
 
             foreach (['newComment', 'dueDate', 'costEstimate'] as $index => $type) {
                 $field = MashaFeedlyConfigExtension::notificationFieldMap()[$type]['du'];

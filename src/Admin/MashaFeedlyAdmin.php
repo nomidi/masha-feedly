@@ -216,7 +216,17 @@ class MashaFeedlyAdmin extends ModelAdmin
         foreach (Member::get()->sort('Surname ASC, FirstName ASC') as $member) {
             $members[(string)$member->ID] = (string)$member->getName();
         }
+        $pollingIntervals = [];
+        foreach (range(5, 60, 5) as $minutes) {
+            $pollingIntervals[$minutes] = $minutes . ' ' . self::translate('CONFIG_POLLING_MINUTES', 'Minuten');
+        }
         $fields = FieldList::create(
+            CheckboxField::create('MashaFeedlyPollingEnabled', self::translate('CONFIG_POLLING_ENABLED', 'Aktivitäten automatisch aktualisieren (Polling)'))
+                ->setValue(MashaFeedlyConfigExtension::pollingEnabled())
+                ->setDescription(self::translate('CONFIG_POLLING_HELP', 'Standardmäßig ausgeschaltet. Fragt neue Aktivitäten nur bei geöffnetem Feedly-Panel und sichtbarem Browser-Tab ab. Beim Öffnen einer Liste werden die Daten auch ohne Polling geladen. Änderungen gelten nach dem Neuladen der Seite.')),
+            DropdownField::create('MashaFeedlyPollingMinutes', self::translate('CONFIG_POLLING_INTERVAL', 'Aktualisierungsintervall'), $pollingIntervals)
+                ->setValue(MashaFeedlyConfigExtension::pollingMinutes())
+                ->setDescription(self::translate('CONFIG_POLLING_INTERVAL_HELP', 'Gilt bei aktiviertem Polling: 5 bis 60 Minuten in 5-Minuten-Schritten. Bei Fehlern wird länger gewartet.')),
             DropdownField::create('MashaFeedlyAddress', self::translate('CONFIG_ADDRESS', 'Wie möchtest du angesprochen werden?'), [
                 'du' => self::translate('CONFIG_ADDRESS_DU', 'Du'),
                 'sie' => self::translate('CONFIG_ADDRESS_SIE', 'Sie'),
@@ -305,7 +315,7 @@ class MashaFeedlyAdmin extends ModelAdmin
             }
             return $group;
         };
-        $generalFields = $takeFields(['MashaFeedlyEmailTestNotice', 'MashaFeedlyAddress', 'MashaFeedlyFontSize', 'MashaFeedlyTheme']);
+        $generalFields = $takeFields(['MashaFeedlyPollingEnabled', 'MashaFeedlyPollingMinutes', 'MashaFeedlyEmailTestNotice', 'MashaFeedlyAddress', 'MashaFeedlyFontSize', 'MashaFeedlyTheme']);
         $accessFields = $takeFields(['AllowedMemberIDs']);
         $sections = [
             LiteralField::create('ConfigurationIntro', $this->renderConfigurationIntro($canManageSensitiveSettings)),
@@ -1421,6 +1431,8 @@ class MashaFeedlyAdmin extends ModelAdmin
         $memberIDs = MashaFeedlyConfigExtension::normalizeMemberIDs($data['AllowedMemberIDs'] ?? []);
         $siteConfig = MashaFeedlyConfigExtension::currentSiteConfig();
         $siteConfig->MashaFeedlyAllowedMemberIDs = json_encode($memberIDs);
+        $siteConfig->MashaFeedlyPollingEnabled = !empty($data['MashaFeedlyPollingEnabled']);
+        $siteConfig->MashaFeedlyPollingMinutes = MashaFeedlyConfigExtension::normalizePollingMinutes((int)($data['MashaFeedlyPollingMinutes'] ?? 5));
         $siteConfig->MashaFeedlyAddress = strtolower((string)($data['MashaFeedlyAddress'] ?? 'du')) === 'sie' ? 'sie' : 'du';
         $fontSize = strtolower((string)($data['MashaFeedlyFontSize'] ?? 'small'));
         $siteConfig->MashaFeedlyFontSize = in_array($fontSize, ['small', 'medium', 'large'], true) ? $fontSize : 'small';

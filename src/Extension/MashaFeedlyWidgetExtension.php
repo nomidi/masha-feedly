@@ -108,6 +108,8 @@ class MashaFeedlyWidgetExtension extends Extension
             'CreateEntryURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'createEntry'),
             'EntryDetailsURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'entryDetails'),
             'EntryHistoryURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'entryHistory'),
+            'PollingEnabled' => MashaFeedlyConfigExtension::pollingEnabled(),
+            'PollingMinutes' => MashaFeedlyConfigExtension::pollingMinutes(),
             'ListEntriesURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'listEntries'),
             'MarkEntryReadURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'markEntryRead'),
             'UpdateEntryURL' => Controller::join_links(Director::baseURL(), '__masha-feedly', 'updateEntry'),

@@ -939,6 +939,35 @@ class MashaFeedlyEntryController extends Controller
             return $this->respond(['success' => false, 'message' => $this->translate('NO_PERMISSION', 'Diese Aktion ist für dein Benutzerkonto nicht freigeschaltet. Wende dich an die Person, die Masha:Feedly betreut.')], 403);
         }
 
+        // Aktivitätsabfragen benötigen weder Karten, Avatare noch Kategorie- und Prioritätsdaten.
+        if ($request->getVar('activityOnly') === '1') {
+            if (!MashaFeedlyConfigExtension::pollingEnabled()) {
+                return $this->respond(['success' => true, 'pollingEnabled' => false])
+                    ->addHeader('Cache-Control', 'private, no-store');
+            }
+            $visibleEntries = MashaFeedlyEntry::visibleTo($member)->toArray();
+            $unreadIDs = MashaFeedlyEntryRead::unreadEntryIDs($member, $visibleEntries);
+            $unreadLookup = array_fill_keys($unreadIDs, true);
+            $counts = MashaFeedlyEntryRead::unreadActivityCounts($member, $unreadIDs);
+            $activity = [];
+            foreach ($visibleEntries as $entry) {
+                $activity[] = [
+                    'id' => (int)$entry->ID,
+                    'isUnread' => isset($unreadLookup[(int)$entry->ID]),
+                    'activityAt' => (new \DateTimeImmutable(
+                        (string)($entry->LastActivityAt ?: $entry->Created),
+                        new \DateTimeZone('UTC')
+                    ))->format('Y-m-d\\TH:i:s\\Z'),
+                ];
+            }
+            return $this->respond([
+                'success' => true,
+                'unreadCount' => $counts['entries'],
+                'unreadCommentCount' => $counts['comments'],
+                'entries' => $activity,
+            ])->addHeader('Cache-Control', 'private, no-store');
+        }
+
         $requestedPageURL = trim((string)$request->getVar('PageURL'));
         $pageURL = $this->safePageURL($requestedPageURL);
         $pageURLs = array_values(array_unique(array_filter([$pageURL, $requestedPageURL])));

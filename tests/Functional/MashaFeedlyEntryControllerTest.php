@@ -94,6 +94,47 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(403, $this->get('/__masha-feedly/widgetData')->getStatusCode());
     }
 
+    /** Aktivitätsabfragen erhalten Lesestände und dieselbe Zugriffssperre ohne vollständige Karten. */
+    public function testActivityPollingReturnsOnlyActivityForAllowedMembers(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($member);
+        $this->logInAs($member);
+        $entry = MashaFeedlyEntry::create([
+            'Content' => 'Geschützter Inhalt',
+            'PageURL' => 'https://example.test/activity',
+        ]);
+        $entry->write();
+        // Ein fremder, bislang ungelesener Stand für das abfragende Mitglied.
+        foreach (MashaFeedlyEntryRead::get()->filter(['EntryID' => (int)$entry->ID, 'MemberID' => (int)$member->ID]) as $read) {
+            $read->delete();
+        }
+        $path = '/__masha-feedly/listEntries?activityOnly=1';
+        $config = MashaFeedlyConfigExtension::currentSiteConfig();
+        $config->MashaFeedlyPollingEnabled = false;
+        $config->write();
+        $disabled = json_decode($this->get($path)->getBody(), true);
+        $this->assertFalse($disabled['pollingEnabled']);
+        $this->assertArrayNotHasKey('entries', $disabled);
+        $config->MashaFeedlyPollingEnabled = true;
+        $config->write();
+        $response = $this->get($path);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertStringContainsString('no-store', (string)$response->getHeader('Cache-Control'));
+        $data = json_decode($response->getBody(), true);
+        $this->assertArrayNotHasKey('categories', $data);
+        $this->assertArrayNotHasKey('priorities', $data);
+        $activity = array_values(array_filter($data['entries'], static fn(array $row): bool => $row['id'] === (int)$entry->ID))[0];
+        $this->assertSame(['id', 'isUnread', 'activityAt'], array_keys($activity));
+        $this->assertTrue($activity['isUnread']);
+        MashaFeedlyEntryRead::markAsSeen($entry, $member);
+        $data = json_decode($this->get($path)->getBody(), true);
+        $activity = array_values(array_filter($data['entries'], static fn(array $row): bool => $row['id'] === (int)$entry->ID))[0];
+        $this->assertFalse($activity['isUnread']);
+        $this->logInAs($this->objFromFixture(Member::class, 'notAllowed'));
+        $this->assertSame(403, $this->get($path)->getStatusCode());
+    }
+
     /** Die Übersicht enthält keine Detaildaten; nur freigegebene Personen können sie nachladen. */
     public function testListLoadsDetailsOnlyOnDemand(): void
     {

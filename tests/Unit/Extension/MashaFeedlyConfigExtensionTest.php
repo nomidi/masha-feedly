@@ -26,6 +26,17 @@ class MashaFeedlyConfigExtensionTest extends SapphireTest
 {
     protected static $fixture_file = '../../fixtures/MashaFeedlyConfig.yml';
 
+    /** Polling startet nur nach Aktivierung; fehlerhafte Intervalle fallen auf fünf Minuten zurück. */
+    public function testPollingDefaultsAndIntervals(): void
+    {
+        $fresh = SiteConfig::create();
+        $this->assertFalse((bool)$fresh->MashaFeedlyPollingEnabled);
+        $this->assertSame(5, (int)$fresh->MashaFeedlyPollingMinutes);
+        foreach ([0 => 5, 1 => 5, 5 => 5, 7 => 5, 10 => 10, 60 => 60, 65 => 5] as $input => $expected) {
+            $this->assertSame($expected, MashaFeedlyConfigExtension::normalizePollingMinutes($input));
+        }
+    }
+
     /** Stellt sicher, dass SiteConfig-Felder physisch angelegt sind und regulär gelesen werden können. */
     public function testThemeFieldExistsInSiteConfigSchema(): void
     {

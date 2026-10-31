@@ -27,7 +27,7 @@ Im Tab **E-Mail-Texte** bearbeitet das Betreiberkonto die Einleitungen für neue
 
 Unter jeder bearbeitbaren Einleitung kann zusätzlich eine Test-E-Mail an das Betreiberkonto gesendet werden. Sie verwendet den aktuellen Editorinhalt auch dann, wenn er noch nicht gespeichert ist, und rendert ihn in der passenden Originalvorlage.
 
-Die Testmails zeigen neben der Einleitung Beispielinhalte im tatsächlichen E-Mail-Layout: Meldungen enthalten Meldeperson, Kategorie, Priorität, Fälligkeit, Zuständigkeit und Beschreibung; Kommentare zeigen Meldung, Kommentar und Person; Fälligkeitserinnerungen ergänzen den Termin und Meldungsdetails; Kostenschätzungen zeigen Aufwand, Beispielkosten und Erläuterung. Die Änderungs-Testmail veranschaulicht Status-, Prioritäts-, Termin- und Zuständigkeitswechsel. Diese Beispielwerte sind keine echten Meldungsdaten.
+Die Testmails zeigen neben der Einleitung Beispielinhalte im tatsächlichen E-Mail-Layout: Meldungen enthalten Meldeperson, Kategorie, Priorität, Fälligkeit, Zuständigkeit und Beschreibung; Kommentare zeigen Meldung, Kommentar und Person; Fälligkeitserinnerungen ergänzen den Termin und Meldungsdetails; Kostenschätzungen zeigen Aufwand, Beispielkosten und Erläuterung. Die Änderungs-Testmail zeigt die eingegebene Einleitung, die aktuelle Beispielkategorie und einen Meldungslink in der Originalvorlage. Diese Beispielwerte sind keine echten Meldungsdaten.
 
 Bei normalen Benachrichtigungen entscheidet die persönliche Anrede im Profil der empfangenden Person über Du oder Sie. Für die Willkommens-E-Mail gilt dagegen die Website-Vorgabe unter **Masha:Feedly → Konfiguration**. Meldungsdaten und Link ergänzt Masha:Feedly automatisch. Der gemeinsame Footer wird in diesem Tab gepflegt.
 
@@ -62,6 +62,8 @@ Die aktuelle Funktion schneidet das Bild zu; einzelne Stellen innerhalb des Auss
 Im Feedly-Panel öffnet **Board** unter dem FAQ-Button das Meldungsboard im CMS. Dort siehst du alle für dich freigegebenen Meldungen nach Status. Beim Darüberfahren oder Tastaturfokus erklärt ein Hinweis das Ziel. Der Board-Link ist unabhängig von Helply verfügbar.
 
 Das Globus-Symbol öffnet offene Einträge der ganzen Website. Das Seitensymbol zeigt offene Einträge der aktuellen Seite. Die Schaltflächen für Neuigkeiten, Feedback und abgeschlossene Einträge öffnen jeweils die passende Liste. Neuigkeiten heben Einträge und Kommentare seit dem letzten Besuch hervor.
+
+Unter **Masha:Feedly → Konfiguration** ist **Aktivitäten automatisch aktualisieren (Polling)** standardmäßig ausgeschaltet. Bei Bedarf aktivieren und das **Aktualisierungsintervall** wählen: 5 bis 60 Minuten in 5-Minuten-Schritten, Vorgabe 5 Minuten. Nach dem Speichern die Seite neu laden. Automatische Aktivitätsabfragen laufen nur bei geöffnetem Feedly-Panel und sichtbarem Browser-Tab. Beim Zurückkehren wird geprüft, sofern das Intervall abgelaufen ist. Es werden nur Aktivitätsdaten übertragen. Bei Fehlern steigt die Wartezeit bis zum Vierfachen des gewählten Intervalls; laufende Abfragen überlappen sich nicht. Auch ohne Polling lädt das Öffnen einer Liste aktuelle Daten.
 
 In der Liste kannst du nach Kategorie, Priorität, Seite und Zuständigkeit filtern. Über **Filter** lassen sich persönliche Filterkombinationen speichern und später wieder auswählen. Öffne einen Eintrag, um Beschreibung, Browser- und Seitendetails, Kommentare, Anhänge, Verlauf und Zusammenhänge zu sehen. Status, Priorität und Zuständigkeiten werden nach **Änderungen speichern** übernommen.
 

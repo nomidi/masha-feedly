@@ -1588,19 +1588,36 @@ document.addEventListener('DOMContentLoaded', () => {
     return badge;
   };
 
-  /** Aktualisiert Aktivitätsmarkierungen im geöffneten Listenpanel ohne die Liste neu aufzubauen. */
+  let pollingEnabled = widget.dataset.pollingEnabled === '1';
+  const configuredPollingMinutes = Number(widget.dataset.pollingMinutes);
+  const pollingMinutes = Number.isInteger(configuredPollingMinutes) && configuredPollingMinutes >= 5
+    && configuredPollingMinutes <= 60 && configuredPollingMinutes % 5 === 0 ? configuredPollingMinutes : 5;
+  const activityInterval = pollingMinutes * 60000;
+  let activityRequestPending = false;
+  let activityRetryAt = 0;
+  let activityRetryDelay = activityInterval;
+
+  /** Lädt nur Aktivitätsdaten; versteckte Tabs und laufende Abfragen erzeugen keine weiteren Polls. */
   const refreshListActivity = async () => {
-    if (!panelOpen) return;
+    if (!pollingEnabled || !panelOpen || document.visibilityState !== 'visible' || activityRequestPending || Date.now() < activityRetryAt) return;
+    activityRequestPending = true;
+    const activityStartedAt = Date.now();
     const url = new URL(widget.dataset.listUrl, window.location.href);
-    url.searchParams.set('mode', 'all');
-    url.searchParams.set('PageURL', window.location.href);
+    url.searchParams.set('activityOnly', '1');
     try {
       const response = await fetch(url.toString(), { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } });
       const data = await window.KWMashaFeedlyReadJSON(response);
-      if (!response.ok || !data.success) return;
+      if (!response.ok || !data.success) throw new Error('Activity request failed');
+      if (data.pollingEnabled === false) {
+        pollingEnabled = false;
+        return;
+      }
+      activityRetryAt = activityStartedAt + activityInterval;
+      activityRetryDelay = activityInterval;
+      if (!panelOpen || document.visibilityState !== 'visible') return;
       updateUnreadCount(data.unreadCount, data.unreadCommentCount);
       const latest = new Map((data.entries || []).map((entry) => [Number(entry.id), entry]));
-      entries = entries.map((entry) => latest.get(Number(entry.id)) || entry);
+      entries = entries.map((entry) => ({ ...entry, ...latest.get(Number(entry.id)) }));
       if (listModal.hidden) return;
       entries.forEach((entry) => {
         const card = listContainer.querySelector(`[data-entry-id="${entry.id}"]`);
@@ -1614,7 +1631,13 @@ document.addEventListener('DOMContentLoaded', () => {
           delete card.dataset.entryUnread;
         }
       });
-    } catch (_) { /* Der Listeninhalt bleibt bei einem vorübergehenden Netzwerkfehler unverändert. */ }
+    } catch (_) {
+      // Bei Serverfehlern schrittweise bis zum Vierfachen des Intervalls warten; vorhandene Inhalte bleiben erhalten.
+      activityRetryDelay = Math.min(activityRetryDelay * 2, activityInterval * 4);
+      activityRetryAt = Date.now() + activityRetryDelay;
+    } finally {
+      activityRequestPending = false;
+    }
   };
 
   const renderList = (data) => {
@@ -2251,7 +2274,8 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('resize', () => {
     if (panelOpen) repositionMarkers();
   });
-  window.setInterval(() => {
-    if (panelOpen) refreshListActivity();
-  }, 30000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') return refreshListActivity();
+  });
+  if (pollingEnabled) window.setInterval(refreshListActivity, activityInterval);
 });

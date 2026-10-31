@@ -1,5 +1,10 @@
 de:
   KW\MashaFeedly\Translations:
+    CONFIG_POLLING_MINUTES: "Minuten"
+    CONFIG_POLLING_ENABLED: "Aktivitäten automatisch aktualisieren (Polling)"
+    CONFIG_POLLING_HELP: "Standardmäßig ausgeschaltet. Fragt neue Aktivitäten nur bei geöffnetem Feedly-Panel und sichtbarem Browser-Tab ab. Beim Öffnen einer Liste werden die Daten auch ohne Polling geladen. Änderungen gelten nach dem Neuladen der Seite."
+    CONFIG_POLLING_INTERVAL: "Aktualisierungsintervall"
+    CONFIG_POLLING_INTERVAL_HELP: "Gilt bei aktiviertem Polling: 5 bis 60 Minuten in 5-Minuten-Schritten. Bei Fehlern wird länger gewartet."
     PROFILE_WEEKLY_ENABLED: "Wöchentlichen Website-Rückblick erhalten"
     PROFILE_WEEKLY_HELP: "Montags ab 08:00 Uhr: Aufgaben, verfügbare Kennzahlen und nächste Schritte aus deinen freigegebenen Bereichen. Diese Wochenmail kannst du hier unabhängig von den einzelnen Feedly-Nachrichten abwählen."
     MITE_SETTINGS_TITLE: "Zeit erfassen mit Mite"

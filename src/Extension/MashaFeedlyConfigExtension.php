@@ -20,6 +20,8 @@ use KW\MashaFeedly\Model\MashaFeedlyMiteTrigger;
  * Ergänzt die SiteConfig um die für Masha Feedly freigegebenen Benutzer.
  *
  * @property string $MashaFeedlyAddress Konfigurierte Anrede im Modul (du oder sie).
+ * @property bool $MashaFeedlyPollingEnabled Aktiviert automatische Aktivitätsabfragen.
+ * @property int $MashaFeedlyPollingMinutes Abstand der Aktivitätsabfragen in Minuten.
  * @property string $MashaFeedlyTheme Website-Vorgabe für das persönliche Masha-Feedly-Erscheinungsbild.
  * @property string $MashaFeedlyAllowedMemberIDs JSON-Liste freigegebener Mitglieds-IDs.
  * @property bool $MashaFeedlyClosedCategoriesMigrated Kennzeichnet die einmalige Übernahme abgeschlossener Kategorien.
@@ -70,6 +72,8 @@ class MashaFeedlyConfigExtension extends Extension
         'MashaFeedlyAddress' => "Varchar(3)",
         'MashaFeedlyFontSize' => 'Varchar(10)',
         'MashaFeedlyTheme' => 'Varchar(80)',
+        'MashaFeedlyPollingEnabled' => 'Boolean',
+        'MashaFeedlyPollingMinutes' => 'Int',
         'MashaFeedlyDueDateReminderMode' => 'Varchar(20)',
         'MashaFeedlyHourlyRate' => 'Decimal(10,2)',
         'MashaFeedlyMiteProjectID' => 'Int',
@@ -95,6 +99,8 @@ class MashaFeedlyConfigExtension extends Extension
 
     private static $defaults = [
         'MashaFeedlyTheme' => 'playful',
+        'MashaFeedlyPollingEnabled' => false,
+        'MashaFeedlyPollingMinutes' => 5,
         'MashaFeedlyMiteEnabled' => false,
         'MashaFeedlyHourlyRate' => 0,
         'MashaFeedlyEstimateCategoriesSeeded' => false,
@@ -108,6 +114,8 @@ class MashaFeedlyConfigExtension extends Extension
     public function updateCMSFields(\SilverStripe\Forms\FieldList $fields): void
     {
         $fields->removeByName([
+            'MashaFeedlyPollingEnabled',
+            'MashaFeedlyPollingMinutes',
             'MashaFeedlyMiteProjectID',
             'MashaFeedlyMiteEnabled',
             'MashaFeedlyMiteTriggers',
@@ -319,6 +327,27 @@ class MashaFeedlyConfigExtension extends Extension
     public static function currentSiteConfig(): SiteConfig
     {
         return SiteConfig::current_site_config();
+    }
+
+    /** Aktivitätsabfragen bleiben ohne ausdrückliche Aktivierung ausgeschaltet. */
+    public static function pollingEnabled(): bool
+    {
+        return self::hasSiteConfigField('MashaFeedlyPollingEnabled')
+            && (bool)self::currentSiteConfig()->MashaFeedlyPollingEnabled;
+    }
+
+    /** Begrenzt das Intervall auf fünf bis 60 Minuten in Fünf-Minuten-Schritten. */
+    public static function normalizePollingMinutes(int $minutes): int
+    {
+        return $minutes >= 5 && $minutes <= 60 && $minutes % 5 === 0 ? $minutes : 5;
+    }
+
+    /** Liefert auch vor dem Schemaaufbau eine sichere Intervallvorgabe. */
+    public static function pollingMinutes(): int
+    {
+        return self::hasSiteConfigField('MashaFeedlyPollingMinutes')
+            ? self::normalizePollingMinutes((int)self::currentSiteConfig()->MashaFeedlyPollingMinutes)
+            : 5;
     }
 
     /** Liefert die konfigurierte Anrede und fällt bei ungültigen Werten auf Du zurück. */
