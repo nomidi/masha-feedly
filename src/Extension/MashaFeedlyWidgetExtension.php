@@ -33,6 +33,11 @@ class MashaFeedlyWidgetExtension extends Extension
     /** Bindet Widget, Stylesheet und JavaScript in Frontend und CMS ein. */
     public function onAfterInit(): void
     {
+        // Auch vorgeschaltete Controller dürfen für die markierte Prism-Vorschau keine Assets registrieren.
+        if ($this->owner->getRequest()->getVar('masha_prism_preview') === '1') {
+            return;
+        }
+
         if ($this->owner instanceof ContentController) {
             \KW\MashaFeedly\Service\MashaFeedlyErrorService::runForWebsiteVisit();
             MashaFeedlyDueDateReminderTask::runForWebsiteVisit();

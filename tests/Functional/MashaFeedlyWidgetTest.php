@@ -29,6 +29,19 @@ class MashaFeedlyWidgetTest extends FunctionalTest
         i18n::set_locale('de_DE');
     }
 
+    /** Die markierte Prism-Vorschau registriert weder Widget-Assets noch Widget-Markup. */
+    public function testPrismMarkedPreviewDoesNotLoadFeedly(): void
+    {
+        $controller = new \SilverStripe\CMS\Controllers\ModelAsController();
+        $controller->setRequest(new \SilverStripe\Control\HTTPRequest('GET', '/', ['masha_prism_preview' => '1']));
+        $extension = new \KW\MashaFeedly\Extension\MashaFeedlyWidgetExtension();
+        $extension->setOwner($controller);
+        \SilverStripe\View\Requirements::clear();
+        $extension->onAfterInit();
+        self::assertSame([], \SilverStripe\View\Requirements::backend()->getJavascript());
+        self::assertSame([], \SilverStripe\View\Requirements::backend()->getCSS());
+    }
+
     /** Alle Schließen-Aktionen bleiben beschriftet und verwenden ein dekoratives SVG statt eines Schriftzeichens. */
     public function testWidgetCloseButtonsUseDecorativeSvg(): void
     {
