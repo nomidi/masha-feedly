@@ -182,6 +182,7 @@ function createEnvironment(fetchImplementation = async () => ({
   widget.querySelectorAll = (selectorText) => selectorText === '[data-masha-feedly-close-modal]' ? [close] : [];
 
   const documentListeners = {};
+  const previewFrames = [];
   const dispatchedEvents = [];
   const body = new TestElement('body');
   const document = {
@@ -193,6 +194,7 @@ function createEnvironment(fetchImplementation = async () => ({
       if (selectorText === 'button[type="submit"][form="kw-masha-feedly-create-form"]') return submit;
       return null;
     },
+    querySelectorAll(selector) { return selector === '.cms-preview iframe, iframe.cms-preview' ? previewFrames : []; },
     createElement(tagName) { return new TestElement(tagName); },
   };
   const formData = {
@@ -240,7 +242,7 @@ function createEnvironment(fetchImplementation = async () => ({
   };
   vm.runInNewContext(source, contextObject);
   documentListeners.DOMContentLoaded();
-  return { widget, startButton, banner, modal, context, status, toast, toastMessage, dismissToast, panel, toggle, form, content, date, pageURL, selector, selectedText, submit, column, body, documentListeners, dispatchedEvents, calls, formData, similarSection, similarResults, createCategory, estimateSection, estimateDuration, estimateNote, estimatePrice, diagnostics, diagnosticsSteps, diagnosticsExpected, diagnosticsActual, window: contextObject.window };
+  return { document, previewFrames, widget, startButton, banner, modal, context, status, toast, toastMessage, dismissToast, panel, toggle, form, content, date, pageURL, selector, selectedText, submit, column, body, documentListeners, dispatchedEvents, calls, formData, similarSection, similarResults, createCategory, estimateSection, estimateDuration, estimateNote, estimatePrice, diagnostics, diagnosticsSteps, diagnosticsExpected, diagnosticsActual, window: contextObject.window };
 }
 
 test('optionale Fehlerdetails öffnen sich bei Fehlerbegriffen automatisch und bleiben manuell verfügbar', () => {
@@ -542,4 +544,95 @@ test('blendet Ähnlichkeitsvorschläge beim Erstellen vorerst aus', () => {
 
 test('ausgeliefertes JavaScript entspricht der getesteten Quelldatei', () => {
   assert.equal(compiledSource, source);
+});
+
+
+/** Erstellt einen lesbaren CMS-Vorschauframe mit eigener Adresse und eigenem Dokument. */
+function previewFrame(env, href = 'https://example.test/kontakt?stage=Stage&CMSPreview=1') {
+  const listeners = {};
+  const frame = new TestElement('iframe');
+  frame.removeEventListener = (name) => { delete frame.listeners[name]; };
+  const view = { ...env.window, location: { href }, innerWidth: 800, innerHeight: 600, KWMashaFeedlyWidgetMarkup: '<div>Feedly</div>' };
+  const previewDocument = {
+    body: new TestElement('body'), defaultView: view,
+    addEventListener(name, callback) { listeners[name] = callback; },
+    removeEventListener(name) { delete listeners[name]; },
+    querySelectorAll() { return []; },
+  };
+  frame.contentWindow = view;
+  frame.contentDocument = previewDocument;
+  return { frame, document: previewDocument, listeners };
+}
+
+test('markiert im Vorschauframe und öffnet das äußere Formular mit Entwurfsadresse und Vorschaufenstergröße', () => {
+  const env = createEnvironment();
+  const preview = previewFrame(env);
+  env.previewFrames.push(preview.frame);
+  env.startButton.click();
+  const target = new TestElement('h2', { id: 'draft-heading', text: 'Entwurfsüberschrift' });
+  target.ownerDocument = preview.document;
+  preview.listeners.pointerover({ target });
+  assert.equal(target.classList.contains('kw-masha-feedly-selected-target'), true);
+  preview.listeners.click({ target, clientX: 10, clientY: 20, preventDefault() {}, stopPropagation() {} });
+  assert.equal(env.modal.hidden, false);
+  assert.equal(env.form.fields['[name="PageURL"]'].value, preview.frame.contentWindow.location.href);
+  assert.equal(env.form.fields['[name="ElementSelector"]'].value, '#draft-heading');
+  assert.equal(env.form.fields['[name="BrowserWindow"]'].value, '800 × 600 px');
+  assert.equal(preview.listeners.click, undefined);
+  assert.equal(preview.document.body.classList.contains('kw-masha-feedly-is-selecting'), false);
+  assert.equal(target.classList.contains('kw-masha-feedly-selected-target'), false);
+});
+
+test('Vorschauauswahl bindet nach Frame-Navigation neu und räumt bei Escape vollständig auf', () => {
+  const env = createEnvironment();
+  const preview = previewFrame(env);
+  env.previewFrames.push(preview.frame);
+  env.startButton.click();
+  const replacement = previewFrame(env, 'https://example.test/andere-seite?stage=Stage');
+  preview.frame.contentDocument = replacement.document;
+  preview.frame.contentWindow = replacement.frame.contentWindow;
+  preview.frame.listeners.load();
+  assert.equal(preview.listeners.click, undefined);
+  assert.equal(typeof replacement.listeners.click, 'function');
+  replacement.listeners.keydown({ key: 'Escape', preventDefault() {}, stopImmediatePropagation() {} });
+  assert.equal(replacement.listeners.click, undefined);
+  assert.equal(preview.frame.listeners.load, undefined);
+  assert.equal(env.panel.hidden, false);
+});
+
+test('Fremde Frames und Vorschauen ohne Feedly-Freigabe erhalten keine Auswahlhandler', () => {
+  const env = createEnvironment();
+  const foreign = previewFrame(env, 'https://foreign.example.test/');
+  const denied = previewFrame(env);
+  denied.frame.contentWindow.KWMashaFeedlyWidgetMarkup = '';
+  const inaccessible = new TestElement('iframe');
+  inaccessible.removeEventListener = () => {};
+  Object.defineProperty(inaccessible, 'contentWindow', { get() { throw new Error('Cross-origin'); } });
+  env.previewFrames.push(foreign.frame, denied.frame, inaccessible);
+  env.startButton.click();
+  assert.equal(foreign.listeners.click, undefined);
+  assert.equal(denied.listeners.click, undefined);
+  env.documentListeners.keydown({ key: 'Escape', preventDefault() {} });
+});
+
+test('verbindet nachgeladene Vorschauframes nur während der Auswahl und löst entfernte Frames', () => {
+  const env = createEnvironment();
+  let changed;
+  let disconnected = false;
+  env.window.MutationObserver = class {
+    constructor(callback) { changed = callback; }
+    observe() {}
+    disconnect() { disconnected = true; }
+  };
+  env.startButton.click();
+  const preview = previewFrame(env);
+  env.previewFrames.push(preview.frame);
+  changed();
+  assert.equal(typeof preview.listeners.click, 'function');
+  env.previewFrames.length = 0;
+  changed();
+  assert.equal(preview.listeners.click, undefined);
+  assert.equal(preview.frame.listeners.load, undefined);
+  env.documentListeners.keydown({ key: 'Escape', preventDefault() {} });
+  assert.equal(disconnected, true);
 });

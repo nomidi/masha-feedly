@@ -65,6 +65,74 @@ window.KWMashaFeedlyEnvironment = (() => {
 })();
 
 /**
+ * Verbindet die Bereichsauswahl vorübergehend mit gleichursprünglichen CMS-Vorschauen.
+ * Fremde Frames und Vorschauen ohne Feedly-Freigabe bleiben unberührt.
+ * @param {Document} documentRef Äußeres CMS-Dokument.
+ * @param {Window} windowRef Äußeres CMS-Fenster.
+ * @param {{over: Function, click: Function, cancel: Function}} handlers Auswahlaktionen im CMS.
+ * @return {Function} Entfernt Listener, Auswahlklassen und Beobachter vollständig.
+ */
+window.KWMashaFeedlyPreviewSelection = (documentRef, windowRef, handlers) => {
+  const frames = new Map();
+  const detachDocument = (state) => {
+    if (!state.document) return;
+    state.document.removeEventListener('pointerover', handlers.over, true);
+    state.document.removeEventListener('click', handlers.click, true);
+    state.document.removeEventListener('keydown', state.keydown, true);
+    state.document.body?.classList.remove('kw-masha-feedly-is-selecting');
+    state.document.querySelectorAll('.kw-masha-feedly-selected-target').forEach((element) => element.classList.remove('kw-masha-feedly-selected-target'));
+    state.document = null;
+  };
+  const attachDocument = (frame, state) => {
+    detachDocument(state);
+    try {
+      const view = frame.contentWindow;
+      if (!view || new URL(view.location.href).origin !== new URL(windowRef.location.href).origin
+        || !view.KWMashaFeedlyWidgetMarkup || !frame.contentDocument?.body) return;
+      state.document = frame.contentDocument;
+      state.document.body.classList.add('kw-masha-feedly-is-selecting');
+      state.document.addEventListener('pointerover', handlers.over, true);
+      state.document.addEventListener('click', handlers.click, true);
+      state.document.addEventListener('keydown', state.keydown, true);
+    } catch (_) { /* Fremde oder während der Navigation unzugängliche Frames werden nicht betreten. */ }
+  };
+  const scan = () => {
+    const current = new Set(documentRef.querySelectorAll?.('.cms-preview iframe, iframe.cms-preview') || []);
+    frames.forEach((state, frame) => {
+      if (current.has(frame)) return;
+      detachDocument(state);
+      frame.removeEventListener('load', state.load);
+      frames.delete(frame);
+    });
+    current.forEach((frame) => {
+      if (frames.has(frame)) return;
+      const state = { document: null, keydown: (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          handlers.cancel();
+        }
+      } };
+      state.load = () => attachDocument(frame, state);
+      frames.set(frame, state);
+      frame.addEventListener('load', state.load);
+      attachDocument(frame, state);
+    });
+  };
+  scan();
+  const observer = windowRef.MutationObserver ? new windowRef.MutationObserver(scan) : null;
+  if (observer && documentRef.body) observer.observe(documentRef.body, { childList: true, subtree: true });
+  return () => {
+    observer?.disconnect();
+    frames.forEach((state, frame) => {
+      detachDocument(state);
+      frame.removeEventListener('load', state.load);
+    });
+    frames.clear();
+  };
+};
+
+/**
  * Richtet dieselbe Bildschirmaufnahme für neue und bearbeitete Meldungen ein.
  * @param {HTMLFormElement|null} screenshotForm Formular, dem der Screenshot angehängt wird.
  * @param {HTMLElement} widget Widget, das vor dem Browserdialog ausgeblendet wird.
@@ -280,12 +348,15 @@ document.addEventListener('DOMContentLoaded', () => {
   updateCreateEstimate();
   updateDiagnostics();
   let selecting = false;
+  let stopPreviewSelection = null;
   let highlighted = null;
   let pendingFaqQuestion = '';
   const getElementSelector = window.KWMashaFeedlyEnvironment.getElementSelector;
 
   const stopSelection = () => {
     selecting = false;
+    stopPreviewSelection?.();
+    stopPreviewSelection = null;
     document.body.classList.remove('kw-masha-feedly-is-selecting');
     banner.hidden = true;
     if (highlighted) highlighted.classList.remove('kw-masha-feedly-selected-target');
@@ -312,14 +383,15 @@ document.addEventListener('DOMContentLoaded', () => {
     context.textContent = selectedText ? t('ENTRY_SELECTED_CONTEXT', { text: selectedText }) : t('ENTRY_CONTEXT_EMPTY');
     ['PageURL', 'ElementSelector', 'ElementText', 'ElementPositionX', 'ElementPositionY', 'OperatingSystem', 'Browser', 'UserAgent', 'Resolution', 'BrowserWindow', 'ColorDepth']
       .forEach((name) => form.querySelector(`[name="${name}"]`)?.remove());
+    const selectedWindow = element.ownerDocument?.defaultView || window;
     const browserInfo = window.KWMashaFeedlyEnvironment.collect(
-      window.navigator?.userAgent || '',
-      window.navigator?.platform || '',
-      window.screen || {},
-      window
+      selectedWindow.navigator?.userAgent || '',
+      selectedWindow.navigator?.platform || '',
+      selectedWindow.screen || {},
+      selectedWindow
     );
     [
-      ['PageURL', window.location.href],
+      ['PageURL', selectedWindow.location.href],
       ['ElementSelector', selector],
       ['ElementText', selectedText],
       ['ElementPositionX', options.elementPosition?.x ?? ''],
@@ -357,6 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
   startButton?.addEventListener('click', () => {
     stopSelection();
     selecting = true;
+    stopPreviewSelection = window.KWMashaFeedlyPreviewSelection(document, window, { over: highlightSelection, click: selectTarget, cancel: cancelSelection });
     banner.hidden = false;
     document.body.classList.add('kw-masha-feedly-is-selecting');
     widget.querySelector('.kw-masha-feedly__panel').hidden = true;
@@ -399,17 +472,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  document.addEventListener('pointerover', (event) => {
+  const highlightSelection = (event) => {
     if (!selecting || widget.contains((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target))) return;
     if (highlighted) highlighted.classList.remove('kw-masha-feedly-selected-target');
     highlighted = (window.KWMashaFeedlyDOM?.eventTarget(event) || event.target).closest('body *');
     if (highlighted && highlighted !== document.body) highlighted.classList.add('kw-masha-feedly-selected-target');
-  });
+  };
 
-  document.addEventListener('click', (event) => {
+  const selectTarget = (event) => {
     if (!selecting || widget.contains((window.KWMashaFeedlyDOM?.eventTarget(event) || event.target))) return;
     event.preventDefault();
     event.stopPropagation();
+    event.stopImmediatePropagation?.();
     const element = (window.KWMashaFeedlyDOM?.eventTarget(event) || event.target).closest('body *');
     const elementPosition = window.KWMashaFeedlyEnvironment.elementPosition(element, event.clientX, event.clientY);
     stopSelection();
@@ -420,7 +494,10 @@ document.addEventListener('DOMContentLoaded', () => {
         elementPosition,
       });
     }
-  }, true);
+  };
+  document.addEventListener('pointerover', highlightSelection);
+  document.addEventListener('click', selectTarget, true);
+  window.addEventListener?.('pagehide', stopSelection);
 
   widget.querySelector('[data-masha-feedly-cancel-selection]')?.addEventListener('click', cancelSelection);
   widget.querySelector('[data-masha-feedly-dismiss-toast]')?.addEventListener('click', () => { toast.hidden = true; toast.classList.remove('is-error'); toast.removeAttribute?.('role'); });

@@ -2997,3 +2997,13 @@ test('Polling bleibt ohne Aktivierung aus und übernimmt nur Intervalle in Fünf
     }
   }
 });
+
+
+test('Entwurfsmeldungen gehören nur zur Entwurfsseite und behalten ihren Stand im Direktlink', () => {
+  const entry = { id: 71, pageURL: 'https://example.test/kontakt?stage=Stage' };
+  assert.equal(entriesUI.entryIsOnPage(entry, 'https://example.test/kontakt'), false);
+  assert.equal(entriesUI.entryIsOnPage(entry, 'https://example.test/kontakt?stage=Stage&CMSPreview=1'), true);
+  const link = new URL(entriesUI.entryTargetURL(entry, 'https://example.test/admin/pages'));
+  assert.equal(link.searchParams.get('stage'), 'Stage');
+  assert.equal(link.searchParams.get('masha-feedly-entry'), '71');
+});

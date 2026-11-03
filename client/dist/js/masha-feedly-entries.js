@@ -433,7 +433,8 @@ window.KWMashaFeedlyEntries = (() => {
     try {
       const saved = new URL(entry.pageURL || location, location);
       const current = new URL(location);
-      return saved.origin === current.origin && saved.pathname === current.pathname;
+      return saved.origin === current.origin && saved.pathname === current.pathname
+        && (saved.searchParams.get('stage') === 'Stage') === (current.searchParams.get('stage') === 'Stage');
     } catch (_) { return false; }
   };
 
@@ -2074,7 +2075,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (event.target.closest('a')) return;
     event.preventDefault();
-    if (!entry.isTechnicalError && entry.pageURL && new URL(entry.pageURL, window.location.href).href.split(/[?#]/)[0] !== window.location.href.split(/[?#]/)[0]) {
+    if (!entry.isTechnicalError && entry.pageURL && !window.KWMashaFeedlyEntries.entryIsOnPage(entry, window.location.href)) {
       window.location.assign(window.KWMashaFeedlyEntries.entryTargetURL(entry, window.location.href));
       return;
     }

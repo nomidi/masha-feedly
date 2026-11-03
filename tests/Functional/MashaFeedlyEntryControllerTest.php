@@ -135,6 +135,30 @@ class MashaFeedlyEntryControllerTest extends FunctionalTest
         $this->assertSame(403, $this->get($path)->getStatusCode());
     }
 
+    /** Entwürfe behalten nur ihren Stand; Vorschauparameter werden nicht dauerhaft übernommen. */
+    public function testDraftSelectionPreservesStageAndSeparatesLivePage(): void
+    {
+        $member = $this->objFromFixture(Member::class, 'allowed');
+        $this->allowMember($member);
+        $this->logInAs($member);
+        MashaFeedlyCategory::ensureDefaultCategories();
+        $response = $this->post('/__masha-feedly/createEntry', [
+            'SecurityID' => SecurityToken::getSecurityID(),
+            'Content' => 'Überschrift im Entwurf prüfen',
+            'CategoryID' => (int)MashaFeedlyCategory::defaultCategory()->ID,
+            'PageURL' => 'https://example.test/draft/?stage=Stage&CMSPreview=1&campaign=mail#heading',
+            'ElementSelector' => '#heading',
+        ]);
+        $this->assertSame(200, $response->getStatusCode());
+        $id = (int)json_decode($response->getBody(), true)['entryID'];
+        $entry = MashaFeedlyEntry::get()->byID($id);
+        $this->assertSame('https://example.test/draft?stage=Stage', $entry->PageURL);
+        foreach (['https://example.test/draft?stage=Stage&CMSPreview=1' => true, 'https://example.test/draft' => false] as $url => $expected) {
+            $list = json_decode($this->get('/__masha-feedly/listEntries?mode=page&PageURL=' . rawurlencode($url))->getBody(), true);
+            $this->assertSame($expected, in_array($id, array_column($list['entries'], 'id'), true));
+        }
+    }
+
     /** Die Übersicht enthält keine Detaildaten; nur freigegebene Personen können sie nachladen. */
     public function testListLoadsDetailsOnlyOnDemand(): void
     {

@@ -1389,12 +1389,15 @@ class MashaFeedlyEntryController extends Controller
         }));
     }
 
-    /** Vereinheitlicht Seitenadressen ohne Query und Fragment für zuverlässige Seitenfilter. */
+    /** Vereinheitlicht Seitenadressen; ausschließlich der explizite Entwurfsstand bleibt erhalten. */
     private function safePageURL(string $url): string
     {
         $url = trim($url);
+        $query = [];
+        parse_str((string)parse_url($url, PHP_URL_QUERY), $query);
+        $stage = ($query['stage'] ?? null) === 'Stage' ? '?stage=Stage' : '';
         if (str_starts_with($url, '/') && !str_starts_with($url, '//') && MashaFeedlyEntry::isValidPageURL($url)) {
-            return rtrim((string)parse_url($url, PHP_URL_PATH), '/') ?: '/';
+            return (rtrim((string)parse_url($url, PHP_URL_PATH), '/') ?: '/') . $stage;
         }
         $parts = parse_url(trim($url));
         $scheme = strtolower((string)($parts['scheme'] ?? ''));
@@ -1409,7 +1412,7 @@ class MashaFeedlyEntryController extends Controller
         if ($path !== '/') {
             $path = rtrim($path, '/');
         }
-        return mb_substr($scheme . '://' . $host . $port . $path, 0, 2048);
+        return mb_substr($scheme . '://' . $host . $port . $path, 0, 2048 - strlen($stage)) . $stage;
     }
 
     /** Normalisiert eine Beschreibung für einen robusten Ähnlichkeitsvergleich. */
